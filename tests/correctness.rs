@@ -78,7 +78,7 @@ fn h0_table_matches_brute_force() {
     let b = ball(5);
     let mut best: HashMap<u64, u8> = HashMap::new();
     for &(c, d) in b.values() {
-        let idx = cs.index11(c) >> 11;
+        let idx = cs.index(c, 0);
         let e = best.entry(idx).or_insert(d);
         *e = (*e).min(d);
         // admissible
@@ -176,9 +176,9 @@ fn table_value_is_symmetry_invariant() {
     let mut rng = Rng(99);
     for _ in 0..500 {
         let c = Cube::from_cubie(&CubieCube::random(&mut rng));
-        let v0 = t.get(cs.index11(c) >> 11).0;
+        let v0 = t.get(cs.index(c, 0)).0;
         for s in 0..48 {
-            assert_eq!(t.get(cs.index11(c.transform(s)) >> 11).0, v0);
+            assert_eq!(t.get(cs.index(c.transform(s), 0)).0, v0);
         }
     }
 }

@@ -99,12 +99,18 @@ impl Cocsep {
         }
     }
 
-    /// Full h11 index of a cube.
+    /// Full h11 key of a cube.
     #[inline(always)]
-    pub fn index11(&self, c: Cube) -> u64 {
+    pub fn key11(&self, c: Cube) -> u64 {
         let d = unsafe { *self.data.get_unchecked(cocsep(c)) };
         let e = c.transform_edges(cd_ttrep(d));
-        cd_class(d) as u64 * (N_ESEP * N_EO) as u64 + edge_coord(e)
+        h11_key(cd_class(d), e)
+    }
+
+    /// hk table index of a cube.
+    #[inline(always)]
+    pub fn index(&self, c: Cube, k: u32) -> u64 {
+        reduce_key(self.key11(c), k)
     }
 }
 
@@ -212,33 +218,47 @@ impl Drop for Mem {
 }
 
 // ---------------------------------------------------------------------------
-// H48 table: 64-byte lines of 254 2-bit entries + a 4-bit line minimum.
+// H48 table (cube48opt layout): 128-byte rows of 512 2-bit slots, one row
+// per (class, msplit, eoK); the row is indexed by eslot. Each 16-byte group
+// (64 slots) reserves slots 0-1 for a 4-bit minimum over the group.
 // ---------------------------------------------------------------------------
 
-pub const LINE_ENTRIES: u64 = 254;
-pub const LINE_BYTES: u64 = 64;
+pub const ROW_BYTES: u64 = 128;
+pub const WORDS_PER_ROW: u64 = 16;
 
-pub fn h48_entries(k: u32) -> u64 {
-    (N_CLASSES * N_ESEP) as u64 * (1u64 << k)
+pub fn h48_rows(k: u32) -> u64 {
+    (N_CLASSES * N_MSPLIT) as u64 * (1u64 << k)
 }
-pub fn h48_lines(k: u32) -> u64 {
-    h48_entries(k).div_ceil(LINE_ENTRIES)
+/// Size of the index space (including unused slots).
+pub fn h48_slots(k: u32) -> u64 {
+    h48_rows(k) * N_SLOTS as u64
 }
 pub fn h48_bytes(k: u32) -> u64 {
-    h48_lines(k) * LINE_BYTES
+    h48_rows(k) * ROW_BYTES
 }
 
-/// Default base value per h (from nissy, tuned experimentally there).
+/// Default base value per h (cube48opt: 7 for h0, 8 for h2-3, 9 for h4-7, 10 above).
 pub fn default_base(k: u32) -> u8 {
-    [8, 8, 8, 8, 9, 9, 9, 9, 10, 10, 10, 10][k as usize]
+    [7, 8, 8, 8, 9, 9, 9, 9, 10, 10, 10, 10][k as usize]
 }
 
-/// Word index and bit shift of an entry.
+/// u64 word index and bit shift of an entry.
 #[inline(always)]
 pub fn entry_pos(idx: u64) -> (usize, u32) {
-    let line = idx / LINE_ENTRIES;
-    let pos = idx - line * LINE_ENTRIES;
-    ((line * 8 + pos / 32) as usize, ((pos % 32) * 2) as u32)
+    ((idx >> 5) as usize, ((idx & 31) * 2) as u32)
+}
+
+/// Mask of the low bits of the 2-bit slots of word `w` that are real entries.
+#[inline(always)]
+pub fn entry_lo_mask(w: u64) -> u64 {
+    let mut m = 0x5555_5555_5555_5555u64;
+    if w & 1 == 0 {
+        m &= !0x5; // slots 0, 1: group minimum
+    }
+    if w % WORDS_PER_ROW == WORDS_PER_ROW - 1 {
+        m &= !(1 << 62); // slot 511 unused
+    }
+    m
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -258,36 +278,33 @@ impl H48Table {
         self.mem.ptr()
     }
 
-    /// Returns (2-bit code, line minimum).
+    /// Returns (2-bit code, group minimum).
     #[inline(always)]
     pub fn get(&self, idx: u64) -> (u8, u8) {
-        let line = idx / LINE_ENTRIES;
-        let pos = idx - line * LINE_ENTRIES;
         unsafe {
-            let lp = self.mem.ptr().add((line * LINE_BYTES) as usize);
-            let b = *lp.add((pos >> 2) as usize);
-            let m = *lp.add(63) >> 4;
-            ((b >> ((pos & 3) * 2)) & 3, m)
+            let p = self.mem.ptr() as *const u64;
+            let w = (idx >> 5) as usize;
+            let x = *p.add(w);
+            let m = *p.add(w & !1) & 15;
+            (((x >> ((idx & 31) * 2)) & 3) as u8, m as u8)
         }
     }
 
     #[inline(always)]
     pub fn prefetch(&self, idx: u64) {
-        let line = idx / LINE_ENTRIES;
         unsafe {
-            let lp = self.mem.ptr().add((line * LINE_BYTES) as usize);
-            std::arch::x86_64::_mm_prefetch(lp as *const i8, std::arch::x86_64::_MM_HINT_T0);
+            let a = self.mem.ptr().add((idx >> 2) as usize);
+            std::arch::x86_64::_mm_prefetch(a as *const i8, std::arch::x86_64::_MM_HINT_T0);
         }
     }
 
-    /// Distribution of the 2-bit codes.
+    /// Distribution of the 2-bit codes over real entries.
     pub fn distribution(&self) -> [u64; 4] {
-        let lines = h48_lines(self.meta.k);
-        let entries = h48_entries(self.meta.k);
+        let words_total = h48_bytes(self.meta.k) / 8;
         let nt = std::thread::available_parallelism()
             .map(|x| x.get())
             .unwrap_or(1) as u64;
-        let per = lines.div_ceil(nt);
+        let per = words_total.div_ceil(nt);
         let words = self.mem.words();
         let mut tot = [0u64; 4];
         std::thread::scope(|s| {
@@ -295,17 +312,15 @@ impl H48Table {
                 .map(|t| {
                     s.spawn(move || {
                         let mut d = [0u64; 4];
-                        for line in t * per..((t + 1) * per).min(lines) {
-                            for w in 0..8 {
-                                let x = words[(line * 8 + w) as usize].load(Ordering::Relaxed);
-                                let n = if w == 7 { 30 } else { 32 };
-                                for e in 0..n {
-                                    let idx = line * LINE_ENTRIES + w * 32 + e;
-                                    if idx < entries {
-                                        d[((x >> (2 * e)) & 3) as usize] += 1;
-                                    }
-                                }
-                            }
+                        for w in t * per..((t + 1) * per).min(words_total) {
+                            let x = words[w as usize].load(Ordering::Relaxed);
+                            let m = entry_lo_mask(w);
+                            let lo = x & m;
+                            let hi = (x >> 1) & m;
+                            d[3] += (lo & hi).count_ones() as u64;
+                            d[2] += (!lo & hi).count_ones() as u64;
+                            d[1] += (lo & !hi).count_ones() as u64;
+                            d[0] += (m & !lo & !hi).count_ones() as u64;
                         }
                         d
                     })
@@ -322,8 +337,6 @@ impl H48Table {
     }
 }
 
-/// Metadata sidecar path. hugetlbfs does not support `write(2)`, so for
-/// tables there the sidecar lives in the repository's `tables/` directory.
 pub fn meta_path(path: &str) -> String {
     if path.starts_with("/mnt/huge") {
         let name = std::path::Path::new(path)
