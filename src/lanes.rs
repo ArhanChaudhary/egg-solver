@@ -44,6 +44,10 @@ struct Node {
     /// Move that led here, and whether it was applied to the normal cube.
     m: u8,
     m_normal: bool,
+    /// Other-side value of the X and X' children of each face (0xFF if not
+    /// yet known). They are equal: H X = H X' because X2 is in H, and the
+    /// other side's coordinate only depends on the coset H X^-1 b.
+    tw: [u8; 6],
 }
 
 #[derive(Clone, Copy)]
@@ -117,6 +121,7 @@ impl Lane {
             lb: 0,
             m: 0,
             m_normal: true,
+            tw: [0xFF; 6],
         };
         Lane {
             active: false,
@@ -348,8 +353,28 @@ impl Lane {
                 self.phase = Phase::WaitMoved;
                 return Step::Pending;
             }
+            let tw = self.stack[self.sp].tw[face];
+            if tw != 0xFF {
+                // X' child: the other side's value is the X child's.
+                if tw > r1 {
+                    self.note_value(face, tw);
+                    continue;
+                }
+                let (idx, cd) = s.index(a2);
+                if cd > r1 {
+                    self.note_value(face, cd.max(tw));
+                    continue;
+                }
+                self.k_po = tw;
+                self.k_idx = idx;
+                self.k_cd = cd;
+                s.table.prefetch(idx);
+                self.phase = Phase::WaitMoved;
+                return Step::Pending;
+            }
             let (idx, cd) = s.index(b2);
             if cd > r1 {
+                self.stack[self.sp].tw[face] = cd;
                 self.note_value(face, cd);
                 continue;
             }
@@ -375,6 +400,7 @@ impl Lane {
         let po = s.value(self.k_idx, self.k_cd);
         let r1 = self.stack[self.sp].r - 1;
         let face = (self.k_m / 3) as usize;
+        self.stack[self.sp].tw[face] = po;
         if po > r1 {
             self.note_value(face, po);
             self.phase = Phase::Idle;
@@ -485,6 +511,7 @@ fn make_node(
         lb: 0,
         m,
         m_normal,
+        tw: [0xFF; 6],
     }
 }
 
