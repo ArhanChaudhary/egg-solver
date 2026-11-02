@@ -1,17 +1,15 @@
 //! Lane-interleaved IDA* for throughput.
 //!
 //! Each thread runs several independent "lanes"; each lane solves its own
-//! cube with an explicit-stack DFS that generates one child at a time. The
-//! lanes advance in lockstep and their table lookups are batched:
+//! cube with an explicit-stack DFS that generates one child at a time and
+//! stops whenever it needs a table lookup: it computes the index, issues a
+//! prefetch and yields. Lanes are visited round-robin; a visit first
+//! resolves the lookup issued on the previous visit (the other side's value
+//! first, then the moved side's), then advances the lane to its next lookup.
+//! With 16 lanes each miss gets a whole round (~0.5us) of slack while only
+//! ~one miss per lane is in flight.
 //!
-//! 1. every idle lane advances to its next child and prefetches the lookup
-//!    for the side that is not being moved (or, for half turns, whose bound
-//!    is inherited, the moved side);
-//! 2. pending first lookups are resolved and the second lookup prefetched;
-//! 3. second lookups are resolved and the child is pushed or pruned.
-//!
-//! This keeps up to two misses per lane in flight (cube48opt's design), and
-//! since children are generated one at a time, sibling-face pruning skips
+//! Since children are generated one at a time, sibling-face pruning skips
 //! the lookups of pruned siblings entirely.
 //!
 //! The search logic (masks, tight-bound tricks, side choice, sibling
@@ -578,11 +576,24 @@ pub fn run_lanes(
             nactive += 1;
         }
     }
+    // Single-pass round-robin: each visit resolves the lookup the lane
+    // issued one round earlier, then advances it to its next lookup. Every
+    // lane has one miss in flight with a whole round of slack.
     while nactive > 0 && !stop.load(Relaxed) {
         for li in 0..nlanes {
             let l = &mut lanes[li];
-            if !l.active || l.phase != Phase::Idle {
+            if !l.active {
                 continue;
+            }
+            match l.phase {
+                Phase::WaitOther => {
+                    l.resolve_other(s);
+                    if l.phase != Phase::Idle {
+                        continue;
+                    }
+                }
+                Phase::WaitMoved => l.resolve_moved(s),
+                Phase::Idle => {}
             }
             if let Step::Found = l.advance(s) {
                 let sol = l.reconstruct();
@@ -591,16 +602,6 @@ pub fn run_lanes(
                 if !fetch(l, &mut started[li], &mut done) {
                     nactive -= 1;
                 }
-            }
-        }
-        for l in lanes.iter_mut() {
-            if l.active && l.phase == Phase::WaitOther {
-                l.resolve_other(s);
-            }
-        }
-        for l in lanes.iter_mut() {
-            if l.active && l.phase == Phase::WaitMoved {
-                l.resolve_moved(s);
             }
         }
     }
