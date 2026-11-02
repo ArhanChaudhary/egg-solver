@@ -5,7 +5,6 @@ use crate::cubie::{inverse_move, CubieCube};
 use crate::simd::Cube;
 use crate::tables::*;
 
-const ESIZE11: u64 = (N_ESEP * N_EO) as u64;
 pub const ALL_MOVES: u32 = (1 << 18) - 1;
 /// Quarter turns only (moves with m % 3 != 1).
 pub const NO_HALF: u32 = 0b101_101_101_101_101_101;
@@ -29,7 +28,7 @@ pub static ALLOWED_AFTER: [u32; 6] = mk_allowed();
 pub struct Solver<'a> {
     pub cs: &'a Cocsep,
     pub table: &'a H48Table,
-    shift: u32,
+    k: u32,
     base: u8,
 }
 
@@ -65,7 +64,7 @@ impl<'a> Solver<'a> {
         Solver {
             cs,
             table,
-            shift: 11 - table.meta.k,
+            k: table.meta.k,
             base: table.meta.base,
         }
     }
@@ -75,7 +74,7 @@ impl<'a> Solver<'a> {
     fn index(&self, c: Cube) -> (u64, u8) {
         let d = unsafe { *self.cs.data.get_unchecked(cocsep(c)) };
         let e = c.transform_edges(cd_ttrep(d));
-        let idx = (cd_class(d) as u64 * ESIZE11 + edge_coord(e)) >> self.shift;
+        let idx = reduce_key(h11_key(cd_class(d), e), self.k);
         (idx, cd_depth(d))
     }
 

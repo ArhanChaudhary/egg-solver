@@ -2,12 +2,15 @@
 //!
 //! * cocsep: corner orientation (3^7) x corner tetrad separation (C(8,4)=70),
 //!   reduced by the 48 symmetries to 3393 classes.
-//! * esep: which edges are in which slice, C(12,4) * C(8,4) = 34650.
+//! * msplit: which of the 8 non-E-slice positions hold S-slice edges (70).
 //! * eo: orientation of 11 edges (2^11).
+//! * eslot: E-slice edge placement (495 values) packed into 512 slots, so
+//!   that slots 64k and 64k+1 are free for a 4-bit group minimum.
 //!
-//! The full h11 index is `((class * 34650 + esep) << 11) | eo11`, computed
-//! after conjugating the cube by the symmetry that maps its corners to the
-//! class representative. The hk index is `h11 >> (11 - k)`.
+//! The full h11 key (computed after conjugating the cube by the symmetry
+//! that maps its corners to the class representative) is
+//! `X = ((class * 70 + msplit) << 20) | (eo11 << 9) | eslot` and the hk index
+//! is `((X >> (11 - k)) & !0x1FF) | (X & 0x1FF)` (cube48opt's layout).
 
 use crate::simd::Cube;
 use std::arch::x86_64::*;
@@ -16,8 +19,9 @@ pub const N_CO: usize = 2187;
 pub const N_CSEP: usize = 70;
 pub const N_COCSEP: usize = N_CO * N_CSEP; // 153090
 pub const N_CLASSES: usize = 3393;
-pub const N_ESEP: usize = 34650;
+pub const N_MSPLIT: usize = 70;
 pub const N_EO: usize = 2048;
+pub const N_SLOTS: usize = 512;
 
 const fn binom(n: u32, k: u32) -> u32 {
     if k > n {
@@ -51,19 +55,28 @@ const fn popcnt(x: u32) -> u32 {
     x.count_ones()
 }
 
-const fn mk_e_rank() -> [u16; 4096] {
-    let mut t = [0u16; 4096];
-    let mut m = 0;
-    while m < 4096 {
-        t[m] = if popcnt(m as u32) == 4 {
-            comb_rank(m as u32) as u16
-        } else {
-            0xFFFF
-        };
-        m += 1;
+/// E-slice mask -> slot: masks in descending order fill slots 2..510,
+/// skipping slots 64k and 64k+1 (reserved for the group minimum).
+const fn mk_eslot() -> ([u16; 4096], [u16; 512]) {
+    let mut slot = [0xFFFFu16; 4096];
+    let mut mask = [0u16; 512];
+    let mut v = 2usize;
+    let mut m = 4096;
+    while m > 0 {
+        m -= 1;
+        if popcnt(m as u32) == 4 {
+            slot[m] = v as u16;
+            mask[v] = m as u16;
+            if (v + 1) % 64 == 0 {
+                v += 3;
+            } else {
+                v += 1;
+            }
+        }
     }
-    t
+    (slot, mask)
 }
+const ESLOT_TABLES: ([u16; 4096], [u16; 512]) = mk_eslot();
 
 const fn mk_8_rank() -> [u8; 256] {
     let mut t = [0u8; 256];
@@ -74,18 +87,6 @@ const fn mk_8_rank() -> [u8; 256] {
         } else {
             0xFF
         };
-        m += 1;
-    }
-    t
-}
-
-const fn mk_e_unrank() -> [u16; 495] {
-    let mut t = [0u16; 495];
-    let mut m = 0;
-    while m < 4096 {
-        if popcnt(m as u32) == 4 {
-            t[comb_rank(m as u32) as usize] = m as u16;
-        }
         m += 1;
     }
     t
@@ -122,9 +123,9 @@ const fn mk_co_part(mul: u16, n: usize) -> [u16; 256] {
     t
 }
 
-pub static E_RANK: [u16; 4096] = mk_e_rank();
+pub static ESLOT: [u16; 4096] = ESLOT_TABLES.0;
+pub static SLOT_EMASK: [u16; 512] = ESLOT_TABLES.1;
 pub static RANK8: [u8; 256] = mk_8_rank();
-pub static E_UNRANK: [u16; 495] = mk_e_unrank();
 pub static UNRANK8: [u8; 70] = mk_8_unrank();
 static CO_LO: [u16; 256] = mk_co_part(1, 4);
 static CO_HI: [u16; 256] = mk_co_part(81, 3);
@@ -153,55 +154,65 @@ pub fn edge_masks(c: Cube) -> (u32, u32, u32) {
     }
 }
 
-/// esep * 2048 + eo11, of an (already transformed) cube.
+/// Edge part of the h11 key of an (already transformed) cube:
+/// `(msplit << 20) | (eo11 << 9) | eslot`.
 #[inline(always)]
-pub fn edge_coord(c: Cube) -> u64 {
+pub fn edge_key(c: Cube) -> u64 {
     let (e, s, o) = edge_masks(c);
     unsafe {
         let srel = _pext_u32(s, !e & 0xFFF);
-        let esep = E_RANK[e as usize] as u64 * N_CSEP as u64 + RANK8[srel as usize] as u64;
-        (esep << 11) | (o >> 1) as u64
+        let msplit = RANK8[srel as usize] as u64;
+        let eslot = ESLOT[e as usize] as u64;
+        (msplit << 20) | (((o >> 1) as u64) << 9) | eslot
     }
 }
 
-/// Edge bytes (lane 1) for each esep value: E positions get pieces 8..11,
-/// S positions get 4..7, M positions get 0..3, all oriented.
-pub fn esep_edges() -> &'static [[u8; 12]] {
-    use std::sync::OnceLock;
-    static T: OnceLock<Vec<[u8; 12]>> = OnceLock::new();
-    T.get_or_init(|| {
-        let mut v = vec![[0u8; 12]; N_ESEP];
-        for (esep, out) in v.iter_mut().enumerate() {
-            let e = E_UNRANK[esep / N_CSEP] as u32;
-            let srel = UNRANK8[esep % N_CSEP] as u32;
-            let s = unsafe { _pdep_u32(srel, !e & 0xFFF) };
-            let (mut ne, mut ns, mut nm) = (8u8, 4u8, 0u8);
-            for (p, o) in out.iter_mut().enumerate() {
-                if e >> p & 1 == 1 {
-                    *o = ne;
-                    ne += 1;
-                } else if s >> p & 1 == 1 {
-                    *o = ns;
-                    ns += 1;
-                } else {
-                    *o = nm;
-                    nm += 1;
-                }
-            }
-        }
-        v
-    })
+/// Full h11 key from a corner class and transformed edges.
+#[inline(always)]
+pub fn h11_key(class: usize, e: Cube) -> u64 {
+    ((class as u64 * N_MSPLIT as u64) << 20) + edge_key(e)
 }
 
-/// Build a cube from corners of `corner_src` and the given edge coordinate.
-pub fn cube_from_edge_coord(corner_src: Cube, ec: u64) -> Cube {
-    let esep = (ec >> 11) as usize;
-    let eo11 = (ec & 0x7FF) as u32;
+/// Reduce an h11 key to an hk index.
+#[inline(always)]
+pub fn reduce_key(x: u64, k: u32) -> u64 {
+    ((x >> (11 - k)) & !0x1FF) | (x & 0x1FF)
+}
+
+/// Inverse of `reduce_key` for k in {0, 11}: (class, h11 edge key).
+#[inline(always)]
+pub fn split_index(idx: u64, k: u32) -> (usize, u64) {
+    let eslot = idx & 0x1FF;
+    let rest = idx >> 9;
+    let eo = (rest & ((1 << k) - 1)) << (11 - k);
+    let cm = rest >> k;
+    let class = (cm / N_MSPLIT as u64) as usize;
+    let msplit = cm % N_MSPLIT as u64;
+    (class, (msplit << 20) | (eo << 9) | eslot)
+}
+
+/// Build a cube from the corners of `corner_src` and an h11 edge key.
+pub fn cube_from_edge_key(corner_src: Cube, ek: u64) -> Cube {
+    let eslot = (ek & 0x1FF) as usize;
+    let eo11 = ((ek >> 9) & 0x7FF) as u32;
+    let msplit = (ek >> 20) as usize;
+    let e = SLOT_EMASK[eslot] as u32;
+    let s = unsafe { _pdep_u32(UNRANK8[msplit] as u32, !e & 0xFFF) };
     let eo12 = (eo11 << 1) | (eo11.count_ones() & 1);
     let mut b = corner_src.to_bytes();
-    let edges = esep_edges()[esep];
+    let (mut ne, mut ns, mut nm) = (8u8, 4u8, 0u8);
     for p in 0..12 {
-        b[16 + p] = edges[p] | (((eo12 >> p) & 1) << 4) as u8;
+        let piece = if e >> p & 1 == 1 {
+            ne += 1;
+            ne - 1
+        } else if s >> p & 1 == 1 {
+            ns += 1;
+            ns - 1
+        } else {
+            nm += 1;
+            nm - 1
+        };
+        b[16 + p] = piece | (((eo12 >> p) & 1) << 4) as u8;
     }
     b[8..16].fill(0);
     b[28..32].fill(0);
@@ -217,15 +228,16 @@ mod tests {
     #[test]
     fn rank_tables() {
         assert_eq!(binom(12, 4), 495);
-        let mut seen = vec![false; 495];
+        let mut seen = vec![false; 512];
         for m in 0..4096u32 {
             if m.count_ones() == 4 {
-                let r = E_RANK[m as usize] as usize;
-                assert!(!seen[r]);
+                let r = ESLOT[m as usize] as usize;
+                assert!(r < 511 && r % 64 >= 2 && !seen[r]);
                 seen[r] = true;
-                assert_eq!(E_UNRANK[r] as u32, m);
+                assert_eq!(SLOT_EMASK[r] as u32, m);
             }
         }
+        assert_eq!(seen.iter().filter(|&&x| x).count(), 495);
         for m in 0..256u32 {
             if m.count_ones() == 4 {
                 assert_eq!(UNRANK8[RANK8[m as usize] as usize] as u32, m);
@@ -234,14 +246,24 @@ mod tests {
     }
 
     #[test]
-    fn edge_coord_roundtrip() {
+    fn edge_key_roundtrip() {
         let mut rng = Rng(11);
         for _ in 0..1000 {
             let c = Cube::from_cubie(&CubieCube::random(&mut rng));
-            let ec = edge_coord(c);
-            let d = cube_from_edge_coord(c, ec);
-            assert_eq!(edge_coord(d), ec);
-            assert!(ec < (N_ESEP * N_EO) as u64);
+            let ek = edge_key(c);
+            let d = cube_from_edge_key(c, ek);
+            assert_eq!(edge_key(d), ek);
+            assert!(ek < (N_MSPLIT << 20) as u64);
+            for k in [0, 11] {
+                let x = h11_key(17, c);
+                let (cl, ek2) = split_index(reduce_key(x, k), k);
+                assert_eq!(cl, 17);
+                if k == 11 {
+                    assert_eq!(ek2, ek);
+                } else {
+                    assert_eq!(ek2, ek & !(0x7FF << 9));
+                }
+            }
         }
     }
 }
