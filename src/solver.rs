@@ -49,6 +49,9 @@ struct Job {
     c: Cube,
     ci: Cube,
     stat: u64,
+    /// Lower bounds of the job root (normal, inverse); computed once.
+    ln: u8,
+    li: u8,
 }
 
 /// Face weight compensating for D/L/B prefixes having fewer continuations.
@@ -153,6 +156,23 @@ impl<'a> Solver<'a> {
         out
     }
 
+    /// Compute the root bounds of jobs, prefetching in batches.
+    fn job_bounds(&self, jobs: &mut [Job]) {
+        for chunk in jobs.chunks_mut(32) {
+            let mut idx = [(0u64, 0u8); 64];
+            for (n, j) in chunk.iter().enumerate() {
+                idx[2 * n] = self.index(j.c);
+                idx[2 * n + 1] = self.index(j.ci);
+                self.table.prefetch(idx[2 * n].0);
+                self.table.prefetch(idx[2 * n + 1].0);
+            }
+            for (n, j) in chunk.iter_mut().enumerate() {
+                j.ln = self.value(idx[2 * n].0, idx[2 * n].1);
+                j.li = self.value(idx[2 * n + 1].0, idx[2 * n + 1].1);
+            }
+        }
+    }
+
     /// Find one optimal solution.
     pub fn solve(&self, cube: &CubieCube) -> (Vec<u8>, Stats) {
         let c = Cube::from_cubie(cube);
@@ -176,12 +196,15 @@ impl<'a> Solver<'a> {
             c,
             ci,
             stat: 0,
+            ln,
+            li,
         }];
         let mut target = ln.max(li).max(1);
         loop {
             let jl = self.job_len(target);
             while (jobs[0].len as usize) < jl {
                 jobs = Self::extend_jobs(&jobs);
+                self.job_bounds(&mut jobs);
             }
             if jl > 0 {
                 // stable sort keeps the canonical order among equal keys
@@ -189,11 +212,7 @@ impl<'a> Solver<'a> {
             }
             for j in jobs.iter_mut() {
                 let r = target - j.len;
-                let (jn, ji) = if j.len == 0 {
-                    (ln, li)
-                } else {
-                    (self.lower_bound(j.c), self.lower_bound(j.ci))
-                };
+                let (jn, ji) = (j.ln, j.li);
                 ctx.heur = 0;
                 if jn > r || ji > r || (j.len > 0 && j.c.is_solved()) {
                     j.stat = 0;
