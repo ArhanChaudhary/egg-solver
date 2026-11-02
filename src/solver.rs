@@ -1,0 +1,304 @@
+//! IDA* optimal solver using the H48 table.
+
+use crate::coord::*;
+use crate::cubie::{inverse_move, CubieCube};
+use crate::simd::Cube;
+use crate::tables::*;
+
+const ESIZE11: u64 = (N_ESEP * N_EO) as u64;
+pub const ALL_MOVES: u32 = (1 << 18) - 1;
+/// Quarter turns only (moves with m % 3 != 1).
+pub const NO_HALF: u32 = 0b101_101_101_101_101_101;
+
+/// Moves allowed after a move on `face` (on the same side of the search).
+const fn mk_allowed() -> [u32; 6] {
+    let mut r = [0u32; 6];
+    let mut f = 0;
+    while f < 6 {
+        let mut m = ALL_MOVES & !(7 << (3 * f));
+        if f % 2 == 1 {
+            m &= !(7 << (3 * (f - 1)));
+        }
+        r[f] = m;
+        f += 1;
+    }
+    r
+}
+pub static ALLOWED_AFTER: [u32; 6] = mk_allowed();
+
+pub struct Solver<'a> {
+    pub cs: &'a Cocsep,
+    pub table: &'a H48Table,
+    shift: u32,
+    base: u8,
+}
+
+#[derive(Default, Clone, Copy, Debug)]
+pub struct Stats {
+    pub nodes: u64,
+    pub lookups: u64,
+}
+
+struct Ctx {
+    moves: [u8; 32],
+    nmoves: usize,
+    premoves: [u8; 32],
+    npremoves: usize,
+    stats: Stats,
+}
+
+#[derive(Clone, Copy)]
+struct Kid {
+    c: Cube,
+    i: Cube,
+    idx: u64,
+    m: u8,
+    pn: u8,
+    pi: u8,
+    live: bool,
+}
+
+const UNKNOWN: u8 = 0xFF;
+
+impl<'a> Solver<'a> {
+    pub fn new(cs: &'a Cocsep, table: &'a H48Table) -> Solver<'a> {
+        Solver {
+            cs,
+            table,
+            shift: 11 - table.meta.k,
+            base: table.meta.base,
+        }
+    }
+
+    /// (table index, corner lower bound)
+    #[inline(always)]
+    fn index(&self, c: Cube) -> (u64, u8) {
+        let d = unsafe { *self.cs.data.get_unchecked(cocsep(c)) };
+        let e = c.transform_edges(cd_ttrep(d));
+        let idx = (cd_class(d) as u64 * ESIZE11 + edge_coord(e)) >> self.shift;
+        (idx, cd_depth(d))
+    }
+
+    #[inline(always)]
+    fn value(&self, idx: u64, cdepth: u8) -> u8 {
+        let (code, min) = self.table.get(idx);
+        if code == 0 {
+            min.max(cdepth)
+        } else {
+            self.base + code
+        }
+    }
+
+    /// Lower bound for a single cube (no pipelining).
+    pub fn lower_bound(&self, c: Cube) -> u8 {
+        let (idx, cd) = self.index(c);
+        self.value(idx, cd)
+    }
+
+    /// Find one optimal solution.
+    pub fn solve(&self, cube: &CubieCube) -> (Vec<u8>, Stats) {
+        let c = Cube::from_cubie(cube);
+        if c.is_solved() {
+            return (vec![], Stats::default());
+        }
+        let ci = c.inverse();
+        let ln = self.lower_bound(c);
+        let li = self.lower_bound(ci);
+        let mut ctx = Ctx {
+            moves: [0; 32],
+            nmoves: 0,
+            premoves: [0; 32],
+            npremoves: 0,
+            stats: Stats::default(),
+        };
+        let mut target = ln.max(li).max(1);
+        loop {
+            let mut mm_n = ALL_MOVES;
+            let mut mm_i = ALL_MOVES;
+            if li == target {
+                mm_n &= NO_HALF;
+            }
+            if ln == target {
+                mm_i &= NO_HALF;
+            }
+            if self.dfs(&mut ctx, c, ci, ln, li, mm_n, mm_i, target) {
+                let mut sol: Vec<u8> = ctx.moves[..ctx.nmoves].to_vec();
+                for k in (0..ctx.npremoves).rev() {
+                    sol.push(inverse_move(ctx.premoves[k]));
+                }
+                return (sol, ctx.stats);
+            }
+            target += 1;
+        }
+    }
+
+    /// `r` = number of moves remaining (> 0). Bounds `ln`, `li` are <= r.
+    #[allow(clippy::too_many_arguments)]
+    fn dfs(
+        &self,
+        ctx: &mut Ctx,
+        c: Cube,
+        ci: Cube,
+        ln: u8,
+        li: u8,
+        mm_n: u32,
+        mm_i: u32,
+        r: u8,
+    ) -> bool {
+        if r == 1 {
+            let mut mm = mm_n & mm_i;
+            while mm != 0 {
+                let m = mm.trailing_zeros() as usize;
+                mm &= mm - 1;
+                ctx.stats.nodes += 1;
+                if c.apply_move(m).is_solved() {
+                    ctx.moves[ctx.nmoves] = m as u8;
+                    ctx.nmoves += 1;
+                    return true;
+                }
+            }
+            return false;
+        }
+        let r1 = r - 1;
+        let normal = mm_n.count_ones() <= mm_i.count_ones();
+        // On the chosen side, (a, b) = (cube moved, cube premoved).
+        let (a, b, mm, la_same) = if normal {
+            (c, ci, mm_n, li)
+        } else {
+            (ci, c, mm_i, ln)
+        };
+        let mut kids = [Kid {
+            c: a,
+            i: b,
+            idx: 0,
+            m: 0,
+            pn: 0,
+            pi: 0,
+            live: false,
+        }; 18];
+        let mut nk = 0;
+        let mut mmv = mm;
+        while mmv != 0 {
+            let m = mmv.trailing_zeros() as usize;
+            mmv &= mmv - 1;
+            // A half turn on this side does not change the other side's coset.
+            let pi = if m % 3 == 1 { la_same } else { UNKNOWN };
+            if pi != UNKNOWN && pi > r1 {
+                continue;
+            }
+            ctx.stats.nodes += 1;
+            kids[nk] = Kid {
+                c: a.apply_move(m),
+                i: b.premove_inv(m),
+                idx: 0,
+                m: m as u8,
+                pn: 0,
+                pi,
+                live: true,
+            };
+            nk += 1;
+        }
+        let maxval = self.base + 3;
+        if r1 <= maxval {
+            // Stage 1: inverse-side index + prefetch.
+            for k in kids[..nk].iter_mut() {
+                if k.pi == UNKNOWN {
+                    let (idx, cd) = self.index(k.i);
+                    if cd > r1 {
+                        k.live = false;
+                        continue;
+                    }
+                    k.idx = idx;
+                    k.pi = cd; // temporarily the corner bound
+                    self.table.prefetch(idx);
+                    k.pn = UNKNOWN; // marks "pi pending"
+                }
+            }
+            // Stage 2: inverse-side value, normal-side index + prefetch.
+            for k in kids[..nk].iter_mut() {
+                if !k.live {
+                    continue;
+                }
+                if k.pn == UNKNOWN {
+                    ctx.stats.lookups += 1;
+                    k.pi = self.value(k.idx, k.pi);
+                    if k.pi > r1 {
+                        k.live = false;
+                        continue;
+                    }
+                }
+                let (idx, cd) = self.index(k.c);
+                if cd > r1 {
+                    k.live = false;
+                    continue;
+                }
+                k.idx = idx;
+                k.pn = cd;
+                self.table.prefetch(idx);
+            }
+            // Stage 3: normal-side value.
+            for k in kids[..nk].iter_mut() {
+                if !k.live {
+                    continue;
+                }
+                ctx.stats.lookups += 1;
+                k.pn = self.value(k.idx, k.pn);
+                if k.pn > r1 {
+                    k.live = false;
+                }
+            }
+        } else {
+            for k in kids[..nk].iter_mut() {
+                k.pn = 0;
+                if k.pi == UNKNOWN {
+                    k.pi = 0;
+                }
+            }
+        }
+        for k in kids[..nk].iter() {
+            if !k.live {
+                continue;
+            }
+            // Solved before the target depth: a shorter solution exists.
+            if k.c.is_solved() {
+                continue;
+            }
+            let face = (k.m / 3) as usize;
+            let (mut nmm_n, mut nmm_i, nc, nci, nln, nli);
+            if normal {
+                nmm_n = ALLOWED_AFTER[face];
+                nmm_i = mm_i;
+                nc = k.c;
+                nci = k.i;
+                nln = k.pn;
+                nli = k.pi;
+                ctx.moves[ctx.nmoves] = k.m;
+                ctx.nmoves += 1;
+            } else {
+                nmm_n = mm_n;
+                nmm_i = ALLOWED_AFTER[face];
+                nc = k.i;
+                nci = k.c;
+                nln = k.pi;
+                nli = k.pn;
+                ctx.premoves[ctx.npremoves] = k.m;
+                ctx.npremoves += 1;
+            }
+            if nli == r1 {
+                nmm_n &= NO_HALF;
+            }
+            if nln == r1 {
+                nmm_i &= NO_HALF;
+            }
+            if self.dfs(ctx, nc, nci, nln, nli, nmm_n, nmm_i, r1) {
+                return true;
+            }
+            if normal {
+                ctx.nmoves -= 1;
+            } else {
+                ctx.npremoves -= 1;
+            }
+        }
+        false
+    }
+}
