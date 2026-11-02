@@ -67,7 +67,7 @@ const fn mk_eslot() -> ([u16; 4096], [u16; 512]) {
         if popcnt(m as u32) == 4 {
             slot[m] = v as u16;
             mask[v] = m as u16;
-            if (v + 1) % 64 == 0 {
+            if (v + 1).is_multiple_of(64) {
                 v += 3;
             } else {
                 v += 1;
