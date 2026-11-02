@@ -182,3 +182,51 @@ fn table_value_is_symmetry_invariant() {
         }
     }
 }
+
+fn lanes_solve(cubes: &[CubieCube], table: &H48Table, nlanes: usize) -> Vec<Vec<u8>> {
+    let solver = Solver::new(cs_data(), table);
+    let out = std::sync::Mutex::new(vec![vec![]; cubes.len()]);
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let stop = std::sync::atomic::AtomicBool::new(false);
+    let get = |i: usize| cubes.get(i).copied();
+    std::thread::scope(|s| {
+        for _ in 0..4 {
+            s.spawn(|| {
+                cubeopt::lanes::run_lanes(&solver, &get, &next, &stop, nlanes, |i, sol, _, _| {
+                    out.lock().unwrap()[i] = sol;
+                });
+            });
+        }
+    });
+    out.into_inner().unwrap()
+}
+
+#[test]
+fn lanes_solve_known_depth_15() {
+    let cubes: Vec<CubieCube> = dataset("depth15.txt").into_iter().take(40).collect();
+    for nlanes in [1, 7] {
+        let sols = lanes_solve(&cubes, h0(), nlanes);
+        for (c, s) in cubes.iter().zip(sols.iter()) {
+            assert_eq!(c.apply_moves(s), CubieCube::SOLVED);
+            assert_eq!(s.len(), 15);
+        }
+    }
+}
+
+#[test]
+fn lanes_short_scrambles_are_optimal() {
+    let mut rng = Rng(4242);
+    let cs = cs_data();
+    let mut cubes = Vec::new();
+    for len in 0..=8 {
+        for _ in 0..10 {
+            let ms: Vec<u8> = (0..len).map(|_| rng.below(18) as u8).collect();
+            cubes.push(CubieCube::SOLVED.apply_moves(&ms));
+        }
+    }
+    let sols = lanes_solve(&cubes, h0(), 5);
+    for (c, s) in cubes.iter().zip(sols.iter()) {
+        assert_eq!(c.apply_moves(s), CubieCube::SOLVED);
+        assert_eq!(s.len(), reference_length(c, cs), "scramble {:?}", c);
+    }
+}
