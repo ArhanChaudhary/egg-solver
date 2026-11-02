@@ -45,6 +45,7 @@ fn main() {
     let nodes = AtomicU64::new(0);
     let lookups = AtomicU64::new(0);
     let lens = std::sync::Mutex::new(vec![0usize; 32]);
+    let times = std::sync::Mutex::new(Vec::<f64>::new());
     let t = Instant::now();
     std::thread::scope(|s| {
         for _ in 0..threads {
@@ -53,7 +54,10 @@ fn main() {
                 if i >= cubes.len() {
                     break;
                 }
+                let ts = Instant::now();
                 let (sol, st) = solver.solve(&cubes[i]);
+                let dt = ts.elapsed().as_secs_f64();
+                times.lock().unwrap().push(dt);
                 assert!(
                     cubes[i].apply_moves(&sol) == CubieCube::SOLVED,
                     "bad solution"
@@ -85,4 +89,16 @@ fn main() {
         el * 1e9 * threads as f64 / nodes.load(Ordering::Relaxed) as f64
     );
     println!("lengths {}", dist.join(" "));
+    let mut times = times.into_inner().unwrap();
+    times.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let cpu: f64 = times.iter().sum();
+    println!(
+        "cpu-sec/solve {:.4} (sum {:.1}s) max {:.3}s p50 {:.4}s",
+        cpu / n,
+        cpu,
+        times[times.len() - 1],
+        times[times.len() / 2]
+    );
+    // Steady-state throughput: all threads busy, no end-of-batch tail.
+    println!("throughput {:.3}", threads as f64 * n / cpu);
 }
