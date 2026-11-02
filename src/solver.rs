@@ -29,7 +29,7 @@ pub struct Solver<'a> {
     pub cs: &'a Cocsep,
     pub table: &'a H48Table,
     k: u32,
-    base: u8,
+    pub(crate) base: u8,
 }
 
 #[derive(Default, Clone, Copy, Debug)]
@@ -99,7 +99,7 @@ impl<'a> Solver<'a> {
 
     /// (table index, corner lower bound)
     #[inline(always)]
-    fn index(&self, c: Cube) -> (u64, u8) {
+    pub(crate) fn index(&self, c: Cube) -> (u64, u8) {
         let d = unsafe { *self.cs.data.get_unchecked(cocsep(c)) };
         let e = c.transform_edges(cd_ttrep(d));
         let idx = reduce_key(h11_key(cd_class(d), e), self.k);
@@ -107,7 +107,7 @@ impl<'a> Solver<'a> {
     }
 
     #[inline(always)]
-    fn value(&self, idx: u64, cdepth: u8) -> u8 {
+    pub(crate) fn value(&self, idx: u64, cdepth: u8) -> u8 {
         let (code, min) = self.table.get(idx);
         if code == 0 {
             min.max(cdepth)
@@ -123,7 +123,7 @@ impl<'a> Solver<'a> {
     }
 
     /// Length of the job prefixes for an iteration with target `d`.
-    fn job_len(&self, d: u8) -> usize {
+    pub(crate) fn job_len(&self, d: u8) -> usize {
         let top = self.base + 3;
         if d > top {
             ((d - top) as usize).min(4)
