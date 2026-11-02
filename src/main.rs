@@ -1,6 +1,6 @@
 //! Solve scrambles from stdin, one per line.
 //! Usage: cubeopt <table path>
-#![allow(clippy::needless_range_loop)]
+#![allow(clippy::needless_range_loop, clippy::manual_is_multiple_of)]
 use cubeopt::cubie::*;
 use cubeopt::solver::Solver;
 use cubeopt::tables::*;
