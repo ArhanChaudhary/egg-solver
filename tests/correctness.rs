@@ -1,4 +1,4 @@
-#![allow(clippy::needless_range_loop)]
+#![allow(clippy::needless_range_loop, clippy::manual_is_multiple_of)]
 use cubeopt::coord::*;
 use cubeopt::cubie::*;
 use cubeopt::simd::Cube;

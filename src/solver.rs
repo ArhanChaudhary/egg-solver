@@ -38,12 +38,36 @@ pub struct Stats {
     pub lookups: u64,
 }
 
+/// A canonical move prefix searched as a unit; jobs are re-ordered between
+/// iterations by `stat`, an estimate of how close their subtree got to
+/// solved (sum of 2^(12-h) over evaluated nodes), so that in the last
+/// iteration the solution tends to be found early.
+#[derive(Clone, Copy)]
+struct Job {
+    moves: [u8; 4],
+    len: u8,
+    c: Cube,
+    ci: Cube,
+    stat: u64,
+}
+
+/// Face weight compensating for D/L/B prefixes having fewer continuations.
+#[inline(always)]
+fn job_weight(j: &Job) -> u64 {
+    if (j.moves[j.len as usize - 1] / 3) % 2 == 0 {
+        47525
+    } else {
+        58206
+    }
+}
+
 struct Ctx {
     moves: [u8; 32],
     nmoves: usize,
     premoves: [u8; 32],
     npremoves: usize,
     stats: Stats,
+    heur: u64,
 }
 
 #[derive(Clone, Copy)]
@@ -94,6 +118,40 @@ impl<'a> Solver<'a> {
         self.value(idx, cd)
     }
 
+    /// Length of the job prefixes for an iteration with target `d`.
+    fn job_len(&self, d: u8) -> usize {
+        let top = self.base + 3;
+        if d > top {
+            ((d - top) as usize).min(4)
+        } else {
+            0
+        }
+    }
+
+    /// Extend jobs by one move; children inherit the parent's stat.
+    fn extend_jobs(jobs: &[Job]) -> Vec<Job> {
+        let mut out = Vec::with_capacity(jobs.len() * 15);
+        for j in jobs {
+            let mm = if j.len == 0 {
+                ALL_MOVES
+            } else {
+                ALLOWED_AFTER[(j.moves[j.len as usize - 1] / 3) as usize]
+            };
+            let mut mmv = mm;
+            while mmv != 0 {
+                let m = mmv.trailing_zeros() as usize;
+                mmv &= mmv - 1;
+                let mut n = *j;
+                n.moves[n.len as usize] = m as u8;
+                n.len += 1;
+                n.c = j.c.apply_move(m);
+                n.ci = j.ci.premove_inv(m);
+                out.push(n);
+            }
+        }
+        out
+    }
+
     /// Find one optimal solution.
     pub fn solve(&self, cube: &CubieCube) -> (Vec<u8>, Stats) {
         let c = Cube::from_cubie(cube);
@@ -109,23 +167,61 @@ impl<'a> Solver<'a> {
             premoves: [0; 32],
             npremoves: 0,
             stats: Stats::default(),
+            heur: 0,
         };
+        let mut jobs = vec![Job {
+            moves: [0; 4],
+            len: 0,
+            c,
+            ci,
+            stat: 0,
+        }];
         let mut target = ln.max(li).max(1);
         loop {
-            let mut mm_n = ALL_MOVES;
-            let mut mm_i = ALL_MOVES;
-            if li == target {
-                mm_n &= NO_HALF;
+            let jl = self.job_len(target);
+            while (jobs[0].len as usize) < jl {
+                jobs = Self::extend_jobs(&jobs);
             }
-            if ln == target {
-                mm_i &= NO_HALF;
+            if jl > 0 {
+                // stable sort keeps the canonical order among equal keys
+                jobs.sort_by_key(|j| std::cmp::Reverse(j.stat * job_weight(j)));
             }
-            if self.dfs(&mut ctx, c, ci, ln, li, mm_n, mm_i, target) {
-                let mut sol: Vec<u8> = ctx.moves[..ctx.nmoves].to_vec();
-                for k in (0..ctx.npremoves).rev() {
-                    sol.push(inverse_move(ctx.premoves[k]));
+            for j in jobs.iter_mut() {
+                let r = target - j.len;
+                let (jn, ji) = if j.len == 0 {
+                    (ln, li)
+                } else {
+                    (self.lower_bound(j.c), self.lower_bound(j.ci))
+                };
+                ctx.heur = 0;
+                if jn > r || ji > r || (j.len > 0 && j.c.is_solved()) {
+                    j.stat = 0;
+                    continue;
                 }
-                return (sol, ctx.stats);
+                let mut mm_n = if j.len == 0 {
+                    ALL_MOVES
+                } else {
+                    ALLOWED_AFTER[(j.moves[j.len as usize - 1] / 3) as usize]
+                };
+                let mut mm_i = ALL_MOVES;
+                if ji == r {
+                    mm_n &= NO_HALF;
+                }
+                if jn == r {
+                    mm_i &= NO_HALF;
+                }
+                ctx.moves[..j.len as usize].copy_from_slice(&j.moves[..j.len as usize]);
+                ctx.nmoves = j.len as usize;
+                ctx.npremoves = 0;
+                let found = self.dfs(&mut ctx, j.c, j.ci, jn, ji, mm_n, mm_i, r);
+                j.stat = ctx.heur;
+                if found {
+                    let mut sol: Vec<u8> = ctx.moves[..ctx.nmoves].to_vec();
+                    for k in (0..ctx.npremoves).rev() {
+                        sol.push(inverse_move(ctx.premoves[k]));
+                    }
+                    return (sol, ctx.stats);
+                }
             }
             target += 1;
         }
@@ -242,6 +338,7 @@ impl<'a> Solver<'a> {
                 }
                 ctx.stats.lookups += 1;
                 k.pn = self.value(k.idx, k.pn);
+                ctx.heur += (4096u64 >> k.pi.min(63)) + (4096u64 >> k.pn.min(63));
                 if k.pn > r1 {
                     k.live = false;
                 }
