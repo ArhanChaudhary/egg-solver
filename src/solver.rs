@@ -82,6 +82,7 @@ struct Kid {
 }
 
 const UNKNOWN: u8 = 0xFF;
+const FOUND: u8 = 0xFE;
 
 impl<'a> Solver<'a> {
     pub fn new(cs: &'a Cocsep, table: &'a H48Table) -> Solver<'a> {
@@ -213,7 +214,7 @@ impl<'a> Solver<'a> {
                 ctx.moves[..j.len as usize].copy_from_slice(&j.moves[..j.len as usize]);
                 ctx.nmoves = j.len as usize;
                 ctx.npremoves = 0;
-                let found = self.dfs(&mut ctx, j.c, j.ci, jn, ji, mm_n, mm_i, r);
+                let found = self.dfs(&mut ctx, j.c, j.ci, jn, ji, mm_n, mm_i, r) == FOUND;
                 j.stat = ctx.heur;
                 if found {
                     let mut sol: Vec<u8> = ctx.moves[..ctx.nmoves].to_vec();
@@ -228,6 +229,13 @@ impl<'a> Solver<'a> {
     }
 
     /// `r` = number of moves remaining (> 0). Bounds `ln`, `li` are <= r.
+    ///
+    /// Returns `FOUND`, or a lower bound on the distance of this node learned
+    /// from its children (0 if nothing was learned). Every child value is a
+    /// lower bound on the child's true distance, and the true distance
+    /// changes by at most one per move, so (a) a child value `v` bounds this
+    /// node by `v - 1` and (b) bounds same-face siblings (one move apart) by
+    /// `v - 1` as well.
     #[allow(clippy::too_many_arguments)]
     fn dfs(
         &self,
@@ -239,7 +247,7 @@ impl<'a> Solver<'a> {
         mm_n: u32,
         mm_i: u32,
         r: u8,
-    ) -> bool {
+    ) -> u8 {
         if r == 1 {
             let mut mm = mm_n & mm_i;
             while mm != 0 {
@@ -249,10 +257,10 @@ impl<'a> Solver<'a> {
                 if c.apply_move(m).is_solved() {
                     ctx.moves[ctx.nmoves] = m as u8;
                     ctx.nmoves += 1;
-                    return true;
+                    return FOUND;
                 }
             }
-            return false;
+            return 0;
         }
         let r1 = r - 1;
         let normal = mm_n.count_ones() <= mm_i.count_ones();
@@ -262,6 +270,8 @@ impl<'a> Solver<'a> {
         } else {
             (ci, c, mm_i, ln)
         };
+        // Best known lower bound per face over that face's children.
+        let mut fmax = [0u8; 6];
         let mut kids = [Kid {
             c: a,
             i: b,
@@ -279,6 +289,7 @@ impl<'a> Solver<'a> {
             // A half turn on this side does not change the other side's coset.
             let pi = if m % 3 == 1 { la_same } else { UNKNOWN };
             if pi != UNKNOWN && pi > r1 {
+                fmax[m / 3] = fmax[m / 3].max(pi);
                 continue;
             }
             ctx.stats.nodes += 1;
@@ -301,6 +312,8 @@ impl<'a> Solver<'a> {
                     let (idx, cd) = self.index(k.i);
                     if cd > r1 {
                         k.live = false;
+                        let f = (k.m / 3) as usize;
+                        fmax[f] = fmax[f].max(cd);
                         continue;
                     }
                     k.idx = idx;
@@ -314,17 +327,20 @@ impl<'a> Solver<'a> {
                 if !k.live {
                     continue;
                 }
+                let f = (k.m / 3) as usize;
                 if k.pn == UNKNOWN {
                     ctx.stats.lookups += 1;
                     k.pi = self.value(k.idx, k.pi);
                     if k.pi > r1 {
                         k.live = false;
+                        fmax[f] = fmax[f].max(k.pi);
                         continue;
                     }
                 }
                 let (idx, cd) = self.index(k.c);
                 if cd > r1 {
                     k.live = false;
+                    fmax[f] = fmax[f].max(cd);
                     continue;
                 }
                 k.idx = idx;
@@ -339,6 +355,8 @@ impl<'a> Solver<'a> {
                 ctx.stats.lookups += 1;
                 k.pn = self.value(k.idx, k.pn);
                 ctx.heur += (4096u64 >> k.pi.min(63)) + (4096u64 >> k.pn.min(63));
+                let f = (k.m / 3) as usize;
+                fmax[f] = fmax[f].max(k.pn).max(k.pi);
                 if k.pn > r1 {
                     k.live = false;
                 }
@@ -351,15 +369,21 @@ impl<'a> Solver<'a> {
                 }
             }
         }
+        // Lower bound for this node from all children.
+        let mut node_lb = fmax.iter().copied().max().unwrap_or(0).saturating_sub(1);
+        if node_lb > r {
+            return node_lb;
+        }
         for k in kids[..nk].iter() {
-            if !k.live {
+            let face = (k.m / 3) as usize;
+            // Pruned directly, or by a same-face sibling that is >= 2 over.
+            if !k.live || fmax[face] > r1 + 1 {
                 continue;
             }
             // Solved before the target depth: a shorter solution exists.
             if k.c.is_solved() {
                 continue;
             }
-            let face = (k.m / 3) as usize;
             let (mut nmm_n, mut nmm_i, nc, nci, nln, nli);
             if normal {
                 nmm_n = ALLOWED_AFTER[face];
@@ -386,15 +410,23 @@ impl<'a> Solver<'a> {
             if nln == r1 {
                 nmm_i &= NO_HALF;
             }
-            if self.dfs(ctx, nc, nci, nln, nli, nmm_n, nmm_i, r1) {
-                return true;
+            let res = self.dfs(ctx, nc, nci, nln, nli, nmm_n, nmm_i, r1);
+            if res == FOUND {
+                return FOUND;
             }
             if normal {
                 ctx.nmoves -= 1;
             } else {
                 ctx.npremoves -= 1;
             }
+            // Bound learned for the child: prunes its same-face siblings and
+            // possibly this whole node.
+            fmax[face] = fmax[face].max(res);
+            node_lb = node_lb.max(res.saturating_sub(1));
+            if node_lb > r {
+                return node_lb;
+            }
         }
-        false
+        node_lb
     }
 }
