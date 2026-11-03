@@ -328,7 +328,8 @@ impl H48Table {
     pub fn prefetch(&self, idx: u64) {
         unsafe {
             let a = self.mem.ptr().add((idx >> 2) as usize);
-            std::arch::x86_64::_mm_prefetch(a as *const i8, std::arch::x86_64::_MM_HINT_T0);
+            // NTA: each line is read once; less L2 pollution (cocsep data).
+            std::arch::x86_64::_mm_prefetch(a as *const i8, std::arch::x86_64::_MM_HINT_NTA);
         }
     }
 
