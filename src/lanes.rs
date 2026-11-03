@@ -29,14 +29,18 @@ use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES, NO_HALF};
 
 const MAXD: usize = 26;
 
+/// (128 bytes: two cache lines.)
 #[derive(Clone, Copy)]
+#[repr(align(64))]
 struct Node {
-    c: Cube,
-    ci: Cube,
-    ln: u8,
-    li: u8,
-    mm_n: u32,
-    mm_i: u32,
+    /// The cube whose moves generate the children (the normal cube if
+    /// `normal`, else the inverse), and the other one.
+    a: Cube,
+    b: Cube,
+    /// Lower bound of the other side (`b`).
+    lo: u8,
+    /// Allowed moves on the other side.
+    mm_o: u32,
     /// Moves still to try on the chosen side. Faces whose bound exceeds
     /// the remaining depth are removed eagerly (sibling-face pruning).
     todo: u32,
@@ -181,12 +185,10 @@ enum Step {
 impl Lane {
     fn new() -> Lane {
         let n = Node {
-            c: Cube::solved(),
-            ci: Cube::solved(),
-            ln: 0,
-            li: 0,
-            mm_n: 0,
-            mm_i: 0,
+            a: Cube::solved(),
+            b: Cube::solved(),
+            lo: 0,
+            mm_o: 0,
             todo: 0,
             skip: 0,
             r: 0,
@@ -429,11 +431,7 @@ impl Lane {
             let r1 = node.r - 1;
             // (No sibling-face check: such faces were removed from `todo`.)
             self.stats.nodes += 1;
-            let (a, b, lo) = if node.normal {
-                (node.c, node.ci, node.li)
-            } else {
-                (node.ci, node.c, node.ln)
-            };
+            let (a, b, lo) = (node.a, node.b, node.lo);
             if r1 == 0 {
                 // nodes with r == 1 always move the normal cube
                 if a.apply_move(m).is_solved() {
@@ -578,9 +576,9 @@ impl Lane {
         let r1 = node.r - 1;
         let face = (self.k_m / 3) as usize;
         let (c, ci, ln, li, mut mm_n, mut mm_i) = if node.normal {
-            (self.k_a, self.k_b, pm, po, ALLOWED_AFTER[face], node.mm_i)
+            (self.k_a, self.k_b, pm, po, ALLOWED_AFTER[face], node.mm_o)
         } else {
-            (self.k_b, self.k_a, po, pm, node.mm_n, ALLOWED_AFTER[face])
+            (self.k_b, self.k_a, po, pm, node.mm_o, ALLOWED_AFTER[face])
         };
         if li == r1 {
             mm_n &= NO_HALF;
@@ -632,13 +630,12 @@ fn make_node(
     } else {
         (false, mm_i)
     };
+    // (Selected without branching: the side choice is data.)
     Node {
-        c,
-        ci,
-        ln,
-        li,
-        mm_n,
-        mm_i,
+        a: Cube::select(normal, c, ci),
+        b: Cube::select(normal, ci, c),
+        lo: std::hint::select_unpredictable(normal, li, ln),
+        mm_o: std::hint::select_unpredictable(normal, mm_i, mm_n),
         todo,
         skip: 0,
         r,
