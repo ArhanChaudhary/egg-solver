@@ -175,6 +175,13 @@ pub fn edge_key(c: Cube) -> u64 {
 /// path only.
 #[inline(always)]
 pub fn edge_key_sym(c: Cube, t: usize) -> u64 {
+    let (msplit, eo11, eslot) = edge_parts_sym(c, t);
+    (msplit << 20) | (eo11 << 9) | eslot
+}
+
+/// (msplit, eo11, eslot) of `c` conjugated by symmetry `t` (see `edge_key_sym`).
+#[inline(always)]
+pub fn edge_parts_sym(c: Cube, t: usize) -> (u64, u64, u64) {
     unsafe {
         let tab = crate::simd::SYM_EDGE.get_unchecked(t).0.as_ptr();
         let q = _mm256_load_si256(tab as *const __m256i);
@@ -187,8 +194,18 @@ pub fn edge_key_sym(c: Cube, t: usize) -> u64 {
         let o = _mm256_movemask_epi8(_mm256_slli_epi16(_mm256_xor_si256(z, p), 3)) as u32;
         let msplit = *RANK8.get_unchecked(_pext_u32(s, e ^ 0x0FFF_0000) as usize) as u64;
         let eslot = *ESLOT.get_unchecked((e >> 16) as usize) as u64;
-        (msplit << 20) | (((o >> 17) as u64) << 9) | eslot
+        (msplit, (o >> 17) as u64, eslot)
     }
+}
+
+/// hk index of class `class` and edge parts `(msplit, eo11, eslot)`; equals
+/// `reduce_key((class * 70 + msplit) << 20 | eo11 << 9 | eslot, k)` but with
+/// a shorter dependency chain from msplit.
+#[inline(always)]
+pub fn index_from_parts(class: usize, parts: (u64, u64, u64), k: u32) -> u64 {
+    let (msplit, eo11, eslot) = parts;
+    let row = class as u64 * N_MSPLIT as u64 + msplit;
+    (row << (k + 9)) | ((eo11 >> (11 - k)) << 9) | eslot
 }
 
 /// Full h11 key from a corner class and transformed edges.
@@ -275,7 +292,15 @@ mod tests {
         for _ in 0..500 {
             let c = Cube::from_cubie(&CubieCube::random(&mut rng));
             for t in 0..48 {
-                assert_eq!(edge_key_sym(c, t), edge_key(c.transform_edges(t)));
+                let ek = edge_key(c.transform_edges(t));
+                assert_eq!(edge_key_sym(c, t), ek);
+                for k in 0..=11 {
+                    let x = ((1234 * N_MSPLIT as u64) << 20) + ek;
+                    assert_eq!(
+                        index_from_parts(1234, edge_parts_sym(c, t), k),
+                        reduce_key(x, k)
+                    );
+                }
             }
         }
     }
