@@ -1345,7 +1345,7 @@ impl Worker<'_, '_> {
             if self.nactive == 0 && !self.idle_wait(stop) {
                 break;
             }
-            if !self.rounds(stop, &mut round) {
+            if !self.rounds(self.s, stop, &mut round) {
                 break;
             }
         }
@@ -1363,8 +1363,7 @@ impl Worker<'_, '_> {
     /// `on_end` (which may swap another lane into position i), the rest
     /// once per round by `maintain`. (Kept apart from the cold code.)
     #[inline(never)]
-    fn rounds(&mut self, stop: &AtomicBool, round: &mut u32) -> bool {
-        let s = self.s;
+    fn rounds(&mut self, s: &Solver, stop: &AtomicBool, round: &mut u32) -> bool {
         while self.nactive > 0 {
             let mut i = 0;
             let mut n = self.nactive;
