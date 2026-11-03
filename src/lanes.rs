@@ -416,6 +416,8 @@ impl Lane {
             let n = &self.stack[sp];
             (n.todo, n.lb, n.r)
         };
+        // Nodes generated (added to `stats` on return).
+        let mut nodes = 0;
         loop {
             // SAFETY: as above (`sp` is `self.sp`).
             unsafe { std::hint::assert_unchecked(sp < MAXD) };
@@ -425,7 +427,7 @@ impl Lane {
                 // not change in between (their value was already noted).
                 let live = todo & !self.stack[sp].skip;
                 let below = todo & live.isolate_lowest_one().wrapping_sub(1);
-                self.stats.nodes += below.count_ones() as u64;
+                nodes += below.count_ones() as u64;
                 todo &= !below;
             }
             if lb > r || todo == 0 {
@@ -466,7 +468,7 @@ impl Lane {
             let face = m / 3;
             let r1 = r - 1;
             // (No sibling-face check: such faces were removed from `todo`.)
-            self.stats.nodes += 1;
+            nodes += 1;
             let (a, b, lo) = (node.a, node.b, node.lo);
             // One test for the rare kinds: r1 == 0 (wraps) or r1 > maxval.
             if r1.wrapping_sub(1) >= maxval {
@@ -474,6 +476,7 @@ impl Lane {
                     // nodes with r == 1 always move the normal cube
                     if a.apply_move(m).is_solved() {
                         self.k_m = m as u8;
+                        self.stats.nodes += nodes;
                         return Step::Found;
                     }
                     continue;
@@ -533,6 +536,7 @@ impl Lane {
             } else {
                 Phase::WaitMoved
             };
+            self.stats.nodes += nodes;
             return Step::Pending;
         }
     }
