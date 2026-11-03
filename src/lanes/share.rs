@@ -18,8 +18,7 @@
 //!   a long job list is extended and sorted by all of them (`build_task`).
 //!   Jobs whose bounds exceed the iteration are sorted last and not claimed.
 //! * With few cubes in progress (at most threads / 8, e.g. one at a time),
-//!   builds are always staged, the prefixes are of 4 moves as soon as stream
-//!   mode's are of 2, and threads stay with the cubes they work on.
+//!   builds are always staged and threads stay with the cubes they work on.
 //! * A lane whose job ends takes, in order: a piece donated to its thread,
 //!   another job of the same cube, a job its thread already claimed, a fresh
 //!   cube (at most `max_active` cubes are in progress), jobs of the oldest
@@ -784,15 +783,8 @@ fn build(
     let t = inner.target;
     // (As in `start_iteration`: the stack depth stays below the target.)
     assert!((t as usize) < MAXD);
-    // With few cubes in progress, the longest prefixes as soon as stream
-    // mode's are 2 moves (iteration 15 with h11): more and smaller jobs
-    // share the iterations better (a few big jobs set their ends), and the
-    // extension is done once.
     let few = pool.few();
-    let jl = match s.job_len(t) {
-        jl if few && jl >= 2 => MAX_JOB_LEN,
-        jl => jl,
-    };
+    let jl = s.job_len(t);
     // (With few cubes, threads are about to wait for this one.)
     let parallel = few || pool.hungry.load(Relaxed) != 0;
     let len = inner.jobs[0].len as usize;
@@ -858,12 +850,11 @@ fn build(
     false
 }
 
-/// Fewer cubes in progress than threads / `FEW` use prefixes of
-/// `MAX_JOB_LEN` moves early.
+/// Fewer cubes in progress than threads / `FEW` build in stages, and their
+/// threads stay with them.
 const FEW: usize = 8;
 /// Most cubes a thread stays with (`Worker::keep`).
 const KEEP: usize = 2;
-const MAX_JOB_LEN: usize = 4;
 
 /// The statistics of the last iteration to its jobs.
 fn copy_stats(inner: &mut Inner) {
