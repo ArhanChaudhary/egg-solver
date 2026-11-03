@@ -432,19 +432,19 @@ impl Lane {
             // (No sibling-face check: such faces were removed from `todo`.)
             self.stats.nodes += 1;
             let (a, b, lo) = (node.a, node.b, node.lo);
-            if r1 == 0 {
-                // nodes with r == 1 always move the normal cube
-                if a.apply_move(m).is_solved() {
-                    self.k_m = m as u8;
-                    return Step::Found;
+            // One test for the rare kinds: r1 == 0 (wraps) or r1 > maxval.
+            if r1.wrapping_sub(1) >= maxval {
+                if r1 == 0 {
+                    // nodes with r == 1 always move the normal cube
+                    if a.apply_move(m).is_solved() {
+                        self.k_m = m as u8;
+                        return Step::Found;
+                    }
+                    continue;
                 }
-                continue;
-            }
-            let a2 = a.apply_move(m);
-            let b2 = b.premove_inv(m);
-            let half = m % 3 == 1;
-            if r1 > maxval {
-                let po = if half { lo } else { 0 };
+                let a2 = a.apply_move(m);
+                let b2 = b.premove_inv(m);
+                let po = if m % 3 == 1 { lo } else { 0 };
                 if po > r1 || a2.is_solved() {
                     continue;
                 }
@@ -454,6 +454,9 @@ impl Lane {
                 self.push_child(0, po);
                 continue;
             }
+            let a2 = a.apply_move(m);
+            let b2 = b.premove_inv(m);
+            let half = m % 3 == 1;
             self.k_a = a2;
             self.k_b = b2;
             self.k_m = m as u8;
