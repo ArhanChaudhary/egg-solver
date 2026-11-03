@@ -433,16 +433,21 @@ impl Lane {
         loop {
             // SAFETY: as above (`sp` is `self.sp`).
             unsafe { std::hint::assert_unchecked(sp < MAXD) };
-            if lb <= r {
-                // X' moves known to be pruned (`skip`) are reached, and
-                // counted, up to the next move to generate. The bounds do
-                // not change in between (their value was already noted).
-                let live = todo & !self.stack[sp].skip;
-                let below = todo & live.isolate_lowest_one().wrapping_sub(1);
+            // X' moves known to be pruned (`skip`) are reached, and counted,
+            // up to the next move to generate (all of them if there is
+            // none). The bounds do not change in between (their value was
+            // already noted).
+            let mut live = 0;
+            let done = lb > r || {
+                live = todo & !self.stack[sp].skip;
+                // (`bzhi` keeps all of `todo` if `live` is 0.)
+                // SAFETY: BMI2 is a target feature (see `coord::cocsep`).
+                let below = unsafe { std::arch::x86_64::_bzhi_u32(todo, live.trailing_zeros()) };
                 nodes += below.count_ones() as u64;
-                todo &= !below;
-            }
-            if lb > r || todo == 0 {
+                todo ^= below;
+                live == 0
+            };
+            if done {
                 // (The node is done: its `todo` is not needed any more.)
                 let m = self.stack[sp].m;
                 if sp == 0 {
@@ -477,7 +482,8 @@ impl Lane {
                 p.todo = todo;
                 continue;
             }
-            let m = todo.trailing_zeros() as usize;
+            // (The lowest move of `todo` now.)
+            let m = live.trailing_zeros() as usize;
             // SAFETY: move masks are subsets of ALL_MOVES.
             unsafe { std::hint::assert_unchecked(m < 18) };
             todo &= todo - 1;
