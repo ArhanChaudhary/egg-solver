@@ -6,7 +6,7 @@
 //! prefetch and yields. Lanes are visited round-robin; a visit first
 //! resolves the lookup issued on the previous visit (the other side's value
 //! first, then the moved side's), then advances the lane to its next lookup.
-//! With 16 lanes each miss gets a whole round (~0.5us) of slack while only
+//! With 20 lanes (default) each miss gets a whole round of slack while only
 //! ~one miss per lane is in flight.
 //!
 //! Since children are generated one at a time, sibling-face pruning skips
@@ -347,7 +347,7 @@ impl Lane {
     fn setup_job(&mut self) -> bool {
         while self.job_pos < self.jobs.len() {
             let j = self.jobs[self.job_pos];
-            // The job vector is too big for L2 and 16 lanes interleave
+            // The job vector is too big for L2 and 20 lanes interleave
             // their streams: fetch the next jobs' line early.
             let ahead = (self.job_pos + 8).min(self.jobs.len() - 1);
             unsafe {
