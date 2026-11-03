@@ -179,6 +179,32 @@ pub fn cocsep(c: Cube) -> usize {
     }
 }
 
+/// `3 * cocsep(c)` (the byte offset of its packed entry), from tables
+/// scaled by 3 (no multiply on the index path).
+#[inline(always)]
+pub fn cocsep3(c: Cube) -> usize {
+    let x = c.corners_u64();
+    unsafe {
+        let t = &crate::simd::TABS;
+        let (co2, sep): (u64, u64);
+        std::arch::asm!(
+            "pext {co2}, {x}, qword ptr [{t} + {oc}]",
+            "pext {sep}, {x}, qword ptr [{t} + {os}]",
+            co2 = out(reg) co2,
+            sep = lateout(reg) sep,
+            x = in(reg) x,
+            t = in(reg) t,
+            oc = const std::mem::offset_of!(crate::simd::Tabs, pext_co),
+            os = const std::mem::offset_of!(crate::simd::Tabs, pext_sep),
+            options(pure, readonly, nostack, preserves_flags)
+        );
+        std::hint::assert_unchecked(co2 < 1 << 14 && sep < 1 << 8);
+        (*t.co_lo3.get_unchecked((co2 & 0xFF) as usize)
+            + *t.co_hi3.get_unchecked((co2 >> 8) as usize)
+            + *t.sep3.get_unchecked(sep as usize) as u32) as usize
+    }
+}
+
 /// Edge masks: (E-slice positions, S-slice positions, eo), 12 bits each.
 #[inline(always)]
 pub fn edge_masks(c: Cube) -> (u32, u32, u32) {
@@ -242,22 +268,26 @@ fn edge_parts_sym_raw(c: Cube, t: usize) -> (u64, u64, u64) {
         std::arch::asm!("vpmovmskb {s:e}, {zz}", s = out(reg) s, zz = in(ymm_reg) zz,
             options(pure, nomem, nostack, preserves_flags));
         let o = _mm256_movemask_epi8(_mm256_slli_epi16(_mm256_xor_si256(z, p), 3)) as u32;
-        let msplit = *tabs
-            .rank8
-            .get_unchecked(_pext_u64(s as u64, (e ^ 0x0FFF_0000) as u64) as usize)
-            as u64;
-        let eslot = *tabs.eslot.get_unchecked((e >> 16) as usize) as u64;
+        // The non-E positions (`e` is within bits 16..28): the mask of the
+        // pext, and (shifted) the index of the complemented eslot table,
+        // which saves a copy of `e`.
+        let ne = e ^ 0x0FFF_0000;
+        let msplit = *tabs.rank8.get_unchecked(_pext_u32(s, ne) as usize) as u64;
+        let eslot = *tabs.eslot_c.get_unchecked((ne >> 16) as usize) as u64;
         (msplit, o as u64, eslot)
     }
 }
 
-/// `index_from_parts(class, edge_parts_sym(c, t), k)`, with the eo shifts
-/// fused (`eo_shift` = 28 - k).
+/// `index_from_parts(class, edge_parts_sym(c, t), k)`, with the shifts by
+/// `k` done as a multiply by `row_mul` = `1 << (k + 9)` and a pext by
+/// `eo_mask` = the top `k` eo bits, `((1 << k) - 1) << (28 - k)` (memory
+/// operands: no variable shift counts to keep in registers).
 #[inline(always)]
-pub fn index_sym(c: Cube, t: usize, class: usize, k: u32, eo_shift: u32) -> u64 {
+pub fn index_sym(c: Cube, t: usize, class: usize, row_mul: u64, eo_mask: u32) -> u64 {
     let (msplit, o, eslot) = edge_parts_sym_raw(c, t);
     let row = class as u64 * N_MSPLIT as u64 + msplit;
-    (row << (k + 9)) | ((o >> eo_shift) << 9) | eslot
+    let eo = unsafe { _pext_u32(o as u32, eo_mask) } as u64;
+    (row * row_mul) | (eo << 9) | eslot
 }
 
 /// hk index of class `class` and edge parts `(msplit, eo11, eslot)`; equals
@@ -364,6 +394,15 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    #[test]
+    fn cocsep3_is_3_cocsep() {
+        let mut rng = Rng(17);
+        for _ in 0..2000 {
+            let c = Cube::from_cubie(&CubieCube::random(&mut rng));
+            assert_eq!(cocsep3(c), 3 * cocsep(c));
         }
     }
 

@@ -31,10 +31,14 @@ pub struct Solver<'a> {
     pub table: &'a H48Table,
     /// `table.ptr()`, cached (saves a dependent load per prefetch/lookup).
     tptr: *const u8,
-    k: u32,
+    /// `cs.packed_ptr()`, cached (saves a dependent load per index).
+    cptr: *const u8,
+    /// `coord::index_sym` constants of the table's `k`.
+    row_mul: u64,
+    eo_mask: u32,
     pub(crate) base: u8,
 }
-// `tptr` points into `table`, which is shared read-only.
+// `tptr` and `cptr` point into `table` and `cs`, which are shared read-only.
 unsafe impl Send for Solver<'_> {}
 unsafe impl Sync for Solver<'_> {}
 
@@ -99,7 +103,9 @@ impl<'a> Solver<'a> {
             cs,
             table,
             tptr: table.ptr(),
-            k: table.meta.k,
+            cptr: cs.packed_ptr(),
+            row_mul: 1 << (table.meta.k + 9),
+            eo_mask: ((1 << table.meta.k) - 1) << (28 - table.meta.k),
             base: table.meta.base,
         }
     }
@@ -107,8 +113,9 @@ impl<'a> Solver<'a> {
     /// (table index, corner lower bound)
     #[inline(always)]
     pub(crate) fn index(&self, c: Cube) -> (u64, u8) {
-        let d = self.cs.packed(cocsep(c));
-        let idx = index_sym(c, cp_ttrep(d), cp_class(d), self.k, 28 - self.k);
+        // `self.cs.packed(cocsep(c))`
+        let d = unsafe { (self.cptr.add(cocsep3(c)) as *const u32).read_unaligned() };
+        let idx = index_sym(c, cp_ttrep(d), cp_class(d), self.row_mul, self.eo_mask);
         (idx, cp_depth(d))
     }
 

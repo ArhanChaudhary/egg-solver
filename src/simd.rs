@@ -29,7 +29,13 @@ pub struct Tabs {
     pub sym_edge: [A64; 48],
     pub co_lo: [u32; 256],
     pub co_hi: [u32; 64],
-    pub eslot: [u16; 4096],
+    /// `co_lo`, `co_hi` and `rank8` (of tetrad masks) times 3: the byte
+    /// offset of a packed cocsep entry (`coord::cocsep3`).
+    pub co_lo3: [u32; 256],
+    pub co_hi3: [u32; 64],
+    pub sep3: [u8; 256],
+    /// `coord::ESLOT` indexed by the complement (in 12 bits) of the mask.
+    pub eslot_c: [u16; 4096],
     pub rank8: [u8; 256],
     /// `pext` masks of `coord::cocsep` (read from memory: no 64-bit
     /// immediates per call): orientations of corners 0..6, tetrads.
@@ -50,7 +56,45 @@ pub static TABS: Tabs = Tabs {
     sym_edge: SYM_EDGE,
     co_lo: crate::coord::CO_LO_T,
     co_hi: crate::coord::CO_HI_T,
-    eslot: crate::coord::ESLOT_T,
+    co_lo3: {
+        let mut r = [0u32; 256];
+        let mut i = 0;
+        while i < 256 {
+            r[i] = 3 * crate::coord::CO_LO_T[i];
+            i += 1;
+        }
+        r
+    },
+    co_hi3: {
+        let mut r = [0u32; 64];
+        let mut i = 0;
+        while i < 64 {
+            r[i] = 3 * crate::coord::CO_HI_T[i];
+            i += 1;
+        }
+        r
+    },
+    sep3: {
+        // (Only masks of 4 corners occur; the others keep the 0xFF marker.)
+        let mut r = [0xFFu8; 256];
+        let mut i = 0;
+        while i < 256 {
+            if crate::coord::RANK8_T[i] != 0xFF {
+                r[i] = 3 * crate::coord::RANK8_T[i];
+            }
+            i += 1;
+        }
+        r
+    },
+    eslot_c: {
+        let mut r = [0u16; 4096];
+        let mut x = 0;
+        while x < 4096 {
+            r[x] = crate::coord::ESLOT_T[x ^ 0xFFF];
+            x += 1;
+        }
+        r
+    },
     rank8: crate::coord::RANK8_T,
     pext_co: 0x0060_6060_6060_6060,
     pext_sep: 0x0404_0404_0404_0404,
