@@ -194,6 +194,12 @@ impl Cube {
             .compose(Cube(ld(&SYM_TINV[t])))
     }
 
+    /// `if m { a } else { b }`, as a byte blend (no branch).
+    #[inline(always)]
+    pub fn select(m: bool, a: Cube, b: Cube) -> Cube {
+        unsafe { Cube(_mm256_blendv_epi8(b.0, a.0, _mm256_set1_epi8(-(m as i8)))) }
+    }
+
     /// Low 64 bits: the 8 corner bytes.
     #[inline(always)]
     pub fn corners_u64(self) -> u64 {
