@@ -126,6 +126,11 @@ impl Cocsep {
         }
     }
 
+    /// Base of the packed entries (see `packed`).
+    pub fn packed_ptr(&self) -> *const u8 {
+        self.packed.ptr()
+    }
+
     /// Packed entry of cocsep coordinate `i` (see `cp_*`).
     #[inline(always)]
     pub fn packed(&self, i: usize) -> u32 {
