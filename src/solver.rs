@@ -100,9 +100,9 @@ impl<'a> Solver<'a> {
     /// (table index, corner lower bound)
     #[inline(always)]
     pub(crate) fn index(&self, c: Cube) -> (u64, u8) {
-        let d = unsafe { *self.cs.data.get_unchecked(cocsep(c)) };
-        let x = ((cd_class(d) as u64 * N_MSPLIT as u64) << 20) + edge_key_sym(c, cd_ttrep(d));
-        (reduce_key(x, self.k), cd_depth(d))
+        let d = self.cs.packed(cocsep(c));
+        let parts = edge_parts_sym(c, cp_ttrep(d));
+        (index_from_parts(cp_class(d), parts, self.k), cp_depth(d))
     }
 
     #[inline(always)]

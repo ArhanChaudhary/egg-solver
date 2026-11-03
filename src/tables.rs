@@ -17,6 +17,24 @@ pub struct Cocsep {
     pub selfsim: Vec<u64>,
     /// Depth distribution of the 153090 cocsep coordinates.
     pub distribution: Vec<u64>,
+    /// Hot-path copy of `data` packed into 3 bytes per entry (25% less L2
+    /// footprint): `class << 10 | ttrep << 4 | depth` (+1 pad byte), on a
+    /// transparent huge page (one TLB entry instead of ~113).
+    packed: Mem,
+}
+
+/// Packed cocsep entry: (class, ttrep, depth).
+#[inline(always)]
+pub fn cp_class(d: u32) -> usize {
+    ((d >> 10) & 0xFFF) as usize
+}
+#[inline(always)]
+pub fn cp_ttrep(d: u32) -> usize {
+    ((d >> 4) & 0x3F) as usize
+}
+#[inline(always)]
+pub fn cp_depth(d: u32) -> u8 {
+    (d & 15) as u8
 }
 
 #[inline(always)]
@@ -88,15 +106,31 @@ impl Cocsep {
             selfsim.push(ss);
         }
         assert_eq!(reps.len(), N_CLASSES);
-        let data = (0..N_COCSEP)
+        let data: Vec<u32> = (0..N_COCSEP)
             .map(|i| (class[i] << 16) | ((ttrep[i] as u32) << 8) | depth[i] as u32)
             .collect();
+        // 2 MiB: the kernel aligns it so that it gets one huge page.
+        let packed = Mem::anon(2 << 20);
+        let pb = unsafe { std::slice::from_raw_parts_mut(packed.ptr(), 3 * N_COCSEP + 1) };
+        for i in 0..N_COCSEP {
+            assert!(depth[i] < 16);
+            let p = (class[i] << 10) | ((ttrep[i] as u32) << 4) | depth[i] as u32;
+            pb[3 * i..3 * i + 3].copy_from_slice(&p.to_le_bytes()[..3]);
+        }
         Cocsep {
             data,
             reps,
             selfsim,
             distribution,
+            packed,
         }
+    }
+
+    /// Packed entry of cocsep coordinate `i` (see `cp_*`).
+    #[inline(always)]
+    pub fn packed(&self, i: usize) -> u32 {
+        debug_assert!(i < N_COCSEP);
+        unsafe { (self.packed.ptr().add(3 * i) as *const u32).read_unaligned() }
     }
 
     /// Full h11 key of a cube.
@@ -427,6 +461,10 @@ mod tests {
                 assert_eq!(cd_class(d0), cd_class(d1));
                 assert_eq!(cd_depth(d0), cd_depth(d1));
             }
+            let p = cs.packed(cocsep(c));
+            assert_eq!(cp_class(p), cd_class(d0));
+            assert_eq!(cp_ttrep(p), cd_ttrep(d0));
+            assert_eq!(cp_depth(p), cd_depth(d0));
             // ttrep maps the cube's corners onto the representative.
             let r = cs.reps[cd_class(d0)];
             assert_eq!(cocsep(c.transform(cd_ttrep(d0))), cocsep(r));
