@@ -16,6 +16,7 @@
 //!   once; lanes still running jobs of the cube drop them (lanes are checked
 //!   once per round after a cube is solved). If threads are waiting for work,
 //!   a long job list is extended and sorted by all of them (`build_task`).
+//!   Jobs whose bounds exceed the iteration are sorted last and not claimed.
 //! * A lane whose job ends takes, in order: a piece donated to its thread,
 //!   another job of the same cube, a job its thread already claimed, a fresh
 //!   cube (at most `max_active` cubes are in progress), jobs of the oldest
@@ -27,7 +28,8 @@
 //!   threads check once per round whether some thread is waiting and donate
 //!   it a split of one of their lanes (a copy of the path to the split
 //!   node). Waiting threads spin briefly, then yield.
-//! * The job buffers of reported cubes are reused by new ones.
+//! * The job buffers of reported cubes are reused by new ones, the other
+//!   build buffers by later builds: builds touch no fresh pages.
 //!
 //! Each job runs exactly once; its statistic is the sum over its pieces. A
 //! cube's node count includes work done on it after its solution was found
@@ -35,20 +37,22 @@
 //! of a `Lane::shared` lane only differs in returning at the end of a job,
 //! and everything here runs at job boundaries or once per round.
 
-use super::{job_key, sort_jobs, Job, Lane, Node, Phase, Step, MAXD};
+use super::{job_weight, Job, Lane, Node, Phase, Step, MAXD};
 use crate::cubie::CubieCube;
 use crate::simd::Cube;
-use crate::solver::{Solver, Stats, ALLOWED_AFTER};
+use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES};
 use std::cell::UnsafeCell;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, AtomicUsize};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 /// Parents per task of a parallel job extension, and the smallest job lists
 /// extended or sorted in parallel (when threads are waiting for work).
 const EXT_CHUNK: usize = 16;
 const EXT_MIN: usize = 128;
+/// (Extensions by two moves: one parent per task.)
+const EXT_MIN2: usize = 16;
 const SORT_MIN: usize = 8192;
 /// Most jobs a thread claims at once.
 const CHUNK_MAX: u32 = 64;
@@ -65,19 +69,51 @@ pub type Done<'d> = dyn FnMut(usize, Vec<u8>, Stats, f64) + 'd;
 /// Iteration data, written only by the thread that builds an iteration, while
 /// no job of the cube is outstanding (nobody else reads it then).
 struct Inner {
+    /// The jobs of the current iteration, the first `nf` feasible (claimed),
+    /// the others with bounds beyond it.
     jobs: Vec<Job>,
+    nf: usize,
     /// Statistic (f32 bits) of each job of the current iteration, summed
     /// over the job's pieces.
     stats: Vec<AtomicU32>,
     target: u8,
-    /// Parallel build (`build_task`). Extension: the parents and the first
-    /// child of each chunk of `EXT_CHUNK` parents; the children go to
-    /// `out`. Sort (a sample sort): the keys and their buckets, the
-    /// splitters, the keys scattered to `keys_tmp` by bucket, the counts
-    /// (then positions) of the buckets per chunk, the start of each bucket;
-    /// the sorted jobs go to `out`. Tasks write through the `*_ptr` copies
-    /// of the buffer addresses.
-    parents: Vec<Job>,
+    /// Buffers of the build in progress (from `Pool::bufs`).
+    b: Bufs,
+    /// When the current iteration's build started, its jobs were extended
+    /// and the stages of a parallel sort ended (for `Pool::trace`).
+    t0: Instant,
+    t1: Instant,
+    t2: Instant,
+    ts: [Instant; 3],
+}
+
+/// Most jobs of an iteration (the canonical sequences of 4 moves), and the
+/// capacity of every job buffer (`Lane::extend_jobs` reserves 15 children
+/// per parent). Job buffers are allocated at full size and then only
+/// swapped around, and the other buffers of a build are reused through
+/// `Pool::bufs`: builds never touch fresh pages (whose faults, ~1 us per
+/// 4 KiB, took most of the time of a parallel build).
+const MAX_JOBS: usize = 43254;
+const JOBS_CAP: usize = 3240 * 15;
+
+/// Buffers of a build. Parallel extension (`build_task`): the first child
+/// of each chunk of `EXT_CHUNK` parents; the children go to `out`. Sort (a
+/// sample sort; the serial sort uses `keys` and `keys_tmp`): the keys and
+/// their buckets, the splitters, the keys scattered to `keys_tmp` by
+/// bucket, the counts (then positions) of the buckets per chunk, the start
+/// of each bucket; the sorted jobs go to `out`, which is then swapped with
+/// the cube's jobs. Tasks write through the `*_ptr` copies of the buffer
+/// addresses.
+#[derive(Default)]
+struct Bufs {
+    /// From `Pool::bufs` (those of staged builds; serial builds use the
+    /// builder's own).
+    pooled: bool,
+    /// Moves added by the parallel extension.
+    ext_lev: u8,
+    /// The sort keys take the statistics from `Inner::stats` (the jobs are
+    /// those of the last iteration).
+    direct: bool,
     ext_off: Vec<u32>,
     out: Vec<Job>,
     keys: Vec<u64>,
@@ -91,11 +127,121 @@ struct Inner {
     tmp_ptr: usize,
     bids_ptr: usize,
     hist_ptr: usize,
-    /// When the current iteration's build started, its jobs were extended
-    /// and the stages of a parallel sort ended (for `Pool::trace`).
-    t0: Instant,
-    t1: Instant,
-    ts: [Instant; 3],
+}
+
+impl Bufs {
+    fn sized() -> Bufs {
+        Bufs {
+            out: Vec::with_capacity(JOBS_CAP),
+            keys: Vec::with_capacity(MAX_JOBS),
+            keys_tmp: Vec::with_capacity(MAX_JOBS),
+            bids: Vec::with_capacity(MAX_JOBS),
+            ..Bufs::default()
+        }
+    }
+}
+
+/// A reader-writer spin lock. The threads of a pool have cores of their
+/// own and hold it briefly: waiting must not sleep (with `std`'s lock,
+/// readers queued behind a writer sleep in the kernel, for tens of us).
+struct SpinRw<T> {
+    /// Readers, plus `SPIN_W` while a writer holds or waits for the lock.
+    state: AtomicU32,
+    data: UnsafeCell<T>,
+}
+
+const SPIN_W: u32 = 1 << 31;
+
+// (A lock.)
+unsafe impl<T: Send + Sync> Sync for SpinRw<T> {}
+
+struct SpinRead<'l, T>(&'l SpinRw<T>);
+struct SpinWrite<'l, T>(&'l SpinRw<T>);
+
+impl<T> SpinRw<T> {
+    fn new(v: T) -> SpinRw<T> {
+        SpinRw {
+            state: AtomicU32::new(0),
+            data: UnsafeCell::new(v),
+        }
+    }
+
+    fn read(&self) -> SpinRead<'_, T> {
+        let mut i = 0;
+        loop {
+            let s = self.state.load(Relaxed);
+            if s & SPIN_W == 0
+                && self
+                    .state
+                    .compare_exchange_weak(s, s + 1, Acquire, Relaxed)
+                    .is_ok()
+            {
+                return SpinRead(self);
+            }
+            spin_wait(&mut i);
+        }
+    }
+
+    /// (New readers wait while a writer waits for the others to leave.)
+    fn write(&self) -> SpinWrite<'_, T> {
+        let mut i = 0;
+        while self.state.fetch_or(SPIN_W, Acquire) & SPIN_W != 0 {
+            while self.state.load(Relaxed) & SPIN_W != 0 {
+                spin_wait(&mut i);
+            }
+        }
+        while self.state.load(Acquire) != SPIN_W {
+            spin_wait(&mut i);
+        }
+        SpinWrite(self)
+    }
+}
+
+/// One wait of a spin lock: spins, then yields (if threads outnumber the
+/// cores, the holder may be waiting for one).
+#[inline(always)]
+fn spin_wait(i: &mut u32) {
+    *i += 1;
+    if *i < 256 {
+        std::hint::spin_loop();
+    } else {
+        std::thread::yield_now();
+    }
+}
+
+impl<T> std::ops::Deref for SpinRead<'_, T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        // SAFETY: no writer while a reader holds the lock.
+        unsafe { &*self.0.data.get() }
+    }
+}
+
+impl<T> Drop for SpinRead<'_, T> {
+    fn drop(&mut self) {
+        self.0.state.fetch_sub(1, Release);
+    }
+}
+
+impl<T> std::ops::Deref for SpinWrite<'_, T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        // SAFETY: the writer holds the lock alone.
+        unsafe { &*self.0.data.get() }
+    }
+}
+
+impl<T> std::ops::DerefMut for SpinWrite<'_, T> {
+    fn deref_mut(&mut self) -> &mut T {
+        // SAFETY: the writer holds the lock alone.
+        unsafe { &mut *self.0.data.get() }
+    }
+}
+
+impl<T> Drop for SpinWrite<'_, T> {
+    fn drop(&mut self) {
+        self.0.state.store(0, Release);
+    }
 }
 
 /// A value on cache lines of its own (atomics written by many threads).
@@ -116,8 +262,10 @@ struct CubeCtx {
     started: Instant,
     root_c: Cube,
     root_ci: Cube,
-    /// Solved (no more iterations; running jobs are dropped).
+    /// Solved (no more iterations; running jobs are dropped). (Written
+    /// once: with the read-mostly fields.)
     done: AtomicBool,
+    trace: bool,
     /// Jobs of the current iteration: `count << 32 | next unclaimed`.
     claim: Pad<AtomicU64>,
     /// Tasks of a parallel build: `stage << 56 | count << 32 | next
@@ -130,11 +278,30 @@ struct CubeCtx {
     /// 1 until solved, plus one per thread working on the cube; the thread
     /// that drops the last one reports the cube.
     parts: Pad<AtomicU32>,
-    nodes: AtomicU64,
-    lookups: AtomicU64,
+    /// Written now and then (not to disturb the read-mostly fields).
+    rare: Pad<Rare>,
     /// (solution, seconds).
     result: Mutex<(Vec<u8>, f64)>,
     inner: UnsafeCell<Inner>,
+    /// (trace) Per build task (stage - 1) * 256 + c: thread + 1, start and
+    /// end (ms, f32 bits).
+    tlog: Box<[[AtomicU32; 3]]>,
+}
+
+#[derive(Default)]
+struct Rare {
+    /// On `Pool::open` (changed under its write lock).
+    listed: AtomicBool,
+    /// Summed by the threads leaving the cube.
+    nodes: AtomicU64,
+    lookups: AtomicU64,
+    /// (trace) ns from `started` when the claims of the iteration ran out,
+    /// nodes and jobs of the iteration.
+    exhausted: AtomicU64,
+    it_nodes: AtomicU64,
+    it_jobs: AtomicU64,
+    it_donated: AtomicU64,
+    it_splits: AtomicU64,
 }
 
 // `inner` is only written by the builder while nobody else accesses it.
@@ -145,24 +312,13 @@ impl Inner {
         let t0 = Instant::now();
         Inner {
             jobs,
+            nf: 0,
             stats: Vec::new(),
             target,
-            parents: Vec::new(),
-            ext_off: Vec::new(),
-            out: Vec::new(),
-            keys: Vec::new(),
-            keys_tmp: Vec::new(),
-            bids: Vec::new(),
-            splitters: Vec::new(),
-            hist: Vec::new(),
-            groups: Vec::new(),
-            out_ptr: 0,
-            keys_ptr: 0,
-            tmp_ptr: 0,
-            bids_ptr: 0,
-            hist_ptr: 0,
+            b: Bufs::default(),
             t0,
             t1: t0,
+            t2: t0,
             ts: [t0; 3],
         }
     }
@@ -197,6 +353,14 @@ impl CubeCtx {
         let w = self.claim.load(Acquire);
         // (Checked first so that exhausted counters are not bumped forever.)
         if w as u32 >= (w >> 32) as u32 || self.done.load(Relaxed) {
+            if self.trace && self.rare.exhausted.load(Relaxed) == 0 {
+                let _ = self.rare.exhausted.compare_exchange(
+                    0,
+                    self.started.elapsed().as_nanos() as u64,
+                    Relaxed,
+                    Relaxed,
+                );
+            }
             return None;
         }
         let w = self.claim.fetch_add(k as u64, AcqRel);
@@ -248,7 +412,7 @@ pub struct Pool<'a> {
     /// Cubes started and not yet solved.
     active: Pad<AtomicUsize>,
     /// Cubes whose current iteration may have unclaimed jobs, oldest first.
-    open: Pad<RwLock<Vec<Arc<CubeCtx>>>>,
+    open: Pad<SpinRw<Vec<Arc<CubeCtx>>>>,
     nopen: Pad<AtomicUsize>,
     /// Per thread: a piece donated to it while it has no active lane.
     mail: Vec<Pad<Mailbox>>,
@@ -259,8 +423,9 @@ pub struct Pool<'a> {
     epoch: Pad<AtomicU64>,
     /// Bumped whenever a cube is solved (lanes may have jobs to drop).
     solved: Pad<AtomicU64>,
-    /// Buffers of reported cubes, for new ones.
-    spare: Mutex<Vec<Inner>>,
+    /// Buffers of reported cubes, for new ones, and of builds.
+    spare: Pad<Mutex<Vec<Inner>>>,
+    bufs: Pad<Mutex<Vec<Bufs>>>,
     counters: Mutex<[u64; NCOUNT]>,
     /// Print a line per iteration and solution (env `CUBE_TRACE`).
     trace: bool,
@@ -313,7 +478,7 @@ impl<'a> Pool<'a> {
             next: Pad(AtomicUsize::new(0)),
             no_fresh: AtomicBool::new(false),
             active: Pad(AtomicUsize::new(0)),
-            open: Pad(RwLock::new(Vec::new())),
+            open: Pad(SpinRw::new(Vec::new())),
             nopen: Pad(AtomicUsize::new(0)),
             mail: (0..nthreads.max(1))
                 .map(|_| {
@@ -327,7 +492,8 @@ impl<'a> Pool<'a> {
             hungry: Pad(AtomicUsize::new(0)),
             epoch: Pad(AtomicU64::new(0)),
             solved: Pad(AtomicU64::new(0)),
-            spare: Mutex::new(Vec::new()),
+            spare: Pad(Mutex::new(Vec::new())),
+            bufs: Pad(Mutex::new(Vec::new())),
             counters: Mutex::new([0; NCOUNT]),
             trace: std::env::var_os("CUBE_TRACE").is_some(),
         }
@@ -352,6 +518,7 @@ impl<'a> Pool<'a> {
             nactive: 0,
             locals: Vec::new(),
             scratch: Box::new(Lane::new()),
+            bufs: Bufs::sized(),
             epoch: 0,
             solved: 0,
             split_wait: 0,
@@ -381,14 +548,19 @@ impl<'a> Pool<'a> {
         out
     }
 
+    /// Make sure `ctx` is on the open list (new jobs or build tasks).
     fn publish(&self, ctx: &Arc<CubeCtx>) {
-        let mut o = self.open.write().unwrap();
+        let mut o = self.open.write();
         // Drop the cubes with nothing left to claim (else nobody may: when
         // no lane is idle).
         if o.len() >= 64 && o.len().is_power_of_two() {
-            o.retain(|c| c.open());
+            o.retain(keep_open);
         }
-        o.push(ctx.clone());
+        // (`listed` changes only under the write lock.)
+        if !ctx.rare.listed.load(Relaxed) {
+            ctx.rare.listed.store(true, Relaxed);
+            o.push(ctx.clone());
+        }
         self.nopen.store(o.len(), Relaxed);
         drop(o);
         self.epoch.fetch_add(1, Release);
@@ -399,7 +571,7 @@ impl<'a> Pool<'a> {
         if self.nopen.load(Relaxed) == 0 {
             return None;
         }
-        let o = self.open.read().unwrap();
+        let o = self.open.read();
         let mut dead = 0;
         let mut found = None;
         for c in o.iter() {
@@ -418,17 +590,43 @@ impl<'a> Pool<'a> {
         }
         drop(o);
         if dead > 0 {
-            if let Ok(mut o) = self.open.try_write() {
-                o.retain(|c| c.open());
-                self.nopen.store(o.len(), Relaxed);
-            }
+            // (Not a try: under the read locks of the threads looking for
+            // work it would rarely succeed, and the dead cubes would keep
+            // them all taking the lock.)
+            let mut o = self.open.write();
+            o.retain(keep_open);
+            self.nopen.store(o.len(), Relaxed);
         }
         found
+    }
+
+    fn take_bufs(&self) -> Bufs {
+        let mut b = self.bufs.lock().unwrap().pop().unwrap_or_else(Bufs::sized);
+        b.pooled = true;
+        b.direct = false;
+        b
+    }
+
+    /// Give back the buffers of a staged build (if any).
+    fn put_bufs(&self, b: Bufs) {
+        if b.pooled {
+            self.bufs.lock().unwrap().push(b);
+        }
     }
 
     fn finished(&self) -> bool {
         self.no_fresh.load(Acquire) && self.active.load(Acquire) == 0
     }
+}
+
+/// `retain` predicate of the open list: drops (and unlists) the cubes with
+/// nothing left to claim.
+fn keep_open(c: &Arc<CubeCtx>) -> bool {
+    let k = c.open();
+    if !k {
+        c.rare.listed.store(false, Relaxed);
+    }
+    k
 }
 
 /// Solve all cubes of `cubes` (until it returns None) with `threads` threads
@@ -464,6 +662,9 @@ struct Local {
     claimed: u64,
     nodes: u64,
     lookups: u64,
+    /// (trace) Of the current iteration.
+    it_nodes: u64,
+    it_jobs: u64,
 }
 
 struct SLane {
@@ -512,8 +713,9 @@ struct Worker<'w, 'a> {
     lanes: Vec<SLane>,
     nactive: usize,
     locals: Vec<Option<Local>>,
-    /// Builds iterations (its job buffers).
+    /// Builds iterations (its job buffers), and the buffers of serial builds.
     scratch: Box<Lane>,
+    bufs: Bufs,
     epoch: u64,
     /// `Pool::solved` when the lanes were last checked for solved cubes.
     solved: u64,
@@ -527,75 +729,181 @@ struct Worker<'w, 'a> {
 }
 
 /// Build the next iteration of `ctx` (the first one if `first`) with `sc`'s
-/// job buffers, and publish it. If threads are waiting for work, a long job
+/// extension, and publish it. If threads are waiting for work, a long job
 /// list is extended and sorted by all of them instead (`build_task`):
 /// returns true if that was started (the caller then helps).
-fn build(sc: &mut Lane, s: &Solver, pool: &Pool, ctx: &Arc<CubeCtx>, first: bool) -> bool {
+fn build(
+    sc: &mut Lane,
+    own: &mut Bufs,
+    s: &Solver,
+    pool: &Pool,
+    ctx: &Arc<CubeCtx>,
+    first: bool,
+) -> bool {
     let t0 = Instant::now();
     // SAFETY: no job of the cube is outstanding: nobody else accesses
     // `inner` until the iteration (or a build task) is published.
     let inner = unsafe { &mut *ctx.inner.get() };
+    if pool.trace && !first {
+        let ex = ctx.rare.exhausted.swap(0, Relaxed) as f64 * 1e-6;
+        let dt = (t0 - inner.t2).as_secs_f64();
+        let nd = ctx.rare.it_nodes.swap(0, Relaxed);
+        eprintln!("trace cube {} T {} ran {:.3} .. {:.3} ms, claims out at {ex:.3}, nodes {nd} jobs {} donated {} splits {} ({:.2} Gnodes/s)", ctx.index, inner.target, (inner.t2 - ctx.started).as_secs_f64() * 1e3, (t0 - ctx.started).as_secs_f64() * 1e3, ctx.rare.it_jobs.swap(0, Relaxed), ctx.rare.it_donated.swap(0, Relaxed), ctx.rare.it_splits.swap(0, Relaxed), nd as f64 / dt * 1e-9);
+    }
     inner.t0 = t0;
     inner.t1 = t0;
     if !first {
-        for (j, st) in inner.jobs.iter_mut().zip(inner.stats.iter()) {
-            j.stat = f32::from_bits(st.load(Relaxed));
-        }
         inner.target += 1;
     }
     let t = inner.target;
     // (As in `start_iteration`: the stack depth stays below the target.)
     assert!((t as usize) < MAXD);
-    sc.root_c = ctx.root_c;
-    sc.root_ci = ctx.root_ci;
-    std::mem::swap(&mut sc.jobs, &mut inner.jobs);
     let jl = s.job_len(t);
-    while (sc.jobs[0].len as usize) + 1 < jl {
-        sc.extend_jobs(s);
-    }
     let parallel = pool.hungry.load(Relaxed) != 0;
-    if (sc.jobs[0].len as usize) < jl && sc.jobs.len() >= EXT_MIN && parallel {
-        // Parallel extension: chunk c of the parents writes its children
-        // to `out[ext_off[c]..ext_off[c + 1]]`, in the order of a serial
-        // `extend_jobs`.
-        std::mem::swap(&mut sc.jobs, &mut inner.parents);
-        inner.ext_off.clear();
-        let mut off = 0u32;
-        for ch in inner.parents.chunks(EXT_CHUNK) {
-            inner.ext_off.push(off);
-            for j in ch {
-                off += if j.len == 0 {
-                    18
-                } else {
-                    ALLOWED_AFTER[(j.moves[j.len as usize - 1] / 3) as usize].count_ones()
-                };
+    let len = inner.jobs[0].len as usize;
+    // Sorted by the statistics as they are (not copied to the jobs first)?
+    let direct = !first && len >= jl && jl > 0 && parallel && inner.jobs.len() >= SORT_MIN;
+    if !first && !direct {
+        copy_stats(inner);
+    }
+    if len < jl {
+        // (`sc` gets the cube's buffer and ours, and returns them.)
+        sc.root_c = ctx.root_c;
+        sc.root_ci = ctx.root_ci;
+        std::mem::swap(&mut sc.jobs, &mut inner.jobs);
+        std::mem::swap(&mut sc.jobs_tmp, &mut own.out);
+        let par = loop {
+            let (n, lev) = (sc.jobs.len(), jl - sc.jobs[0].len as usize);
+            if lev == 0 || parallel && (lev == 1 && n >= EXT_MIN || lev == 2 && n >= EXT_MIN2) {
+                break lev;
             }
+            sc.extend_jobs(s);
+        };
+        std::mem::swap(&mut sc.jobs, &mut inner.jobs);
+        std::mem::swap(&mut sc.jobs_tmp, &mut own.out);
+        if par > 0 {
+            inner.b = pool.take_bufs();
+            // Parallel extension: chunk c of the parents writes its
+            // children (`par` moves longer) to `out[ext_off[c]..ext_off[c +
+            // 1]]`, in the order of serial `extend_jobs`.
+            let b = &mut inner.b;
+            b.ext_lev = par as u8;
+            b.ext_off.clear();
+            let mut off = 0u32;
+            let chunk = if par == 1 { EXT_CHUNK } else { 1 };
+            for ch in inner.jobs.chunks(chunk) {
+                b.ext_off.push(off);
+                for j in ch {
+                    off += nchildren(j, par);
+                }
+            }
+            b.ext_off.push(off);
+            b.out.clear();
+            assert!(off as usize <= b.out.capacity());
+            b.out_ptr = b.out.as_mut_ptr() as usize;
+            open_stage(pool, ctx, ST_EXT, b.ext_off.len() - 1);
+            return true;
         }
-        inner.ext_off.push(off);
-        inner.out.clear();
-        inner.out.reserve(off as usize);
-        inner.out_ptr = inner.out.as_mut_ptr() as usize;
-        open_stage(pool, ctx, ST_EXT, inner.ext_off.len() - 1);
-        pool.publish(ctx);
-        return true;
     }
-    while (sc.jobs[0].len as usize) < jl {
-        sc.extend_jobs(s);
-    }
-    std::mem::swap(&mut sc.jobs, &mut inner.jobs);
     inner.t1 = Instant::now();
     if jl > 0 && inner.jobs.len() >= SORT_MIN && parallel {
+        inner.b = pool.take_bufs();
+        inner.b.direct = direct;
         start_sort(pool, inner, ctx);
-        pool.publish(ctx);
         return true;
     }
-    if jl > 0 {
-        std::mem::swap(&mut sc.jobs, &mut inner.jobs);
-        sort_jobs(&mut sc.jobs, &mut sc.jobs_tmp);
-        std::mem::swap(&mut sc.jobs, &mut inner.jobs);
-    }
+    // (Serial builds use this thread's buffers: those of the pool were last
+    // written by other threads.)
+    inner.nf = if jl > 0 {
+        sort_serial(&mut inner.jobs, own, t)
+    } else {
+        inner.jobs.len()
+    };
     finish_build(pool, ctx);
     false
+}
+
+/// The statistics of the last iteration to its jobs.
+fn copy_stats(inner: &mut Inner) {
+    let n = inner.jobs.len();
+    for i in 0..n {
+        // (Written by other threads: fetched well ahead.)
+        if i % 16 == 0 {
+            prefetch(&inner.stats[(i + 512).min(n - 1)], false);
+        }
+        inner.jobs[i].stat = f32::from_bits(inner.stats[i].load(Relaxed));
+    }
+}
+
+/// The number of jobs `lev` (at most 2) moves longer than `j`
+/// (`extend_jobs`).
+fn nchildren(j: &Job, lev: usize) -> u32 {
+    /// By the face of the last move (6: none), and moves added.
+    static N: [[u32; 3]; 7] = {
+        let mut n = [[1u32; 3]; 7];
+        let mut f = 0;
+        while f < 7 {
+            let mm = if f == 6 { ALL_MOVES } else { ALLOWED_AFTER[f] };
+            n[f][1] = mm.count_ones();
+            let mut m = 0;
+            n[f][2] = 0;
+            while m < 18 {
+                if mm & (1 << m) != 0 {
+                    n[f][2] += ALLOWED_AFTER[m / 3].count_ones();
+                }
+                m += 1;
+            }
+            f += 1;
+        }
+        n
+    };
+    let f = if j.len == 0 {
+        6
+    } else {
+        (j.moves[j.len as usize - 1] / 3) as usize
+    };
+    N[f][lev]
+}
+
+/// Sort `jobs` for iteration `t` with the buffers of `b` (an LSD radix sort
+/// of the keys of `sort_key`, then a gather); returns the number of
+/// feasible jobs.
+fn sort_serial(jobs: &mut Vec<Job>, b: &mut Bufs, t: u8) -> usize {
+    let n = jobs.len();
+    let (keys, tmp) = (&mut b.keys, &mut b.keys_tmp);
+    keys.clear();
+    keys.extend((0..n).map(|i| sort_key(jobs, &[], false, t, i)));
+    tmp.clear();
+    tmp.resize(n, 0);
+    // (The indices, in the low bits, are in order.)
+    for (shift, bits) in [
+        (KEY_SHIFT, 11u32),
+        (KEY_SHIFT + 11, 11),
+        (KEY_SHIFT + 22, 11),
+    ] {
+        let mask = (1u64 << bits) - 1;
+        let mut cnt = [0u32; 2048];
+        for &k in keys.iter() {
+            cnt[((k >> shift) & mask) as usize] += 1;
+        }
+        if cnt.iter().any(|&c| c as usize == n) {
+            continue; // all keys share this digit
+        }
+        let mut sum = 0;
+        for c in cnt.iter_mut() {
+            (*c, sum) = (sum, sum + *c);
+        }
+        for &k in keys.iter() {
+            let d = ((k >> shift) & mask) as usize;
+            tmp[cnt[d] as usize] = k;
+            cnt[d] += 1;
+        }
+        std::mem::swap(keys, tmp);
+    }
+    b.out.clear();
+    b.out.extend(keys.iter().map(|&k| jobs[key_index(k)]));
+    std::mem::swap(jobs, &mut b.out);
+    keys.partition_point(|&k| k >> 63 == 0)
 }
 
 /// Build stages done in parallel (`build_task`).
@@ -609,63 +917,91 @@ const SORT_CHUNK: usize = 2048;
 const NBUCKETS: usize = 64;
 const SAMPLE: usize = 16;
 
-/// Open build stage `stage` with `n` tasks.
-fn open_stage(pool: &Pool, ctx: &CubeCtx, stage: u64, n: usize) {
+/// Open build stage `stage` with `n` tasks (and list the cube: it may have
+/// been dropped from the open list while the last stage's tasks ran).
+fn open_stage(pool: &Pool, ctx: &Arc<CubeCtx>, stage: u64, n: usize) {
     ctx.task_left.store(n as u32, Relaxed);
     ctx.task.store(stage << 56 | (n as u64) << 32, Release);
-    pool.epoch.fetch_add(1, Release);
+    pool.publish(ctx);
 }
 
 /// Set up the parallel sort of `inner.jobs`, the same order as
 /// `sort_jobs`: by `!job_key << 32 | index`. Keys are counted per chunk by
 /// their top bits (`ST_KEYS`), scattered to their buckets (`ST_SCATTER`),
 /// and runs of buckets are sorted and gathered (`ST_BUCKETS`).
-fn start_sort(pool: &Pool, inner: &mut Inner, ctx: &CubeCtx) {
+fn start_sort(pool: &Pool, inner: &mut Inner, ctx: &Arc<CubeCtx>) {
     let nch = sort_setup(inner);
     open_stage(pool, ctx, ST_KEYS, nch);
 }
 
-/// Sort key of job `i`: `sort_jobs` orders by increasing key.
+/// Sort key of job `i` in iteration `t` (with the statistic from `stats` if
+/// `direct`), in increasing order: the jobs whose bounds exceed the
+/// iteration (they would be skipped) last, then by decreasing `job_key`
+/// (as `sort_jobs`), then by index: `infeasible << 63 | !job_key << 31 |
+/// i`. The feasible jobs are in the order of `sort_jobs`, and only they
+/// are claimed.
 #[inline(always)]
-fn sort_key(jobs: &[Job], i: usize) -> u64 {
-    ((!job_key(&jobs[i]) as u64) << 32) | i as u64
+fn sort_key(jobs: &[Job], stats: &[AtomicU32], direct: bool, t: u8, i: usize) -> u64 {
+    let j = &jobs[i];
+    let stat = if direct {
+        f32::from_bits(stats[i].load(Relaxed))
+    } else {
+        j.stat
+    };
+    let infeasible = j.ln.max(j.li) as u32 + j.len as u32 > t as u32;
+    (infeasible as u64) << 63 | ((!(stat * job_weight(j)).to_bits() as u64) << KEY_SHIFT) | i as u64
+}
+
+const KEY_SHIFT: u32 = 31;
+
+#[inline(always)]
+fn key_index(k: u64) -> usize {
+    (k & ((1 << KEY_SHIFT) - 1)) as usize
 }
 
 /// Splitters of the buckets and buffers of a parallel sort; returns the
-/// number of `ST_KEYS` tasks. (The tasks fill the buffers' spare capacity,
-/// faulting in fresh pages in parallel.)
+/// number of `ST_KEYS` tasks.
 fn sort_setup(inner: &mut Inner) -> usize {
     let n = inner.jobs.len();
+    let t = inner.target;
     let nch = n.div_ceil(SORT_CHUNK);
     let at = |x: usize| x * n / (NBUCKETS * SAMPLE);
+    let direct = inner.b.direct;
     for x in 0..NBUCKETS * SAMPLE {
-        // (The jobs were just written by other threads.)
+        // (The jobs, or statistics, were just written by other threads.)
         prefetch(&inner.jobs[at(x)], false);
+        if direct {
+            prefetch(&inner.stats[at(x)], false);
+        }
     }
-    let mut sample: Vec<u64> = (0..NBUCKETS * SAMPLE)
-        .map(|x| sort_key(&inner.jobs, at(x)))
-        .collect();
+    let b = &mut inner.b;
+    let mut sample = std::mem::take(&mut b.splitters);
+    sample.clear();
+    sample.extend(
+        (0..NBUCKETS * SAMPLE).map(|x| sort_key(&inner.jobs, &inner.stats, direct, t, at(x))),
+    );
     sample.sort_unstable();
     sample.dedup();
-    inner.splitters.clear();
-    inner
-        .splitters
-        .extend((1..NBUCKETS).map(|b| sample[b * sample.len() / NBUCKETS]));
-    inner.hist.clear();
-    inner.hist.resize(nch * NBUCKETS, 0);
-    for v in [&mut inner.keys, &mut inner.keys_tmp] {
-        v.clear();
-        v.reserve(n);
+    let len = sample.len();
+    for i in 1..NBUCKETS {
+        sample[i - 1] = sample[i * len / NBUCKETS];
     }
-    inner.bids.clear();
-    inner.bids.reserve(n);
-    inner.out.clear();
-    inner.out.reserve(n);
-    inner.keys_ptr = inner.keys.as_mut_ptr() as usize;
-    inner.tmp_ptr = inner.keys_tmp.as_mut_ptr() as usize;
-    inner.bids_ptr = inner.bids.as_mut_ptr() as usize;
-    inner.hist_ptr = inner.hist.as_mut_ptr() as usize;
-    inner.out_ptr = inner.out.as_mut_ptr() as usize;
+    sample.truncate(NBUCKETS - 1);
+    b.splitters = sample;
+    b.hist.clear();
+    b.hist.resize(nch * NBUCKETS, 0);
+    for v in [&mut b.keys, &mut b.keys_tmp] {
+        v.clear();
+        assert!(n <= v.capacity());
+    }
+    b.bids.clear();
+    b.out.clear();
+    assert!(n <= b.bids.capacity() && n <= b.out.capacity());
+    b.keys_ptr = b.keys.as_mut_ptr() as usize;
+    b.tmp_ptr = b.keys_tmp.as_mut_ptr() as usize;
+    b.bids_ptr = b.bids.as_mut_ptr() as usize;
+    b.hist_ptr = b.hist.as_mut_ptr() as usize;
+    b.out_ptr = b.out.as_mut_ptr() as usize;
     nch
 }
 
@@ -676,49 +1012,50 @@ fn sort_setup(inner: &mut Inner) -> usize {
 /// `sort_setup` and the previous stages.
 unsafe fn sort_task(inner: &Inner, stage: u64, c: usize) {
     let jobs = &inner.jobs;
+    let b = &inner.b;
     match stage {
         ST_KEYS => {
-            let a = c * SORT_CHUNK;
-            let b = (a + SORT_CHUNK).min(jobs.len());
-            let (keys, bids) = (inner.keys_ptr as *mut u64, inner.bids_ptr as *mut u8);
+            let lo = c * SORT_CHUNK;
+            let hi = (lo + SORT_CHUNK).min(jobs.len());
+            let (keys, bids) = (b.keys_ptr as *mut u64, b.bids_ptr as *mut u8);
             let mut h = [0u32; NBUCKETS];
-            for i in a..b {
-                let k = sort_key(jobs, i);
-                let bk = inner.splitters.partition_point(|&s| s <= k);
+            for i in lo..hi {
+                let k = sort_key(jobs, &inner.stats, b.direct, inner.target, i);
+                let bk = b.splitters.partition_point(|&s| s <= k);
                 *keys.add(i) = k;
                 *bids.add(i) = bk as u8;
                 h[bk] += 1;
             }
-            let hist = (inner.hist_ptr as *mut u32).add(c * NBUCKETS);
+            let hist = (b.hist_ptr as *mut u32).add(c * NBUCKETS);
             std::ptr::copy_nonoverlapping(h.as_ptr(), hist, NBUCKETS);
         }
         ST_SCATTER => {
-            let a = c * SORT_CHUNK;
-            let b = (a + SORT_CHUNK).min(jobs.len());
-            let (keys, tmp) = (inner.keys_ptr as *const u64, inner.tmp_ptr as *mut u64);
-            let bids = inner.bids_ptr as *const u8;
+            let lo = c * SORT_CHUNK;
+            let hi = (lo + SORT_CHUNK).min(jobs.len());
+            let (keys, tmp) = (b.keys_ptr as *const u64, b.tmp_ptr as *mut u64);
+            let bids = b.bids_ptr as *const u8;
             let off = std::slice::from_raw_parts_mut(
-                (inner.hist_ptr as *mut u32).add(c * NBUCKETS),
+                (b.hist_ptr as *mut u32).add(c * NBUCKETS),
                 NBUCKETS,
             );
-            for i in a..b {
+            for i in lo..hi {
                 let o = &mut off[*bids.add(i) as usize];
                 *tmp.add(*o as usize) = *keys.add(i);
                 *o += 1;
             }
         }
         _ => {
-            let (a, b) = (inner.groups[c] as usize, inner.groups[c + 1] as usize);
-            let run = std::slice::from_raw_parts_mut((inner.tmp_ptr as *mut u64).add(a), b - a);
+            let (lo, hi) = (b.groups[c] as usize, b.groups[c + 1] as usize);
+            let run = std::slice::from_raw_parts_mut((b.tmp_ptr as *mut u64).add(lo), hi - lo);
             // (Keys are distinct: the index breaks ties, as in a stable
             // sort.)
             run.sort_unstable();
-            let out = (inner.out_ptr as *mut Job).add(a);
+            let out = (b.out_ptr as *mut Job).add(lo);
             for (p, &k) in run.iter().enumerate() {
                 if let Some(&k) = run.get(p + 16) {
-                    prefetch(&jobs[k as u32 as usize], false);
+                    prefetch(&jobs[key_index(k)], false);
                 }
-                *out.add(p) = jobs[k as u32 as usize];
+                *out.add(p) = jobs[key_index(k)];
             }
         }
     }
@@ -728,28 +1065,34 @@ unsafe fn sort_task(inner: &Inner, stage: u64, c: usize) {
 /// of tasks, or None when the jobs are sorted.
 fn sort_stage_done(inner: &mut Inner, stage: u64) -> Option<(u64, usize)> {
     inner.ts[(stage - ST_KEYS) as usize] = Instant::now();
+    let b = &mut inner.b;
     match stage {
         ST_KEYS => {
             // Counts to the first position of each (chunk, bucket); a
             // bucket is a task of `ST_BUCKETS`.
-            let nch = inner.hist.len() / NBUCKETS;
-            inner.groups.clear();
+            let nch = b.hist.len() / NBUCKETS;
+            b.groups.clear();
             let mut pos = 0u32;
-            for b in 0..NBUCKETS {
-                inner.groups.push(pos);
+            for bk in 0..NBUCKETS {
+                b.groups.push(pos);
                 for ch in 0..nch {
-                    let x = &mut inner.hist[ch * NBUCKETS + b];
+                    let x = &mut b.hist[ch * NBUCKETS + bk];
                     (*x, pos) = (pos, pos + *x);
                 }
             }
-            inner.groups.push(pos);
+            b.groups.push(pos);
             Some((ST_SCATTER, nch))
         }
         ST_SCATTER => Some((ST_BUCKETS, NBUCKETS)),
         _ => {
-            // SAFETY: the tasks wrote all of `out`.
-            unsafe { inner.out.set_len(inner.jobs.len()) };
-            std::mem::swap(&mut inner.jobs, &mut inner.out);
+            let n = inner.jobs.len();
+            // SAFETY: the tasks wrote all of `out` (and sorted `keys_tmp`).
+            unsafe {
+                b.out.set_len(n);
+                inner.nf = std::slice::from_raw_parts(b.tmp_ptr as *const u64, n)
+                    .partition_point(|&k| k >> 63 == 0);
+            }
+            std::mem::swap(&mut inner.jobs, &mut b.out);
             None
         }
     }
@@ -757,7 +1100,7 @@ fn sort_stage_done(inner: &mut Inner, stage: u64) -> Option<(u64, usize)> {
 
 /// Do a task of `ctx`'s parallel build, if one is left (false otherwise);
 /// the last task of a stage opens the next one or publishes the iteration.
-fn build_task(sc: &mut Lane, s: &Solver, pool: &Pool, ctx: &Arc<CubeCtx>) -> bool {
+fn build_task(sc: &mut Lane, s: &Solver, pool: &Pool, ctx: &Arc<CubeCtx>, tid: usize) -> bool {
     let w = ctx.task.load(Acquire);
     if (w as u32) >= (w >> 32) as u32 & 0xFF_FFFF {
         return false;
@@ -771,23 +1114,44 @@ fn build_task(sc: &mut Lane, s: &Solver, pool: &Pool, ctx: &Arc<CubeCtx>) -> boo
     // disjoint parts of the buffers (through the `*_ptr` copies), which are
     // read only in later stages.
     let inner = ctx.inner();
+    let tq0 = if pool.trace {
+        (Instant::now() - ctx.started).as_secs_f32() * 1e3
+    } else {
+        0.0
+    };
     // SAFETY: see above.
     unsafe {
         match stage {
             ST_EXT => {
-                let a = c * EXT_CHUNK;
-                let b = (a + EXT_CHUNK).min(inner.parents.len());
+                let chunk = if inner.b.ext_lev == 1 { EXT_CHUNK } else { 1 };
+                let lo = c * chunk;
+                let hi = (lo + chunk).min(inner.jobs.len());
                 sc.root_c = ctx.root_c;
                 sc.root_ci = ctx.root_ci;
                 sc.jobs.clear();
-                sc.jobs.extend_from_slice(&inner.parents[a..b]);
-                sc.extend_jobs(s);
-                let (o, e) = (inner.ext_off[c] as usize, inner.ext_off[c + 1] as usize);
+                sc.jobs.extend_from_slice(&inner.jobs[lo..hi]);
+                for _ in 0..inner.b.ext_lev {
+                    sc.extend_jobs(s);
+                }
+                let b = &inner.b;
+                let (o, e) = (b.ext_off[c] as usize, b.ext_off[c + 1] as usize);
                 assert_eq!(sc.jobs.len(), e - o);
-                let out = (inner.out_ptr as *mut Job).add(o);
+                let out = (b.out_ptr as *mut Job).add(o);
                 std::ptr::copy_nonoverlapping(sc.jobs.as_ptr(), out, e - o);
             }
             _ => sort_task(inner, stage, c),
+        }
+    }
+    if pool.trace {
+        let tq1 = (Instant::now() - ctx.started).as_secs_f32() * 1e3;
+        if let Some(e) = ctx
+            .tlog
+            .get((stage as usize - 1) * 256 + c)
+            .filter(|_| c < 256)
+        {
+            e[0].store(tid as u32 + 1, Relaxed);
+            e[1].store(tq0.to_bits(), Relaxed);
+            e[2].store(tq1.to_bits(), Relaxed);
         }
     }
     if ctx.task_left.fetch_sub(1, AcqRel) == 1 {
@@ -795,16 +1159,15 @@ fn build_task(sc: &mut Lane, s: &Solver, pool: &Pool, ctx: &Arc<CubeCtx>) -> boo
         let inner = unsafe { &mut *ctx.inner.get() };
         match stage {
             ST_EXT => {
+                let b = &mut inner.b;
                 // SAFETY: the tasks wrote all of `out`.
-                unsafe { inner.out.set_len(*inner.ext_off.last().unwrap() as usize) };
-                std::mem::swap(&mut inner.jobs, &mut inner.out);
+                unsafe { b.out.set_len(*b.ext_off.last().unwrap() as usize) };
+                std::mem::swap(&mut inner.jobs, &mut b.out);
                 inner.t1 = Instant::now();
                 if inner.jobs.len() >= SORT_MIN {
                     start_sort(pool, inner, ctx);
                 } else {
-                    std::mem::swap(&mut sc.jobs, &mut inner.jobs);
-                    sort_jobs(&mut sc.jobs, &mut sc.jobs_tmp);
-                    std::mem::swap(&mut sc.jobs, &mut inner.jobs);
+                    inner.nf = sort_serial(&mut inner.jobs, &mut inner.b, inner.target);
                     finish_build(pool, ctx);
                 }
             }
@@ -821,13 +1184,21 @@ fn build_task(sc: &mut Lane, s: &Solver, pool: &Pool, ctx: &Arc<CubeCtx>) -> boo
 fn finish_build(pool: &Pool, ctx: &Arc<CubeCtx>) {
     // SAFETY: as in `build`.
     let inner = unsafe { &mut *ctx.inner.get() };
+    pool.put_bufs(std::mem::take(&mut inner.b));
     let t = inner.target;
     let t2 = Instant::now();
     let n = inner.jobs.len();
     inner.stats.clear();
     inner.stats.resize_with(n, || AtomicU32::new(0));
-    ctx.outstanding.store(n as u64, Relaxed);
-    ctx.claim.store((n as u64) << 32, Release);
+    // (The infeasible jobs, at the end, keep the statistic 0.)
+    let nf = inner.nf;
+    // At least one job is claimed (an infeasible one is skipped): the
+    // iteration ends when the claimed jobs end.
+    let nc = nf.max(1) as u64;
+    ctx.outstanding.store(nc, Relaxed);
+    ctx.rare.exhausted.store(0, Relaxed);
+    inner.t2 = Instant::now();
+    ctx.claim.store(nc << 32, Release);
     pool.publish(ctx);
     if pool.trace {
         let ms = |t: Instant| (t - ctx.started).as_secs_f64() * 1e3;
@@ -838,13 +1209,37 @@ fn finish_build(pool: &Pool, ctx: &Arc<CubeCtx>) {
             String::new()
         };
         eprintln!(
-            "trace cube {} T {t} jobs {n} build {:.3} .. {:.3} ms (extended {:.3} sorted {:.3}){st}",
+            "trace cube {} T {t} jobs {n} feasible {nf} build {:.3} .. {:.3} ms (extended {:.3} sorted {:.3}){st}",
             ctx.index,
             ms(inner.t0),
             ms(Instant::now()),
             ms(inner.t1),
             ms(t2)
         );
+        for st in 1..5usize {
+            let v: Vec<(u32, f32, f32)> = ctx.tlog[(st - 1) * 256..st * 256]
+                .iter()
+                .filter(|e| e[0].load(Relaxed) != 0)
+                .map(|e| {
+                    (
+                        e[0].swap(0, Relaxed),
+                        f32::from_bits(e[1].load(Relaxed)),
+                        f32::from_bits(e[2].load(Relaxed)),
+                    )
+                })
+                .collect();
+            if v.is_empty() {
+                continue;
+            }
+            let mut th: Vec<u32> = v.iter().map(|x| x.0).collect();
+            th.sort();
+            th.dedup();
+            let first = v.iter().map(|x| x.1).fold(f32::MAX, f32::min);
+            let last = v.iter().map(|x| x.2).fold(0f32, f32::max);
+            let sum: f32 = v.iter().map(|x| x.2 - x.1).sum();
+            let mx = v.iter().map(|x| x.2 - x.1).fold(0f32, f32::max);
+            eprintln!("  stage {st} tasks {} threads {} first {first:.3} last {last:.3} sum {sum:.3} max {mx:.3}", v.len(), th.len());
+        }
     }
 }
 
@@ -1044,7 +1439,15 @@ impl Worker<'_, '_> {
         let sol = sl.l.reconstruct();
         let dt = ctx.started.elapsed().as_secs_f64();
         if self.pool.trace {
-            eprintln!("trace cube {} found {:.3} ms", ctx.index, dt * 1e3);
+            // SAFETY: (trace) the iteration is still on.
+            let t2 = unsafe { (*ctx.inner.get()).t2 };
+            eprintln!(
+                "trace cube {} found {:.3} ms ({:.3} ms into T {})",
+                ctx.index,
+                dt * 1e3,
+                (Instant::now() - t2).as_secs_f64() * 1e3,
+                sl.l.target
+            );
         }
         *ctx.result.lock().unwrap() = (sol, dt);
         self.pool.active.fetch_sub(1, AcqRel);
@@ -1062,6 +1465,8 @@ impl Worker<'_, '_> {
         let loc = self.locals[slot].as_mut().unwrap();
         loc.nodes += sl.l.stats.nodes - sl.n0;
         loc.lookups += sl.l.stats.lookups - sl.k0;
+        loc.it_nodes += sl.l.stats.nodes - sl.n0;
+        loc.it_jobs += 1;
         if stat {
             let st = &loc.ctx.inner().stats[sl.job as usize];
             if sl.split {
@@ -1085,6 +1490,11 @@ impl Worker<'_, '_> {
     fn refill(&mut self, li: usize, prefer: Option<usize>) -> bool {
         // (A piece first: its job holds up the iteration.)
         if matches!(self.mailbox(), Some(m) if m.state.load(Relaxed) == FULL) && self.piece(li) {
+            // (The cube of the lane's last job may have nothing pending
+            // any more: its jobs are to be counted down.)
+            if let Some(slot) = prefer {
+                self.tidy(slot);
+            }
             return true;
         }
         if let Some(slot) = prefer {
@@ -1121,6 +1531,15 @@ impl Worker<'_, '_> {
             self.release(slot);
         }
         false
+    }
+
+    /// Count down the jobs of `slot` if none is pending, and leave the cube
+    /// then.
+    fn tidy(&mut self, slot: usize) {
+        self.settle(slot);
+        if self.locals[slot].as_ref().unwrap().pending == 0 {
+            self.release(slot);
+        }
     }
 
     /// Start the next claimed job of `slot` in lane `li`.
@@ -1195,12 +1614,29 @@ impl Worker<'_, '_> {
         }
         let c = loc.claimed;
         loc.claimed = 0;
+        if self.pool.trace {
+            loc.ctx
+                .rare
+                .it_nodes
+                .fetch_add(std::mem::take(&mut loc.it_nodes), Relaxed);
+            loc.ctx
+                .rare
+                .it_jobs
+                .fetch_add(std::mem::take(&mut loc.it_jobs), Relaxed);
+        }
         // (Release: the statistics of the jobs; Acquire: everybody else's.)
         if loc.ctx.outstanding.fetch_sub(c, AcqRel) == c && !loc.ctx.done.load(Acquire) {
             let ctx = loc.ctx.clone();
             self.count[C_BUILDS] += 1;
-            if build(&mut self.scratch, self.s, self.pool, &ctx, false) {
-                while build_task(&mut self.scratch, self.s, self.pool, &ctx) {}
+            if build(
+                &mut self.scratch,
+                &mut self.bufs,
+                self.s,
+                self.pool,
+                &ctx,
+                false,
+            ) {
+                while build_task(&mut self.scratch, self.s, self.pool, &ctx, self.id) {}
             }
         }
     }
@@ -1210,8 +1646,8 @@ impl Worker<'_, '_> {
         let loc = self.locals[slot].take().unwrap();
         debug_assert!(loc.pending == 0 && loc.claimed == 0);
         let ctx = loc.ctx;
-        ctx.nodes.fetch_add(loc.nodes, Relaxed);
-        ctx.lookups.fetch_add(loc.lookups, Relaxed);
+        ctx.rare.nodes.fetch_add(loc.nodes, Relaxed);
+        ctx.rare.lookups.fetch_add(loc.lookups, Relaxed);
         if ctx.parts.fetch_sub(1, AcqRel) == 1 {
             // Nobody works on the cube any more (the open list only reads
             // its atomics): recycle its buffers.
@@ -1224,8 +1660,8 @@ impl Worker<'_, '_> {
             drop(spare);
             let (sol, dt) = std::mem::take(&mut *ctx.result.lock().unwrap());
             let st = Stats {
-                nodes: ctx.nodes.load(Relaxed),
-                lookups: ctx.lookups.load(Relaxed),
+                nodes: ctx.rare.nodes.load(Relaxed),
+                lookups: ctx.rare.lookups.load(Relaxed),
             };
             (self.done)(ctx.index, sol, st, dt);
         }
@@ -1257,6 +1693,8 @@ impl Worker<'_, '_> {
             claimed: 0,
             nodes: 0,
             lookups: 0,
+            it_nodes: 0,
+            it_jobs: 0,
         };
         Some(match self.locals.iter().position(|l| l.is_none()) {
             Some(i) => {
@@ -1299,6 +1737,9 @@ impl Worker<'_, '_> {
             }
             let ci = c.inverse();
             let (ln, li_) = (s.lower_bound(c), s.lower_bound(ci));
+            let spare = pool.spare.lock().unwrap().pop();
+            let mut inner = spare.unwrap_or_else(|| Inner::new(Vec::with_capacity(JOBS_CAP), 0));
+            inner.target = ln.max(li_).max(1);
             let ctx = Arc::new(CubeCtx {
                 index: i,
                 started,
@@ -1309,19 +1750,16 @@ impl Worker<'_, '_> {
                 task_left: Pad(AtomicU32::new(0)),
                 outstanding: Pad(AtomicU64::new(0)),
                 done: AtomicBool::new(false),
+                trace: pool.trace,
                 parts: Pad(AtomicU32::new(1)),
-                nodes: AtomicU64::new(0),
-                lookups: AtomicU64::new(0),
+                rare: Pad(Rare::default()),
                 result: Mutex::new((vec![], 0.0)),
-                inner: UnsafeCell::new(Inner::new(vec![], ln.max(li_).max(1))),
+                tlog: (0..1024).map(|_| Default::default()).collect(),
+                inner: UnsafeCell::new(inner),
             });
             {
                 // SAFETY: nobody else knows the cube yet.
                 let inner = unsafe { &mut *ctx.inner.get() };
-                if let Some(mut spare) = pool.spare.lock().unwrap().pop() {
-                    std::mem::swap(inner, &mut spare);
-                    inner.target = spare.target;
-                }
                 inner.jobs.clear();
                 inner.jobs.push(Job {
                     moves: [0; 4],
@@ -1334,8 +1772,8 @@ impl Worker<'_, '_> {
                 inner.t0 = started;
                 inner.t1 = started;
             }
-            if build(&mut self.scratch, s, pool, &ctx, true) {
-                while build_task(&mut self.scratch, s, pool, &ctx) {}
+            if build(&mut self.scratch, &mut self.bufs, s, pool, &ctx, true) {
+                while build_task(&mut self.scratch, s, pool, &ctx, self.id) {}
             }
             self.count[C_FRESH] += 1;
             let slot = self.local(&ctx).unwrap();
@@ -1468,7 +1906,11 @@ impl Worker<'_, '_> {
         vl.split = true;
         tl.n0 = tl.l.stats.nodes;
         tl.k0 = tl.l.stats.lookups;
-        self.locals[vl.slot as usize].as_mut().unwrap().pending += 1;
+        let loc = self.locals[vl.slot as usize].as_mut().unwrap();
+        loc.pending += 1;
+        if self.pool.trace {
+            loc.ctx.rare.it_splits.fetch_add(1, Relaxed);
+        }
         self.count[C_SPLITS] += 1;
         true
     }
@@ -1508,6 +1950,9 @@ impl Worker<'_, '_> {
         // (The job is outstanding, so the iteration cannot end before the
         // piece is counted.)
         ctx.outstanding.fetch_add(1, Relaxed);
+        if pool.trace {
+            ctx.rare.it_donated.fetch_add(1, Relaxed);
+        }
         *m.piece.lock().unwrap() = Some(Piece {
             ctx,
             job: sl.job,
@@ -1581,7 +2026,7 @@ impl Worker<'_, '_> {
             let e = pool.epoch.load(Acquire);
             // help extending job lists
             while let Some(ctx) = pool.find_open(true) {
-                while build_task(&mut self.scratch, self.s, pool, &ctx) {}
+                while build_task(&mut self.scratch, self.s, pool, &ctx, self.id) {}
             }
             self.fill_idle(0);
             if self.nactive > 0 {
@@ -1636,8 +2081,27 @@ mod tests {
                 })
                 .collect();
             let mut want = jobs.clone();
-            sort_jobs(&mut want, &mut Vec::new());
-            let mut inner = Inner::new(jobs, 0);
+            super::super::sort_jobs(&mut want, &mut Vec::new());
+            // all feasible
+            let mut serial = jobs.clone();
+            assert_eq!(sort_serial(&mut serial, &mut Bufs::sized(), 255), n);
+            let id = |j: &Job| (j.moves, j.ln, j.stat.to_bits());
+            assert!(serial.iter().map(id).eq(want.iter().map(id)), "n = {n}");
+            // the feasible ones in that order, then the others
+            let t = 100;
+            let feasible = |j: &&Job| (j.ln as usize) < t;
+            let want_t: Vec<Job> = want
+                .iter()
+                .filter(feasible)
+                .chain(want.iter().filter(|j| !feasible(j)))
+                .copied()
+                .collect();
+            let nf = want.iter().filter(feasible).count();
+            let mut serial = jobs.clone();
+            assert_eq!(sort_serial(&mut serial, &mut Bufs::sized(), t as u8), nf);
+            assert!(serial.iter().map(id).eq(want_t.iter().map(id)), "n = {n}");
+            let mut inner = Inner::new(jobs, t as u8);
+            inner.b = Bufs::sized();
             let mut ntasks = sort_setup(&mut inner);
             let mut stage = ST_KEYS;
             loop {
@@ -1650,8 +2114,11 @@ mod tests {
                     None => break,
                 }
             }
-            let id = |j: &Job| (j.moves, j.ln, j.stat.to_bits());
-            assert!(inner.jobs.iter().map(id).eq(want.iter().map(id)), "n = {n}");
+            assert!(
+                inner.jobs.iter().map(id).eq(want_t.iter().map(id)),
+                "n = {n}"
+            );
+            assert_eq!(inner.nf, nf);
         }
     }
 }
