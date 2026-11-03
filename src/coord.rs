@@ -161,6 +161,13 @@ pub fn cocsep(c: Cube) -> usize {
         let t = &crate::simd::TABS;
         let (co2, sep): (u64, u64);
         // co2: orientations of corners 0..6 (14 bits); sep: tetrad mask.
+        // (Miri cannot run inline asm: the same pexts as intrinsics.)
+        #[cfg(miri)]
+        {
+            co2 = _pext_u64(x, t.pext_co);
+            sep = _pext_u64(x, t.pext_sep);
+        }
+        #[cfg(not(miri))]
         std::arch::asm!(
             "pext {co2}, {x}, qword ptr [{t} + {oc}]",
             "pext {sep}, {x}, qword ptr [{t} + {os}]",
@@ -187,6 +194,12 @@ pub fn cocsep3(c: Cube) -> usize {
     unsafe {
         let t = &crate::simd::TABS;
         let (co2, sep): (u64, u64);
+        #[cfg(miri)]
+        {
+            co2 = _pext_u64(x, t.pext_co);
+            sep = _pext_u64(x, t.pext_sep);
+        }
+        #[cfg(not(miri))]
         std::arch::asm!(
             "pext {co2}, {x}, qword ptr [{t} + {oc}]",
             "pext {sep}, {x}, qword ptr [{t} + {os}]",
@@ -265,6 +278,11 @@ fn edge_parts_sym_raw(c: Cube, t: usize) -> (u64, u64, u64) {
         // is ~1.5 cycles longer on Zen 5 (this mask feeds the pext).
         let zz = _mm256_add_epi8(z, z);
         let s: u32;
+        #[cfg(miri)]
+        {
+            s = _mm256_movemask_epi8(zz) as u32;
+        }
+        #[cfg(not(miri))]
         std::arch::asm!("vpmovmskb {s:e}, {zz}", s = out(reg) s, zz = in(ymm_reg) zz,
             options(pure, nomem, nostack, preserves_flags));
         let o = _mm256_movemask_epi8(_mm256_slli_epi16(_mm256_xor_si256(z, p), 3)) as u32;
@@ -381,7 +399,8 @@ mod tests {
     #[test]
     fn edge_key_sym_matches() {
         let mut rng = Rng(13);
-        for _ in 0..500 {
+        // (Fewer under Miri, which is slow.)
+        for _ in 0..if cfg!(miri) { 20 } else { 500 } {
             let c = Cube::from_cubie(&CubieCube::random(&mut rng));
             for t in 0..48 {
                 let ek = edge_key(c.transform_edges(t));

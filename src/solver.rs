@@ -479,3 +479,45 @@ impl<'a> Solver<'a> {
         node_lb
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::cubie::{conjugate, parse_moves, symmetries, Rng};
+
+    /// The hot-path index (`Solver::index`: `cocsep3`, packed entries,
+    /// `index_sym`) equals `Cocsep::index` for every `k`, symmetric cubes too.
+    #[test]
+    #[cfg_attr(miri, ignore = "Cocsep::generate is too slow under Miri")]
+    fn hot_index_matches_reference_index() {
+        let corners = Cocsep::generate();
+        let mut rng = Rng(31);
+        let mut cubes = vec![CubieCube::SOLVED];
+        for scramble in [
+            "U2 D2 R2 L2 F2 B2",
+            "U D' R L' F B' U D'",
+            "U R2 F B R B2 R U2 L B2 R U' D' R2 F R' L B2 U2 F2",
+        ] {
+            cubes.push(CubieCube::SOLVED.apply_moves(&parse_moves(scramble).unwrap()));
+        }
+        for _ in 0..40 {
+            cubes.push(CubieCube::random(&mut rng));
+        }
+        // All conjugates and inverse conjugates (the index picks a symmetry).
+        let variants: Vec<CubieCube> = cubes
+            .iter()
+            .flat_map(|c| [*c, c.inverse()])
+            .flat_map(|c| symmetries().iter().map(move |s| conjugate(&c, s)))
+            .collect();
+        for k in [0, 7, 8, 11] {
+            let table = H48Table::zeroed(k, 10);
+            let solver = Solver::new(&corners, &table);
+            for c in &variants {
+                let cube = Cube::from_cubie(c);
+                let (index, corner_bound) = solver.index(cube);
+                assert_eq!(index, corners.index(cube, k), "k {k}: {c:?}");
+                assert_eq!(corner_bound, cd_depth(corners.data[cocsep(cube)]));
+            }
+        }
+    }
+}

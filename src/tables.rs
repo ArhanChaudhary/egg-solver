@@ -126,6 +126,46 @@ impl Cocsep {
         }
     }
 
+    /// A cheap stand-in for unit tests: corner depths from a BFS cut after
+    /// `depth` moves (deeper coordinates get `depth + 1`, still a lower bound
+    /// and still a function of the coset), all in one class with no symmetry.
+    #[cfg(test)]
+    pub(crate) fn truncated(depth: u8) -> Cocsep {
+        let mut depths = vec![depth + 1; N_COCSEP];
+        depths[cocsep(Cube::solved())] = 0;
+        let mut frontier = vec![Cube::solved()];
+        for d in 1..=depth {
+            let mut next = Vec::new();
+            for cube in frontier {
+                for m in 0..18 {
+                    let child = cube.apply_move(m);
+                    let coord = cocsep(child);
+                    if depths[coord] > d {
+                        depths[coord] = d;
+                        next.push(child);
+                    }
+                }
+            }
+            frontier = next;
+        }
+        // Packed entries `class << 10 | ttrep << 4 | depth` with class and
+        // ttrep 0: just the depth byte.
+        let packed = Mem::anon(2 << 20);
+        let bytes = unsafe { std::slice::from_raw_parts_mut(packed.ptr(), 3 * N_COCSEP + 1) };
+        let mut distribution = vec![0u64; 16];
+        for (i, &d) in depths.iter().enumerate() {
+            bytes[3 * i] = d;
+            distribution[usize::from(d)] += 1;
+        }
+        Cocsep {
+            data: depths.iter().map(|&d| u32::from(d)).collect(),
+            reps: vec![Cube::solved(); N_CLASSES],
+            selfsim: vec![1; N_CLASSES],
+            distribution,
+            packed,
+        }
+    }
+
     /// Base of the packed entries (see `packed`).
     pub fn packed_ptr(&self) -> *const u8 {
         self.packed.ptr()
@@ -167,16 +207,22 @@ unsafe impl Sync for Mem {}
 impl Mem {
     /// Anonymous memory, transparent huge pages requested.
     pub fn anon(len: usize) -> Mem {
+        // (Miri supports only these flags, and no `madvise`.)
+        #[cfg(not(miri))]
+        let flags = libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_NORESERVE;
+        #[cfg(miri)]
+        let flags = libc::MAP_PRIVATE | libc::MAP_ANONYMOUS;
         unsafe {
             let p = libc::mmap(
                 std::ptr::null_mut(),
                 len,
                 libc::PROT_READ | libc::PROT_WRITE,
-                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_NORESERVE,
+                flags,
                 -1,
                 0,
             );
             assert!(p != libc::MAP_FAILED, "mmap failed");
+            #[cfg(not(miri))]
             libc::madvise(p, len, libc::MADV_HUGEPAGE);
             Mem {
                 ptr: p as *mut u8,
@@ -186,12 +232,15 @@ impl Mem {
     }
 
     /// Shared mapping of a file (e.g. on hugetlbfs, which gives 1GB pages).
-    /// If `create`, the file is created/truncated to `len`.
+    /// If `create`, the file is created/truncated to `len` and mapped
+    /// writable, else mapped read-only.
     pub fn file(path: &str, len: usize, create: bool) -> std::io::Result<Mem> {
         use std::os::unix::io::AsRawFd;
+        // (Opened tables are mapped read-only: a stray write faults instead
+        // of corrupting the shared table file for every process.)
         let f = std::fs::OpenOptions::new()
             .read(true)
-            .write(true)
+            .write(create)
             .create(create)
             .truncate(false)
             .open(path)?;
@@ -215,7 +264,11 @@ impl Mem {
             let p = libc::mmap(
                 std::ptr::null_mut(),
                 flen,
-                libc::PROT_READ | libc::PROT_WRITE,
+                if create {
+                    libc::PROT_READ | libc::PROT_WRITE
+                } else {
+                    libc::PROT_READ
+                },
                 libc::MAP_SHARED | libc::MAP_POPULATE,
                 f.as_raw_fd(),
                 0,
@@ -393,13 +446,31 @@ pub fn write_meta(path: &str, m: &H48Meta) -> std::io::Result<()> {
     std::fs::write(meta_path(path), format!("{} {}\n", m.k, m.base))
 }
 
+/// Read a table's `k` and `base`.
+///
+/// # Errors
+/// If the meta file cannot be read, or does not hold `k <= 11` and a base
+/// of at most 12: the search relies on bounds below 16 (`base + 3` and
+/// 4-bit group minima) and on the index layout of `k`.
 pub fn read_meta(path: &str) -> std::io::Result<H48Meta> {
     let s = std::fs::read_to_string(meta_path(path))?;
-    let v: Vec<u32> = s.split_whitespace().map(|x| x.parse().unwrap()).collect();
-    Ok(H48Meta {
-        k: v[0],
-        base: v[1] as u8,
-    })
+    let invalid = || {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("bad table meta {s:?}"),
+        )
+    };
+    let v: Vec<u32> = s
+        .split_whitespace()
+        .map(|x| x.parse().map_err(|_| invalid()))
+        .collect::<Result<_, _>>()?;
+    match v[..] {
+        [k, base] if k <= 11 && base <= 12 => Ok(H48Meta {
+            k,
+            base: u8::try_from(base).unwrap(),
+        }),
+        _ => Err(invalid()),
+    }
 }
 
 impl H48Table {
@@ -408,6 +479,16 @@ impl H48Table {
     pub fn open(path: &str) -> std::io::Result<H48Table> {
         let meta = read_meta(path)?;
         let len = h48_bytes(meta.k) as usize;
+        // A file of another `k` (a stale or wrong meta) would give wrong,
+        // possibly too high, bounds: its size must match (hugetlbfs files
+        // are rounded up to whole 1 GiB pages).
+        let flen = std::fs::metadata(path)?.len();
+        if flen < len as u64 || flen >= len as u64 + (1 << 30) {
+            return Err(std::io::Error::other(format!(
+                "table file {path}: {flen} bytes, but h{} needs {len}",
+                meta.k
+            )));
+        }
         if path.contains("huge") || path.starts_with("/dev/shm") {
             let mem = Mem::file(path, len, false)?;
             return Ok(H48Table { mem, meta });
@@ -437,6 +518,16 @@ impl H48Table {
         Ok(H48Table { mem, meta })
     }
 
+    /// An all-zero table (every bound is then the corner depth), for unit
+    /// tests with `Cocsep::truncated`.
+    #[cfg(test)]
+    pub(crate) fn zeroed(k: u32, base: u8) -> H48Table {
+        H48Table {
+            mem: Mem::anon(usize::try_from(h48_bytes(k)).unwrap()),
+            meta: H48Meta { k, base },
+        }
+    }
+
     pub fn save(&self, path: &str) -> std::io::Result<()> {
         let len = h48_bytes(self.meta.k) as usize;
         std::fs::write(path, &self.mem.bytes()[..len])?;
@@ -449,7 +540,53 @@ mod tests {
     use super::*;
     use crate::cubie::*;
 
+    /// Tables open only with a valid meta and a file of the size its `k`
+    /// needs (a wrong meta would give wrong, possibly too high, bounds).
     #[test]
+    #[cfg_attr(miri, ignore = "files")]
+    fn table_meta_and_size_are_checked() {
+        let dir = std::env::temp_dir().join(format!("cubeopt-meta-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("h0").to_string_lossy().into_owned();
+        let len = h48_bytes(0);
+        std::fs::write(&path, vec![0u8; usize::try_from(len).unwrap()]).unwrap();
+        let open_with = |meta: &str| {
+            std::fs::write(meta_path(&path), meta).unwrap();
+            H48Table::open(&path).map(|t| (t.meta.k, t.meta.base))
+        };
+        assert_eq!(open_with("0 8\n").unwrap(), (0, 8));
+        for bad in ["0 13", "12 8", "0", "0 8 1", "x 8", "0 -1", ""] {
+            assert!(open_with(bad).is_err(), "meta {bad:?}");
+        }
+        // The file of an h0 table is too small for h1.
+        assert!(open_with("1 8").is_err());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A table file opened for solving (hugetlbfs or /dev/shm) is mapped
+    /// read-only.
+    #[test]
+    #[cfg_attr(miri, ignore = "files")]
+    fn opened_table_file_is_read_only() {
+        let path = format!("/dev/shm/cubeopt-test-{}-h0", std::process::id());
+        let len = usize::try_from(h48_bytes(0)).unwrap();
+        std::fs::write(&path, vec![0u8; len]).unwrap();
+        std::fs::write(meta_path(&path), "0 8\n").unwrap();
+        let table = H48Table::open(&path).unwrap();
+        let start = table.ptr() as usize;
+        let maps = std::fs::read_to_string("/proc/self/maps").unwrap();
+        let perms = maps
+            .lines()
+            .find(|l| l.starts_with(&format!("{start:x}-")))
+            .map(|l| l.split_whitespace().nth(1).unwrap().to_string());
+        assert_eq!(perms.as_deref(), Some("r--s"), "{maps}");
+        drop(table);
+        std::fs::remove_file(meta_path(&path)).unwrap();
+        std::fs::remove_file(&path).unwrap();
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore = "Cocsep::generate is too slow under Miri")]
     fn cocsep_classes_and_distribution() {
         let cs = Cocsep::generate();
         assert_eq!(cs.reps.len(), 3393);
