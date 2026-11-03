@@ -127,8 +127,29 @@ pub static ESLOT: [u16; 4096] = ESLOT_TABLES.0;
 pub static SLOT_EMASK: [u16; 512] = ESLOT_TABLES.1;
 pub static RANK8: [u8; 256] = mk_8_rank();
 pub static UNRANK8: [u8; 70] = mk_8_unrank();
-static CO_LO: [u16; 256] = mk_co_part(1, 4);
-static CO_HI: [u16; 256] = mk_co_part(81, 3);
+/// co rank parts pre-multiplied by `N_CSEP` (saves a multiply on the
+/// cube -> cocsep data dependency chain).
+const fn mk_co_part70(mul: u32, n: usize) -> [u32; 256] {
+    let t = mk_co_part(1, n);
+    let mut r = [0u32; 256];
+    let mut i = 0;
+    while i < 256 {
+        r[i] = t[i] as u32 * mul * N_CSEP as u32;
+        i += 1;
+    }
+    r
+}
+static CO_LO: [u32; 256] = mk_co_part70(1, 4);
+static CO_HI: [u32; 64] = {
+    let t = mk_co_part70(81, 3);
+    let mut r = [0u32; 64];
+    let mut i = 0;
+    while i < 64 {
+        r[i] = t[i];
+        i += 1;
+    }
+    r
+};
 
 /// cocsep coordinate in 0..153090.
 #[inline(always)]
@@ -137,9 +158,9 @@ pub fn cocsep(c: Cube) -> usize {
     unsafe {
         let co2 = _pext_u64(x, 0x6060606060606060);
         let sep = _pext_u64(x, 0x0404040404040404);
-        let co =
-            CO_LO[(co2 & 0xFF) as usize] as usize + CO_HI[((co2 >> 8) & 0x3F) as usize] as usize;
-        co * N_CSEP + RANK8[sep as usize] as usize
+        (*CO_LO.get_unchecked((co2 & 0xFF) as usize)
+            + *CO_HI.get_unchecked(((co2 >> 8) & 0x3F) as usize)
+            + *RANK8.get_unchecked(sep as usize) as u32) as usize
     }
 }
 
@@ -190,7 +211,12 @@ pub fn edge_parts_sym(c: Cube, t: usize) -> (u64, u64, u64) {
         let z = _mm256_shuffle_epi8(y, p);
         // Masks of edge positions 0..12, in bits 16..28 (all else zero).
         let e = _mm256_movemask_epi8(z) as u32;
-        let s = _mm256_movemask_epi8(_mm256_add_epi8(z, z)) as u32;
+        // asm: LLVM would turn movemask(z + z) into vptestmb + kmovd, which
+        // is ~1.5 cycles longer on Zen 5 (this mask feeds the pext).
+        let zz = _mm256_add_epi8(z, z);
+        let s: u32;
+        std::arch::asm!("vpmovmskb {s:e}, {zz}", s = out(reg) s, zz = in(ymm_reg) zz,
+            options(pure, nomem, nostack, preserves_flags));
         let o = _mm256_movemask_epi8(_mm256_slli_epi16(_mm256_xor_si256(z, p), 3)) as u32;
         let msplit = *RANK8.get_unchecked(_pext_u32(s, e ^ 0x0FFF_0000) as usize) as u64;
         let eslot = *ESLOT.get_unchecked((e >> 16) as usize) as u64;

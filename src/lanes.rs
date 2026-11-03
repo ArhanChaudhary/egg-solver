@@ -231,8 +231,8 @@ impl Lane {
                 let (c, ci) = self.job_cubes(j);
                 idx[2 * n] = s.index(c);
                 idx[2 * n + 1] = s.index(ci);
-                s.table.prefetch(idx[2 * n].0);
-                s.table.prefetch(idx[2 * n + 1].0);
+                s.prefetch(idx[2 * n].0);
+                s.prefetch(idx[2 * n + 1].0);
             }
             for (n, j) in chunk.iter_mut().enumerate() {
                 j.ln = s.value(idx[2 * n].0, idx[2 * n].1);
@@ -371,7 +371,7 @@ impl Lane {
                 self.k_po = lo;
                 self.k_idx = idx;
                 self.k_cd = cd;
-                s.table.prefetch(idx);
+                s.prefetch(idx);
                 self.phase = Phase::WaitMoved;
                 return Step::Pending;
             }
@@ -390,7 +390,7 @@ impl Lane {
                 self.k_po = tw;
                 self.k_idx = idx;
                 self.k_cd = cd;
-                s.table.prefetch(idx);
+                s.prefetch(idx);
                 self.phase = Phase::WaitMoved;
                 return Step::Pending;
             }
@@ -402,7 +402,7 @@ impl Lane {
             }
             self.k_idx = idx;
             self.k_cd = cd;
-            s.table.prefetch(idx);
+            s.prefetch(idx);
             self.phase = Phase::WaitOther;
             return Step::Pending;
         }
@@ -437,7 +437,7 @@ impl Lane {
         self.k_po = po;
         self.k_idx = idx;
         self.k_cd = cd;
-        s.table.prefetch(idx);
+        s.prefetch(idx);
         self.phase = Phase::WaitMoved;
     }
 

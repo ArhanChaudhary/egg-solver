@@ -34,6 +34,16 @@ fn main() {
         writeln!(s, "  {},", arr(&simd_bytes(m))).unwrap();
     }
     writeln!(s, "];").unwrap();
+    // Orientation part of each move (the `o & ORIENT` term of `compose`).
+    writeln!(s, "pub static MOVES_ORI: [A32; 18] = [").unwrap();
+    for m in moves.iter() {
+        let mut b = simd_bytes(m);
+        for (i, x) in b.iter_mut().enumerate() {
+            *x &= if i < 8 { 0x60 } else { 0x10 };
+        }
+        writeln!(s, "  {},", arr(&b)).unwrap();
+    }
+    writeln!(s, "];").unwrap();
     // Premove cubes: applying move m to the inverse = premove of inverse(m).
     writeln!(s, "pub static INV_MOVES: [A32; 18] = [").unwrap();
     for m in 0..18u8 {
