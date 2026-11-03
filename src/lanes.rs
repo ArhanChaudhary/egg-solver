@@ -140,7 +140,21 @@ const fn mk_heur_terms() -> [f32; 64] {
     }
     t
 }
+#[cfg(test)]
 static HEUR_TERMS: [f32; 64] = mk_heur_terms();
+
+/// `HEUR_TERMS[po] + HEUR_TERMS[pm]` at index `po << 4 | pm` (bounds are
+/// below 16; the same f32 sums as computed at run time).
+static HEUR_PAIR: [f32; 256] = {
+    let t = mk_heur_terms();
+    let mut r = [0f32; 256];
+    let mut i = 0;
+    while i < 256 {
+        r[i] = t[i >> 4] + t[i & 15];
+        i += 1;
+    }
+    r
+};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Phase {
@@ -559,7 +573,8 @@ impl Lane {
         self.stats.lookups += 1;
         self.phase = Phase::Idle;
         let po = self.k_po;
-        self.heur += HEUR_TERMS[po.min(63) as usize] + HEUR_TERMS[pm.min(63) as usize];
+        debug_assert!(po < 16 && pm < 16);
+        self.heur += HEUR_PAIR[(po as usize & 15) << 4 | (pm as usize & 15)];
         let r1 = self.stack[self.sp].r - 1;
         let face = (self.k_m / 3) as usize;
         self.note_value(face, pm.max(po));
