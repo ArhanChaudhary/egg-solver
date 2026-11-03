@@ -61,7 +61,9 @@ struct Node {
     m_normal: bool,
     /// Other-side value of the X and X' children of each face (0xFF if not
     /// yet known). They are equal: H X = H X' because X2 is in H, and the
-    /// other side's coordinate only depends on the coset H X^-1 b.
+    /// other side's coordinate only depends on the coset H X^-1 b. Only
+    /// written when it is at most `r - 1`: otherwise X' is in `skip` and
+    /// never generated.
     tw: [u8; 6],
 }
 
@@ -475,7 +477,7 @@ impl Lane {
                 // SAFETY: moves are below 18.
                 unsafe { std::hint::assert_unchecked(f < 6) };
                 let keep = std::hint::select_unpredictable(lb > p.r, TABS.face_keep[f], !0);
-                lb = p.lb.max(lb.saturating_sub(1));
+                lb = max_dec(p.lb, lb);
                 p.lb = lb;
                 r = p.r;
                 todo = p.todo & keep;
@@ -490,6 +492,8 @@ impl Lane {
             let node = &mut self.stack[sp];
             node.todo = todo;
             let face = m / 3;
+            // (`m % 3`, from `face`: LLVM would divide again.)
+            let kind = m - 3 * face;
             let r1 = r - 1;
             // (No sibling-face check: such faces were removed from `todo`.)
             nodes += 1;
@@ -507,7 +511,7 @@ impl Lane {
                 }
                 let a2 = a.apply_move(m);
                 let b2 = b.premove_inv(m);
-                let po = if m % 3 == 1 { lo } else { 0 };
+                let po = if kind == 1 { lo } else { 0 };
                 if po > r1 || a2.is_solved() {
                     continue;
                 }
@@ -523,7 +527,7 @@ impl Lane {
             }
             let a2 = a.apply_move(m);
             let b2 = b.premove_inv(m);
-            let half = m % 3 == 1;
+            let half = kind == 1;
             self.k_a = a2;
             self.k_b = b2;
             self.k_m = m as u8;
@@ -533,7 +537,7 @@ impl Lane {
             // most r1 (half turns are masked out when `lo` is tight, X'
             // moves with `tw > r1` are skipped), so they look up the moved
             // side. Selected without branching on the move kind.
-            let other = m % 3 == 0;
+            let other = kind == 0;
             let tw = self.stack[sp].tw[face];
             // (LLVM would branch on `half` to skip the `tw` load.)
             let po = std::hint::select_unpredictable(half, lo, tw);
@@ -541,7 +545,6 @@ impl Lane {
             let (idx, cd) = s.index(Cube::select(other, b2, a2));
             if cd > r1 {
                 if other {
-                    self.stack[sp].tw[face] = cd;
                     self.note_value(face, cd);
                     self.skip_xprime(m);
                 } else {
@@ -578,7 +581,7 @@ impl Lane {
         // SAFETY: see `advance`.
         unsafe { std::hint::assert_unchecked(self.sp < MAXD && face < 6) };
         let node = &mut self.stack[self.sp];
-        node.lb = node.lb.max(v.saturating_sub(1));
+        node.lb = max_dec(node.lb, v);
         node.todo &= std::hint::select_unpredictable(v > node.r, TABS.face_keep[face], !0);
     }
 
@@ -608,12 +611,12 @@ impl Lane {
         self.stats.lookups += 1;
         let r1 = self.stack[self.sp].r - 1;
         let face = self.k_face as usize;
-        self.stack[self.sp].tw[face] = po;
         if po > r1 {
             self.note_value(face, po);
             self.skip_xprime(self.k_m as usize);
             return false;
         }
+        self.stack[self.sp].tw[face] = po;
         let (idx, cd) = s.index(self.k_a);
         if cd > r1 {
             self.note_value(face, cd.max(po));
@@ -641,7 +644,8 @@ impl Lane {
         let r1 = self.stack[self.sp].r - 1;
         let face = self.k_face as usize;
         self.note_value(face, pm.max(po));
-        if pm > r1 || self.k_a.is_solved() {
+        // (Only a cube with bound 0 can be solved.)
+        if pm > r1 || (pm == 0 && self.k_a.is_solved()) {
             return self.advance(s);
         }
         self.push_advance(pm, po, s)
@@ -686,7 +690,6 @@ impl Lane {
         let (idx, cd) = s.index(b2);
         self.stack[self.sp] = node;
         if cd > r1 {
-            self.stack[self.sp].tw[face] = cd;
             self.note_value(face, cd);
             self.skip_xprime(m);
             return self.advance_cold(s);
@@ -791,6 +794,14 @@ impl Lane {
         }
         normal
     }
+}
+
+/// `lb.max(v.saturating_sub(1))` for bounds below 128, as a signed max (no
+/// saturation needed).
+#[inline(always)]
+fn max_dec(lb: u8, v: u8) -> u8 {
+    debug_assert!(lb < 128 && v < 128);
+    (lb as i8).max(v as i8 - 1) as u8
 }
 
 #[allow(clippy::too_many_arguments)]
