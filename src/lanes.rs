@@ -59,11 +59,46 @@ struct Job {
 
 #[inline(always)]
 fn job_weight(j: &Job) -> f32 {
-    if (j.moves[j.len as usize - 1] / 3) % 2 == 0 {
-        47525.0
-    } else {
-        58206.0
+    // face weight (branchless: the face parity is unpredictable)
+    [47525.0, 58206.0][((j.moves[j.len as usize - 1] / 3) % 2) as usize]
+}
+
+/// Sort jobs by decreasing `stat * job_weight`, stably: the same order as
+/// a stable `sort_by` with `total_cmp`, since the keys are non-negative
+/// floats, whose bit patterns order like their values. LSD radix sort of
+/// (inverted key, index) pairs, then a gather into `out` (scratch, swapped
+/// with `jobs`). ~43K jobs; much cheaper than a comparison sort.
+fn sort_jobs(jobs: &mut Vec<Job>, out: &mut Vec<Job>) {
+    let n = jobs.len();
+    let mut keys: Vec<u64> = jobs
+        .iter()
+        .enumerate()
+        .map(|(i, j)| ((!(j.stat * job_weight(j)).to_bits() as u64) << 32) | i as u64)
+        .collect();
+    let mut tmp = vec![0u64; n];
+    for (shift, bits) in [(32u32, 11u32), (43, 11), (54, 10)] {
+        let mask = (1u64 << bits) - 1;
+        let mut cnt = [0u32; 2048];
+        for &k in &keys {
+            cnt[((k >> shift) & mask) as usize] += 1;
+        }
+        if cnt.iter().any(|&c| c as usize == n) {
+            continue; // all keys share this digit
+        }
+        let mut sum = 0;
+        for c in cnt.iter_mut() {
+            (*c, sum) = (sum, sum + *c);
+        }
+        for &k in &keys {
+            let d = ((k >> shift) & mask) as usize;
+            tmp[cnt[d] as usize] = k;
+            cnt[d] += 1;
+        }
+        std::mem::swap(&mut keys, &mut tmp);
     }
+    out.clear();
+    out.extend(keys.iter().map(|&k| jobs[k as u32 as usize]));
+    std::mem::swap(jobs, out);
 }
 
 /// Job statistic contribution of a lookup value h: 8^(16-h). Steeper than
@@ -105,6 +140,8 @@ pub struct Lane {
     root_c: Cube,
     root_ci: Cube,
     jobs: Vec<Job>,
+    /// Scratch buffer for job extension and sorting.
+    jobs_tmp: Vec<Job>,
     job_pos: usize,
     target: u8,
     stack: [Node; MAXD],
@@ -151,6 +188,7 @@ impl Lane {
             root_c: Cube::solved(),
             root_ci: Cube::solved(),
             jobs: Vec::new(),
+            jobs_tmp: Vec::new(),
             job_pos: 0,
             target: 0,
             stack: [n; MAXD],
@@ -207,39 +245,67 @@ impl Lane {
     }
 
     fn extend_jobs(&mut self, s: &Solver) {
-        let mut out = Vec::with_capacity(self.jobs.len() * 15);
+        let mut out = std::mem::take(&mut self.jobs_tmp);
+        out.clear();
+        out.reserve(self.jobs.len() * 15);
+        // Bounds of the new jobs: lookups are prefetched and resolved LAG
+        // lookups later. Only X children need an inverse lookup: X2 keeps
+        // the parent's inverse coset (`li` is inherited by the copy) and X'
+        // shares the X sibling's (see `Node::tw`).
+        const LAG: usize = 48;
+        let mut ring = [(0usize, 0u64, 0u8); 64];
+        let (mut head, mut tail) = (0, 0);
+        let resolve = |out: &mut Vec<Job>, (slot, idx, cd): (usize, u64, u8)| {
+            let v = s.value(idx, cd);
+            if slot % 2 == 0 {
+                out[slot / 2].ln = v;
+            } else {
+                out[slot / 2].li = v;
+            }
+        };
         for j in &self.jobs {
-            let mm = if j.len == 0 {
+            let (c, ci) = self.job_cubes(j);
+            let mut mm = if j.len == 0 {
                 ALL_MOVES
             } else {
                 ALLOWED_AFTER[(j.moves[j.len as usize - 1] / 3) as usize]
             };
-            let mut mmv = mm;
-            while mmv != 0 {
-                let m = mmv.trailing_zeros() as u8;
-                mmv &= mmv - 1;
+            while mm != 0 {
+                let m = mm.trailing_zeros() as usize;
+                mm &= mm - 1;
                 let mut n = *j;
-                n.moves[n.len as usize] = m;
+                n.moves[n.len as usize] = m as u8;
                 n.len += 1;
+                let pos = out.len();
                 out.push(n);
+                let (idx, cd) = s.index(c.apply_move(m));
+                s.prefetch(idx);
+                ring[head % 64] = (2 * pos, idx, cd);
+                head += 1;
+                if m % 3 == 0 {
+                    let (idx, cd) = s.index(ci.premove_inv(m));
+                    s.prefetch(idx);
+                    ring[head % 64] = (2 * pos + 1, idx, cd);
+                    head += 1;
+                }
+                while head - tail > LAG {
+                    resolve(&mut out, ring[tail % 64]);
+                    tail += 1;
+                }
             }
         }
-        // bounds, with batched prefetch
-        for chunk in out.chunks_mut(32) {
-            let mut idx = [(0u64, 0u8); 64];
-            for (n, j) in chunk.iter().enumerate() {
-                let (c, ci) = self.job_cubes(j);
-                idx[2 * n] = s.index(c);
-                idx[2 * n + 1] = s.index(ci);
-                s.prefetch(idx[2 * n].0);
-                s.prefetch(idx[2 * n + 1].0);
-            }
-            for (n, j) in chunk.iter_mut().enumerate() {
-                j.ln = s.value(idx[2 * n].0, idx[2 * n].1);
-                j.li = s.value(idx[2 * n + 1].0, idx[2 * n + 1].1);
+        while tail < head {
+            resolve(&mut out, ring[tail % 64]);
+            tail += 1;
+        }
+        // X' follows its X sibling two places earlier (faces are whole).
+        for i in 0..out.len() {
+            let j = &out[i];
+            if j.moves[j.len as usize - 1] % 3 == 2 {
+                out[i].li = out[i - 2].li;
             }
         }
-        self.jobs = out;
+        self.jobs_tmp = std::mem::replace(&mut self.jobs, out);
     }
 
     fn start_iteration(&mut self, s: &Solver) {
@@ -249,8 +315,7 @@ impl Lane {
                 self.extend_jobs(s);
             }
             if jl > 0 {
-                self.jobs
-                    .sort_by(|a, b| (b.stat * job_weight(b)).total_cmp(&(a.stat * job_weight(a))));
+                sort_jobs(&mut self.jobs, &mut self.jobs_tmp);
             }
             self.job_pos = 0;
             if self.setup_job() {
@@ -265,6 +330,13 @@ impl Lane {
     fn setup_job(&mut self) -> bool {
         while self.job_pos < self.jobs.len() {
             let j = self.jobs[self.job_pos];
+            // The job vector is too big for L2 and 16 lanes interleave
+            // their streams: fetch the next jobs' line early.
+            let ahead = (self.job_pos + 8).min(self.jobs.len() - 1);
+            unsafe {
+                use std::arch::x86_64::*;
+                _mm_prefetch(self.jobs.as_ptr().add(ahead) as *const i8, _MM_HINT_T0);
+            }
             let r = self.target - j.len;
             self.heur = 0.0;
             let (c, ci) = self.job_cubes(&j);
@@ -603,6 +675,42 @@ pub fn run_lanes(
                     nactive -= 1;
                 }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sort_jobs_matches_stable_sort() {
+        let mut rng = crate::cubie::Rng(7);
+        for n in [1usize, 2, 17, 1000, 5000] {
+            let jobs: Vec<Job> = (0..n)
+                .map(|i| {
+                    let r = rng.next_u64();
+                    // many ties (few distinct stats) and a wide exponent range
+                    let stat = match r % 4 {
+                        0 => 0.0,
+                        1 => HEUR_TERMS[(r >> 8) as usize % 64],
+                        _ => HEUR_TERMS[(r >> 8) as usize % 64] * ((r >> 20) % 3) as f32,
+                    };
+                    Job {
+                        moves: [(r >> 32) as u8 % 18, 0, 0, (i % 251) as u8],
+                        len: 1,
+                        ln: (i / 251) as u8,
+                        li: 0,
+                        stat,
+                    }
+                })
+                .collect();
+            let mut want = jobs.clone();
+            want.sort_by(|a, b| (b.stat * job_weight(b)).total_cmp(&(a.stat * job_weight(a))));
+            let mut got = jobs.clone();
+            sort_jobs(&mut got, &mut Vec::new());
+            let id = |j: &Job| (j.moves, j.ln, j.stat.to_bits());
+            assert!(got.iter().map(id).eq(want.iter().map(id)), "n = {n}");
         }
     }
 }
