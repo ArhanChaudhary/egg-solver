@@ -232,12 +232,15 @@ impl Mem {
     }
 
     /// Shared mapping of a file (e.g. on hugetlbfs, which gives 1GB pages).
-    /// If `create`, the file is created/truncated to `len`.
+    /// If `create`, the file is created/truncated to `len` and mapped
+    /// writable, else mapped read-only.
     pub fn file(path: &str, len: usize, create: bool) -> std::io::Result<Mem> {
         use std::os::unix::io::AsRawFd;
+        // (Opened tables are mapped read-only: a stray write faults instead
+        // of corrupting the shared table file for every process.)
         let f = std::fs::OpenOptions::new()
             .read(true)
-            .write(true)
+            .write(create)
             .create(create)
             .truncate(false)
             .open(path)?;
@@ -261,7 +264,11 @@ impl Mem {
             let p = libc::mmap(
                 std::ptr::null_mut(),
                 flen,
-                libc::PROT_READ | libc::PROT_WRITE,
+                if create {
+                    libc::PROT_READ | libc::PROT_WRITE
+                } else {
+                    libc::PROT_READ
+                },
                 libc::MAP_SHARED | libc::MAP_POPULATE,
                 f.as_raw_fd(),
                 0,
@@ -554,6 +561,28 @@ mod tests {
         // The file of an h0 table is too small for h1.
         assert!(open_with("1 8").is_err());
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// A table file opened for solving (hugetlbfs or /dev/shm) is mapped
+    /// read-only.
+    #[test]
+    #[cfg_attr(miri, ignore = "files")]
+    fn opened_table_file_is_read_only() {
+        let path = format!("/dev/shm/cubeopt-test-{}-h0", std::process::id());
+        let len = usize::try_from(h48_bytes(0)).unwrap();
+        std::fs::write(&path, vec![0u8; len]).unwrap();
+        std::fs::write(meta_path(&path), "0 8\n").unwrap();
+        let table = H48Table::open(&path).unwrap();
+        let start = table.ptr() as usize;
+        let maps = std::fs::read_to_string("/proc/self/maps").unwrap();
+        let perms = maps
+            .lines()
+            .find(|l| l.starts_with(&format!("{start:x}-")))
+            .map(|l| l.split_whitespace().nth(1).unwrap().to_string());
+        assert_eq!(perms.as_deref(), Some("r--s"), "{maps}");
+        drop(table);
+        std::fs::remove_file(meta_path(&path)).unwrap();
+        std::fs::remove_file(&path).unwrap();
     }
 
     #[test]
