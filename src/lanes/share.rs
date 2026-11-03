@@ -1085,6 +1085,14 @@ impl Worker<'_, '_> {
     fn refill(&mut self, li: usize, prefer: Option<usize>) -> bool {
         // (A piece first: its job holds up the iteration.)
         if matches!(self.mailbox(), Some(m) if m.state.load(Relaxed) == FULL) && self.piece(li) {
+            // (The cube of the lane's last job may have nothing pending
+            // any more: its jobs are to be counted down.)
+            if let Some(slot) = prefer {
+                self.settle(slot);
+                if self.locals[slot].as_ref().unwrap().pending == 0 {
+                    self.release(slot);
+                }
+            }
             return true;
         }
         if let Some(slot) = prefer {

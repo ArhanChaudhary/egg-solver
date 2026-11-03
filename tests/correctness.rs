@@ -249,11 +249,19 @@ fn share_solve(
     std::thread::scope(|s| {
         for _ in 0..threads {
             s.spawn(|| {
-                pool.run(&solver, nlanes, &stop, |i, sol, _, _| {
-                    let mut o = out.lock().unwrap();
-                    assert!(o[i].is_none(), "cube {i} reported twice");
-                    o[i] = Some(sol);
-                });
+                // (A panic stops the other threads: they would wait for its
+                // work forever.)
+                let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    pool.run(&solver, nlanes, &stop, |i, sol, _, _| {
+                        let mut o = out.lock().unwrap();
+                        assert!(o[i].is_none(), "cube {i} reported twice");
+                        o[i] = Some(sol);
+                    });
+                }));
+                if let Err(e) = r {
+                    stop.store(true, std::sync::atomic::Ordering::Relaxed);
+                    std::panic::resume_unwind(e);
+                }
             });
         }
     });
@@ -305,6 +313,40 @@ fn share_splits_and_donates() {
     assert!(count("splits") > 0, "{counters}");
     assert!(count("donated") > 0, "{counters}");
     assert!(count("pieces") > 0, "{counters}");
+}
+
+/// Many short runs with small thread and lane counts (races of the
+/// mailboxes, the open list, builds and cube hand-over): every solution
+/// optimal, every cube reported once.
+#[test]
+fn share_stress() {
+    let mut rng = Rng(4244);
+    let cs = cs_data();
+    let mut cubes = Vec::new();
+    for len in 0..=8 {
+        for _ in 0..6 {
+            let ms: Vec<u8> = (0..len).map(|_| rng.below(18) as u8).collect();
+            cubes.push(CubieCube::SOLVED.apply_moves(&ms));
+        }
+    }
+    let mut want: Vec<usize> = cubes.iter().map(|c| reference_length(c, cs)).collect();
+    let deep = dataset("depth15.txt");
+    cubes.extend(deep.into_iter().skip(60).take(6));
+    want.resize(cubes.len(), 15);
+    for run in 0..40 {
+        let threads = [2, 3, 8, 9, 16][run % 5];
+        let nlanes = [1, 2, 5][run % 3];
+        let max_active = [1, 2, usize::MAX, 3][run % 4];
+        let (sols, counters) = share_solve(&cubes, h0(), threads, nlanes, max_active);
+        for ((c, s), &n) in cubes.iter().zip(sols.iter()).zip(want.iter()) {
+            assert_eq!(c.apply_moves(s), CubieCube::SOLVED);
+            assert_eq!(
+                s.len(),
+                n,
+                "run {run}: {threads} threads {nlanes} lanes {max_active}: {counters}"
+            );
+        }
+    }
 }
 
 #[test]
