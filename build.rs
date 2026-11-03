@@ -52,6 +52,26 @@ fn main() {
         writeln!(s, "  {},", arr(&simd_bytes(&y.tinv))).unwrap();
     }
     writeln!(s, "];").unwrap();
+    // Edge-only conjugation tables (see `coord::edge_key_sym`), one 64-byte
+    // line per symmetry: bytes 0..32 classify a piece j of T (edge lane:
+    // bit 7 = E-slice, bit 6 = S-slice, bit 4 = eo of T at j), bytes 32..64
+    // are the position permutation Tinv (edge lane; 0x80 = zero elsewhere).
+    writeln!(s, "pub static SYM_EDGE: [A64; 48] = [").unwrap();
+    for y in syms.iter() {
+        let t = simd_bytes(&y.t);
+        let ti = simd_bytes(&y.tinv);
+        let mut b = [0u8; 64];
+        for j in 0..12 {
+            let x = t[16 + j];
+            b[16 + j] = ((x & 0x0C) << 4) | (x & 0x10);
+        }
+        for i in 0..32 {
+            b[32 + i] = if (16..28).contains(&i) { ti[i] } else { 0x80 };
+        }
+        let v: Vec<String> = b.iter().map(|x| format!("{x}")).collect();
+        writeln!(s, "  A64([{}]),", v.join(",")).unwrap();
+    }
+    writeln!(s, "];").unwrap();
     let mirrors: Vec<String> = syms.iter().map(|y| format!("{}", y.mirror)).collect();
     writeln!(
         s,

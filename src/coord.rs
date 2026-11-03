@@ -167,6 +167,30 @@ pub fn edge_key(c: Cube) -> u64 {
     }
 }
 
+/// Edge part of the h11 key of `c` conjugated by symmetry `t`; equals
+/// `edge_key(c.transform_edges(t))`. Only the edge classes and orientations
+/// of the conjugate are built: one shuffle classifies each piece `p` as
+/// `T[p]` (E/S flags, eo of T), xor adds c's eo, and a second shuffle
+/// applies the position permutation `Tinv`, whose eo is added on the eo
+/// path only.
+#[inline(always)]
+pub fn edge_key_sym(c: Cube, t: usize) -> u64 {
+    unsafe {
+        let tab = crate::simd::SYM_EDGE.get_unchecked(t).0.as_ptr();
+        let q = _mm256_load_si256(tab as *const __m256i);
+        let p = _mm256_load_si256(tab.add(32) as *const __m256i);
+        let y = _mm256_xor_si256(_mm256_shuffle_epi8(q, c.0), c.0);
+        let z = _mm256_shuffle_epi8(y, p);
+        // Masks of edge positions 0..12, in bits 16..28 (all else zero).
+        let e = _mm256_movemask_epi8(z) as u32;
+        let s = _mm256_movemask_epi8(_mm256_add_epi8(z, z)) as u32;
+        let o = _mm256_movemask_epi8(_mm256_slli_epi16(_mm256_xor_si256(z, p), 3)) as u32;
+        let msplit = *RANK8.get_unchecked(_pext_u32(s, e ^ 0x0FFF_0000) as usize) as u64;
+        let eslot = *ESLOT.get_unchecked((e >> 16) as usize) as u64;
+        (msplit << 20) | (((o >> 17) as u64) << 9) | eslot
+    }
+}
+
 /// Full h11 key from a corner class and transformed edges.
 #[inline(always)]
 pub fn h11_key(class: usize, e: Cube) -> u64 {
@@ -241,6 +265,17 @@ mod tests {
         for m in 0..256u32 {
             if m.count_ones() == 4 {
                 assert_eq!(UNRANK8[RANK8[m as usize] as usize] as u32, m);
+            }
+        }
+    }
+
+    #[test]
+    fn edge_key_sym_matches() {
+        let mut rng = Rng(13);
+        for _ in 0..500 {
+            let c = Cube::from_cubie(&CubieCube::random(&mut rng));
+            for t in 0..48 {
+                assert_eq!(edge_key_sym(c, t), edge_key(c.transform_edges(t)));
             }
         }
     }

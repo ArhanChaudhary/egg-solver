@@ -101,9 +101,8 @@ impl<'a> Solver<'a> {
     #[inline(always)]
     pub(crate) fn index(&self, c: Cube) -> (u64, u8) {
         let d = unsafe { *self.cs.data.get_unchecked(cocsep(c)) };
-        let e = c.transform_edges(cd_ttrep(d));
-        let idx = reduce_key(h11_key(cd_class(d), e), self.k);
-        (idx, cd_depth(d))
+        let x = ((cd_class(d) as u64 * N_MSPLIT as u64) << 20) + edge_key_sym(c, cd_ttrep(d));
+        (reduce_key(x, self.k), cd_depth(d))
     }
 
     #[inline(always)]

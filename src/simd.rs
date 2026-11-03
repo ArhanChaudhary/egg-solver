@@ -11,6 +11,10 @@ use std::arch::x86_64::*;
 #[derive(Clone, Copy)]
 pub struct A32(pub [u8; 32]);
 
+#[repr(C, align(64))]
+#[derive(Clone, Copy)]
+pub struct A64(pub [u8; 64]);
+
 include!(concat!(env!("OUT_DIR"), "/consts.rs"));
 
 #[derive(Clone, Copy)]
