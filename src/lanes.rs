@@ -164,7 +164,6 @@ enum Phase {
     WaitMoved = 0,
     /// Waiting for the lookup of the non-moved side.
     WaitOther = 1,
-    Idle = 2,
 }
 
 pub struct Lane {
@@ -228,7 +227,7 @@ impl Lane {
             target: 0,
             stack: [n; MAXD],
             sp: 0,
-            phase: Phase::Idle,
+            phase: Phase::WaitMoved,
             k_a: Cube::solved(),
             k_b: Cube::solved(),
             k_m: 0,
@@ -257,7 +256,6 @@ impl Lane {
         self.cube_index = index;
         self.stats = Stats::default();
         self.solution.clear();
-        self.phase = Phase::Idle;
         let c = Cube::from_cubie(cube);
         if c.is_solved() {
             return true;
@@ -403,26 +401,38 @@ impl Lane {
     }
 
     /// Advance until a lookup is pending or a solution is found.
+    ///
+    /// The depth and the top node's `todo`, `lb` and `r` are kept in
+    /// registers across the loop (and written through to the stack): the
+    /// exhaustion and pop branches, mispredicted often, then do not also wait
+    /// for store forwarding.
     #[inline(always)]
     fn advance(&mut self, s: &Solver) -> Step {
         let maxval = s.base + 3;
+        let mut sp = self.sp;
+        // SAFETY: the depth is bounded by the target (< MAXD).
+        unsafe { std::hint::assert_unchecked(sp < MAXD) };
+        let (mut todo, mut lb, mut r) = {
+            let n = &self.stack[sp];
+            (n.todo, n.lb, n.r)
+        };
+        // Nodes generated (added to `stats` on return).
+        let mut nodes = 0;
         loop {
-            let sp = self.sp;
-            // SAFETY: the depth is bounded by the target (< MAXD).
+            // SAFETY: as above (`sp` is `self.sp`).
             unsafe { std::hint::assert_unchecked(sp < MAXD) };
-            let node = &mut self.stack[sp];
-            if node.lb <= node.r {
+            if lb <= r {
                 // X' moves known to be pruned (`skip`) are reached, and
                 // counted, up to the next move to generate. The bounds do
                 // not change in between (their value was already noted).
-                let todo = node.todo;
-                let live = todo & !node.skip;
+                let live = todo & !self.stack[sp].skip;
                 let below = todo & live.isolate_lowest_one().wrapping_sub(1);
-                self.stats.nodes += below.count_ones() as u64;
-                node.todo = todo & !below;
+                nodes += below.count_ones() as u64;
+                todo &= !below;
             }
-            if node.lb > node.r || node.todo == 0 {
-                let (lb, m) = (node.lb, node.m);
+            if lb > r || todo == 0 {
+                // (The node is done: its `todo` is not needed any more.)
+                let m = self.stack[sp].m;
                 if sp == 0 {
                     // job finished
                     self.jobs[self.job_pos].stat = self.heur;
@@ -431,25 +441,34 @@ impl Lane {
                         self.target += 1;
                         self.start_iteration(s);
                     }
+                    sp = self.sp;
+                    let n = &self.stack[sp];
+                    (todo, lb, r) = (n.todo, n.lb, n.r);
                     continue;
                 }
-                self.sp -= 1;
-                let p = &mut self.stack[self.sp];
+                sp -= 1;
+                self.sp = sp;
+                let p = &mut self.stack[sp];
                 let f = (m / 3) as usize;
                 let fm = p.fmax[f].max(lb);
                 p.fmax[f] = fm;
-                p.lb = p.lb.max(lb.saturating_sub(1));
-                p.todo &= !(((fm > p.r) as u32).wrapping_neg() & (7 << (3 * f)));
+                lb = p.lb.max(lb.saturating_sub(1));
+                p.lb = lb;
+                r = p.r;
+                todo = p.todo & !(((fm > r) as u32).wrapping_neg() & (7 << (3 * f)));
+                p.todo = todo;
                 continue;
             }
-            let m = node.todo.trailing_zeros() as usize;
+            let m = todo.trailing_zeros() as usize;
             // SAFETY: move masks are subsets of ALL_MOVES.
             unsafe { std::hint::assert_unchecked(m < 18) };
-            node.todo &= node.todo - 1;
+            todo &= todo - 1;
+            let node = &mut self.stack[sp];
+            node.todo = todo;
             let face = m / 3;
-            let r1 = node.r - 1;
+            let r1 = r - 1;
             // (No sibling-face check: such faces were removed from `todo`.)
-            self.stats.nodes += 1;
+            nodes += 1;
             let (a, b, lo) = (node.a, node.b, node.lo);
             // One test for the rare kinds: r1 == 0 (wraps) or r1 > maxval.
             if r1.wrapping_sub(1) >= maxval {
@@ -457,6 +476,7 @@ impl Lane {
                     // nodes with r == 1 always move the normal cube
                     if a.apply_move(m).is_solved() {
                         self.k_m = m as u8;
+                        self.stats.nodes += nodes;
                         return Step::Found;
                     }
                     continue;
@@ -471,6 +491,9 @@ impl Lane {
                 self.k_b = b2;
                 self.k_m = m as u8;
                 self.push_child(0, po);
+                sp = self.sp;
+                let n = &self.stack[sp];
+                (todo, lb, r) = (n.todo, n.lb, n.r);
                 continue;
             }
             let a2 = a.apply_move(m);
@@ -486,19 +509,21 @@ impl Lane {
             // moves with `tw > r1` are skipped), so they look up the moved
             // side. Selected without branching on the move kind.
             let other = m % 3 == 0;
-            let tw = self.stack[self.sp].tw[face];
+            let tw = self.stack[sp].tw[face];
             // (LLVM would branch on `half` to skip the `tw` load.)
             let po = std::hint::select_unpredictable(half, lo, tw);
             debug_assert!(other || po <= r1);
             let (idx, cd) = s.index(Cube::select(other, b2, a2));
             if cd > r1 {
                 if other {
-                    self.stack[self.sp].tw[face] = cd;
+                    self.stack[sp].tw[face] = cd;
                     self.note_value(face, cd);
                     self.skip_xprime(m);
                 } else {
                     self.note_value(face, cd.max(po));
                 }
+                let n = &self.stack[sp];
+                (todo, lb) = (n.todo, n.lb);
                 continue;
             }
             self.k_face = face as u8;
@@ -511,6 +536,7 @@ impl Lane {
             } else {
                 Phase::WaitMoved
             };
+            self.stats.nodes += nodes;
             return Step::Pending;
         }
     }
@@ -538,8 +564,8 @@ impl Lane {
         self.stack[self.sp].skip |= 4 << m;
     }
 
-    /// The pending lookup's value (any value if the lane is idle). Loaded
-    /// before the phase dispatch, whose mispredicts then do not delay it.
+    /// The pending lookup's value. Loaded before the phase dispatch, whose
+    /// mispredicts then do not delay it.
     #[inline(always)]
     fn pending_value(&self, s: &Solver) -> u8 {
         s.value(self.k_idx, self.k_cd)
@@ -574,10 +600,9 @@ impl Lane {
         true
     }
 
-    /// Resolve the moved side's lookup (the lane is to advance next, which
-    /// sets the phase).
+    /// Resolve the moved side's lookup and advance the lane.
     #[inline(always)]
-    fn resolve_moved(&mut self, pm: u8) {
+    fn resolve_moved(&mut self, pm: u8, s: &Solver) -> Step {
         // SAFETY: see `advance`.
         unsafe { std::hint::assert_unchecked(self.sp < MAXD && self.k_m < 18 && self.k_face < 6) };
         self.stats.lookups += 1;
@@ -588,15 +613,77 @@ impl Lane {
         let face = self.k_face as usize;
         self.note_value(face, pm.max(po));
         if pm > r1 || self.k_a.is_solved() {
-            return;
+            return self.advance(s);
         }
-        self.push_child(pm, po);
+        self.push_advance(pm, po, s)
+    }
+
+    /// `advance` out of line, for rare paths (and a lane's first lookup).
+    #[inline(never)]
+    fn advance_cold(&mut self, s: &Solver) -> Step {
+        self.advance(s)
+    }
+
+    /// Push the pending child and advance into it. Its first child is
+    /// generated from the node in registers (rather than reloaded by the
+    /// general loop of `advance`): a fresh node has no bound (`lb` = 0) and
+    /// no skipped moves, and its first move is an X move (move masks are
+    /// whole faces, less half turns), which looks up the other side first.
+    #[inline(always)]
+    fn push_advance(&mut self, pm: u8, po: u8, s: &Solver) -> Step {
+        let mut node = self.child_node(pm, po);
+        // SAFETY: see `advance`.
+        unsafe { std::hint::assert_unchecked(self.sp + 1 < MAXD) };
+        self.sp += 1;
+        let todo = node.todo;
+        let r1 = node.r.wrapping_sub(1);
+        // (Rare kinds as in `advance`: r1 == 0 or r1 > maxval.)
+        if todo == 0 || r1.wrapping_sub(1) >= s.base + 3 {
+            self.stack[self.sp] = node;
+            return self.advance_cold(s);
+        }
+        let m = todo.trailing_zeros() as usize;
+        // SAFETY: move masks are subsets of ALL_MOVES.
+        unsafe { std::hint::assert_unchecked(m < 18) };
+        debug_assert!(m % 3 == 0);
+        let face = m / 3;
+        node.todo = todo & (todo - 1);
+        self.stats.nodes += 1;
+        let a2 = node.a.apply_move(m);
+        let b2 = node.b.premove_inv(m);
+        self.k_a = a2;
+        self.k_b = b2;
+        self.k_m = m as u8;
+        let (idx, cd) = s.index(b2);
+        self.stack[self.sp] = node;
+        if cd > r1 {
+            self.stack[self.sp].tw[face] = cd;
+            self.note_value(face, cd);
+            self.skip_xprime(m);
+            return self.advance_cold(s);
+        }
+        self.k_face = face as u8;
+        self.k_idx = idx;
+        self.k_cd = cd;
+        s.prefetch(idx);
+        self.phase = Phase::WaitOther;
+        Step::Pending
     }
 
     /// Push the pending child (`k_a`, `k_b`, `k_m`) with bounds for the moved
     /// side (`pm`) and the other side (`po`).
     #[inline(always)]
     fn push_child(&mut self, pm: u8, po: u8) {
+        let child = self.child_node(pm, po);
+        // SAFETY: see `advance`.
+        unsafe { std::hint::assert_unchecked(self.sp + 1 < MAXD) };
+        self.sp += 1;
+        self.stack[self.sp] = child;
+    }
+
+    /// The pending child as a node (see `push_child`).
+    #[inline(always)]
+    fn child_node(&self, pm: u8, po: u8) -> Node {
         // SAFETY: see `advance`.
         unsafe { std::hint::assert_unchecked(self.sp + 1 < MAXD && self.k_m < 18) };
         let node = &self.stack[self.sp];
@@ -613,9 +700,7 @@ impl Lane {
         if ln == r1 {
             mm_i &= NO_HALF;
         }
-        let child = make_node(c, ci, ln, li, mm_n, mm_i, r1, self.k_m, node.normal);
-        self.sp += 1;
-        self.stack[self.sp] = child;
+        make_node(c, ci, ln, li, mm_n, mm_i, r1, self.k_m, node.normal)
     }
 
     fn reconstruct(&self) -> Vec<u8> {
@@ -705,10 +790,25 @@ pub fn run_lanes(
             return true;
         }
     };
+    // Give lane `l` a new cube and advance it to its first lookup (past
+    // solutions found on the way); returns false if there are no cubes left.
+    let refill = |l: &mut Lane, done: &mut dyn FnMut(usize, Vec<u8>, Stats, f64)| -> bool {
+        loop {
+            if !fetch(l, done) {
+                return false;
+            }
+            if let Step::Pending = l.advance_cold(s) {
+                return true;
+            }
+            let sol = l.reconstruct();
+            let dt = l.started.elapsed().as_secs_f64();
+            done(l.cube_index, sol, l.stats, dt);
+        }
+    };
     // The active lanes are `lanes[..nactive]` (no per-visit activity test).
     let mut nactive = 0;
     for li in 0..nlanes {
-        if fetch(&mut lanes[li], &mut done) {
+        if refill(&mut lanes[li], &mut done) {
             lanes.swap(li, nactive);
             nactive += 1;
         }
@@ -720,20 +820,20 @@ pub fn run_lanes(
         let mut gone: Option<*const Lane> = None;
         for l in lanes[..nactive].iter_mut() {
             let v = l.pending_value(s);
-            match l.phase {
+            let st = match l.phase {
                 Phase::WaitOther => {
                     if l.resolve_other(v, s) {
                         continue;
                     }
+                    l.advance(s)
                 }
-                Phase::WaitMoved => l.resolve_moved(v),
-                Phase::Idle => {}
-            }
-            if let Step::Found = l.advance(s) {
+                Phase::WaitMoved => l.resolve_moved(v, s),
+            };
+            if let Step::Found = st {
                 let sol = l.reconstruct();
                 let dt = l.started.elapsed().as_secs_f64();
                 done(l.cube_index, sol, l.stats, dt);
-                if !fetch(l, &mut done) {
+                if !refill(l, &mut done) {
                     // (The rest of the round waits for the next one.)
                     gone = Some(l);
                     break;
