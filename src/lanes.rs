@@ -148,8 +148,9 @@ enum Phase {
 }
 
 pub struct Lane {
-    active: bool,
     pub cube_index: usize,
+    /// When the current cube was started.
+    started: std::time::Instant,
     root_c: Cube,
     root_ci: Cube,
     jobs: Vec<Job>,
@@ -197,8 +198,8 @@ impl Lane {
             tw: [0xFF; 6],
         };
         Lane {
-            active: false,
             cube_index: 0,
+            started: std::time::Instant::now(),
             root_c: Cube::solved(),
             root_ci: Cube::solved(),
             jobs: Vec::new(),
@@ -232,7 +233,6 @@ impl Lane {
 
     /// Start solving a cube. Returns true if it is already solved.
     fn start(&mut self, s: &Solver, cube: &CubieCube, index: usize) -> bool {
-        self.active = true;
         self.cube_index = index;
         self.stats = Stats::default();
         self.solution.clear();
@@ -666,27 +666,26 @@ pub fn run_lanes(
     use std::sync::atomic::Ordering::Relaxed;
     use std::time::Instant;
     let mut lanes: Vec<Lane> = (0..nlanes).map(|_| Lane::new()).collect();
-    let mut started = vec![Instant::now(); nlanes];
-    // Give lane `li` a new cube; returns false if there are none left.
-    let fetch =
-        |l: &mut Lane, t: &mut Instant, done: &mut dyn FnMut(usize, Vec<u8>, Stats, f64)| -> bool {
-            loop {
-                let i = next.fetch_add(1, Relaxed);
-                let Some(cube) = cubes(i) else {
-                    l.active = false;
-                    return false;
-                };
-                *t = Instant::now();
-                if l.start(s, &cube, i) {
-                    done(i, vec![], Stats::default(), 0.0);
-                    continue;
-                }
-                return true;
+    // Give lane `l` a new cube; returns false if there are none left.
+    let fetch = |l: &mut Lane, done: &mut dyn FnMut(usize, Vec<u8>, Stats, f64)| -> bool {
+        loop {
+            let i = next.fetch_add(1, Relaxed);
+            let Some(cube) = cubes(i) else {
+                return false;
+            };
+            l.started = Instant::now();
+            if l.start(s, &cube, i) {
+                done(i, vec![], Stats::default(), 0.0);
+                continue;
             }
-        };
+            return true;
+        }
+    };
+    // The active lanes are `lanes[..nactive]` (no per-visit activity test).
     let mut nactive = 0;
-    for (l, t) in lanes.iter_mut().zip(started.iter_mut()) {
-        if fetch(l, t, &mut done) {
+    for li in 0..nlanes {
+        if fetch(&mut lanes[li], &mut done) {
+            lanes.swap(li, nactive);
             nactive += 1;
         }
     }
@@ -694,11 +693,8 @@ pub fn run_lanes(
     // issued one round earlier, then advances it to its next lookup. Every
     // lane has one miss in flight with a whole round of slack.
     while nactive > 0 && !stop.load(Relaxed) {
-        for li in 0..nlanes {
-            let l = &mut lanes[li];
-            if !l.active {
-                continue;
-            }
+        let mut gone: Option<*const Lane> = None;
+        for l in lanes[..nactive].iter_mut() {
             let v = l.pending_value(s);
             match l.phase {
                 Phase::WaitOther => {
@@ -712,12 +708,20 @@ pub fn run_lanes(
             }
             if let Step::Found = l.advance(s) {
                 let sol = l.reconstruct();
-                let dt = started[li].elapsed().as_secs_f64();
+                let dt = l.started.elapsed().as_secs_f64();
                 done(l.cube_index, sol, l.stats, dt);
-                if !fetch(l, &mut started[li], &mut done) {
-                    nactive -= 1;
+                if !fetch(l, &mut done) {
+                    // (The rest of the round waits for the next one.)
+                    gone = Some(l);
+                    break;
                 }
             }
+        }
+        if let Some(l) = gone {
+            // SAFETY: `l` points into `lanes`.
+            let li = unsafe { l.offset_from(lanes.as_ptr()) } as usize;
+            nactive -= 1;
+            lanes.swap(li, nactive);
         }
     }
 }
