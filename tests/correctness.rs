@@ -368,3 +368,41 @@ fn share_short_scrambles_are_optimal() {
         }
     }
 }
+
+/// All conjugates of a cube and of its inverse (by the 48 symmetries) have
+/// the same optimal length: recursive, stream (odd lane counts) and share.
+#[test]
+fn conjugates_have_equal_lengths_in_all_modes() {
+    let mut rng = Rng(2027);
+    let mut cubes = Vec::new();
+    for _ in 0..3 {
+        let moves: Vec<u8> = (0..9)
+            .map(|_| u8::try_from(rng.below(18)).unwrap())
+            .collect();
+        let cube = CubieCube::SOLVED.apply_moves(&moves);
+        for base in [cube, cube.inverse()] {
+            cubes.extend(symmetries().iter().map(|s| conjugate(&base, s)));
+        }
+    }
+    let lengths = |sols: &[Vec<u8>]| -> Vec<usize> {
+        for (c, s) in cubes.iter().zip(sols) {
+            assert_eq!(c.apply_moves(s), CubieCube::SOLVED);
+        }
+        sols.iter().map(Vec::len).collect()
+    };
+    let want = lengths(&par_solve(&cubes, h0()));
+    for group in want.chunks(96) {
+        assert!(group.iter().all(|&n| n == group[0]), "{group:?}");
+    }
+    for nlanes in [1, 3, 21] {
+        assert_eq!(
+            lengths(&lanes_solve(&cubes, h0(), nlanes)),
+            want,
+            "{nlanes} lanes"
+        );
+    }
+    for (threads, nlanes, max_active) in [(3, 2, usize::MAX), (2, 5, 1)] {
+        let (sols, counters) = share_solve(&cubes, h0(), threads, nlanes, max_active);
+        assert_eq!(lengths(&sols), want, "{counters}");
+    }
+}
