@@ -24,7 +24,7 @@
 //! pruning, back-jumps, job ordering) mirrors `solver.rs`.
 
 use crate::cubie::{inverse_move, CubieCube};
-use crate::simd::Cube;
+use crate::simd::{Cube, TABS};
 use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES, NO_HALF};
 
 pub mod share;
@@ -150,8 +150,9 @@ const fn mk_heur_terms() -> [f32; 64] {
 static HEUR_TERMS: [f32; 64] = mk_heur_terms();
 
 /// `HEUR_TERMS[po] + HEUR_TERMS[pm]` at index `po << 4 | pm` (bounds are
-/// below 16; the same f32 sums as computed at run time).
-static HEUR_PAIR: [f32; 256] = {
+/// below 16; the same f32 sums as computed at run time). Used as
+/// `TABS.heur_pair`.
+pub(crate) const HEUR_PAIR: [f32; 256] = {
     let t = mk_heur_terms();
     let mut r = [0f32; 256];
     let mut i = 0;
@@ -466,11 +467,13 @@ impl Lane {
                 let p = &mut self.stack[sp];
                 let f = (m / 3) as usize;
                 // Sibling-face pruning on the child's bound (see `note_value`).
-                let cut = lb > p.r;
+                // SAFETY: moves are below 18.
+                unsafe { std::hint::assert_unchecked(f < 6) };
+                let keep = std::hint::select_unpredictable(lb > p.r, TABS.face_keep[f], !0);
                 lb = p.lb.max(lb.saturating_sub(1));
                 p.lb = lb;
                 r = p.r;
-                todo = p.todo & !((cut as u32).wrapping_neg() & (7 << (3 * f)));
+                todo = p.todo & keep;
                 p.todo = todo;
                 continue;
             }
@@ -505,6 +508,7 @@ impl Lane {
                 self.k_a = a2;
                 self.k_b = b2;
                 self.k_m = m as u8;
+                self.k_face = face as u8;
                 self.push_child(0, po);
                 sp = self.sp;
                 let n = &self.stack[sp];
@@ -569,7 +573,7 @@ impl Lane {
         unsafe { std::hint::assert_unchecked(self.sp < MAXD && face < 6) };
         let node = &mut self.stack[self.sp];
         node.lb = node.lb.max(v.saturating_sub(1));
-        node.todo &= !(((v > node.r) as u32).wrapping_neg() & (7 << (3 * face)));
+        node.todo &= std::hint::select_unpredictable(v > node.r, TABS.face_keep[face], !0);
     }
 
     /// The X child `m` was pruned by its other-side value (`tw`), which its
@@ -624,8 +628,10 @@ impl Lane {
         unsafe { std::hint::assert_unchecked(self.sp < MAXD && self.k_m < 18 && self.k_face < 6) };
         self.stats.lookups += 1;
         let po = self.k_po;
-        debug_assert!(po < 16 && pm < 16);
-        self.heur += HEUR_PAIR[(po as usize & 15) << 4 | (pm as usize & 15)];
+        // SAFETY: bounds are below 16 (4-bit table entries and corner
+        // depths, or base + 3; `tw` is known for every X' move reached).
+        unsafe { std::hint::assert_unchecked(po < 16 && pm < 16) };
+        self.heur += TABS.heur_pair[(po as usize) << 4 | pm as usize];
         let r1 = self.stack[self.sp].r - 1;
         let face = self.k_face as usize;
         self.note_value(face, pm.max(po));
@@ -702,14 +708,15 @@ impl Lane {
     #[inline(always)]
     fn child_node(&self, pm: u8, po: u8) -> Node {
         // SAFETY: see `advance`.
-        unsafe { std::hint::assert_unchecked(self.sp + 1 < MAXD && self.k_m < 18) };
+        unsafe { std::hint::assert_unchecked(self.sp + 1 < MAXD && self.k_face < 6) };
         let node = &self.stack[self.sp];
         let r1 = node.r - 1;
-        let face = (self.k_m / 3) as usize;
+        let face = self.k_face as usize;
+        let allowed = TABS.allowed_after[face];
         let (c, ci, ln, li, mut mm_n, mut mm_i) = if node.normal {
-            (self.k_a, self.k_b, pm, po, ALLOWED_AFTER[face], node.mm_o)
+            (self.k_a, self.k_b, pm, po, allowed, node.mm_o)
         } else {
-            (self.k_b, self.k_a, po, pm, node.mm_o, ALLOWED_AFTER[face])
+            (self.k_b, self.k_a, po, pm, node.mm_o, allowed)
         };
         if li == r1 {
             mm_n &= NO_HALF;

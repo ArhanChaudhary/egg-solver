@@ -23,7 +23,8 @@ const fn mk_allowed() -> [u32; 6] {
     }
     r
 }
-pub static ALLOWED_AFTER: [u32; 6] = mk_allowed();
+pub(crate) const ALLOWED_AFTER_T: [u32; 6] = mk_allowed();
+pub static ALLOWED_AFTER: [u32; 6] = ALLOWED_AFTER_T;
 
 pub struct Solver<'a> {
     pub cs: &'a Cocsep,

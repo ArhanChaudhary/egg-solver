@@ -35,6 +35,12 @@ pub struct Tabs {
     /// immediates per call): orientations of corners 0..6, tetrads.
     pub pext_co: u64,
     pub pext_sep: u64,
+    /// `lanes::HEUR_PAIR`.
+    pub heur_pair: [f32; 256],
+    /// `solver::ALLOWED_AFTER`.
+    pub allowed_after: [u32; 6],
+    /// `!(7 << (3 * f))`: all moves but those of face `f`.
+    pub face_keep: [u32; 6],
 }
 
 pub static TABS: Tabs = Tabs {
@@ -48,6 +54,17 @@ pub static TABS: Tabs = Tabs {
     rank8: crate::coord::RANK8_T,
     pext_co: 0x0060_6060_6060_6060,
     pext_sep: 0x0404_0404_0404_0404,
+    heur_pair: crate::lanes::HEUR_PAIR,
+    allowed_after: crate::solver::ALLOWED_AFTER_T,
+    face_keep: {
+        let mut r = [0u32; 6];
+        let mut f = 0;
+        while f < 6 {
+            r[f] = !(7 << (3 * f));
+            f += 1;
+        }
+        r
+    },
 };
 
 #[derive(Clone, Copy)]
