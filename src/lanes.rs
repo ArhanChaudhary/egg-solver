@@ -710,27 +710,68 @@ impl Lane {
         self.stack[self.sp] = child;
     }
 
-    /// The pending child as a node (see `push_child`).
+    /// The pending child as a node (see `push_child`): `make_node` of the
+    /// child's normal and inverse cubes, worked out in terms of the moved
+    /// and the other side (no branch or select on the node's side).
     #[inline(always)]
     fn child_node(&self, pm: u8, po: u8) -> Node {
         // SAFETY: see `advance`.
         unsafe { std::hint::assert_unchecked(self.sp + 1 < MAXD && self.k_face < 6) };
+        let (a2, b2) = (self.k_a, self.k_b);
         let node = &self.stack[self.sp];
         let r1 = node.r - 1;
-        let face = self.k_face as usize;
-        let allowed = TABS.allowed_after[face];
-        let (c, ci, ln, li, mut mm_n, mut mm_i) = if node.normal {
-            (self.k_a, self.k_b, pm, po, allowed, node.mm_o)
+        let pn = node.normal;
+        // Allowed moves on the moved side and on the other side.
+        let mut mm_m = TABS.allowed_after[self.k_face as usize];
+        let mut mm_x = node.mm_o;
+        if po == r1 {
+            mm_m &= NO_HALF;
+        }
+        if pm == r1 {
+            mm_x &= NO_HALF;
+        }
+        // Whether the child generates its children on the moved side, as
+        // `make_node` chooses (fewer moves; ties go to the normal cube; at
+        // r == 1 the normal cube, with the moves allowed on both sides).
+        let (same, todo) = if r1 == 1 {
+            (pn, mm_m & mm_x)
         } else {
-            (self.k_b, self.k_a, po, pm, node.mm_o, allowed)
+            let s = mm_m.count_ones() < mm_x.count_ones() + pn as u32;
+            (s, std::hint::select_unpredictable(s, mm_m, mm_x))
         };
-        if li == r1 {
-            mm_n &= NO_HALF;
+        let child = Node {
+            a: Cube::select(same, a2, b2),
+            b: Cube::select(same, b2, a2),
+            lo: std::hint::select_unpredictable(same, po, pm),
+            mm_o: std::hint::select_unpredictable(same, mm_x, mm_m),
+            todo,
+            skip: 0,
+            r: r1,
+            normal: pn == same,
+            lb: 0,
+            m: self.k_m,
+            m_normal: pn,
+            tw: [0xFF; 6],
+        };
+        #[cfg(debug_assertions)]
+        {
+            let allowed = TABS.allowed_after[self.k_face as usize];
+            let (c, ci, ln, li, mut mm_n, mut mm_i) = if pn {
+                (a2, b2, pm, po, allowed, node.mm_o)
+            } else {
+                (b2, a2, po, pm, node.mm_o, allowed)
+            };
+            if li == r1 {
+                mm_n &= NO_HALF;
+            }
+            if ln == r1 {
+                mm_i &= NO_HALF;
+            }
+            let w = make_node(c, ci, ln, li, mm_n, mm_i, r1, self.k_m, pn);
+            debug_assert!(w.a == child.a && w.b == child.b && w.normal == child.normal);
+            debug_assert!((w.lo, w.mm_o, w.todo) == (child.lo, child.mm_o, child.todo));
         }
-        if ln == r1 {
-            mm_i &= NO_HALF;
-        }
-        make_node(c, ci, ln, li, mm_n, mm_i, r1, self.k_m, node.normal)
+        child
     }
 
     fn reconstruct(&self) -> Vec<u8> {
