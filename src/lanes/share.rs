@@ -1845,7 +1845,7 @@ impl Worker<'_, '_> {
             let d = p.nodes.len() - 1;
             l.stack[..=d].copy_from_slice(&p.nodes);
             l.sp = d;
-            l.heur = 0.0;
+            l.cheur = [0.0; 18];
             sl.slot = slot as u32;
             sl.job = p.job;
             sl.split = true;
@@ -1906,7 +1906,7 @@ impl Worker<'_, '_> {
         tl.l.stack[d].todo = give;
         vl.l.stack[d].todo &= !give;
         tl.l.sp = d;
-        tl.l.heur = 0.0;
+        tl.l.cheur = [0.0; 18];
         tl.l.jobs[0] = vl.l.jobs[0];
         tl.l.job_pos = 0;
         tl.l.target = vl.l.target;
