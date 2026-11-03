@@ -156,13 +156,15 @@ static HEUR_PAIR: [f32; 256] = {
     r
 };
 
+/// (Encoded so that the phase of a new lookup is the `other` flag.)
 #[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
 enum Phase {
-    Idle,
-    /// Waiting for the lookup of the non-moved side.
-    WaitOther,
     /// Waiting for the lookup of the moved side.
-    WaitMoved,
+    WaitMoved = 0,
+    /// Waiting for the lookup of the non-moved side.
+    WaitOther = 1,
+    Idle = 2,
 }
 
 pub struct Lane {

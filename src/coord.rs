@@ -244,7 +244,8 @@ fn edge_parts_sym_raw(c: Cube, t: usize) -> (u64, u64, u64) {
         let o = _mm256_movemask_epi8(_mm256_slli_epi16(_mm256_xor_si256(z, p), 3)) as u32;
         let msplit = *tabs
             .rank8
-            .get_unchecked(_pext_u32(s, e ^ 0x0FFF_0000) as usize) as u64;
+            .get_unchecked(_pext_u64(s as u64, (e ^ 0x0FFF_0000) as u64) as usize)
+            as u64;
         let eslot = *tabs.eslot.get_unchecked((e >> 16) as usize) as u64;
         (msplit, o as u64, eslot)
     }
