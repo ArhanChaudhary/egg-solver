@@ -107,8 +107,8 @@ impl<'a> Solver<'a> {
     #[inline(always)]
     pub(crate) fn index(&self, c: Cube) -> (u64, u8) {
         let d = self.cs.packed(cocsep(c));
-        let parts = edge_parts_sym(c, cp_ttrep(d));
-        (index_from_parts(cp_class(d), parts, self.k), cp_depth(d))
+        let idx = index_sym(c, cp_ttrep(d), cp_class(d), self.k, 28 - self.k);
+        (idx, cp_depth(d))
     }
 
     #[inline(always)]

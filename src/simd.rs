@@ -31,6 +31,10 @@ pub struct Tabs {
     pub co_hi: [u32; 64],
     pub eslot: [u16; 4096],
     pub rank8: [u8; 256],
+    /// `pext` masks of `coord::cocsep` (read from memory: no 64-bit
+    /// immediates per call): orientations of corners 0..6, tetrads.
+    pub pext_co: u64,
+    pub pext_sep: u64,
 }
 
 pub static TABS: Tabs = Tabs {
@@ -42,6 +46,8 @@ pub static TABS: Tabs = Tabs {
     co_hi: crate::coord::CO_HI_T,
     eslot: crate::coord::ESLOT_T,
     rank8: crate::coord::RANK8_T,
+    pext_co: 0x0060_6060_6060_6060,
+    pext_sep: 0x0404_0404_0404_0404,
 };
 
 #[derive(Clone, Copy)]

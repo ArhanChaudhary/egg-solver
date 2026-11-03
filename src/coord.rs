@@ -158,11 +158,23 @@ pub(crate) const CO_HI_T: [u32; 64] = {
 pub fn cocsep(c: Cube) -> usize {
     let x = c.corners_u64();
     unsafe {
-        let co2 = _pext_u64(x, 0x6060606060606060);
-        let sep = _pext_u64(x, 0x0404040404040404);
         let t = &crate::simd::TABS;
+        let (co2, sep): (u64, u64);
+        // co2: orientations of corners 0..6 (14 bits); sep: tetrad mask.
+        std::arch::asm!(
+            "pext {co2}, {x}, qword ptr [{t} + {oc}]",
+            "pext {sep}, {x}, qword ptr [{t} + {os}]",
+            co2 = out(reg) co2,
+            sep = lateout(reg) sep,
+            x = in(reg) x,
+            t = in(reg) t,
+            oc = const std::mem::offset_of!(crate::simd::Tabs, pext_co),
+            os = const std::mem::offset_of!(crate::simd::Tabs, pext_sep),
+            options(pure, readonly, nostack, preserves_flags)
+        );
+        std::hint::assert_unchecked(co2 < 1 << 14 && sep < 1 << 8);
         (*t.co_lo.get_unchecked((co2 & 0xFF) as usize)
-            + *t.co_hi.get_unchecked(((co2 >> 8) & 0x3F) as usize)
+            + *t.co_hi.get_unchecked((co2 >> 8) as usize)
             + *t.rank8.get_unchecked(sep as usize) as u32) as usize
     }
 }
@@ -206,6 +218,14 @@ pub fn edge_key_sym(c: Cube, t: usize) -> u64 {
 /// (msplit, eo11, eslot) of `c` conjugated by symmetry `t` (see `edge_key_sym`).
 #[inline(always)]
 pub fn edge_parts_sym(c: Cube, t: usize) -> (u64, u64, u64) {
+    let (msplit, o, eslot) = edge_parts_sym_raw(c, t);
+    (msplit, o >> 17, eslot)
+}
+
+/// `edge_parts_sym` with the eo part unshifted: the eo of edges 0..11 in
+/// bits 16..28 (all else zero).
+#[inline(always)]
+fn edge_parts_sym_raw(c: Cube, t: usize) -> (u64, u64, u64) {
     unsafe {
         let tabs = &crate::simd::TABS;
         let tab = tabs.sym_edge.get_unchecked(t).0.as_ptr();
@@ -224,10 +244,20 @@ pub fn edge_parts_sym(c: Cube, t: usize) -> (u64, u64, u64) {
         let o = _mm256_movemask_epi8(_mm256_slli_epi16(_mm256_xor_si256(z, p), 3)) as u32;
         let msplit = *tabs
             .rank8
-            .get_unchecked(_pext_u32(s, e ^ 0x0FFF_0000) as usize) as u64;
+            .get_unchecked(_pext_u64(s as u64, (e ^ 0x0FFF_0000) as u64) as usize)
+            as u64;
         let eslot = *tabs.eslot.get_unchecked((e >> 16) as usize) as u64;
-        (msplit, (o >> 17) as u64, eslot)
+        (msplit, o as u64, eslot)
     }
+}
+
+/// `index_from_parts(class, edge_parts_sym(c, t), k)`, with the eo shifts
+/// fused (`eo_shift` = 28 - k).
+#[inline(always)]
+pub fn index_sym(c: Cube, t: usize, class: usize, k: u32, eo_shift: u32) -> u64 {
+    let (msplit, o, eslot) = edge_parts_sym_raw(c, t);
+    let row = class as u64 * N_MSPLIT as u64 + msplit;
+    (row << (k + 9)) | ((o >> eo_shift) << 9) | eslot
 }
 
 /// hk index of class `class` and edge parts `(msplit, eo11, eslot)`; equals
