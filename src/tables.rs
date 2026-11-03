@@ -126,6 +126,46 @@ impl Cocsep {
         }
     }
 
+    /// A cheap stand-in for unit tests: corner depths from a BFS cut after
+    /// `depth` moves (deeper coordinates get `depth + 1`, still a lower bound
+    /// and still a function of the coset), all in one class with no symmetry.
+    #[cfg(test)]
+    pub(crate) fn truncated(depth: u8) -> Cocsep {
+        let mut depths = vec![depth + 1; N_COCSEP];
+        depths[cocsep(Cube::solved())] = 0;
+        let mut frontier = vec![Cube::solved()];
+        for d in 1..=depth {
+            let mut next = Vec::new();
+            for cube in frontier {
+                for m in 0..18 {
+                    let child = cube.apply_move(m);
+                    let coord = cocsep(child);
+                    if depths[coord] > d {
+                        depths[coord] = d;
+                        next.push(child);
+                    }
+                }
+            }
+            frontier = next;
+        }
+        // Packed entries `class << 10 | ttrep << 4 | depth` with class and
+        // ttrep 0: just the depth byte.
+        let packed = Mem::anon(2 << 20);
+        let bytes = unsafe { std::slice::from_raw_parts_mut(packed.ptr(), 3 * N_COCSEP + 1) };
+        let mut distribution = vec![0u64; 16];
+        for (i, &d) in depths.iter().enumerate() {
+            bytes[3 * i] = d;
+            distribution[usize::from(d)] += 1;
+        }
+        Cocsep {
+            data: depths.iter().map(|&d| u32::from(d)).collect(),
+            reps: vec![Cube::solved(); N_CLASSES],
+            selfsim: vec![1; N_CLASSES],
+            distribution,
+            packed,
+        }
+    }
+
     /// Base of the packed entries (see `packed`).
     pub fn packed_ptr(&self) -> *const u8 {
         self.packed.ptr()
@@ -435,6 +475,16 @@ impl H48Table {
             }
         });
         Ok(H48Table { mem, meta })
+    }
+
+    /// An all-zero table (every bound is then the corner depth), for unit
+    /// tests with `Cocsep::truncated`.
+    #[cfg(test)]
+    pub(crate) fn zeroed(k: u32, base: u8) -> H48Table {
+        H48Table {
+            mem: Mem::anon(usize::try_from(h48_bytes(k)).unwrap()),
+            meta: H48Meta { k, base },
+        }
     }
 
     pub fn save(&self, path: &str) -> std::io::Result<()> {

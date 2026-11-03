@@ -429,6 +429,10 @@ pub struct Pool<'a> {
     counters: Mutex<[u64; NCOUNT]>,
     /// Print a line per iteration and solution (env `CUBE_TRACE`).
     trace: bool,
+    /// (Tests) Pause after publishing a fresh cube, so that other threads
+    /// can solve and report it before its creator goes on.
+    #[cfg(test)]
+    pause_after_publish: bool,
 }
 
 /// Event counters (summed over threads; see `Pool::counters`).
@@ -496,6 +500,8 @@ impl<'a> Pool<'a> {
             bufs: Pad(Mutex::new(Vec::new())),
             counters: Mutex::new([0; NCOUNT]),
             trace: std::env::var_os("CUBE_TRACE").is_some(),
+            #[cfg(test)]
+            pause_after_publish: false,
         }
     }
 
@@ -1772,11 +1778,17 @@ impl Worker<'_, '_> {
                 inner.t0 = started;
                 inner.t1 = started;
             }
+            // Join before `build` publishes the cube: from then on another
+            // thread may solve and report it, and joining would fail.
+            let slot = self.local(&ctx).unwrap();
             if build(&mut self.scratch, &mut self.bufs, s, pool, &ctx, true) {
                 while build_task(&mut self.scratch, s, pool, &ctx, self.id) {}
             }
+            #[cfg(test)]
+            if pool.pause_after_publish {
+                std::thread::sleep(std::time::Duration::from_millis(2));
+            }
             self.count[C_FRESH] += 1;
-            let slot = self.local(&ctx).unwrap();
             if self.continue_local(li, slot) {
                 return true;
             }
@@ -2055,6 +2067,114 @@ impl Worker<'_, '_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tables::{Cocsep, H48Table};
+
+    /// Solve `cubes` with a pool of `threads` threads of `nlanes` lanes and at
+    /// most `max_active` cubes in progress; checks each cube is reported once.
+    fn solve_with_pool(
+        solver: &Solver,
+        cubes: &[CubieCube],
+        threads: usize,
+        nlanes: usize,
+        max_active: usize,
+        pause_after_publish: bool,
+    ) -> Vec<Vec<u8>> {
+        let get = |i: usize| cubes.get(i).copied();
+        let mut pool = Pool::new(&get, max_active, threads);
+        pool.pause_after_publish = pause_after_publish;
+        let solutions = Mutex::new(vec![None; cubes.len()]);
+        let stop = AtomicBool::new(false);
+        std::thread::scope(|scope| {
+            for _ in 0..threads {
+                scope.spawn(|| {
+                    // A panic stops the other threads (else they could wait
+                    // for its jobs forever and the test would hang).
+                    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                        pool.run(solver, nlanes, &stop, |i, solution, _, _| {
+                            let mut all = solutions.lock().unwrap();
+                            assert!(all[i].is_none(), "cube {i} reported twice");
+                            all[i] = Some(solution);
+                        });
+                    }));
+                    if let Err(e) = result {
+                        stop.store(true, Relaxed);
+                        std::panic::resume_unwind(e);
+                    }
+                });
+            }
+        });
+        let solutions = solutions.into_inner().unwrap();
+        solutions
+            .into_iter()
+            .enumerate()
+            .map(|(i, s)| s.unwrap_or_else(|| panic!("cube {i} not reported")))
+            .collect()
+    }
+
+    /// A fresh cube solved and reported by other threads as soon as it is
+    /// published is still handled by its creator (which must have joined it).
+    #[test]
+    fn share_fresh_cube_solved_by_others_at_once() {
+        let corners = Cocsep::truncated(4);
+        let table = H48Table::zeroed(0, 2);
+        let solver = Solver::new(&corners, &table);
+        let cubes: Vec<CubieCube> = (0..6)
+            .map(|m| CubieCube::SOLVED.apply_move(3 * m))
+            .collect();
+        for (threads, max_active) in [(4, 1), (3, 2)] {
+            let solutions = solve_with_pool(&solver, &cubes, threads, 1, max_active, true);
+            for (cube, solution) in cubes.iter().zip(&solutions) {
+                assert_eq!(cube.apply_moves(solution), CubieCube::SOLVED);
+                assert_eq!(solution.len(), 1);
+            }
+        }
+    }
+
+    /// Work sharing over a tiny search (claims, builds, splits, donations,
+    /// cube hand-over): every cube reported once, as short as `Solver::solve`.
+    #[test]
+    fn share_protocol_with_tiny_search() {
+        // Corner depths cut at 4 and base 2: lookups at remaining depth <= 6,
+        // where local splits (4) and donations (5) happen; jobs from target 6.
+        let corners = Cocsep::truncated(4);
+        let table = H48Table::zeroed(0, 2);
+        let solver = Solver::new(&corners, &table);
+        let mut rng = crate::cubie::Rng(77);
+        let count = if cfg!(miri) { 5 } else { 64 };
+        let cubes: Vec<CubieCube> = (0..count)
+            .map(|i| {
+                let moves: Vec<u8> = (0..i % 7)
+                    .map(|_| u8::try_from(rng.below(18)).unwrap())
+                    .collect();
+                CubieCube::SOLVED.apply_moves(&moves)
+            })
+            .collect();
+        let optimal: Vec<usize> = cubes.iter().map(|c| solver.solve(c).0.len()).collect();
+        // (threads, lanes per thread, cubes in progress)
+        let configs: &[(usize, usize, usize)] = if cfg!(miri) {
+            &[(3, 2, usize::MAX), (2, 1, 1)]
+        } else {
+            &[
+                (2, 1, 1),
+                (3, 2, usize::MAX),
+                (4, 3, 2),
+                (5, 1, 1),
+                (8, 2, 3),
+                (16, 1, 4),
+            ]
+        };
+        for &(threads, nlanes, max_active) in configs {
+            let solutions = solve_with_pool(&solver, &cubes, threads, nlanes, max_active, false);
+            for (i, (cube, solution)) in cubes.iter().zip(&solutions).enumerate() {
+                assert_eq!(cube.apply_moves(solution), CubieCube::SOLVED, "cube {i}");
+                assert_eq!(
+                    solution.len(),
+                    optimal[i],
+                    "cube {i}: {threads} threads, {nlanes} lanes, {max_active} cubes"
+                );
+            }
+        }
+    }
 
     /// The staged sort (its tasks run in any order within a stage) gives
     /// the order of `sort_jobs`.
