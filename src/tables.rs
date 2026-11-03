@@ -439,13 +439,31 @@ pub fn write_meta(path: &str, m: &H48Meta) -> std::io::Result<()> {
     std::fs::write(meta_path(path), format!("{} {}\n", m.k, m.base))
 }
 
+/// Read a table's `k` and `base`.
+///
+/// # Errors
+/// If the meta file cannot be read, or does not hold `k <= 11` and a base
+/// of at most 12: the search relies on bounds below 16 (`base + 3` and
+/// 4-bit group minima) and on the index layout of `k`.
 pub fn read_meta(path: &str) -> std::io::Result<H48Meta> {
     let s = std::fs::read_to_string(meta_path(path))?;
-    let v: Vec<u32> = s.split_whitespace().map(|x| x.parse().unwrap()).collect();
-    Ok(H48Meta {
-        k: v[0],
-        base: v[1] as u8,
-    })
+    let invalid = || {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("bad table meta {s:?}"),
+        )
+    };
+    let v: Vec<u32> = s
+        .split_whitespace()
+        .map(|x| x.parse().map_err(|_| invalid()))
+        .collect::<Result<_, _>>()?;
+    match v[..] {
+        [k, base] if k <= 11 && base <= 12 => Ok(H48Meta {
+            k,
+            base: u8::try_from(base).unwrap(),
+        }),
+        _ => Err(invalid()),
+    }
 }
 
 impl H48Table {
@@ -454,6 +472,16 @@ impl H48Table {
     pub fn open(path: &str) -> std::io::Result<H48Table> {
         let meta = read_meta(path)?;
         let len = h48_bytes(meta.k) as usize;
+        // A file of another `k` (a stale or wrong meta) would give wrong,
+        // possibly too high, bounds: its size must match (hugetlbfs files
+        // are rounded up to whole 1 GiB pages).
+        let flen = std::fs::metadata(path)?.len();
+        if flen < len as u64 || flen >= len as u64 + (1 << 30) {
+            return Err(std::io::Error::other(format!(
+                "table file {path}: {flen} bytes, but h{} needs {len}",
+                meta.k
+            )));
+        }
         if path.contains("huge") || path.starts_with("/dev/shm") {
             let mem = Mem::file(path, len, false)?;
             return Ok(H48Table { mem, meta });
@@ -504,6 +532,29 @@ impl H48Table {
 mod tests {
     use super::*;
     use crate::cubie::*;
+
+    /// Tables open only with a valid meta and a file of the size its `k`
+    /// needs (a wrong meta would give wrong, possibly too high, bounds).
+    #[test]
+    #[cfg_attr(miri, ignore = "files")]
+    fn table_meta_and_size_are_checked() {
+        let dir = std::env::temp_dir().join(format!("cubeopt-meta-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("h0").to_string_lossy().into_owned();
+        let len = h48_bytes(0);
+        std::fs::write(&path, vec![0u8; usize::try_from(len).unwrap()]).unwrap();
+        let open_with = |meta: &str| {
+            std::fs::write(meta_path(&path), meta).unwrap();
+            H48Table::open(&path).map(|t| (t.meta.k, t.meta.base))
+        };
+        assert_eq!(open_with("0 8\n").unwrap(), (0, 8));
+        for bad in ["0 13", "12 8", "0", "0 8 1", "x 8", "0 -1", ""] {
+            assert!(open_with(bad).is_err(), "meta {bad:?}");
+        }
+        // The file of an h0 table is too small for h1.
+        assert!(open_with("1 8").is_err());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     #[cfg_attr(miri, ignore = "Cocsep::generate is too slow under Miri")]
