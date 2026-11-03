@@ -1,7 +1,8 @@
 //! Fast cube representation: one AVX2 register.
 //!
 //! Bytes 0..8 hold corners (`piece | co << 5`), bytes 16..28 hold edges
-//! (`piece | eo << 4`); everything else is zero. Composition is a single
+//! (`piece | eo << 4`); everything else is unspecified (zero for cubes
+//! built from cubies, garbage after `compose`). Composition is a single
 //! `vpshufb` plus orientation fix-up (method from vcube).
 
 use crate::cubie::CubieCube;
@@ -62,7 +63,10 @@ impl Cube {
 
     pub fn to_bytes(self) -> [u8; 32] {
         let mut b = A32([0; 32]);
-        unsafe { _mm256_store_si256(b.0.as_mut_ptr() as *mut __m256i, self.0) };
+        unsafe {
+            let x = _mm256_and_si256(self.0, ld(&USED));
+            _mm256_store_si256(b.0.as_mut_ptr() as *mut __m256i, x)
+        };
         b.0
     }
 
@@ -88,14 +92,21 @@ impl Cube {
             let so = _mm256_and_si256(o.0, ld(&ORIENT));
             let ss = _mm256_add_epi8(ss, so);
             let su = _mm256_sub_epi8(ss, ld(&CARRY));
-            let ss = _mm256_min_epu8(ss, su);
-            Cube(_mm256_and_si256(ss, ld(&USED)))
+            // Bytes outside USED are left as garbage (they never feed back
+            // into used bytes); `equals` and `to_bytes` mask them.
+            Cube(_mm256_min_epu8(ss, su))
         }
     }
 
     #[inline(always)]
     pub fn apply_move(self, m: usize) -> Cube {
-        self.compose(Cube(ld(&MOVES[m])))
+        // `compose` with the move's orientation term precomputed.
+        unsafe {
+            let ss = _mm256_shuffle_epi8(self.0, ld(&MOVES[m]));
+            let ss = _mm256_add_epi8(ss, ld(&MOVES_ORI[m]));
+            let su = _mm256_sub_epi8(ss, ld(&CARRY));
+            Cube(_mm256_min_epu8(ss, su))
+        }
     }
 
     /// Given the inverse `i` of a cube `c`, return the inverse of `c * m`.
@@ -153,7 +164,7 @@ impl Cube {
     pub fn equals(self, o: Cube) -> bool {
         unsafe {
             let x = _mm256_xor_si256(self.0, o.0);
-            _mm256_testz_si256(x, x) != 0
+            _mm256_testz_si256(x, ld(&USED)) != 0
         }
     }
 

@@ -28,9 +28,14 @@ pub static ALLOWED_AFTER: [u32; 6] = mk_allowed();
 pub struct Solver<'a> {
     pub cs: &'a Cocsep,
     pub table: &'a H48Table,
+    /// `table.ptr()`, cached (saves a dependent load per prefetch/lookup).
+    tptr: *const u8,
     k: u32,
     pub(crate) base: u8,
 }
+// `tptr` points into `table`, which is shared read-only.
+unsafe impl Send for Solver<'_> {}
+unsafe impl Sync for Solver<'_> {}
 
 #[derive(Default, Clone, Copy, Debug)]
 pub struct Stats {
@@ -92,6 +97,7 @@ impl<'a> Solver<'a> {
         Solver {
             cs,
             table,
+            tptr: table.ptr(),
             k: table.meta.k,
             base: table.meta.base,
         }
@@ -107,11 +113,28 @@ impl<'a> Solver<'a> {
 
     #[inline(always)]
     pub(crate) fn value(&self, idx: u64, cdepth: u8) -> u8 {
-        let (code, min) = self.table.get(idx);
+        // `H48Table::get` through the cached pointer.
+        let (code, min) = unsafe {
+            let p = self.tptr as *const u64;
+            let w = (idx >> 5) as usize;
+            let x = *p.add(w);
+            let m = *p.add(w & !1) & 15;
+            (((x >> ((idx & 31) * 2)) & 3) as u8, m as u8)
+        };
         if code == 0 {
             min.max(cdepth)
         } else {
             self.base + code
+        }
+    }
+
+    /// Prefetch table entry `idx` (`H48Table::prefetch`).
+    #[inline(always)]
+    pub(crate) fn prefetch(&self, idx: u64) {
+        unsafe {
+            let a = self.tptr.add((idx >> 2) as usize);
+            // NTA: each line is read once; less L2 pollution (cocsep data).
+            std::arch::x86_64::_mm_prefetch(a as *const i8, std::arch::x86_64::_MM_HINT_NTA);
         }
     }
 
@@ -162,8 +185,8 @@ impl<'a> Solver<'a> {
             for (n, j) in chunk.iter().enumerate() {
                 idx[2 * n] = self.index(j.c);
                 idx[2 * n + 1] = self.index(j.ci);
-                self.table.prefetch(idx[2 * n].0);
-                self.table.prefetch(idx[2 * n + 1].0);
+                self.prefetch(idx[2 * n].0);
+                self.prefetch(idx[2 * n + 1].0);
             }
             for (n, j) in chunk.iter_mut().enumerate() {
                 j.ln = self.value(idx[2 * n].0, idx[2 * n].1);
@@ -336,7 +359,7 @@ impl<'a> Solver<'a> {
                     }
                     k.idx = idx;
                     k.pi = cd; // temporarily the corner bound
-                    self.table.prefetch(idx);
+                    self.prefetch(idx);
                     k.pn = UNKNOWN; // marks "pi pending"
                 }
             }
@@ -363,7 +386,7 @@ impl<'a> Solver<'a> {
                 }
                 k.idx = idx;
                 k.pn = cd;
-                self.table.prefetch(idx);
+                self.prefetch(idx);
             }
             // Stage 3: normal-side value.
             for k in kids[..nk].iter_mut() {
