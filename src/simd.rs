@@ -18,6 +18,32 @@ pub struct A64(pub [u8; 64]);
 
 include!(concat!(env!("OUT_DIR"), "/consts.rs"));
 
+/// The small lookup tables of the move/index hot path in one static, so that
+/// all their accesses share one base register (x86 has no RIP-relative
+/// indexed addressing: separate statics cost an `lea` each per use).
+#[repr(C, align(64))]
+pub struct Tabs {
+    pub mv: [A32; 18],
+    pub mv_ori: [A32; 18],
+    pub inv_mv: [A32; 18],
+    pub sym_edge: [A64; 48],
+    pub co_lo: [u32; 256],
+    pub co_hi: [u32; 64],
+    pub eslot: [u16; 4096],
+    pub rank8: [u8; 256],
+}
+
+pub static TABS: Tabs = Tabs {
+    mv: MOVES,
+    mv_ori: MOVES_ORI,
+    inv_mv: INV_MOVES,
+    sym_edge: SYM_EDGE,
+    co_lo: crate::coord::CO_LO_T,
+    co_hi: crate::coord::CO_HI_T,
+    eslot: crate::coord::ESLOT_T,
+    rank8: crate::coord::RANK8_T,
+};
+
 #[derive(Clone, Copy)]
 #[repr(transparent)]
 pub struct Cube(pub __m256i);
@@ -102,8 +128,8 @@ impl Cube {
     pub fn apply_move(self, m: usize) -> Cube {
         // `compose` with the move's orientation term precomputed.
         unsafe {
-            let ss = _mm256_shuffle_epi8(self.0, ld(&MOVES[m]));
-            let ss = _mm256_add_epi8(ss, ld(&MOVES_ORI[m]));
+            let ss = _mm256_shuffle_epi8(self.0, ld(&TABS.mv[m]));
+            let ss = _mm256_add_epi8(ss, ld(&TABS.mv_ori[m]));
             let su = _mm256_sub_epi8(ss, ld(&CARRY));
             Cube(_mm256_min_epu8(ss, su))
         }
@@ -112,7 +138,7 @@ impl Cube {
     /// Given the inverse `i` of a cube `c`, return the inverse of `c * m`.
     #[inline(always)]
     pub fn premove_inv(self, m: usize) -> Cube {
-        Cube(ld(&INV_MOVES[m])).compose(self)
+        Cube(ld(&TABS.inv_mv[m])).compose(self)
     }
 
     #[inline(always)]

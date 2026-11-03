@@ -467,7 +467,8 @@ impl Lane {
             // side. Selected without branching on the move kind.
             let other = m % 3 == 0;
             let tw = self.stack[self.sp].tw[face];
-            let po = if half { lo } else { tw };
+            // (LLVM would branch on `half` to skip the `tw` load.)
+            let po = std::hint::select_unpredictable(half, lo, tw);
             debug_assert!(other || po <= r1);
             let (idx, cd) = s.index(Cube::select(other, b2, a2));
             if cd > r1 {
@@ -516,12 +517,18 @@ impl Lane {
         self.stack[self.sp].skip |= 4 << m;
     }
 
+    /// The pending lookup's value (any value if the lane is idle). Loaded
+    /// before the phase dispatch, whose mispredicts then do not delay it.
     #[inline(always)]
-    fn resolve_other(&mut self, s: &Solver) {
+    fn pending_value(&self, s: &Solver) -> u8 {
+        s.value(self.k_idx, self.k_cd)
+    }
+
+    #[inline(always)]
+    fn resolve_other(&mut self, po: u8, s: &Solver) {
         // SAFETY: see `advance`.
         unsafe { std::hint::assert_unchecked(self.sp < MAXD && self.k_m < 18) };
         self.stats.lookups += 1;
-        let po = s.value(self.k_idx, self.k_cd);
         let r1 = self.stack[self.sp].r - 1;
         let face = (self.k_m / 3) as usize;
         self.stack[self.sp].tw[face] = po;
@@ -545,12 +552,11 @@ impl Lane {
     }
 
     #[inline(always)]
-    fn resolve_moved(&mut self, s: &Solver) {
+    fn resolve_moved(&mut self, pm: u8) {
         // SAFETY: see `advance`.
         unsafe { std::hint::assert_unchecked(self.sp < MAXD && self.k_m < 18) };
         self.stats.lookups += 1;
         self.phase = Phase::Idle;
-        let pm = s.value(self.k_idx, self.k_cd);
         let po = self.k_po;
         self.heur += HEUR_TERMS[po.min(63) as usize] + HEUR_TERMS[pm.min(63) as usize];
         let r1 = self.stack[self.sp].r - 1;
@@ -693,14 +699,15 @@ pub fn run_lanes(
             if !l.active {
                 continue;
             }
+            let v = l.pending_value(s);
             match l.phase {
                 Phase::WaitOther => {
-                    l.resolve_other(s);
+                    l.resolve_other(v, s);
                     if l.phase != Phase::Idle {
                         continue;
                     }
                 }
-                Phase::WaitMoved => l.resolve_moved(s),
+                Phase::WaitMoved => l.resolve_moved(v),
                 Phase::Idle => {}
             }
             if let Step::Found = l.advance(s) {
