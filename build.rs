@@ -29,13 +29,13 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     let mut s = String::new();
     let moves = cubie::move_cubes();
-    writeln!(s, "pub static MOVES: [A32; 18] = [").unwrap();
+    writeln!(s, "pub const MOVES: [A32; 18] = [").unwrap();
     for m in moves.iter() {
         writeln!(s, "  {},", arr(&simd_bytes(m))).unwrap();
     }
     writeln!(s, "];").unwrap();
     // Orientation part of each move (the `o & ORIENT` term of `compose`).
-    writeln!(s, "pub static MOVES_ORI: [A32; 18] = [").unwrap();
+    writeln!(s, "pub const MOVES_ORI: [A32; 18] = [").unwrap();
     for m in moves.iter() {
         let mut b = simd_bytes(m);
         for (i, x) in b.iter_mut().enumerate() {
@@ -45,7 +45,7 @@ fn main() {
     }
     writeln!(s, "];").unwrap();
     // Premove cubes: applying move m to the inverse = premove of inverse(m).
-    writeln!(s, "pub static INV_MOVES: [A32; 18] = [").unwrap();
+    writeln!(s, "pub const INV_MOVES: [A32; 18] = [").unwrap();
     for m in 0..18u8 {
         let im = cubie::inverse_move(m);
         writeln!(s, "  {},", arr(&simd_bytes(&moves[im as usize]))).unwrap();
@@ -66,7 +66,7 @@ fn main() {
     // line per symmetry: bytes 0..32 classify a piece j of T (edge lane:
     // bit 7 = E-slice, bit 6 = S-slice, bit 4 = eo of T at j), bytes 32..64
     // are the position permutation Tinv (edge lane; 0x80 = zero elsewhere).
-    writeln!(s, "pub static SYM_EDGE: [A64; 48] = [").unwrap();
+    writeln!(s, "pub const SYM_EDGE: [A64; 48] = [").unwrap();
     for y in syms.iter() {
         let t = simd_bytes(&y.t);
         let ti = simd_bytes(&y.tinv);
