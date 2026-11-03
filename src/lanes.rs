@@ -164,7 +164,6 @@ enum Phase {
     WaitMoved = 0,
     /// Waiting for the lookup of the non-moved side.
     WaitOther = 1,
-    Idle = 2,
 }
 
 pub struct Lane {
@@ -228,7 +227,7 @@ impl Lane {
             target: 0,
             stack: [n; MAXD],
             sp: 0,
-            phase: Phase::Idle,
+            phase: Phase::WaitMoved,
             k_a: Cube::solved(),
             k_b: Cube::solved(),
             k_m: 0,
@@ -257,7 +256,6 @@ impl Lane {
         self.cube_index = index;
         self.stats = Stats::default();
         self.solution.clear();
-        self.phase = Phase::Idle;
         let c = Cube::from_cubie(cube);
         if c.is_solved() {
             return true;
@@ -562,8 +560,8 @@ impl Lane {
         self.stack[self.sp].skip |= 4 << m;
     }
 
-    /// The pending lookup's value (any value if the lane is idle). Loaded
-    /// before the phase dispatch, whose mispredicts then do not delay it.
+    /// The pending lookup's value. Loaded before the phase dispatch, whose
+    /// mispredicts then do not delay it.
     #[inline(always)]
     fn pending_value(&self, s: &Solver) -> u8 {
         s.value(self.k_idx, self.k_cd)
@@ -616,7 +614,7 @@ impl Lane {
         self.push_advance(pm, po, s)
     }
 
-    /// `advance` out of line, for rare paths.
+    /// `advance` out of line, for rare paths (and a lane's first lookup).
     #[inline(never)]
     fn advance_cold(&mut self, s: &Solver) -> Step {
         self.advance(s)
@@ -788,10 +786,25 @@ pub fn run_lanes(
             return true;
         }
     };
+    // Give lane `l` a new cube and advance it to its first lookup (past
+    // solutions found on the way); returns false if there are no cubes left.
+    let refill = |l: &mut Lane, done: &mut dyn FnMut(usize, Vec<u8>, Stats, f64)| -> bool {
+        loop {
+            if !fetch(l, done) {
+                return false;
+            }
+            if let Step::Pending = l.advance_cold(s) {
+                return true;
+            }
+            let sol = l.reconstruct();
+            let dt = l.started.elapsed().as_secs_f64();
+            done(l.cube_index, sol, l.stats, dt);
+        }
+    };
     // The active lanes are `lanes[..nactive]` (no per-visit activity test).
     let mut nactive = 0;
     for li in 0..nlanes {
-        if fetch(&mut lanes[li], &mut done) {
+        if refill(&mut lanes[li], &mut done) {
             lanes.swap(li, nactive);
             nactive += 1;
         }
@@ -811,13 +824,12 @@ pub fn run_lanes(
                     l.advance(s)
                 }
                 Phase::WaitMoved => l.resolve_moved(v, s),
-                Phase::Idle => l.advance(s),
             };
             if let Step::Found = st {
                 let sol = l.reconstruct();
                 let dt = l.started.elapsed().as_secs_f64();
                 done(l.cube_index, sol, l.stats, dt);
-                if !fetch(l, &mut done) {
+                if !refill(l, &mut done) {
                     // (The rest of the round waits for the next one.)
                     gone = Some(l);
                     break;
