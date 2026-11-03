@@ -17,6 +17,9 @@
 //!   once per round after a cube is solved). If threads are waiting for work,
 //!   a long job list is extended and sorted by all of them (`build_task`).
 //!   Jobs whose bounds exceed the iteration are sorted last and not claimed.
+//! * With few cubes in progress (at most threads / 8, e.g. one at a time),
+//!   builds are always staged, the prefixes are of 4 moves as soon as stream
+//!   mode's are of 2, and threads stay with the cubes they work on.
 //! * A lane whose job ends takes, in order: a piece donated to its thread,
 //!   another job of the same cube, a job its thread already claimed, a fresh
 //!   cube (at most `max_active` cubes are in progress), jobs of the oldest
@@ -27,7 +30,8 @@
 //! * A thread without active lanes asks for work in its mailbox; busy
 //!   threads check once per round whether some thread is waiting and donate
 //!   it a split of one of their lanes (a copy of the path to the split
-//!   node). Waiting threads spin briefly, then yield.
+//!   node; the piece's slot is written and read in the order of the
+//!   mailbox states). Waiting threads spin briefly, then yield.
 //! * The job buffers of reported cubes are reused by new ones, the other
 //!   build buffers by later builds: builds touch no fresh pages.
 //!
@@ -380,11 +384,13 @@ fn add_f32(st: &AtomicU32, v: f32) {
 }
 
 /// Part of a job's tree donated to another thread: the path from the job
-/// root, whose last node holds the donated moves (the others have none).
+/// root (`nodes[..=depth]`), whose last node holds the donated moves (the
+/// others have none).
 struct Piece {
-    ctx: Arc<CubeCtx>,
+    ctx: Option<Arc<CubeCtx>>,
     job: u32,
-    nodes: Vec<Node>,
+    depth: usize,
+    nodes: [Node; MAXD],
 }
 
 /// Mailbox states: the owner has work, waits for a piece, a donor is
@@ -398,9 +404,13 @@ const FULL: u8 = 3;
 /// busy thread takes the request (`FILL`) and delivers (`FULL`).
 struct Mailbox {
     state: AtomicU8,
-    /// (Uncontended: the donor writes it, then the owner takes it.)
-    piece: Mutex<Option<Piece>>,
+    /// Written only by the donor that moved `state` from `WANT` to `FILL`,
+    /// then read by the owner once it is `FULL` (ordered by `state`).
+    piece: UnsafeCell<Piece>,
 }
+
+// `piece` is accessed as described above.
+unsafe impl Sync for Mailbox {}
 
 /// Shared state of a batch: the cube source and the active cubes.
 pub struct Pool<'a> {
@@ -488,7 +498,12 @@ impl<'a> Pool<'a> {
                 .map(|_| {
                     Pad(Mailbox {
                         state: AtomicU8::new(IDLE),
-                        piece: Mutex::new(None),
+                        piece: UnsafeCell::new(Piece {
+                            ctx: None,
+                            job: 0,
+                            depth: 0,
+                            nodes: [Lane::new().stack[0]; MAXD],
+                        }),
                     })
                 })
                 .collect(),
@@ -618,6 +633,11 @@ impl<'a> Pool<'a> {
         if b.pooled {
             self.bufs.lock().unwrap().push(b);
         }
+    }
+
+    /// Few cubes in progress (each to be shared by many threads).
+    fn few(&self) -> bool {
+        self.active.load(Relaxed) * FEW <= self.nthreads as usize
     }
 
     fn finished(&self) -> bool {
@@ -764,8 +784,17 @@ fn build(
     let t = inner.target;
     // (As in `start_iteration`: the stack depth stays below the target.)
     assert!((t as usize) < MAXD);
-    let jl = s.job_len(t);
-    let parallel = pool.hungry.load(Relaxed) != 0;
+    // With few cubes in progress, the longest prefixes as soon as stream
+    // mode's are 2 moves (iteration 15 with h11): more and smaller jobs
+    // share the iterations better (a few big jobs set their ends), and the
+    // extension is done once.
+    let few = pool.few();
+    let jl = match s.job_len(t) {
+        jl if few && jl >= 2 => MAX_JOB_LEN,
+        jl => jl,
+    };
+    // (With few cubes, threads are about to wait for this one.)
+    let parallel = few || pool.hungry.load(Relaxed) != 0;
     let len = inner.jobs[0].len as usize;
     // Sorted by the statistics as they are (not copied to the jobs first)?
     let direct = !first && len >= jl && jl > 0 && parallel && inner.jobs.len() >= SORT_MIN;
@@ -828,6 +857,13 @@ fn build(
     finish_build(pool, ctx);
     false
 }
+
+/// Fewer cubes in progress than threads / `FEW` use prefixes of
+/// `MAX_JOB_LEN` moves early.
+const FEW: usize = 8;
+/// Most cubes a thread stays with (`Worker::keep`).
+const KEEP: usize = 2;
+const MAX_JOB_LEN: usize = 4;
 
 /// The statistics of the last iteration to its jobs.
 fn copy_stats(inner: &mut Inner) {
@@ -1515,6 +1551,16 @@ impl Worker<'_, '_> {
                 return true;
             }
         }
+        // (Kept cubes: no need to look for them.)
+        if self.pool.few() {
+            for slot in 0..self.locals.len() {
+                if matches!(&self.locals[slot], Some(l) if l.ctx.unclaimed() > 0)
+                    && self.continue_local(li, slot)
+                {
+                    return true;
+                }
+            }
+        }
         self.count[C_REFILL] += 1;
         let ok = self.fresh(li) || self.open_cube(li) || self.split(li);
         self.count[C_REFILL_FAIL] += !ok as u64;
@@ -1522,7 +1568,8 @@ impl Worker<'_, '_> {
     }
 
     /// Start a job of the cube in `slot` in lane `li`, claiming more jobs if
-    /// needed. Releases the slot if nothing is left to do there.
+    /// needed. Releases the slot if nothing is left to do there (unless the
+    /// cube is kept).
     fn continue_local(&mut self, li: usize, slot: usize) -> bool {
         loop {
             if self.take(li, slot) {
@@ -1533,18 +1580,41 @@ impl Worker<'_, '_> {
                 break;
             }
         }
-        if self.locals[slot].as_ref().unwrap().pending == 0 {
+        let loc = self.locals[slot].as_ref().unwrap();
+        if loc.pending == 0 && !self.keep(&loc.ctx) {
             self.release(slot);
         }
         false
     }
 
     /// Count down the jobs of `slot` if none is pending, and leave the cube
-    /// then.
+    /// then (unless it is kept).
     fn tidy(&mut self, slot: usize) {
         self.settle(slot);
-        if self.locals[slot].as_ref().unwrap().pending == 0 {
+        let loc = self.locals[slot].as_ref().unwrap();
+        if loc.pending == 0 && !self.keep(&loc.ctx) {
             self.release(slot);
+        }
+    }
+
+    /// With few cubes in progress, a thread stays with (at most `KEEP`)
+    /// unsolved cubes it has nothing to do on: its next jobs there need no
+    /// search of the open list, nor joining again (atomics on lines shared
+    /// by all threads, at every iteration).
+    fn keep(&self, ctx: &CubeCtx) -> bool {
+        !ctx.done.load(Relaxed)
+            && self.pool.few()
+            && self.locals.iter().filter(|l| l.is_some()).count() <= KEEP
+    }
+
+    /// Leave the kept cubes that were solved (nothing pending).
+    fn release_done(&mut self) {
+        for slot in 0..self.locals.len() {
+            if matches!(&self.locals[slot], Some(l) if l.pending == 0 && l.ctx.done.load(Relaxed)) {
+                // (Clears the claimed count.)
+                self.settle(slot);
+                self.release(slot);
+            }
         }
     }
 
@@ -1569,12 +1639,7 @@ impl Worker<'_, '_> {
             l.jobs[0] = inner.jobs[ji as usize];
             l.job_pos = 0;
             if l.setup_job() {
-                // The statistic is written at the end of the job, the next
-                // job is read when it starts.
-                prefetch(&inner.stats[ji as usize], true);
-                if loc.next < loc.end {
-                    prefetch(&inner.jobs[loc.next as usize], false);
-                }
+                // (The jobs and statistics were fetched when claimed.)
                 self.count[C_JOBS] += 1;
                 sl.slot = slot as u32;
                 sl.job = ji;
@@ -1601,7 +1666,20 @@ impl Worker<'_, '_> {
         loc.end = p + c;
         loc.pending += c;
         loc.claimed += c as u64;
-        prefetch(&loc.ctx.inner().jobs[p as usize], false);
+        // The claimed jobs and their statistics (written at their ends):
+        // the lines were written by other threads (the jobs by the build,
+        // the statistics by the publication), and lanes take the jobs one
+        // after another.
+        let inner = loc.ctx.inner();
+        let (p, e) = (p as usize, (p + c) as usize);
+        for i in (p..e).step_by(4) {
+            prefetch(&inner.jobs[i], false);
+        }
+        prefetch(&inner.jobs[e - 1], false);
+        for i in (p..e).step_by(16) {
+            prefetch(&inner.stats[i], true);
+        }
+        prefetch(&inner.stats[e - 1], true);
         true
     }
 
@@ -1815,45 +1893,49 @@ impl Worker<'_, '_> {
 
     /// Start the piece in this thread's mailbox in lane `li`.
     fn piece(&mut self, li: usize) -> bool {
-        let Some(m) = self.mailbox() else {
+        let pool = self.pool;
+        let Some(m) = pool.mail.get(self.id) else {
             return false;
         };
         if m.state.load(Acquire) != FULL {
             return false;
         }
-        let p = m.piece.lock().unwrap().take().unwrap();
+        let (ctx, job) = {
+            // SAFETY: `FULL`: the slot is ours until we store `IDLE`.
+            let p = unsafe { &mut *m.piece.get() };
+            // (The lane is idle: its stack is free.)
+            let l = &mut self.lanes[li].l;
+            l.stack[..=p.depth].copy_from_slice(&p.nodes[..=p.depth]);
+            l.sp = p.depth;
+            (p.ctx.take().unwrap(), p.job)
+        };
         m.state.store(IDLE, Release);
-        {
-            // (A solved cube's outstanding count no longer matters.)
-            if p.ctx.done.load(Relaxed) {
-                return false;
-            }
-            let Some(slot) = self.local(&p.ctx) else {
-                return false;
-            };
-            let loc = self.locals[slot].as_mut().unwrap();
-            loc.pending += 1;
-            loc.claimed += 1;
-            let inner = p.ctx.inner();
-            let sl = &mut self.lanes[li];
-            let l = &mut sl.l;
-            l.jobs[0] = inner.jobs[p.job as usize];
-            l.job_pos = 0;
-            l.target = inner.target;
-            l.root_c = p.ctx.root_c;
-            l.root_ci = p.ctx.root_ci;
-            let d = p.nodes.len() - 1;
-            l.stack[..=d].copy_from_slice(&p.nodes);
-            l.sp = d;
-            l.heur = 0.0;
-            sl.slot = slot as u32;
-            sl.job = p.job;
-            sl.split = true;
-            sl.n0 = l.stats.nodes;
-            sl.k0 = l.stats.lookups;
-            self.count[C_PIECES] += 1;
-            true
+        // (A solved cube's outstanding count no longer matters.)
+        if ctx.done.load(Relaxed) {
+            return false;
         }
+        let Some(slot) = self.local(&ctx) else {
+            return false;
+        };
+        let loc = self.locals[slot].as_mut().unwrap();
+        loc.pending += 1;
+        loc.claimed += 1;
+        let inner = ctx.inner();
+        let sl = &mut self.lanes[li];
+        let l = &mut sl.l;
+        l.jobs[0] = inner.jobs[job as usize];
+        l.job_pos = 0;
+        l.target = inner.target;
+        l.root_c = ctx.root_c;
+        l.root_ci = ctx.root_ci;
+        l.heur = 0.0;
+        sl.slot = slot as u32;
+        sl.job = job;
+        sl.split = true;
+        sl.n0 = l.stats.nodes;
+        sl.k0 = l.stats.lookups;
+        self.count[C_PIECES] += 1;
+        true
     }
 
     /// The lane and node to split for another lane: the active lane (other
@@ -1952,12 +2034,6 @@ impl Worker<'_, '_> {
         pool.hungry.fetch_sub(1, Relaxed);
         let sl = &mut self.lanes[v];
         sl.split = true;
-        let mut nodes = sl.l.stack[..=d].to_vec();
-        for n in &mut nodes[..d] {
-            n.todo = 0;
-        }
-        nodes[d].todo = give;
-        sl.l.stack[d].todo &= !give;
         let ctx = self.locals[sl.slot as usize].as_ref().unwrap().ctx.clone();
         // (The job is outstanding, so the iteration cannot end before the
         // piece is counted.)
@@ -1965,11 +2041,19 @@ impl Worker<'_, '_> {
         if pool.trace {
             ctx.rare.it_donated.fetch_add(1, Relaxed);
         }
-        *m.piece.lock().unwrap() = Some(Piece {
-            ctx,
-            job: sl.job,
-            nodes,
-        });
+        {
+            // SAFETY: `FILL` (ours): the owner reads the slot once `FULL`.
+            let p = unsafe { &mut *m.piece.get() };
+            p.nodes[..=d].copy_from_slice(&sl.l.stack[..=d]);
+            for n in &mut p.nodes[..d] {
+                n.todo = 0;
+            }
+            p.nodes[d].todo = give;
+            p.ctx = Some(ctx);
+            p.job = sl.job;
+            p.depth = d;
+        }
+        sl.l.stack[d].todo &= !give;
         m.state.store(FULL, Release);
         self.count[C_DONATED] += 1;
     }
@@ -1982,6 +2066,7 @@ impl Worker<'_, '_> {
         if solved != self.solved {
             self.solved = solved;
             self.cancel_done();
+            self.release_done();
         }
         if self.nactive < self.lanes.len() {
             let e = self.pool.epoch.load(Acquire);
@@ -2036,7 +2121,13 @@ impl Worker<'_, '_> {
                 return false;
             }
             let e = pool.epoch.load(Acquire);
-            // help extending job lists
+            self.release_done();
+            // help extending job lists (of kept cubes first)
+            for slot in 0..self.locals.len() {
+                if let Some(l) = &self.locals[slot] {
+                    while build_task(&mut self.scratch, self.s, pool, &l.ctx, self.id) {}
+                }
+            }
             while let Some(ctx) = pool.find_open(true) {
                 while build_task(&mut self.scratch, self.s, pool, &ctx, self.id) {}
             }

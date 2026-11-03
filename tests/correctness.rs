@@ -315,6 +315,25 @@ fn share_splits_and_donates() {
     assert!(count("pieces") > 0, "{counters}");
 }
 
+/// Few cubes in progress for the threads (at most threads / 8): longer
+/// prefixes early (extended by two moves in parallel), staged builds, and
+/// threads staying with their cubes.
+#[test]
+fn share_few_cubes() {
+    let cubes: Vec<CubieCube> = dataset("depth15.txt").into_iter().take(24).collect();
+    for (threads, nlanes, max_active) in [(8, 3, 1), (9, 2, 1), (16, 1, 2)] {
+        let (sols, counters) = share_solve(&cubes, h0(), threads, nlanes, max_active);
+        for (c, s) in cubes.iter().zip(sols.iter()) {
+            assert_eq!(c.apply_moves(s), CubieCube::SOLVED);
+            assert_eq!(
+                s.len(),
+                15,
+                "{threads} threads {nlanes} lanes {max_active}: {counters}"
+            );
+        }
+    }
+}
+
 /// Many short runs with small thread and lane counts (races of the
 /// mailboxes, the open list, builds and cube hand-over): every solution
 /// optimal, every cube reported once.
