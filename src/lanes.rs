@@ -403,26 +403,36 @@ impl Lane {
     }
 
     /// Advance until a lookup is pending or a solution is found.
+    ///
+    /// The depth and the top node's `todo`, `lb` and `r` are kept in
+    /// registers across the loop (and written through to the stack): the
+    /// exhaustion and pop branches, mispredicted often, then do not also wait
+    /// for store forwarding.
     #[inline(always)]
     fn advance(&mut self, s: &Solver) -> Step {
         let maxval = s.base + 3;
+        let mut sp = self.sp;
+        // SAFETY: the depth is bounded by the target (< MAXD).
+        unsafe { std::hint::assert_unchecked(sp < MAXD) };
+        let (mut todo, mut lb, mut r) = {
+            let n = &self.stack[sp];
+            (n.todo, n.lb, n.r)
+        };
         loop {
-            let sp = self.sp;
-            // SAFETY: the depth is bounded by the target (< MAXD).
+            // SAFETY: as above (`sp` is `self.sp`).
             unsafe { std::hint::assert_unchecked(sp < MAXD) };
-            let node = &mut self.stack[sp];
-            if node.lb <= node.r {
+            if lb <= r {
                 // X' moves known to be pruned (`skip`) are reached, and
                 // counted, up to the next move to generate. The bounds do
                 // not change in between (their value was already noted).
-                let todo = node.todo;
-                let live = todo & !node.skip;
+                let live = todo & !self.stack[sp].skip;
                 let below = todo & live.isolate_lowest_one().wrapping_sub(1);
                 self.stats.nodes += below.count_ones() as u64;
-                node.todo = todo & !below;
+                todo &= !below;
             }
-            if node.lb > node.r || node.todo == 0 {
-                let (lb, m) = (node.lb, node.m);
+            if lb > r || todo == 0 {
+                // (The node is done: its `todo` is not needed any more.)
+                let m = self.stack[sp].m;
                 if sp == 0 {
                     // job finished
                     self.jobs[self.job_pos].stat = self.heur;
@@ -431,23 +441,32 @@ impl Lane {
                         self.target += 1;
                         self.start_iteration(s);
                     }
+                    sp = self.sp;
+                    let n = &self.stack[sp];
+                    (todo, lb, r) = (n.todo, n.lb, n.r);
                     continue;
                 }
-                self.sp -= 1;
-                let p = &mut self.stack[self.sp];
+                sp -= 1;
+                self.sp = sp;
+                let p = &mut self.stack[sp];
                 let f = (m / 3) as usize;
                 let fm = p.fmax[f].max(lb);
                 p.fmax[f] = fm;
-                p.lb = p.lb.max(lb.saturating_sub(1));
-                p.todo &= !(((fm > p.r) as u32).wrapping_neg() & (7 << (3 * f)));
+                lb = p.lb.max(lb.saturating_sub(1));
+                p.lb = lb;
+                r = p.r;
+                todo = p.todo & !(((fm > r) as u32).wrapping_neg() & (7 << (3 * f)));
+                p.todo = todo;
                 continue;
             }
-            let m = node.todo.trailing_zeros() as usize;
+            let m = todo.trailing_zeros() as usize;
             // SAFETY: move masks are subsets of ALL_MOVES.
             unsafe { std::hint::assert_unchecked(m < 18) };
-            node.todo &= node.todo - 1;
+            todo &= todo - 1;
+            let node = &mut self.stack[sp];
+            node.todo = todo;
             let face = m / 3;
-            let r1 = node.r - 1;
+            let r1 = r - 1;
             // (No sibling-face check: such faces were removed from `todo`.)
             self.stats.nodes += 1;
             let (a, b, lo) = (node.a, node.b, node.lo);
@@ -471,6 +490,9 @@ impl Lane {
                 self.k_b = b2;
                 self.k_m = m as u8;
                 self.push_child(0, po);
+                sp = self.sp;
+                let n = &self.stack[sp];
+                (todo, lb, r) = (n.todo, n.lb, n.r);
                 continue;
             }
             let a2 = a.apply_move(m);
@@ -486,19 +508,21 @@ impl Lane {
             // moves with `tw > r1` are skipped), so they look up the moved
             // side. Selected without branching on the move kind.
             let other = m % 3 == 0;
-            let tw = self.stack[self.sp].tw[face];
+            let tw = self.stack[sp].tw[face];
             // (LLVM would branch on `half` to skip the `tw` load.)
             let po = std::hint::select_unpredictable(half, lo, tw);
             debug_assert!(other || po <= r1);
             let (idx, cd) = s.index(Cube::select(other, b2, a2));
             if cd > r1 {
                 if other {
-                    self.stack[self.sp].tw[face] = cd;
+                    self.stack[sp].tw[face] = cd;
                     self.note_value(face, cd);
                     self.skip_xprime(m);
                 } else {
                     self.note_value(face, cd.max(po));
                 }
+                let n = &self.stack[sp];
+                (todo, lb) = (n.todo, n.lb);
                 continue;
             }
             self.k_face = face as u8;
