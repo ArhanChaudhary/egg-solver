@@ -8,6 +8,9 @@
 //!   bench <table> <scramble file | random:N:SEED> [count] [threads] [lanes]
 //!       Solves a fixed batch and verifies every solution.
 //! lanes = 0 uses the recursive single-cube solver; default 20.
+//! A last argument `share[:C]` uses the work-sharing mode (`lanes::share`)
+//! with at most C cubes in progress at once (default: threads * lanes; 1
+//! solves one cube at a time with all threads).
 use cubeopt::cubie::*;
 use cubeopt::solver::{Solver, Stats};
 use cubeopt::tables::*;
@@ -28,9 +31,14 @@ fn run(
     threads: usize,
     nlanes: usize,
     duration: Option<f64>,
+    share: Option<usize>,
 ) -> (Vec<Rec>, f64) {
     let next = AtomicUsize::new(0);
     let stop = AtomicBool::new(false);
+    let pool = share.map(|c| {
+        let c = if c == 0 { threads * nlanes } else { c };
+        cubeopt::lanes::share::Pool::new(cubes, c, threads)
+    });
     let recs = Mutex::new(Vec::new());
     let bad = AtomicU64::new(0);
     let t0 = Instant::now();
@@ -49,7 +57,9 @@ fn run(
                         st,
                     });
                 };
-                if nlanes > 0 {
+                if let Some(pool) = &pool {
+                    pool.run(solver, nlanes, &stop, record);
+                } else if nlanes > 0 {
                     cubeopt::lanes::run_lanes(solver, cubes, &next, &stop, nlanes, record);
                 } else {
                     while !stop.load(Ordering::Relaxed) {
@@ -68,6 +78,9 @@ fn run(
         }
     });
     assert_eq!(bad.load(Ordering::Relaxed), 0, "bad solutions");
+    if let Some(pool) = &pool {
+        eprintln!("share: {}", pool.counters());
+    }
     (recs.into_inner().unwrap(), t0.elapsed().as_secs_f64())
 }
 
@@ -105,6 +118,16 @@ fn main() {
         tl.elapsed().as_secs_f64()
     );
     let solver = Solver::new(&cs, &table);
+    // trailing `share[:C]`
+    let mut a = a;
+    let share = match a.last() {
+        Some(x) if x.starts_with("share") => {
+            let c = x.strip_prefix("share:").map_or(0, |c| c.parse().unwrap());
+            a.pop();
+            Some(c)
+        }
+        _ => None,
+    };
     let arg = |i: usize, d: f64| a.get(i).map(|x| x.parse().unwrap()).unwrap_or(d);
     if a[2] == "stream" {
         let warm = arg(3, 3.0);
@@ -117,12 +140,13 @@ fn main() {
             rng.next_u64();
             Some(CubieCube::random(&mut rng))
         };
-        let (recs, _) = run(&solver, &cubes, threads, nlanes, Some(warm + window));
+        let (recs, _) = run(&solver, &cubes, threads, nlanes, Some(warm + window), share);
         let w: Vec<Rec> = recs
             .into_iter()
             .filter(|r| r.t >= warm && r.t < warm + window)
             .collect();
-        println!("threads {threads} lanes {nlanes} window {window}s");
+        let mode = share.map_or(String::new(), |c| format!(" share {c}"));
+        println!("threads {threads} lanes {nlanes} window {window}s{mode}");
         summary(&w);
         println!("throughput {:.3}", w.len() as f64 / window);
         return;
@@ -146,10 +170,12 @@ fn main() {
     let threads = arg(4, cubeopt::nthreads() as f64) as usize;
     let nlanes = arg(5, 20.0) as usize;
     let get = |i: usize| cubes.get(i).copied();
-    let (recs, el) = run(&solver, &get, threads, nlanes, None);
+    let (recs, el) = run(&solver, &get, threads, nlanes, None, share);
+    assert_eq!(recs.len(), cubes.len(), "cubes not reported");
     let n = cubes.len() as f64;
+    let mode = share.map_or(String::new(), |c| format!(" share {c}"));
     println!(
-        "cubes {} threads {threads} lanes {nlanes} time {el:.3}s",
+        "cubes {} threads {threads} lanes {nlanes} time {el:.3}s{mode}",
         cubes.len()
     );
     println!("solves/sec {:.3}", n / el);

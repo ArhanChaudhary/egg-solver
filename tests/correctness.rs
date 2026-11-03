@@ -230,3 +230,99 @@ fn lanes_short_scrambles_are_optimal() {
         assert_eq!(s.len(), reference_length(c, cs), "scramble {:?}", c);
     }
 }
+
+/// Solve with the work-sharing lanes (`lanes::share`): `threads` threads of
+/// `nlanes` lanes, at most `max_active` cubes at once. Returns the solutions
+/// and the pool's event counters.
+fn share_solve(
+    cubes: &[CubieCube],
+    table: &H48Table,
+    threads: usize,
+    nlanes: usize,
+    max_active: usize,
+) -> (Vec<Vec<u8>>, String) {
+    let solver = Solver::new(cs_data(), table);
+    let out = std::sync::Mutex::new(vec![None; cubes.len()]);
+    let get = |i: usize| cubes.get(i).copied();
+    let pool = cubeopt::lanes::share::Pool::new(&get, max_active, threads);
+    let stop = std::sync::atomic::AtomicBool::new(false);
+    std::thread::scope(|s| {
+        for _ in 0..threads {
+            s.spawn(|| {
+                pool.run(&solver, nlanes, &stop, |i, sol, _, _| {
+                    let mut o = out.lock().unwrap();
+                    assert!(o[i].is_none(), "cube {i} reported twice");
+                    o[i] = Some(sol);
+                });
+            });
+        }
+    });
+    let sols = out.into_inner().unwrap();
+    let sols = sols
+        .into_iter()
+        .enumerate()
+        .map(|(i, s)| s.unwrap_or_else(|| panic!("cube {i} not reported")))
+        .collect();
+    (sols, pool.counters())
+}
+
+#[test]
+fn share_solve_known_depth_15() {
+    let cubes: Vec<CubieCube> = dataset("depth15.txt").into_iter().take(40).collect();
+    // batch, one cube at a time, a few at a time; one lane, several lanes
+    for (threads, nlanes, max_active) in [(4, 7, usize::MAX), (4, 7, 1), (3, 1, 2), (1, 5, 3)] {
+        let (sols, counters) = share_solve(&cubes, h0(), threads, nlanes, max_active);
+        for (c, s) in cubes.iter().zip(sols.iter()) {
+            assert_eq!(c.apply_moves(s), CubieCube::SOLVED);
+            assert_eq!(
+                s.len(),
+                15,
+                "{threads} threads {nlanes} lanes {max_active}: {counters}"
+            );
+        }
+    }
+}
+
+/// One cube at a time with idle lanes and threads: lanes split each other's
+/// jobs and threads donate pieces.
+#[test]
+fn share_splits_and_donates() {
+    let cubes: Vec<CubieCube> = dataset("depth15.txt")
+        .into_iter()
+        .skip(40)
+        .take(12)
+        .collect();
+    let (sols, counters) = share_solve(&cubes, h0(), 4, 12, 1);
+    for (c, s) in cubes.iter().zip(sols.iter()) {
+        assert_eq!(c.apply_moves(s), CubieCube::SOLVED);
+        assert_eq!(s.len(), 15);
+    }
+    let count = |name: &str| -> u64 {
+        let f: Vec<&str> = counters.split_whitespace().collect();
+        let i = f.iter().position(|&x| x == name).unwrap();
+        f[i + 1].parse().unwrap()
+    };
+    assert!(count("splits") > 0, "{counters}");
+    assert!(count("donated") > 0, "{counters}");
+    assert!(count("pieces") > 0, "{counters}");
+}
+
+#[test]
+fn share_short_scrambles_are_optimal() {
+    let mut rng = Rng(4243);
+    let cs = cs_data();
+    let mut cubes = Vec::new();
+    for len in 0..=8 {
+        for _ in 0..10 {
+            let ms: Vec<u8> = (0..len).map(|_| rng.below(18) as u8).collect();
+            cubes.push(CubieCube::SOLVED.apply_moves(&ms));
+        }
+    }
+    for max_active in [usize::MAX, 1] {
+        let (sols, _) = share_solve(&cubes, h0(), 4, 5, max_active);
+        for (c, s) in cubes.iter().zip(sols.iter()) {
+            assert_eq!(c.apply_moves(s), CubieCube::SOLVED);
+            assert_eq!(s.len(), reference_length(c, cs), "scramble {:?}", c);
+        }
+    }
+}

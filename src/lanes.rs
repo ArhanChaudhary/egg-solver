@@ -27,6 +27,8 @@ use crate::cubie::{inverse_move, CubieCube};
 use crate::simd::Cube;
 use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES, NO_HALF};
 
+pub mod share;
+
 const MAXD: usize = 26;
 
 /// (128 bytes: two cache lines.)
@@ -80,6 +82,12 @@ fn job_weight(j: &Job) -> f32 {
     [47525.0, 58206.0][((j.moves[j.len as usize - 1] / 3) % 2) as usize]
 }
 
+/// The bits of `stat * job_weight` (`sort_jobs` sorts by decreasing key).
+#[inline(always)]
+fn job_key(j: &Job) -> u32 {
+    (j.stat * job_weight(j)).to_bits()
+}
+
 /// Sort jobs by decreasing `stat * job_weight`, stably: the same order as
 /// a stable `sort_by` with `total_cmp`, since the keys are non-negative
 /// floats, whose bit patterns order like their values. LSD radix sort of
@@ -90,7 +98,7 @@ fn sort_jobs(jobs: &mut Vec<Job>, out: &mut Vec<Job>) {
     let mut keys: Vec<u64> = jobs
         .iter()
         .enumerate()
-        .map(|(i, j)| ((!(j.stat * job_weight(j)).to_bits() as u64) << 32) | i as u64)
+        .map(|(i, j)| ((!job_key(j) as u64) << 32) | i as u64)
         .collect();
     let mut tmp = vec![0u64; n];
     for (shift, bits) in [(32u32, 11u32), (43, 11), (54, 10)] {
@@ -192,11 +200,16 @@ pub struct Lane {
     heur: f32,
     pub stats: Stats,
     pub solution: Vec<u8>,
+    /// Lane of `share`: `advance` returns `Step::JobDone` at the end of a
+    /// job instead of starting the lane's next one.
+    shared: bool,
 }
 
 enum Step {
     Pending,
     Found,
+    /// The job is finished (only for `Lane::shared` lanes).
+    JobDone,
 }
 
 impl Lane {
@@ -238,6 +251,7 @@ impl Lane {
             heur: 0.0,
             stats: Stats::default(),
             solution: Vec::new(),
+            shared: false,
         }
     }
 
@@ -435,6 +449,10 @@ impl Lane {
                 let m = self.stack[sp].m;
                 if sp == 0 {
                     // job finished
+                    if self.shared {
+                        self.stats.nodes += nodes;
+                        return Step::JobDone;
+                    }
                     self.jobs[self.job_pos].stat = self.heur;
                     self.job_pos += 1;
                     if !self.setup_job() {
