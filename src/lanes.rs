@@ -310,6 +310,9 @@ impl Lane {
 
     fn start_iteration(&mut self, s: &Solver) {
         loop {
+            // The stack depth stays below the target (relied on by the
+            // unchecked indexing in `advance`); 20 moves always suffice.
+            assert!((self.target as usize) < MAXD);
             let jl = s.job_len(self.target);
             while (self.jobs[0].len as usize) < jl {
                 self.extend_jobs(s);
@@ -370,6 +373,8 @@ impl Lane {
         let maxval = s.base + 3;
         loop {
             let sp = self.sp;
+            // SAFETY: the depth is bounded by the target (< MAXD).
+            unsafe { std::hint::assert_unchecked(sp < MAXD) };
             let node = &mut self.stack[sp];
             if node.lb > node.r || node.todo == 0 {
                 let (lb, m) = (node.lb, node.m);
@@ -391,6 +396,8 @@ impl Lane {
                 continue;
             }
             let m = node.todo.trailing_zeros() as usize;
+            // SAFETY: move masks are subsets of ALL_MOVES.
+            unsafe { std::hint::assert_unchecked(m < 18) };
             node.todo &= node.todo - 1;
             let face = m / 3;
             let r1 = node.r - 1;
@@ -483,6 +490,8 @@ impl Lane {
     /// Record a value learned for a child on `face` of the top node.
     #[inline(always)]
     fn note_value(&mut self, face: usize, v: u8) {
+        // SAFETY: see `advance`.
+        unsafe { std::hint::assert_unchecked(self.sp < MAXD && face < 6) };
         let node = &mut self.stack[self.sp];
         node.fmax[face] = node.fmax[face].max(v);
         node.lb = node.lb.max(v.saturating_sub(1));
@@ -490,6 +499,8 @@ impl Lane {
 
     #[inline(always)]
     fn resolve_other(&mut self, s: &Solver) {
+        // SAFETY: see `advance`.
+        unsafe { std::hint::assert_unchecked(self.sp < MAXD && self.k_m < 18) };
         self.stats.lookups += 1;
         let po = s.value(self.k_idx, self.k_cd);
         let r1 = self.stack[self.sp].r - 1;
@@ -515,6 +526,8 @@ impl Lane {
 
     #[inline(always)]
     fn resolve_moved(&mut self, s: &Solver) {
+        // SAFETY: see `advance`.
+        unsafe { std::hint::assert_unchecked(self.sp < MAXD && self.k_m < 18) };
         self.stats.lookups += 1;
         self.phase = Phase::Idle;
         let pm = s.value(self.k_idx, self.k_cd);
@@ -533,6 +546,8 @@ impl Lane {
     /// side (`pm`) and the other side (`po`).
     #[inline(always)]
     fn push_child(&mut self, pm: u8, po: u8) {
+        // SAFETY: see `advance`.
+        unsafe { std::hint::assert_unchecked(self.sp + 1 < MAXD && self.k_m < 18) };
         let node = &self.stack[self.sp];
         let r1 = node.r - 1;
         let face = (self.k_m / 3) as usize;
