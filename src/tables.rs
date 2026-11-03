@@ -207,16 +207,22 @@ unsafe impl Sync for Mem {}
 impl Mem {
     /// Anonymous memory, transparent huge pages requested.
     pub fn anon(len: usize) -> Mem {
+        // (Miri supports only these flags, and no `madvise`.)
+        #[cfg(not(miri))]
+        let flags = libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_NORESERVE;
+        #[cfg(miri)]
+        let flags = libc::MAP_PRIVATE | libc::MAP_ANONYMOUS;
         unsafe {
             let p = libc::mmap(
                 std::ptr::null_mut(),
                 len,
                 libc::PROT_READ | libc::PROT_WRITE,
-                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_NORESERVE,
+                flags,
                 -1,
                 0,
             );
             assert!(p != libc::MAP_FAILED, "mmap failed");
+            #[cfg(not(miri))]
             libc::madvise(p, len, libc::MADV_HUGEPAGE);
             Mem {
                 ptr: p as *mut u8,
@@ -500,6 +506,7 @@ mod tests {
     use crate::cubie::*;
 
     #[test]
+    #[cfg_attr(miri, ignore = "Cocsep::generate is too slow under Miri")]
     fn cocsep_classes_and_distribution() {
         let cs = Cocsep::generate();
         assert_eq!(cs.reps.len(), 3393);

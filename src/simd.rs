@@ -321,7 +321,8 @@ mod tests {
     fn simd_matches_cubie() {
         let mut rng = Rng(5);
         let syms = symmetries();
-        for _ in 0..200 {
+        // (Fewer under Miri, which is slow.)
+        for _ in 0..if cfg!(miri) { 20 } else { 200 } {
             let a = CubieCube::random(&mut rng);
             let b = CubieCube::random(&mut rng);
             let (sa, sb) = (Cube::from_cubie(&a), Cube::from_cubie(&b));
