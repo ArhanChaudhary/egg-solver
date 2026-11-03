@@ -183,6 +183,8 @@ pub struct Lane {
     k_a: Cube,
     k_b: Cube,
     k_m: u8,
+    /// `k_m / 3`.
+    k_face: u8,
     k_idx: u64,
     k_cd: u8,
     k_po: u8,
@@ -228,6 +230,7 @@ impl Lane {
             k_a: Cube::solved(),
             k_b: Cube::solved(),
             k_m: 0,
+            k_face: 0,
             k_idx: 0,
             k_cd: 0,
             k_po: 0,
@@ -496,6 +499,7 @@ impl Lane {
                 }
                 continue;
             }
+            self.k_face = face as u8;
             self.k_po = po;
             self.k_idx = idx;
             self.k_cd = cd;
@@ -539,44 +543,47 @@ impl Lane {
         s.value(self.k_idx, self.k_cd)
     }
 
+    /// Resolve the other side's lookup of an X child. Returns whether the
+    /// moved side's lookup is now pending (else the lane is to advance, which
+    /// sets the phase).
     #[inline(always)]
-    fn resolve_other(&mut self, po: u8, s: &Solver) {
+    fn resolve_other(&mut self, po: u8, s: &Solver) -> bool {
         // SAFETY: see `advance`.
-        unsafe { std::hint::assert_unchecked(self.sp < MAXD && self.k_m < 18) };
+        unsafe { std::hint::assert_unchecked(self.sp < MAXD && self.k_m < 18 && self.k_face < 6) };
         self.stats.lookups += 1;
         let r1 = self.stack[self.sp].r - 1;
-        let face = (self.k_m / 3) as usize;
+        let face = self.k_face as usize;
         self.stack[self.sp].tw[face] = po;
         if po > r1 {
             self.note_value(face, po);
             self.skip_xprime(self.k_m as usize);
-            self.phase = Phase::Idle;
-            return;
+            return false;
         }
         let (idx, cd) = s.index(self.k_a);
         if cd > r1 {
             self.note_value(face, cd.max(po));
-            self.phase = Phase::Idle;
-            return;
+            return false;
         }
         self.k_po = po;
         self.k_idx = idx;
         self.k_cd = cd;
         s.prefetch(idx);
         self.phase = Phase::WaitMoved;
+        true
     }
 
+    /// Resolve the moved side's lookup (the lane is to advance next, which
+    /// sets the phase).
     #[inline(always)]
     fn resolve_moved(&mut self, pm: u8) {
         // SAFETY: see `advance`.
-        unsafe { std::hint::assert_unchecked(self.sp < MAXD && self.k_m < 18) };
+        unsafe { std::hint::assert_unchecked(self.sp < MAXD && self.k_m < 18 && self.k_face < 6) };
         self.stats.lookups += 1;
-        self.phase = Phase::Idle;
         let po = self.k_po;
         debug_assert!(po < 16 && pm < 16);
         self.heur += HEUR_PAIR[(po as usize & 15) << 4 | (pm as usize & 15)];
         let r1 = self.stack[self.sp].r - 1;
-        let face = (self.k_m / 3) as usize;
+        let face = self.k_face as usize;
         self.note_value(face, pm.max(po));
         if pm > r1 || self.k_a.is_solved() {
             return;
@@ -713,8 +720,7 @@ pub fn run_lanes(
             let v = l.pending_value(s);
             match l.phase {
                 Phase::WaitOther => {
-                    l.resolve_other(v, s);
-                    if l.phase != Phase::Idle {
+                    if l.resolve_other(v, s) {
                         continue;
                     }
                 }
