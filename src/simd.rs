@@ -115,7 +115,7 @@ pub static HOT_TABLES: HotTables = HotTables {
     co_pext_mask: 0x0060_6060_6060_6060,
     tetrad_pext_mask: 0x0404_0404_0404_0404,
     heur_pair: crate::lanes::HEUR_PAIR,
-    allowed_after: crate::solver::ALLOWED_AFTER_T,
+    allowed_after: crate::solver::ALLOWED_AFTER_CONST,
     face_keep: {
         let mut result = [0u32; 6];
         let mut face = 0;

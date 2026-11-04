@@ -29,7 +29,7 @@
 
 use crate::cubie::{inverse_move, CubieCube};
 use crate::simd::{Cube, HOT_TABLES};
-use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES, NO_HALF};
+use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES, QUARTER_TURNS};
 
 pub mod share;
 
@@ -936,10 +936,10 @@ impl Lane {
             };
             let mut mm_i = ALL_MOVES;
             if j.li == r {
-                mm_n &= NO_HALF;
+                mm_n &= QUARTER_TURNS;
             }
             if j.ln == r {
-                mm_i &= NO_HALF;
+                mm_i &= QUARTER_TURNS;
             }
             self.sp = 0;
             self.stack[0] = if self.rs.full {
@@ -1301,10 +1301,10 @@ impl Lane {
         let mut mm_m = HOT_TABLES.allowed_after[self.k_face as usize];
         let mut mm_x = node.mm_o;
         if po == r1 {
-            mm_m &= NO_HALF;
+            mm_m &= QUARTER_TURNS;
         }
         if pm == r1 {
-            mm_x &= NO_HALF;
+            mm_x &= QUARTER_TURNS;
         }
         // Whether the child generates its children on the moved side, as
         // `make_node` chooses (fewer moves; ties go to the normal cube; at
@@ -1338,10 +1338,10 @@ impl Lane {
                 (b2, a2, po, pm, node.mm_o, allowed)
             };
             if li == r1 {
-                mm_n &= NO_HALF;
+                mm_n &= QUARTER_TURNS;
             }
             if ln == r1 {
-                mm_i &= NO_HALF;
+                mm_i &= QUARTER_TURNS;
             }
             let w = make_node(c, ci, ln, li, mm_n, mm_i, r1, self.k_m, pn);
             debug_assert!(w.a == child.a && w.b == child.b && w.normal == child.normal);
