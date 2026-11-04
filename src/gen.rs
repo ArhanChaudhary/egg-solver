@@ -15,6 +15,9 @@
 //! neighbors for a frontier entry) once most entries are reached (not
 //! measured separately).
 
+pub mod collapse;
+pub mod dfs;
+
 use crate::coord::{cocsep, cube_from_edge_key, h11_key, reduce_key, split_index};
 use crate::simd::Cube;
 use crate::tables::{

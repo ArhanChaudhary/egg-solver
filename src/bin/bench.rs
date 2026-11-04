@@ -6,8 +6,11 @@
 //!       solves completed per second during the window (steady state).
 //!   bench <table> <scramble file | random:N:SEED> [count] [threads] [lanes]
 //!       Solves a fixed batch and verifies every solution.
-//! lanes = 0 uses the recursive single-cube solver; default
-//! `lanes::DEFAULT_LANES` (24).
+//!   bench <table> tune [seconds]
+//!       Short stream runs at 1 thread and at all threads over lane counts;
+//!       prints the best and saves it next to the table (`<table>.tune`).
+//! lanes = 0 uses the recursive single-cube solver; the default is
+//! `<table>.tune`'s if `tune` made one, else `tables::file::untuned_lanes`.
 //! A last argument `share[:C]` uses the work-sharing mode (`lanes::share`)
 //! with at most C cubes in progress at once (default: threads * lanes; 1
 //! solves one cube at a time with all threads).
@@ -131,6 +134,52 @@ fn stream_thread(
     cubeopt::lanes::run_lanes(solver, cubes, next, stop, lanes, record);
 }
 
+/// Stream throughput (solves/s) of `threads` x `lanes` lanes, over a
+/// `window` after a warm-up of half as long.
+fn stream_throughput(solver: &Solver, threads: usize, lanes: usize, window: f64) -> f64 {
+    let cubes = |i: usize| {
+        let mut rng = Rng(2026u64.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ (i as u64));
+        rng.next_u64();
+        Some(CubieCube::random(&mut rng))
+    };
+    let warmup = window / 2.0;
+    let (records, _) = run(solver, &cubes, threads, lanes, Some(warmup + window), None);
+    let done = records
+        .iter()
+        .filter(|r| r.finished >= warmup && r.finished < warmup + window)
+        .count();
+    #[expect(clippy::cast_precision_loss, reason = "a rate")]
+    let rate = done as f64 / window;
+    rate
+}
+
+/// `bench <table> tune`: the best lane count at 1 thread and at all threads
+/// (each candidate measured for `window` seconds), saved to `<table>.tune`.
+fn tune(solver: &Solver, path: &str, window: f64) {
+    let all = cubeopt::thread_count();
+    let candidates = [8, 12, 16, 20, 24, 32, 40, 48];
+    let mut best = Vec::new();
+    for threads in if all > 1 { vec![1, all] } else { vec![1] } {
+        let mut top = (0.0, 0);
+        for &lanes in &candidates {
+            let rate = stream_throughput(solver, threads, lanes, window);
+            println!("threads {threads} lanes {lanes}: {rate:.2} solves/s");
+            if rate > top.0 {
+                top = (rate, lanes);
+            }
+        }
+        println!(
+            "best at {threads} threads: {} lanes ({:.2} solves/s)",
+            top.1, top.0
+        );
+        best.push((threads, top.1));
+    }
+    match cubeopt::tables::file::save_tuned_lanes(path, &best) {
+        Ok(tune_path) => println!("saved to {tune_path}"),
+        Err(e) => println!("not saved: {e}"),
+    }
+}
+
 /// Print nodes and lookups per cube and the distribution of lengths.
 #[expect(clippy::cast_precision_loss, reason = "statistics")]
 fn summary(records: &[Record]) {
@@ -186,11 +235,16 @@ fn main() {
         _ => None,
     };
     let mode = share.map_or(String::new(), |c| format!(" share {c}"));
+    let default_lanes = cubeopt::tables::file::default_lanes(&args[1], table.meta.k);
+    if args[2] == "tune" {
+        tune(&solver, &args[1], arg(&args, 3, 6.0));
+        return;
+    }
     if args[2] == "stream" {
         let warmup = arg(&args, 3, 3.0);
         let window = arg(&args, 4, 15.0);
         let threads = arg(&args, 5, cubeopt::thread_count());
-        let lanes = arg(&args, 6, cubeopt::lanes::DEFAULT_LANES);
+        let lanes = arg(&args, 6, default_lanes(threads));
         let seed: u64 = arg(&args, 7, 2026);
         // Cube i of the stream: from its own seed, so that it does not
         // depend on the order in which the threads take the cubes.
@@ -235,7 +289,7 @@ fn main() {
         cubes.truncate(count.parse().unwrap());
     }
     let threads = arg(&args, 4, cubeopt::thread_count());
-    let lanes = arg(&args, 5, cubeopt::lanes::DEFAULT_LANES);
+    let lanes = arg(&args, 5, default_lanes(threads));
     let get = |i: usize| cubes.get(i).copied();
     let (records, elapsed) = run(&solver, &get, threads, lanes, None, share);
     assert_eq!(records.len(), cubes.len(), "cubes not reported");

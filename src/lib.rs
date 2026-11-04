@@ -10,8 +10,8 @@
 //! * `cubie`: the reference cube model (pieces and their orientations).
 //! * `simd`: the fast cube (one AVX2 register) and its moves and symmetries.
 //! * `coord`: coordinates, the table indices of a cube.
-//! * `tables`: the corner table and the big H48 table; `gen` builds the
-//!   latter.
+//! * `tables`: the corner table and the big H48 table (and its files,
+//!   `tables::file`); `gen` builds the latter, for any k.
 //! * `solver`: a plain recursive IDA*, the reference search.
 //! * `lanes`: the fast search: many cubes per thread, interleaved so that
 //!   table loads overlap; `lanes::share` lets all threads work on a few
@@ -22,11 +22,12 @@ pub mod cubie;
 pub mod gen;
 pub mod hot;
 pub mod lanes;
+pub mod prefetch;
 pub mod simd;
 pub mod solver;
 pub mod tables;
 
-use tables::{h48_bytes, write_meta, Cocsep, H48Meta, H48Table, Memory};
+use tables::{h48_bytes, h48_rows, Cocsep, H48Meta, H48Table, Memory};
 
 /// Generate a table by BFS on h0 or h11, plus derived tables (each
 /// `(k, base, file)`). Returns the main table and the derived tables (each
@@ -45,10 +46,15 @@ pub fn generate(
 ) -> (H48Table, Vec<H48Table>) {
     assert!(k == 0 || k == 11, "BFS only on true coordinates h0/h11");
     let allocate = |k: u32, path: Option<&str>| -> Memory {
-        let len = usize::try_from(h48_bytes(k)).expect("64-bit usize");
+        let len = h48_bytes(k);
         match path {
-            Some(path) => Memory::map_file(path, len, true).expect("create table file"),
-            None => Memory::anonymous(len),
+            Some(path) => {
+                // (Room for the trailer after the data.)
+                let file_len = tables::file::file_bytes(len, tables::file::is_hugetlbfs(path));
+                let file_len = usize::try_from(file_len).expect("64-bit usize");
+                Memory::map_file(path, file_len, true).expect("create table file")
+            }
+            None => Memory::anonymous(usize::try_from(len).expect("64-bit usize")),
         }
     };
     let memory = allocate(k, out);
@@ -76,25 +82,70 @@ pub fn generate(
             .collect(),
     };
     let _counts = generator.run(&memory);
-    let meta = H48Meta { k, base };
+    let table = H48Table {
+        memory,
+        meta: H48Meta { k, base },
+    };
     if let Some(path) = out {
-        write_meta(path, &meta).unwrap();
+        tables::file::write_trailer(path, &table.trailer(threads)).expect("write table trailer");
     }
     let derived_tables = derived
         .iter()
         .zip(derived_memory)
         .map(|((dk, dbase, path), memory)| {
-            let meta = H48Meta {
-                k: *dk,
-                base: *dbase,
+            let table = H48Table {
+                memory,
+                meta: H48Meta {
+                    k: *dk,
+                    base: *dbase,
+                },
             };
             if let Some(path) = path {
-                write_meta(path, &meta).unwrap();
+                tables::file::write_trailer(path, &table.trailer(threads))
+                    .expect("write table trailer");
             }
-            H48Table { memory, meta }
+            table
         })
         .collect();
-    (H48Table { memory, meta }, derived_tables)
+    (table, derived_tables)
+}
+
+/// Generate hk of any k (0..=11) in anonymous memory: by BFS for the true
+/// coordinates h0 and h11, else by `gen::dfs`.
+///
+/// # Panics
+/// If `k` is above 11 or `base` above 12.
+#[must_use]
+pub fn generate_table(
+    corners: &Cocsep,
+    k: u32,
+    base: u8,
+    threads: usize,
+    verbose: bool,
+) -> H48Table {
+    if k == 0 || k == 11 {
+        return generate(corners, k, base, None, &[], threads).0;
+    }
+    let settings = gen::dfs::Settings {
+        k,
+        base,
+        threads,
+        prefix_depth: gen::dfs::PREFIX_DEPTH.min(base + 2),
+        verbose,
+    };
+    let generator = gen::dfs::Generator::new(corners, settings);
+    let memory = Memory::anonymous(usize::try_from(h48_bytes(k)).expect("64-bit usize"));
+    let rows = 0..h48_rows(k);
+    let part = gen::dfs::Part {
+        words: memory.words(),
+        first_slot: 0,
+        end_slot: rows.end * coord::N_SLOTS as u64,
+    };
+    generator.generate(&rows, &part);
+    H48Table {
+        memory,
+        meta: H48Meta { k, base },
+    }
 }
 
 /// The number of hardware threads (1 if unknown).

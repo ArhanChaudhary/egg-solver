@@ -4,10 +4,13 @@
 //! tables generated in memory (no table file needed).
 
 use cubeopt::coord::cocsep;
+use cubeopt::coord::N_SLOTS;
 use cubeopt::cubie::{conjugate, parse_moves, symmetries, CubieCube, Rng};
 use cubeopt::simd::Cube;
 use cubeopt::solver::Solver;
-use cubeopt::tables::{entry_depth, Cocsep, H48Table};
+use cubeopt::tables::{
+    entry_depth, h48_bytes, h48_rows, Cocsep, H48Meta, H48Table, Memory, ROW_BYTES,
+};
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
@@ -472,5 +475,114 @@ fn conjugates_have_equal_lengths_in_all_modes() {
     for (threads, nlanes, max_active) in [(3, 2, usize::MAX), (2, 5, 1)] {
         let (solutions, counters) = share_solve(&cubes, h0(), threads, nlanes, max_active);
         assert_eq!(lengths(&solutions), want, "{counters}");
+    }
+}
+
+/// hk generated depth-first (`gen::dfs`) with base 3 and a BFS prefix of
+/// `prefix_depth`, in `parts` row ranges (each in its own memory).
+fn dfs_table_in_parts(k: u32, prefix_depth: u8, parts: u64) -> H48Table {
+    let settings = cubeopt::gen::dfs::Settings {
+        k,
+        base: 3,
+        threads: cubeopt::thread_count(),
+        prefix_depth,
+        verbose: false,
+    };
+    let generator = cubeopt::gen::dfs::Generator::new(corners(), settings);
+    let memory = Memory::anonymous(usize::try_from(h48_bytes(k)).unwrap());
+    let rows = h48_rows(k);
+    let per = rows.div_ceil(parts);
+    for start in (0..rows).step_by(usize::try_from(per).unwrap()) {
+        let range = start..(start + per).min(rows);
+        let part_mem =
+            Memory::anonymous(usize::try_from((range.end - range.start) * ROW_BYTES).unwrap());
+        let part = cubeopt::gen::dfs::Part {
+            words: part_mem.words(),
+            first_slot: range.start * N_SLOTS as u64,
+            end_slot: range.end * N_SLOTS as u64,
+        };
+        generator.generate(&range, &part);
+        let offset = usize::try_from(range.start * ROW_BYTES).unwrap();
+        // SAFETY: the part's rows of the table's own memory.
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                part_mem.ptr(),
+                memory.ptr().add(offset),
+                part_mem.bytes().len(),
+            );
+        }
+    }
+    H48Table {
+        memory,
+        meta: H48Meta { k, base: 3 },
+    }
+}
+
+fn dfs_table(k: u32, prefix_depth: u8) -> H48Table {
+    dfs_table_in_parts(k, prefix_depth, 1)
+}
+
+/// The depth-first generator gives the BFS's h0 byte for byte (for any
+/// prefix depth), an h2 that matches brute force (codes, group minima, no
+/// entry too low), and hk that collapse to h(k-1) (`gen::collapse`).
+#[test]
+fn dfs_generator_matches_bfs_and_brute_force() {
+    let cs = corners();
+    let base = 3u8;
+    let len = usize::try_from(h48_bytes(0)).unwrap();
+    let bfs = cubeopt::generate(cs, 0, base, None, &[], cubeopt::thread_count()).0;
+    for prefix_depth in [1, 2, 5] {
+        let t = dfs_table(0, prefix_depth);
+        assert!(
+            t.memory.bytes()[..len] == bfs.memory.bytes()[..len],
+            "h0 with prefix depth {prefix_depth}"
+        );
+    }
+    // h2 against all positions within 5 moves (base + 2: every code but 3
+    // is decided by them).
+    let k = 2;
+    let t = dfs_table(k, 2);
+    let mut best: HashMap<u64, u8> = HashMap::new();
+    for &(c, d) in ball(5).values() {
+        let e = best.entry(cs.index(c, k)).or_insert(d);
+        *e = (*e).min(d);
+    }
+    let mut group_min: HashMap<u64, u8> = HashMap::new();
+    for (&idx, &d) in &best {
+        let (code, _) = t.get(idx);
+        assert_eq!(code, d.saturating_sub(base).min(3), "idx {idx} depth {d}");
+        let g = group_min.entry(idx >> 6).or_insert(d);
+        *g = (*g).min(d);
+    }
+    let dist = t.distribution();
+    assert_eq!(
+        dist[0] + dist[1] + dist[2],
+        best.len() as u64,
+        "no entry too low"
+    );
+    for (&g, &d) in &group_min {
+        assert_eq!(t.get(g << 6 | 2).1, d, "group {g}");
+    }
+    // Collapse: h3 -> h2, h3 -> h0.
+    let t3 = dfs_table(3, 2);
+    // In parts (rows of several classes and parts of a class): the same.
+    let n3 = usize::try_from(h48_bytes(3)).unwrap();
+    for parts in [3, 7] {
+        let t = dfs_table_in_parts(3, 2, parts);
+        assert!(
+            t.memory.bytes()[..n3] == t3.memory.bytes()[..n3],
+            "h3 in {parts} parts"
+        );
+    }
+    let threads = cubeopt::thread_count();
+    for (small, want) in [(&t, 2), (&bfs, 0)] {
+        let derived = cubeopt::gen::collapse::derive(&t3, want, threads);
+        let n = usize::try_from(h48_bytes(want)).unwrap();
+        assert!(
+            derived.memory.bytes()[..n] == small.memory.bytes()[..n],
+            "h3 -> h{want}"
+        );
+        let diff = cubeopt::gen::collapse::compare(small, &t3, threads);
+        assert_eq!((diff.codes, diff.group_minima), (0, 0), "{diff:?}");
     }
 }

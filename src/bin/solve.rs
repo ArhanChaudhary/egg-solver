@@ -5,7 +5,8 @@
 //! ```text
 //! Usage: solve <table> [-t threads] [-l lanes] [-c concurrency] [-n count]
 //!   -t  threads (default: all cores)
-//!   -l  interleaved lanes per thread (default `lanes::DEFAULT_LANES`, 24)
+//!   -l  interleaved lanes per thread (default: from `<table>.tune` if
+//!       `bench <table> tune` made one, else `tables::file::untuned_lanes`)
 //!   -c  cubes in progress at once: 1 solves one cube at a time with all
 //!       threads (latency); 0 (default) solves the whole input as a batch
 //!   -n  solve only the first `count` scrambles
@@ -44,7 +45,7 @@ fn main() {
         usage();
     }
     let mut threads = cubeopt::thread_count();
-    let mut lanes = cubeopt::lanes::DEFAULT_LANES;
+    let mut lanes = None;
     let mut concurrency = 0;
     let mut count = usize::MAX;
     // Options are pairs: `-x value`.
@@ -53,7 +54,7 @@ fn main() {
         let Some(value) = value else { usage() };
         match option[0].as_str() {
             "-t" => threads = value.max(1),
-            "-l" => lanes = value.max(1),
+            "-l" => lanes = Some(value.max(1)),
             "-c" => concurrency = value,
             "-n" => count = value,
             _ => usage(),
@@ -75,7 +76,12 @@ fn main() {
         cubes.push(CubieCube::SOLVED.apply_moves(&moves));
     }
     let corners = Cocsep::generate();
-    let table = H48Table::open(&args[1]).expect("open table");
+    let table = H48Table::open(&args[1]).unwrap_or_else(|e| {
+        eprintln!("solve: cannot open table {}: {e}", args[1]);
+        std::process::exit(2);
+    });
+    let default_lanes = cubeopt::tables::file::default_lanes(&args[1], table.meta.k);
+    let lanes = lanes.unwrap_or_else(|| default_lanes(threads));
     let solver = Solver::new(&corners, &table);
     let get = |i: usize| cubes.get(i).copied();
     let max_active = if concurrency == 0 {
