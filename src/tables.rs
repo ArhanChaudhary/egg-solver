@@ -430,13 +430,39 @@ impl H48Table {
     }
 }
 
+/// The source tree this binary was built from, whose `tables/` holds the
+/// `.hugemeta` files of tables on hugetlbfs (which only holds page-sized
+/// files). Stored in a fixed-size buffer so that the binary's layout does not
+/// depend on the length of the build path: otherwise builds from different
+/// worktrees place all code at different offsets, which alone moves benchmark
+/// results by 1-2%.
+static BUILD_DIR: [u8; 256] = {
+    let path = env!("CARGO_MANIFEST_DIR").as_bytes();
+    assert!(path.len() < 256, "build path too long");
+    let mut buf = [0u8; 256];
+    let mut i = 0;
+    while i < path.len() {
+        buf[i] = path[i];
+        i += 1;
+    }
+    buf
+};
+
+/// [`BUILD_DIR`] as a string (read through `black_box`, so the padded buffer
+/// is what the binary contains, not a folded copy of the path).
+fn build_dir() -> String {
+    let buf: &[u8; 256] = std::hint::black_box(&BUILD_DIR);
+    let len = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
+    String::from_utf8_lossy(&buf[..len]).into_owned()
+}
+
 pub fn meta_path(path: &str) -> String {
     if path.starts_with("/mnt/huge") {
         let name = std::path::Path::new(path)
             .file_name()
             .unwrap()
             .to_string_lossy();
-        format!("{}/tables/{name}.hugemeta", env!("CARGO_MANIFEST_DIR"))
+        format!("{}/tables/{name}.hugemeta", build_dir())
     } else {
         format!("{path}.meta")
     }
