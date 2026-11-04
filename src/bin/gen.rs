@@ -1,7 +1,6 @@
 //! Generate H48 tables.
 //! Usage: gen <k: 0|11> <base> <out path> [derived k:base:path ...]
-#![allow(clippy::needless_range_loop, clippy::manual_is_multiple_of)]
-use cubeopt::tables::*;
+use cubeopt::tables::Cocsep;
 
 fn main() {
     let a: Vec<String> = std::env::args().collect();

@@ -6,7 +6,12 @@
 //! `vpshufb` plus orientation fix-up (method from vcube).
 
 use crate::cubie::CubieCube;
-use std::arch::x86_64::*;
+use std::arch::x86_64::{
+    __m256i, _mm256_add_epi8, _mm256_and_si256, _mm256_andnot_si256, _mm256_blendv_epi8,
+    _mm256_castsi256_si128, _mm256_load_si256, _mm256_min_epu8, _mm256_or_si256, _mm256_set1_epi8,
+    _mm256_shuffle_epi8, _mm256_slli_epi32, _mm256_srli_epi32, _mm256_store_si256, _mm256_sub_epi8,
+    _mm256_testz_si256, _mm256_xor_si256, _mm_cvtsi128_si64,
+};
 
 #[repr(C, align(32))]
 #[derive(Clone, Copy)]
@@ -117,32 +122,36 @@ pub struct Cube(pub __m256i);
 
 #[inline(always)]
 fn ld(a: &A32) -> __m256i {
-    unsafe { _mm256_load_si256(a.0.as_ptr() as *const __m256i) }
+    // (`A32` is 32-byte aligned.)
+    unsafe { _mm256_load_si256(std::ptr::from_ref(a).cast()) }
 }
 
-const fn set64(a: i64, b: i64, c: i64, d: i64) -> A32 {
-    let mut r = [0u8; 32];
-    let v = [a, b, c, d];
+/// 32 bytes from four little-endian 64-bit words (as `_mm256_set_epi64x`,
+/// lowest word first).
+const fn set64(words: [i64; 4]) -> A32 {
+    let mut bytes = [0u8; 32];
     let mut i = 0;
     while i < 32 {
-        r[i] = (v[i / 8] >> (8 * (i % 8))) as u8;
+        bytes[i] = words[i / 8].to_le_bytes()[i % 8];
         i += 1;
     }
-    A32(r)
+    A32(bytes)
 }
 
-static ORIENT: A32 = set64(0x6060606060606060, 0, 0x1010101010101010, 0x10101010);
-static CARRY: A32 = set64(0x6060606060606060, 0, 0x2020202020202020, 0x20202020);
-static USED: A32 = set64(-1, 0, -1, 0xFFFFFFFF);
-static CO2: A32 = set64(0x6060606060606060, 0, 0, 0);
-static SOLVED: A32 = set64(0x0706050403020100, 0, 0x0706050403020100, 0x0B0A0908);
+static ORIENT: A32 = set64([0x6060_6060_6060_6060, 0, 0x1010_1010_1010_1010, 0x1010_1010]);
+static CARRY: A32 = set64([0x6060_6060_6060_6060, 0, 0x2020_2020_2020_2020, 0x2020_2020]);
+static USED: A32 = set64([-1, 0, -1, 0xFFFF_FFFF]);
+static CO2: A32 = set64([0x6060_6060_6060_6060, 0, 0, 0]);
+static SOLVED: A32 = set64([0x0706_0504_0302_0100, 0, 0x0706_0504_0302_0100, 0x0B0A_0908]);
 
 impl Cube {
     #[inline(always)]
+    #[must_use]
     pub fn solved() -> Cube {
         Cube(ld(&SOLVED))
     }
 
+    #[must_use]
     pub fn from_cubie(c: &CubieCube) -> Cube {
         let mut b = A32([0; 32]);
         for i in 0..8 {
@@ -154,31 +163,34 @@ impl Cube {
         Cube(ld(&b))
     }
 
+    #[must_use]
     pub fn to_bytes(self) -> [u8; 32] {
         let mut b = A32([0; 32]);
         unsafe {
             let x = _mm256_and_si256(self.0, ld(&USED));
-            _mm256_store_si256(b.0.as_mut_ptr() as *mut __m256i, x)
-        };
+            _mm256_store_si256(std::ptr::from_mut(&mut b).cast(), x);
+        }
         b.0
     }
 
+    #[must_use]
     pub fn to_cubie(self) -> CubieCube {
         let b = self.to_bytes();
         let mut c = CubieCube::SOLVED;
-        for i in 0..8 {
-            c.cp[i] = b[i] & 7;
-            c.co[i] = b[i] >> 5;
+        for (i, &byte) in b[..8].iter().enumerate() {
+            c.cp[i] = byte & 7;
+            c.co[i] = byte >> 5;
         }
-        for i in 0..12 {
-            c.ep[i] = b[16 + i] & 15;
-            c.eo[i] = (b[16 + i] >> 4) & 1;
+        for (i, &byte) in b[16..28].iter().enumerate() {
+            c.ep[i] = byte & 15;
+            c.eo[i] = (byte >> 4) & 1;
         }
         c
     }
 
     /// "self then other".
     #[inline(always)]
+    #[must_use]
     pub fn compose(self, o: Cube) -> Cube {
         unsafe {
             let ss = _mm256_shuffle_epi8(self.0, o.0);
@@ -192,6 +204,7 @@ impl Cube {
     }
 
     #[inline(always)]
+    #[must_use]
     pub fn apply_move(self, m: usize) -> Cube {
         // `compose` with the move's orientation term precomputed.
         unsafe {
@@ -204,11 +217,13 @@ impl Cube {
 
     /// Given the inverse `i` of a cube `c`, return the inverse of `c * m`.
     #[inline(always)]
+    #[must_use]
     pub fn premove_inv(self, m: usize) -> Cube {
         Cube(ld(&TABS.inv_mv[m])).compose(self)
     }
 
     #[inline(always)]
+    #[must_use]
     pub fn invert_co(self) -> Cube {
         unsafe {
             let co = _mm256_and_si256(self.0, ld(&CO2));
@@ -222,6 +237,7 @@ impl Cube {
 
     /// Inverse cube (vcube's addition chain for c^27719).
     #[inline(always)]
+    #[must_use]
     pub fn inverse(self) -> Cube {
         unsafe {
             let c = self.0;
@@ -254,6 +270,7 @@ impl Cube {
     }
 
     #[inline(always)]
+    #[must_use]
     pub fn equals(self, o: Cube) -> bool {
         unsafe {
             let x = _mm256_xor_si256(self.0, o.0);
@@ -262,12 +279,14 @@ impl Cube {
     }
 
     #[inline(always)]
+    #[must_use]
     pub fn is_solved(self) -> bool {
         self.equals(Cube::solved())
     }
 
     /// Conjugate by symmetry `t`.
     #[inline(always)]
+    #[must_use]
     pub fn transform(self, t: usize) -> Cube {
         let r = Cube(ld(&SYM_T[t]))
             .compose(self)
@@ -281,6 +300,7 @@ impl Cube {
 
     /// Conjugate by symmetry `t`, only edges are guaranteed correct.
     #[inline(always)]
+    #[must_use]
     pub fn transform_edges(self, t: usize) -> Cube {
         Cube(ld(&SYM_T[t]))
             .compose(self)
@@ -289,14 +309,16 @@ impl Cube {
 
     /// `if m { a } else { b }`, as a byte blend (no branch).
     #[inline(always)]
+    #[must_use]
     pub fn select(m: bool, a: Cube, b: Cube) -> Cube {
-        unsafe { Cube(_mm256_blendv_epi8(b.0, a.0, _mm256_set1_epi8(-(m as i8)))) }
+        unsafe { Cube(_mm256_blendv_epi8(b.0, a.0, _mm256_set1_epi8(-i8::from(m)))) }
     }
 
     /// Low 64 bits: the 8 corner bytes.
     #[inline(always)]
+    #[must_use]
     pub fn corners_u64(self) -> u64 {
-        unsafe { _mm_cvtsi128_si64(_mm256_castsi256_si128(self.0)) as u64 }
+        unsafe { _mm_cvtsi128_si64(_mm256_castsi256_si128(self.0)).cast_unsigned() }
     }
 }
 
@@ -336,8 +358,8 @@ mod tests {
                     a.apply_move(m).inverse()
                 );
             }
-            for t in 0..48 {
-                assert_eq!(sa.transform(t).to_cubie(), conjugate(&a, &syms[t]));
+            for (t, sym) in syms.iter().enumerate() {
+                assert_eq!(sa.transform(t).to_cubie(), conjugate(&a, sym));
             }
         }
         assert!(Cube::from_cubie(&CubieCube::SOLVED).is_solved());

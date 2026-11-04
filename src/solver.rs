@@ -1,11 +1,12 @@
 //! IDA* optimal solver using the H48 table.
 
-use crate::coord::*;
+use crate::coord::{cocsep3, index_sym};
 use crate::cubie::{inverse_move, CubieCube};
 use crate::simd::Cube;
-use crate::tables::*;
+use crate::tables::{cp_class, cp_depth, cp_ttrep, Cocsep, H48Table};
 
-pub const ALL_MOVES: u32 = (1 << 18) - 1;
+/// All 18 moves (the low 18 bits).
+pub const ALL_MOVES: u32 = u32::MAX.unbounded_shr(32 - 18);
 /// Quarter turns only (moves with m % 3 != 1).
 pub const NO_HALF: u32 = 0b101_101_101_101_101_101;
 
@@ -67,7 +68,7 @@ struct Job {
 /// Face weight compensating for D/L/B prefixes having fewer continuations.
 #[inline(always)]
 fn job_weight(j: &Job) -> u64 {
-    if (j.moves[j.len as usize - 1] / 3) % 2 == 0 {
+    if (j.moves[j.len as usize - 1] / 3).is_multiple_of(2) {
         47525
     } else {
         58206
@@ -98,14 +99,16 @@ const UNKNOWN: u8 = 0xFF;
 const FOUND: u8 = 0xFE;
 
 impl<'a> Solver<'a> {
+    #[must_use]
     pub fn new(cs: &'a Cocsep, table: &'a H48Table) -> Solver<'a> {
+        let k = table.meta.k;
         Solver {
             cs,
             table,
             tptr: table.ptr(),
             cptr: cs.packed_ptr(),
-            row_mul: 1 << (table.meta.k + 9),
-            eo_mask: ((1 << table.meta.k) - 1) << (28 - table.meta.k),
+            row_mul: 1 << (k + 9),
+            eo_mask: u32::MAX.unbounded_shr(32 - k) << (28 - k),
             base: table.meta.base,
         }
     }
@@ -114,16 +117,17 @@ impl<'a> Solver<'a> {
     #[inline(always)]
     pub(crate) fn index(&self, c: Cube) -> (u64, u8) {
         // `self.cs.packed(cocsep(c))`
-        let d = unsafe { (self.cptr.add(cocsep3(c)) as *const u32).read_unaligned() };
+        let d = unsafe { self.cptr.add(cocsep3(c)).cast::<u32>().read_unaligned() };
         let idx = index_sym(c, cp_ttrep(d), cp_class(d), self.row_mul, self.eo_mask);
         (idx, cp_depth(d))
     }
 
     #[inline(always)]
+    #[expect(clippy::cast_ptr_alignment, reason = "tables are page aligned")]
     pub(crate) fn value(&self, idx: u64, cdepth: u8) -> u8 {
         // `H48Table::get` through the cached pointer.
         let (code, min) = unsafe {
-            let p = self.tptr as *const u64;
+            let p = self.tptr.cast::<u64>();
             let w = (idx >> 5) as usize;
             let x = *p.add(w);
             let m = *p.add(w & !1) & 15;
@@ -142,11 +146,12 @@ impl<'a> Solver<'a> {
         unsafe {
             let a = self.tptr.add((idx >> 2) as usize);
             // NTA: each line is read once; less L2 pollution (cocsep data).
-            std::arch::x86_64::_mm_prefetch(a as *const i8, std::arch::x86_64::_MM_HINT_NTA);
+            std::arch::x86_64::_mm_prefetch(a.cast::<i8>(), std::arch::x86_64::_MM_HINT_NTA);
         }
     }
 
     /// Lower bound for a single cube (no pipelining).
+    #[must_use]
     pub fn lower_bound(&self, c: Cube) -> u8 {
         let (idx, cd) = self.index(c);
         self.value(idx, cd)
@@ -163,6 +168,7 @@ impl<'a> Solver<'a> {
     }
 
     /// Extend jobs by one move; children inherit the parent's stat.
+    #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
     fn extend_jobs(jobs: &[Job]) -> Vec<Job> {
         let mut out = Vec::with_capacity(jobs.len() * 15);
         for j in jobs {
@@ -174,7 +180,7 @@ impl<'a> Solver<'a> {
             let mut mmv = mm;
             while mmv != 0 {
                 let m = mmv.trailing_zeros() as usize;
-                mmv &= mmv - 1;
+                mmv ^= mmv.isolate_lowest_one();
                 let mut n = *j;
                 n.moves[n.len as usize] = m as u8;
                 n.len += 1;
@@ -204,6 +210,7 @@ impl<'a> Solver<'a> {
     }
 
     /// Find one optimal solution.
+    #[must_use]
     pub fn solve(&self, cube: &CubieCube) -> (Vec<u8>, Stats) {
         let c = Cube::from_cubie(cube);
         if c.is_solved() {
@@ -240,7 +247,7 @@ impl<'a> Solver<'a> {
                 // stable sort keeps the canonical order among equal keys
                 jobs.sort_by_key(|j| std::cmp::Reverse(j.stat * job_weight(j)));
             }
-            for j in jobs.iter_mut() {
+            for j in &mut jobs {
                 let r = target - j.len;
                 let (jn, ji) = (j.ln, j.li);
                 ctx.heur = 0;
@@ -286,6 +293,8 @@ impl<'a> Solver<'a> {
     /// node by `v - 1` and (b) bounds same-face siblings (one move apart) by
     /// `v - 1` as well.
     #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_lines, clippy::many_single_char_names)]
+    #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
     fn dfs(
         &self,
         ctx: &mut Ctx,
@@ -301,7 +310,7 @@ impl<'a> Solver<'a> {
             let mut mm = mm_n & mm_i;
             while mm != 0 {
                 let m = mm.trailing_zeros() as usize;
-                mm &= mm - 1;
+                mm ^= mm.isolate_lowest_one();
                 ctx.stats.nodes += 1;
                 if c.apply_move(m).is_solved() {
                     ctx.moves[ctx.nmoves] = m as u8;
@@ -334,7 +343,7 @@ impl<'a> Solver<'a> {
         let mut mmv = mm;
         while mmv != 0 {
             let m = mmv.trailing_zeros() as usize;
-            mmv &= mmv - 1;
+            mmv ^= mmv.isolate_lowest_one();
             // A half turn on this side does not change the other side's coset.
             let pi = if m % 3 == 1 { la_same } else { UNKNOWN };
             if pi != UNKNOWN && pi > r1 {
@@ -356,7 +365,7 @@ impl<'a> Solver<'a> {
         let maxval = self.base + 3;
         if r1 <= maxval {
             // Stage 1: inverse-side index + prefetch.
-            for k in kids[..nk].iter_mut() {
+            for k in &mut kids[..nk] {
                 if k.pi == UNKNOWN {
                     let (idx, cd) = self.index(k.i);
                     if cd > r1 {
@@ -372,7 +381,7 @@ impl<'a> Solver<'a> {
                 }
             }
             // Stage 2: inverse-side value, normal-side index + prefetch.
-            for k in kids[..nk].iter_mut() {
+            for k in &mut kids[..nk] {
                 if !k.live {
                     continue;
                 }
@@ -397,7 +406,7 @@ impl<'a> Solver<'a> {
                 self.prefetch(idx);
             }
             // Stage 3: normal-side value.
-            for k in kids[..nk].iter_mut() {
+            for k in &mut kids[..nk] {
                 if !k.live {
                     continue;
                 }
@@ -411,7 +420,7 @@ impl<'a> Solver<'a> {
                 }
             }
         } else {
-            for k in kids[..nk].iter_mut() {
+            for k in &mut kids[..nk] {
                 k.pn = 0;
                 if k.pi == UNKNOWN {
                     k.pi = 0;
@@ -423,7 +432,7 @@ impl<'a> Solver<'a> {
         if node_lb > r {
             return node_lb;
         }
-        for k in kids[..nk].iter() {
+        for k in &kids[..nk] {
             let face = (k.m / 3) as usize;
             // Pruned directly, or by a same-face sibling that is >= 2 over.
             if !k.live || fmax[face] > r1 + 1 {
@@ -483,7 +492,9 @@ impl<'a> Solver<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::coord::cocsep;
     use crate::cubie::{conjugate, parse_moves, symmetries, Rng};
+    use crate::tables::cd_depth;
 
     /// The hot-path index (`Solver::index`: `cocsep3`, packed entries,
     /// `index_sym`) equals `Cocsep::index` for every `k`, symmetric cubes too.

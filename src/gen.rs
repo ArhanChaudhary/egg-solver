@@ -9,10 +9,13 @@
 //! point the codes are exactly the final ones: `0` = `<= base`,
 //! `1` = `base + 1`, `2` = `base + 2`, `3` = `>= base + 3`.
 
-use crate::coord::*;
+use crate::coord::{cocsep, cube_from_edge_key, h11_key, reduce_key, split_index};
 use crate::simd::Cube;
-use crate::tables::*;
-use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
+use crate::tables::{
+    cd_class, cd_ttrep, entry_lo_mask, entry_pos, h48_bytes, h48_rows, Cocsep, H48Meta, Mem,
+    WORDS_PER_ROW,
+};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering::Relaxed};
 use std::time::Instant;
 
 pub struct Gen<'a> {
@@ -80,21 +83,20 @@ fn derived_update(words: &[AtomicU64], idx: u64, code: u64, depth: u64) {
     lower_nibble(words, w, depth);
 }
 
-impl<'a> Gen<'a> {
+impl Gen<'_> {
     /// Index of a neighbor plus all indices equivalent to it by the
     /// self-symmetries of its corner class.
     #[inline(always)]
-    fn for_each_index(&self, n: Cube, mut f: impl FnMut(u64)) {
-        let d = unsafe { *self.cs.data.get_unchecked(cocsep(n)) };
-        let class = cd_class(d);
-        let e = n.transform_edges(cd_ttrep(d));
-        f(reduce_key(h11_key(class, e), self.k));
-        let mut ss = unsafe { *self.cs.selfsim.get_unchecked(class) } & !1;
-        while ss != 0 {
-            let t = ss.trailing_zeros() as usize;
-            ss &= ss - 1;
-            let e2 = e.transform_edges(t);
-            f(reduce_key(h11_key(class, e2), self.k));
+    fn for_each_index(&self, cube: Cube, mut f: impl FnMut(u64)) {
+        let data = unsafe { *self.cs.data.get_unchecked(cocsep(cube)) };
+        let class = cd_class(data);
+        let edges = cube.transform_edges(cd_ttrep(data));
+        f(reduce_key(h11_key(class, edges), self.k));
+        let mut syms = unsafe { *self.cs.selfsim.get_unchecked(class) } & !1;
+        while syms != 0 {
+            let t = syms.trailing_zeros() as usize;
+            syms ^= syms.isolate_lowest_one();
+            f(reduce_key(h11_key(class, edges.transform_edges(t)), self.k));
         }
     }
 
@@ -104,9 +106,9 @@ impl<'a> Gen<'a> {
     }
 
     /// Run `f(first_word, end_word)` over chunks of whole rows in parallel.
-    fn par_words(&self, words: u64, f: impl Fn(u64, u64) + Sync) {
+    fn par_words(&self, words: usize, f: impl Fn(usize, usize) + Sync) {
         let chunk = WORDS_PER_ROW << 12;
-        let next = AtomicU64::new(0);
+        let next = AtomicUsize::new(0);
         std::thread::scope(|s| {
             for _ in 0..self.threads {
                 s.spawn(|| loop {
@@ -120,28 +122,31 @@ impl<'a> Gen<'a> {
         });
     }
 
+    /// Run the BFS, filling `mem` and the derived tables. Returns the
+    /// number of entries per depth.
+    #[must_use]
     pub fn run(&self, mem: &Mem) -> Vec<u64> {
-        let nwords = h48_bytes(self.k) / 8;
+        let nwords = table_words(self.k);
         let words = mem.words();
         let t0 = Instant::now();
         // init: all entries 3, all group minima 15
-        self.par_words(nwords, |a, b| {
-            for w in a..b {
-                words[w as usize].store(u64::MAX, Relaxed);
+        self.par_words(nwords, |first, end| {
+            for word in &words[first..end] {
+                word.store(u64::MAX, Relaxed);
             }
         });
         for (dm, dmem) in &self.derived {
             let dw = dmem.words();
-            self.par_words(h48_bytes(dm.k) / 8, |a, b| {
-                for w in a..b {
-                    dw[w as usize].store(u64::MAX, Relaxed);
+            self.par_words(table_words(dm.k), |first, end| {
+                for word in &dw[first..end] {
+                    word.store(u64::MAX, Relaxed);
                 }
             });
         }
         // depth 0
         let mut start = Vec::new();
         self.for_each_index(Cube::solved(), |i| start.push(i));
-        start.sort();
+        start.sort_unstable();
         start.dedup();
         for &i in &start {
             let (w, sh) = entry_pos(i);
@@ -157,23 +162,23 @@ impl<'a> Gen<'a> {
         let mut counts = vec![start.len() as u64];
         let mut total = start.len() as u64;
         eprintln!("[gen h{}] depth 0: {} entries", self.k, total);
-        let last = self.base as u64 + 2;
+        let last = u64::from(self.base) + 2;
         for d in 0..last {
-            let frontier = counts[d as usize];
+            let frontier = counts[counts.len() - 1];
             let unvisited = entries - total;
             let forward = frontier.saturating_mul(18) < unvisited.saturating_mul(4);
             let tl = Instant::now();
             if forward {
-                self.par_words(nwords, |a, b| self.forward_chunk(words, a, b));
+                self.par_words(nwords, |first, end| self.forward_chunk(words, first, end));
             } else {
-                self.par_words(nwords, |a, b| self.backward_chunk(words, a, b));
+                self.par_words(nwords, |first, end| self.backward_chunk(words, first, end));
             }
             let tstep = tl.elapsed().as_secs_f64();
             let newd = d + 1;
             let relabel = newd != last;
             let cnt = AtomicU64::new(0);
-            self.par_words(nwords, |a, b| {
-                let c = self.post_pass(words, a, b, newd, relabel);
+            self.par_words(nwords, |first, end| {
+                let c = self.post_pass(words, first, end, newd, relabel);
                 cnt.fetch_add(c, Relaxed);
             });
             let c = cnt.load(Relaxed);
@@ -196,41 +201,40 @@ impl<'a> Gen<'a> {
         counts
     }
 
-    fn forward_chunk(&self, words: &[AtomicU64], a: u64, b: u64) {
-        for w in a..b {
-            let x = words[w as usize].load(Relaxed);
-            let m = entry_lo_mask(w);
-            let lo = x & m;
-            let hi = (x >> 1) & m;
-            let mut f = lo & !hi; // code 1
-            while f != 0 {
-                let bit = f.trailing_zeros() as u64;
-                f &= f - 1;
-                let idx = w * 32 + bit / 2;
-                let c = decode(self.cs, self.k, idx);
+    fn forward_chunk(&self, words: &[AtomicU64], first: usize, end: usize) {
+        for (w, word) in (first as u64..).zip(&words[first..end]) {
+            let bits = word.load(Relaxed);
+            let mask = entry_lo_mask(w);
+            let lo = bits & mask;
+            let hi = (bits >> 1) & mask;
+            let mut frontier = lo & !hi; // code 1
+            while frontier != 0 {
+                let bit = u64::from(frontier.trailing_zeros());
+                frontier ^= frontier.isolate_lowest_one();
+                let cube = decode(self.cs, self.k, w * 32 + bit / 2);
                 for mv in 0..18 {
-                    let n = c.apply_move(mv);
-                    self.for_each_index(n, |i| mark_new(words, i));
+                    let neighbor = cube.apply_move(mv);
+                    self.for_each_index(neighbor, |i| mark_new(words, i));
                 }
             }
         }
     }
 
-    fn backward_chunk(&self, words: &[AtomicU64], a: u64, b: u64) {
+    fn backward_chunk(&self, words: &[AtomicU64], first: usize, end: usize) {
         const BATCH: usize = 8;
         let mut pending: [u64; BATCH] = [0; BATCH];
         let mut np = 0;
         let mut nidx = [[0u64; 18]; BATCH];
         let flush = |pending: &[u64], nidx: &mut [[u64; 18]; BATCH]| {
             for (p, &idx) in pending.iter().enumerate() {
-                let c = decode(self.cs, self.k, idx);
+                let cube = decode(self.cs, self.k, idx);
                 for (mv, slot) in nidx[p].iter_mut().enumerate() {
-                    let i = self.index(c.apply_move(mv));
+                    let i = self.index(cube.apply_move(mv));
                     *slot = i;
                     let (w, _) = entry_pos(i);
                     unsafe {
                         std::arch::x86_64::_mm_prefetch(
-                            words.as_ptr().add(w) as *const i8,
+                            words.as_ptr().add(w).cast::<i8>(),
                             std::arch::x86_64::_MM_HINT_T0,
                         );
                     }
@@ -243,12 +247,12 @@ impl<'a> Gen<'a> {
                 }
             }
         };
-        for w in a..b {
-            let x = words[w as usize].load(Relaxed);
-            let mut f = x & (x >> 1) & entry_lo_mask(w); // code 3
-            while f != 0 {
-                let bit = f.trailing_zeros() as u64;
-                f &= f - 1;
+        for (w, word) in (first as u64..).zip(&words[first..end]) {
+            let bits = word.load(Relaxed);
+            let mut unvisited = bits & (bits >> 1) & entry_lo_mask(w); // code 3
+            while unvisited != 0 {
+                let bit = u64::from(unvisited.trailing_zeros());
+                unvisited ^= unvisited.isolate_lowest_one();
                 pending[np] = w * 32 + bit / 2;
                 np += 1;
                 if np == BATCH {
@@ -262,22 +266,29 @@ impl<'a> Gen<'a> {
 
     /// Count code-2 entries, update group minima and derived tables, and
     /// optionally relabel (1 -> 0, 2 -> 1).
-    fn post_pass(&self, words: &[AtomicU64], a: u64, b: u64, depth: u64, relabel: bool) -> u64 {
+    fn post_pass(
+        &self,
+        words: &[AtomicU64],
+        first: usize,
+        end: usize,
+        depth: u64,
+        relabel: bool,
+    ) -> u64 {
         let mut count = 0;
         let mut last = [u64::MAX; 8];
-        for w in a..b {
-            let wi = w as usize;
-            let x = words[wi].load(Relaxed);
-            let m = entry_lo_mask(w);
-            let lo = x & m;
-            let hi = (x >> 1) & m;
-            let mut newm = hi & !lo; // code 2
-            if newm != 0 {
-                count += newm.count_ones() as u64;
+        for wi in first..end {
+            let w = wi as u64;
+            let bits = words[wi].load(Relaxed);
+            let mask = entry_lo_mask(w);
+            let lo = bits & mask;
+            let hi = (bits >> 1) & mask;
+            let mut new = hi & !lo; // code 2
+            if new != 0 {
+                count += u64::from(new.count_ones());
                 lower_nibble(words, wi, depth);
-                while newm != 0 && !self.derived.is_empty() {
-                    let bit = newm.trailing_zeros() as u64;
-                    newm &= newm - 1;
+                while new != 0 && !self.derived.is_empty() {
+                    let bit = u64::from(new.trailing_zeros());
+                    new ^= new.isolate_lowest_one();
                     let idx = w * 32 + bit / 2;
                     for (di, (dm, dmem)) in self.derived.iter().enumerate() {
                         let j = reduce_key_k(idx, self.k, dm.k);
@@ -285,22 +296,25 @@ impl<'a> Gen<'a> {
                             continue;
                         }
                         last[di] = j;
-                        let code = depth.saturating_sub(dm.base as u64).min(3);
+                        let code = depth.saturating_sub(u64::from(dm.base)).min(3);
                         derived_update(dmem.words(), j, code, depth);
                     }
                 }
             }
             if relabel {
                 // reload: lower_nibble may have changed this word
-                let x = words[wi].load(Relaxed);
-                let nl = hi;
-                let nh = hi & lo;
-                let keep = !(m | (m << 1));
-                words[wi].store((x & keep) | nl | (nh << 1), Relaxed);
+                let bits = words[wi].load(Relaxed);
+                let keep = !(mask | (mask << 1));
+                words[wi].store((bits & keep) | hi | ((hi & lo) << 1), Relaxed);
             }
         }
         count
     }
+}
+
+/// Number of `u64` words of an hk table.
+fn table_words(k: u32) -> usize {
+    usize::try_from(h48_bytes(k) / 8).expect("64-bit usize")
 }
 
 /// Map an index of the k-table to the index of the dk-table (dk <= k).

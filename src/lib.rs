@@ -1,4 +1,3 @@
-#![allow(clippy::needless_range_loop, clippy::manual_is_multiple_of)]
 pub mod coord;
 pub mod cubie;
 pub mod gen;
@@ -7,10 +6,14 @@ pub mod simd;
 pub mod solver;
 pub mod tables;
 
-use tables::*;
+use tables::{h48_bytes, write_meta, Cocsep, H48Meta, H48Table, Mem};
 
 /// Generate a table by BFS on h0 or h11, plus derived tables.
 /// Returns the main table and the derived tables (each with its own memory).
+///
+/// # Panics
+/// If `k` is not 0 or 11, or a table file cannot be created or written.
+#[must_use]
 pub fn generate(
     cs: &Cocsep,
     k: u32,
@@ -21,7 +24,7 @@ pub fn generate(
 ) -> (H48Table, Vec<H48Table>) {
     assert!(k == 0 || k == 11, "BFS only on true coordinates h0/h11");
     let alloc = |kk: u32, path: Option<&str>| -> Mem {
-        let len = h48_bytes(kk) as usize;
+        let len = usize::try_from(h48_bytes(kk)).expect("64-bit usize");
         match path {
             Some(p) => Mem::file(p, len, true).expect("create table file"),
             None => Mem::anon(len),
@@ -43,7 +46,7 @@ pub fn generate(
             .map(|((dk, db, _), m)| (H48Meta { k: *dk, base: *db }, m))
             .collect(),
     };
-    g.run(&mem);
+    let _counts = g.run(&mem);
     let meta = H48Meta { k, base };
     if let Some(p) = out {
         write_meta(p, &meta).unwrap();
@@ -62,8 +65,7 @@ pub fn generate(
     (H48Table { mem, meta }, dts)
 }
 
+#[must_use]
 pub fn nthreads() -> usize {
-    std::thread::available_parallelism()
-        .map(|x| x.get())
-        .unwrap_or(1)
+    std::thread::available_parallelism().map_or(1, std::num::NonZero::get)
 }

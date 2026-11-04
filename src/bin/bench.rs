@@ -1,4 +1,3 @@
-#![allow(clippy::needless_range_loop, clippy::manual_is_multiple_of)]
 //! Optimal-solve throughput benchmark.
 //!
 //! Usage:
@@ -12,10 +11,10 @@
 //! A last argument `share[:C]` uses the work-sharing mode (`lanes::share`)
 //! with at most C cubes in progress at once (default: threads * lanes; 1
 //! solves one cube at a time with all threads).
-use cubeopt::cubie::*;
+use cubeopt::cubie::{parse_moves, CubieCube, Rng};
 use cubeopt::lanes::share::Pool;
 use cubeopt::solver::{Solver, Stats};
-use cubeopt::tables::*;
+use cubeopt::tables::{Cocsep, H48Table};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
@@ -113,6 +112,7 @@ fn stream_thread(
     cubeopt::lanes::run_lanes(solver, cubes, next, stop, nlanes, record);
 }
 
+#[expect(clippy::cast_precision_loss, reason = "statistics")]
 fn summary(recs: &[Rec]) {
     let n = recs.len().max(1) as f64;
     let nodes: u64 = recs.iter().map(|r| r.st.nodes).sum();
@@ -135,6 +135,15 @@ fn summary(recs: &[Rec]) {
     println!("lengths {}", dist.join(" "));
 }
 
+/// Argument `i`, or `default` if it is not given.
+fn arg<T: std::str::FromStr>(a: &[String], i: usize, default: T) -> T
+where
+    T::Err: std::fmt::Debug,
+{
+    a.get(i).map_or(default, |x| x.parse().unwrap())
+}
+
+#[expect(clippy::cast_precision_loss, reason = "statistics")]
 fn main() {
     let a: Vec<String> = std::env::args().collect();
     let cs = Cocsep::generate();
@@ -157,15 +166,12 @@ fn main() {
         }
         _ => None,
     };
-    let arg = |i: usize, d: f64| a.get(i).map(|x| x.parse().unwrap()).unwrap_or(d);
     if a[2] == "stream" {
-        let warm = arg(3, 3.0);
-        let window = arg(4, 15.0);
-        let threads = arg(5, cubeopt::nthreads() as f64) as usize;
-        let nlanes: usize = a
-            .get(6)
-            .map_or(cubeopt::lanes::DEFAULT_LANES, |x| x.parse().unwrap());
-        let seed = arg(7, 2026.0) as u64;
+        let warm = arg(&a, 3, 3.0);
+        let window = arg(&a, 4, 15.0);
+        let threads = arg(&a, 5, cubeopt::nthreads());
+        let nlanes = arg(&a, 6, cubeopt::lanes::DEFAULT_LANES);
+        let seed: u64 = arg(&a, 7, 2026);
         let cubes = move |i: usize| {
             let mut rng = Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ (i as u64));
             rng.next_u64();
@@ -198,10 +204,8 @@ fn main() {
     if let Some(n) = a.get(3) {
         cubes.truncate(n.parse().unwrap());
     }
-    let threads = arg(4, cubeopt::nthreads() as f64) as usize;
-    let nlanes: usize = a
-        .get(5)
-        .map_or(cubeopt::lanes::DEFAULT_LANES, |x| x.parse().unwrap());
+    let threads = arg(&a, 4, cubeopt::nthreads());
+    let nlanes = arg(&a, 5, cubeopt::lanes::DEFAULT_LANES);
     let get = |i: usize| cubes.get(i).copied();
     let (recs, el) = run(&solver, &get, threads, nlanes, None, share);
     assert_eq!(recs.len(), cubes.len(), "cubes not reported");

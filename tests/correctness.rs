@@ -1,9 +1,8 @@
-#![allow(clippy::needless_range_loop, clippy::manual_is_multiple_of)]
-use cubeopt::coord::*;
-use cubeopt::cubie::*;
+use cubeopt::coord::cocsep;
+use cubeopt::cubie::{conjugate, parse_moves, symmetries, CubieCube, Rng};
 use cubeopt::simd::Cube;
 use cubeopt::solver::Solver;
-use cubeopt::tables::*;
+use cubeopt::tables::{cd_depth, Cocsep, H48Table};
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
@@ -47,7 +46,7 @@ fn par_solve(cubes: &[CubieCube], table: &H48Table) -> Vec<Vec<u8>> {
 }
 
 /// All positions within `depth` moves, with their distance.
-fn ball(depth: usize) -> HashMap<[u8; 32], (Cube, u8)> {
+fn ball(depth: u8) -> HashMap<[u8; 32], (Cube, u8)> {
     let mut seen: HashMap<[u8; 32], (Cube, u8)> = HashMap::new();
     let mut frontier = vec![Cube::solved()];
     seen.insert(Cube::solved().to_bytes(), (Cube::solved(), 0));
@@ -58,7 +57,7 @@ fn ball(depth: usize) -> HashMap<[u8; 32], (Cube, u8)> {
                 let n = c.apply_move(m);
                 let k = n.to_bytes();
                 if let std::collections::hash_map::Entry::Vacant(e) = seen.entry(k) {
-                    e.insert((n, d as u8));
+                    e.insert((n, d));
                     next.push(n);
                 }
             }
@@ -87,7 +86,7 @@ fn h0_table_matches_brute_force() {
         assert!(v <= d, "inadmissible: idx {idx} value {v} > distance {d}");
     }
     let mut want = [0u64; 3];
-    for (&idx, &d) in best.iter() {
+    for (&idx, &d) in &best {
         let (code, _) = t.get(idx);
         let expect = d.saturating_sub(base).min(3);
         assert_eq!(code, expect, "idx {idx} depth {d}");
@@ -129,7 +128,10 @@ fn reference_length(c: &CubieCube, cs: &Cocsep) -> usize {
         false
     }
     let c = Cube::from_cubie(c);
-    (0..=20).find(|&d| dfs(c, cs, d as u8, 99)).unwrap()
+    (0..=20)
+        .find(|&d| dfs(c, cs, d, 99))
+        .map(usize::from)
+        .unwrap()
 }
 
 #[test]
@@ -139,14 +141,14 @@ fn short_scrambles_are_optimal() {
     let mut cubes = Vec::new();
     for len in 0..=8 {
         for _ in 0..12 {
-            let ms: Vec<u8> = (0..len).map(|_| rng.below(18) as u8).collect();
+            let ms: Vec<u8> = (0..len).map(|_| rng.below_u8(18)).collect();
             cubes.push(CubieCube::SOLVED.apply_moves(&ms));
         }
     }
     let sols = par_solve(&cubes, h0());
     for (c, s) in cubes.iter().zip(sols.iter()) {
         assert_eq!(c.apply_moves(s), CubieCube::SOLVED);
-        assert_eq!(s.len(), reference_length(c, cs), "scramble {:?}", c);
+        assert_eq!(s.len(), reference_length(c, cs), "scramble {c:?}");
     }
 }
 
@@ -220,14 +222,14 @@ fn lanes_short_scrambles_are_optimal() {
     let mut cubes = Vec::new();
     for len in 0..=8 {
         for _ in 0..10 {
-            let ms: Vec<u8> = (0..len).map(|_| rng.below(18) as u8).collect();
+            let ms: Vec<u8> = (0..len).map(|_| rng.below_u8(18)).collect();
             cubes.push(CubieCube::SOLVED.apply_moves(&ms));
         }
     }
     let sols = lanes_solve(&cubes, h0(), 5);
     for (c, s) in cubes.iter().zip(sols.iter()) {
         assert_eq!(c.apply_moves(s), CubieCube::SOLVED);
-        assert_eq!(s.len(), reference_length(c, cs), "scramble {:?}", c);
+        assert_eq!(s.len(), reference_length(c, cs), "scramble {c:?}");
     }
 }
 
@@ -338,14 +340,13 @@ fn share_few_cubes() {
 /// mailboxes, the open list, builds and cube hand-over): every solution
 /// optimal, every cube reported once.
 #[test]
-#[expect(clippy::cast_possible_truncation, reason = "moves < 18")]
 fn share_stress() {
     let mut rng = Rng(4244);
     let cs = cs_data();
     let mut cubes = Vec::new();
     for len in 0..=8 {
         for _ in 0..6 {
-            let ms: Vec<u8> = (0..len).map(|_| rng.below(18) as u8).collect();
+            let ms: Vec<u8> = (0..len).map(|_| rng.below_u8(18)).collect();
             cubes.push(CubieCube::SOLVED.apply_moves(&ms));
         }
     }
@@ -376,7 +377,7 @@ fn share_short_scrambles_are_optimal() {
     let mut cubes = Vec::new();
     for len in 0..=8 {
         for _ in 0..10 {
-            let ms: Vec<u8> = (0..len).map(|_| rng.below(18) as u8).collect();
+            let ms: Vec<u8> = (0..len).map(|_| rng.below_u8(18)).collect();
             cubes.push(CubieCube::SOLVED.apply_moves(&ms));
         }
     }
@@ -384,7 +385,7 @@ fn share_short_scrambles_are_optimal() {
         let (sols, _) = share_solve(&cubes, h0(), 4, 5, max_active);
         for (c, s) in cubes.iter().zip(sols.iter()) {
             assert_eq!(c.apply_moves(s), CubieCube::SOLVED);
-            assert_eq!(s.len(), reference_length(c, cs), "scramble {:?}", c);
+            assert_eq!(s.len(), reference_length(c, cs), "scramble {c:?}");
         }
     }
 }

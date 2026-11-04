@@ -70,6 +70,7 @@ impl CubieCube {
     };
 
     /// "self then other".
+    #[must_use]
     pub fn mul(&self, o: &CubieCube) -> CubieCube {
         let mut r = CubieCube::SOLVED;
         for i in 0..8 {
@@ -83,20 +84,22 @@ impl CubieCube {
         r
     }
 
+    #[must_use]
     pub fn inverse(&self) -> CubieCube {
         let mut r = CubieCube::SOLVED;
-        for i in 0..8 {
-            r.cp[self.cp[i] as usize] = i as u8;
-            r.co[self.cp[i] as usize] = (3 - self.co[i]) % 3;
+        for (i, (&piece, &orient)) in (0..).zip(self.cp.iter().zip(&self.co)) {
+            r.cp[usize::from(piece)] = i;
+            r.co[usize::from(piece)] = (3 - orient) % 3;
         }
-        for i in 0..12 {
-            r.ep[self.ep[i] as usize] = i as u8;
-            r.eo[self.ep[i] as usize] = self.eo[i];
+        for (i, (&piece, &orient)) in (0..).zip(self.ep.iter().zip(&self.eo)) {
+            r.ep[usize::from(piece)] = i;
+            r.eo[usize::from(piece)] = orient;
         }
         r
     }
 
     /// Negate all corner orientations (used for mirror conjugation).
+    #[must_use]
     pub fn invert_co(&self) -> CubieCube {
         let mut r = *self;
         for i in 0..8 {
@@ -105,10 +108,12 @@ impl CubieCube {
         r
     }
 
+    #[must_use]
     pub fn apply_move(&self, m: usize) -> CubieCube {
         self.mul(&move_cubes()[m])
     }
 
+    #[must_use]
     pub fn apply_moves(&self, ms: &[u8]) -> CubieCube {
         let mut c = *self;
         for &m in ms {
@@ -117,15 +122,18 @@ impl CubieCube {
         c
     }
 
+    #[must_use]
     pub fn corner_parity(&self) -> u32 {
         perm_parity(&self.cp)
     }
 
+    #[must_use]
     pub fn edge_parity(&self) -> u32 {
         perm_parity(&self.ep)
     }
 
     /// Is this a reachable cube position?
+    #[must_use]
     pub fn is_solvable(&self) -> bool {
         let mut cs = [false; 8];
         let mut es = [false; 12];
@@ -141,8 +149,17 @@ impl CubieCube {
             }
             es[p as usize] = true;
         }
-        self.co.iter().map(|&x| x as u32).sum::<u32>() % 3 == 0
-            && self.eo.iter().map(|&x| x as u32).sum::<u32>() % 2 == 0
+        self.co
+            .iter()
+            .map(|&x| u32::from(x))
+            .sum::<u32>()
+            .is_multiple_of(3)
+            && self
+                .eo
+                .iter()
+                .map(|&x| u32::from(x))
+                .sum::<u32>()
+                .is_multiple_of(2)
             && self.corner_parity() == self.edge_parity()
     }
 
@@ -151,22 +168,22 @@ impl CubieCube {
         loop {
             let mut c = CubieCube::SOLVED;
             for i in (1..8).rev() {
-                let j = rng.below(i as u64 + 1) as usize;
+                let j = rng.below_usize(i + 1);
                 c.cp.swap(i, j);
             }
             for i in (1..12).rev() {
-                let j = rng.below(i as u64 + 1) as usize;
+                let j = rng.below_usize(i + 1);
                 c.ep.swap(i, j);
             }
             let mut s = 0;
             for i in 0..7 {
-                c.co[i] = rng.below(3) as u8;
+                c.co[i] = rng.below_u8(3);
                 s += c.co[i];
             }
             c.co[7] = (3 - s % 3) % 3;
             let mut s = 0;
             for i in 0..11 {
-                c.eo[i] = rng.below(2) as u8;
+                c.eo[i] = rng.below_u8(2);
                 s += c.eo[i];
             }
             c.eo[11] = s % 2;
@@ -193,14 +210,34 @@ fn perm_parity(p: &[u8]) -> u32 {
 pub struct Rng(pub u64);
 impl Rng {
     pub fn next_u64(&mut self) -> u64 {
-        self.0 = self.0.wrapping_add(0x9E3779B97F4A7C15);
+        self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
         let mut z = self.0;
-        z = (z ^ (z >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
-        z = (z ^ (z >> 27)).wrapping_mul(0x94D049BB133111EB);
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
         z ^ (z >> 31)
     }
+
+    /// Uniform in `0..n`: the high half of the 128-bit product of a
+    /// random `u64` and `n` (no division).
     pub fn below(&mut self, n: u64) -> u64 {
-        ((self.next_u64() as u128 * n as u128) >> 64) as u64
+        self.next_u64().carrying_mul(n, 0).1
+    }
+
+    /// `below` for small numbers (moves, orientations).
+    ///
+    /// # Panics
+    /// Cannot panic: the result is below `n`.
+    pub fn below_u8(&mut self, n: u8) -> u8 {
+        u8::try_from(self.below(n.into())).expect("below n")
+    }
+
+    /// `below` for indices.
+    ///
+    /// # Panics
+    /// Cannot panic: the result is below `n` (and `usize` is 64 bits).
+    pub fn below_usize(&mut self, n: usize) -> usize {
+        let n = u64::try_from(n).expect("64-bit usize");
+        usize::try_from(self.below(n)).expect("below n")
     }
 }
 
@@ -267,8 +304,9 @@ fn all_stickers() -> Vec<Sticker> {
     v
 }
 
-fn sticker_index(all: &[Sticker], s: Sticker) -> usize {
-    all.iter().position(|&x| x == s).expect("bad sticker")
+fn sticker_index(all: &[Sticker], s: Sticker) -> u8 {
+    let index = all.iter().position(|&x| x == s).expect("bad sticker");
+    u8::try_from(index).expect("48 stickers")
 }
 
 type Mat = [[i32; 3]; 3];
@@ -285,7 +323,18 @@ fn mat_det(m: &Mat) -> i32 {
     det3(m[0], m[1], m[2])
 }
 
+fn mat_mul(a: &Mat, b: &Mat) -> Mat {
+    let mut p = [[0; 3]; 3];
+    for i in 0..3 {
+        for j in 0..3 {
+            p[i][j] = (0..3).map(|k| a[i][k] * b[k][j]).sum();
+        }
+    }
+    p
+}
+
 /// Rotation by -90 degrees about unit axis `u` (clockwise seen from outside).
+#[expect(clippy::needless_range_loop, reason = "matrix indices")]
 fn quarter_turn_matrix(u: V3) -> Mat {
     // R v = -(u x v) + u (u.v)
     let mut m = [[0; 3]; 3];
@@ -309,15 +358,17 @@ fn quarter_turn_matrix(u: V3) -> Mat {
 pub struct StickerCube(pub [u8; 48]);
 
 impl StickerCube {
+    #[must_use]
     pub fn solved() -> StickerCube {
         let mut s = [0u8; 48];
-        for (i, x) in s.iter_mut().enumerate() {
-            *x = i as u8;
+        for (x, i) in s.iter_mut().zip(0..) {
+            *x = i;
         }
         StickerCube(s)
     }
 
     /// Apply a face move (`face` in 0..6, `q` quarter turns clockwise).
+    #[must_use]
     pub fn apply_face(&self, face: usize, q: usize) -> StickerCube {
         let all = all_stickers();
         let u = FACE_NORMAL[face];
@@ -332,7 +383,7 @@ impl StickerCube {
                         p: mat_apply(&m, l.p),
                         n: mat_apply(&m, l.n),
                     };
-                    next.0[sticker_index(&all, to)] = cur.0[li];
+                    next.0[usize::from(sticker_index(&all, to))] = cur.0[li];
                 }
             }
             cur = next;
@@ -341,10 +392,11 @@ impl StickerCube {
     }
 
     /// Conjugate by a spatial symmetry: `out[M(L)] = M(s[L])`.
+    #[must_use]
     pub fn conjugate(&self, m: &Mat) -> StickerCube {
         let all = all_stickers();
-        let map = |idx: usize| -> usize {
-            let l = all[idx];
+        let map = |idx: u8| -> u8 {
+            let l = all[usize::from(idx)];
             sticker_index(
                 &all,
                 Sticker {
@@ -354,8 +406,8 @@ impl StickerCube {
             )
         };
         let mut out = [0u8; 48];
-        for li in 0..48 {
-            out[map(li)] = map(self.0[li] as usize) as u8;
+        for (li, &id) in (0..).zip(&self.0) {
+            out[usize::from(map(li))] = map(id);
         }
         StickerCube(out)
     }
@@ -369,53 +421,54 @@ impl StickerCube {
         let all = all_stickers();
         let mut out = [0u8; 48];
         for (li, o) in out.iter_mut().enumerate() {
-            let l = all[self.0[li] as usize];
+            let l = all[usize::from(self.0[li])];
             *o = sticker_index(
                 &all,
                 Sticker {
                     p: mat_apply(m, l.p),
                     n: mat_apply(m, l.n),
                 },
-            ) as u8;
+            );
         }
         StickerCube(out)
     }
 
+    #[must_use]
     pub fn to_cubie(&self) -> CubieCube {
         let mut c = CubieCube::SOLVED;
         for i in 0..8 {
-            let ref_id = self.0[3 * i] as usize;
-            let piece = ref_id / 3;
-            c.cp[i] = piece as u8;
-            for k in 0..3 {
-                if self.0[3 * i + k] as usize == 3 * piece {
-                    c.co[i] = k as u8;
+            let piece = self.0[3 * i] / 3;
+            c.cp[i] = piece;
+            for (k, &id) in (0..).zip(&self.0[3 * i..3 * i + 3]) {
+                if id == 3 * piece {
+                    c.co[i] = k;
                 }
             }
         }
         for i in 0..12 {
-            let id = self.0[24 + 2 * i] as usize - 24;
-            c.ep[i] = (id / 2) as u8;
-            c.eo[i] = (id % 2) as u8;
+            let id = self.0[24 + 2 * i] - 24;
+            c.ep[i] = id / 2;
+            c.eo[i] = id % 2;
         }
         c
     }
 
+    #[must_use]
     pub fn from_cubie(c: &CubieCube) -> StickerCube {
         let mut s = [0u8; 48];
         for i in 0..8 {
-            let p = c.cp[i] as usize;
+            let p = c.cp[i];
             for k in 0..3 {
                 // piece sticker j sits at position sticker (co + j) % 3
-                let j = (k + 3 - c.co[i] as usize) % 3;
-                s[3 * i + k] = (3 * p + j) as u8;
+                let j = (k + 3 - c.co[i]) % 3;
+                s[3 * i + usize::from(k)] = 3 * p + j;
             }
         }
         for i in 0..12 {
-            let p = c.ep[i] as usize;
+            let p = c.ep[i];
             for k in 0..2 {
-                let j = (k + c.eo[i] as usize) % 2;
-                s[24 + 2 * i + k] = (24 + 2 * p + j) as u8;
+                let j = (k + c.eo[i]) % 2;
+                s[24 + 2 * i + usize::from(k)] = 24 + 2 * p + j;
             }
         }
         StickerCube(s)
@@ -442,6 +495,7 @@ pub fn move_cubes() -> &'static [CubieCube; 18] {
     })
 }
 
+#[must_use]
 pub fn move_name(m: u8) -> String {
     let f = FACE_CHARS[(m / 3) as usize];
     match m % 3 {
@@ -451,11 +505,13 @@ pub fn move_name(m: u8) -> String {
     }
 }
 
+#[must_use]
 pub fn inverse_move(m: u8) -> u8 {
     3 * (m / 3) + 2 - m % 3
 }
 
 /// Parse "R U2 F' D3 B1" style sequences (both Singmaster and 1/2/3 suffixes).
+#[must_use]
 pub fn parse_moves(s: &str) -> Option<Vec<u8>> {
     let mut out = Vec::new();
     let chars: Vec<char> = s.chars().collect();
@@ -466,7 +522,7 @@ pub fn parse_moves(s: &str) -> Option<Vec<u8>> {
             i += 1;
             continue;
         }
-        let f = FACE_CHARS.iter().position(|&c| c == ch)? as u8;
+        let f = FACE_CHARS.iter().zip(0..).find(|&(&c, _)| c == ch)?.1;
         i += 1;
         let mut q = 1;
         if i < chars.len() {
@@ -490,6 +546,7 @@ pub fn parse_moves(s: &str) -> Option<Vec<u8>> {
     Some(out)
 }
 
+#[must_use]
 pub fn format_moves(ms: &[u8]) -> String {
     ms.iter()
         .map(|&m| move_name(m))
@@ -511,6 +568,9 @@ pub struct Sym {
 }
 
 /// All 48 symmetries; index 0 is the identity.
+///
+/// # Panics
+/// Never: every symmetry maps faces to faces.
 pub fn symmetries() -> &'static Vec<Sym> {
     use std::sync::OnceLock;
     static S: OnceLock<Vec<Sym>> = OnceLock::new();
@@ -543,12 +603,17 @@ pub fn symmetries() -> &'static Vec<Sym> {
                 let t = StickerCube::symmetry_state(m).to_cubie();
                 let tinv = t.inverse();
                 let mut move_map = [0u8; 18];
-                for f in 0..6 {
-                    let n = mat_apply(m, FACE_NORMAL[f]);
-                    let f2 = FACE_NORMAL.iter().position(|&x| x == n).unwrap();
+                for (f, &normal) in (0..).zip(&FACE_NORMAL) {
+                    let n = mat_apply(m, normal);
+                    let f2 = FACE_NORMAL
+                        .iter()
+                        .zip(0..)
+                        .find(|&(&x, _)| x == n)
+                        .unwrap()
+                        .1;
                     for q in 0..3 {
                         let q2 = if mirror { 2 - q } else { q };
-                        move_map[3 * f + q] = (3 * f2 + q2) as u8;
+                        move_map[usize::from(3 * f + q)] = 3 * f2 + q2;
                     }
                 }
                 Sym {
@@ -564,6 +629,7 @@ pub fn symmetries() -> &'static Vec<Sym> {
 }
 
 /// Conjugate `c` by symmetry `s` at the cubie level: `T c T^-1` (+ co inversion for mirrors).
+#[must_use]
 pub fn conjugate(c: &CubieCube, s: &Sym) -> CubieCube {
     let r = s.t.mul(c).mul(&s.tinv);
     if s.mirror {
@@ -581,15 +647,9 @@ pub fn sym_inverse_table() -> &'static [u8; 48] {
         let syms = symmetries();
         let mut r = [0u8; 48];
         for i in 0..48 {
-            for j in 0..48 {
-                let mut p = [[0; 3]; 3];
-                for a in 0..3 {
-                    for b in 0..3 {
-                        p[a][b] = (0..3).map(|k| syms[i].mat[a][k] * syms[j].mat[k][b]).sum();
-                    }
-                }
-                if p == syms[0].mat {
-                    r[i] = j as u8;
+            for (j, sym_j) in (0..).zip(syms) {
+                if mat_mul(&syms[i].mat, &sym_j.mat) == syms[0].mat {
+                    r[i] = j;
                 }
             }
         }
@@ -598,6 +658,7 @@ pub fn sym_inverse_table() -> &'static [u8; 48] {
 }
 
 /// Reference conjugation through the sticker model (slow; for tests).
+#[must_use]
 pub fn conjugate_sticker(c: &CubieCube, s: &Sym) -> CubieCube {
     StickerCube::from_cubie(c).conjugate(&s.mat).to_cubie()
 }
@@ -622,7 +683,7 @@ mod tests {
             let mut s = StickerCube::solved();
             let mut c = CubieCube::SOLVED;
             for _ in 0..30 {
-                let m = rng.below(18) as usize;
+                let m = rng.below_usize(18);
                 s = s.apply_face(m / 3, m % 3 + 1);
                 c = c.apply_move(m);
                 assert_eq!(s.to_cubie(), c);
@@ -640,7 +701,8 @@ mod tests {
                 c = c.mul(&mc);
             }
             assert_eq!(c, CubieCube::SOLVED);
-            assert_eq!(mc.inverse(), move_cubes()[inverse_move(m as u8) as usize]);
+            let inverse = inverse_move(u8::try_from(m).unwrap());
+            assert_eq!(mc.inverse(), move_cubes()[usize::from(inverse)]);
         }
         // R moves FR edge to UR (front to top).
         let r = move_cubes()[6];

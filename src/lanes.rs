@@ -113,16 +113,20 @@ fn job_key(j: &Job) -> u32 {
 /// floats, whose bit patterns order like their values. LSD radix sort of
 /// (inverted key, index) pairs, then a gather into `out` (scratch, swapped
 /// with `jobs`). ~43K jobs; much cheaper than a comparison sort.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "`usize` is 64 bits; the low half of a key is the job's index"
+)]
 fn sort_jobs(jobs: &mut Vec<Job>, out: &mut Vec<Job>) {
     let n = jobs.len();
     let mut keys: Vec<u64> = jobs
         .iter()
         .enumerate()
-        .map(|(i, j)| ((!job_key(j) as u64) << 32) | i as u64)
+        .map(|(i, j)| (u64::from(!job_key(j)) << 32) | i as u64)
         .collect();
     let mut tmp = vec![0u64; n];
     for (shift, bits) in [(32u32, 11u32), (43, 11), (54, 10)] {
-        let mask = (1u64 << bits) - 1;
+        let mask = u64::MAX.unbounded_shr(64 - bits);
         let mut cnt = [0u32; 2048];
         for &k in &keys {
             cnt[((k >> shift) & mask) as usize] += 1;
@@ -131,7 +135,7 @@ fn sort_jobs(jobs: &mut Vec<Job>, out: &mut Vec<Job>) {
             continue; // all keys share this digit
         }
         let mut sum = 0;
-        for c in cnt.iter_mut() {
+        for c in &mut cnt {
             (*c, sum) = (sum, sum + *c);
         }
         for &k in &keys {
@@ -186,7 +190,8 @@ const RUN_ALL: u32 = 31;
 /// (exponent and top two mantissa bits of the f32), 0 below 1.
 #[inline(always)]
 fn quant(x: f32) -> u8 {
-    ((x.to_bits() >> 21) as i32 - 127 * 4).clamp(0, 255) as u8
+    // (Saturating at both ends: exponents below 127 and codes above 255.)
+    u8::try_from((x.to_bits() >> 21).saturating_sub(127 * 4)).unwrap_or(u8::MAX)
 }
 
 /// The `JobX::ck` codes of the statistics `x` of a root's children:
@@ -196,10 +201,16 @@ fn quant(x: f32) -> u8 {
 /// measured 0.6% fewer nodes. (Code 0 means statistic 0: every lookup adds
 /// at least 2 * 8.)
 #[inline(always)]
+#[expect(clippy::cast_ptr_alignment, reason = "unaligned store")]
 fn quant18(x: &[f32; 18], children: u32) -> [u8; 18] {
     let mut r = [0u8; 18];
     unsafe {
-        use std::arch::x86_64::*;
+        use std::arch::x86_64::{
+            __m128i, _mm512_castps_si512, _mm512_cvtusepi32_epi8, _mm512_loadu_ps,
+            _mm512_max_epi32, _mm512_set1_epi32, _mm512_setzero_si512, _mm512_srli_epi32,
+            _mm512_sub_epi32, _mm_add_epi8, _mm_mask_adds_epu8, _mm_mask_mov_epi8, _mm_set1_epi8,
+            _mm_setr_epi8, _mm_storeu_si128, _mm_test_epi8_mask,
+        };
         let v = _mm512_loadu_ps(x.as_ptr());
         let q = _mm512_sub_epi32(
             _mm512_srli_epi32(_mm512_castps_si512(v), 21),
@@ -213,7 +224,7 @@ fn quant18(x: &[f32; 18], children: u32) -> [u8; 18] {
         #[expect(clippy::cast_possible_truncation, reason = "moves 0..16")]
         let children_lo = children as u16;
         let q = _mm_mask_mov_epi8(q, !seen & children_lo, unseen);
-        _mm_storeu_si128(r.as_mut_ptr() as *mut __m128i, q);
+        _mm_storeu_si128(r.as_mut_ptr().cast::<__m128i>(), q);
     }
     // (moves 16 and 17 are on face 5)
     for m in 16..18 {
@@ -233,28 +244,38 @@ fn quant18(x: &[f32; 18], children: u32) -> [u8; 18] {
 #[inline(always)]
 fn sum18(x: &[f32; 18]) -> f32 {
     unsafe {
-        use std::arch::x86_64::*;
+        use std::arch::x86_64::{_mm512_loadu_ps, _mm512_reduce_add_ps};
         _mm512_reduce_add_ps(_mm512_loadu_ps(x.as_ptr())) + (x[16] + x[17])
     }
 }
 
 /// Bit mask of the moves m with `ck[m] > theta`.
 #[inline(always)]
+#[expect(clippy::cast_ptr_alignment, reason = "unaligned load")]
 fn ck_above(ck: &[u8; 18], theta: u8) -> u32 {
     unsafe {
-        use std::arch::x86_64::*;
-        let v = _mm_loadu_si128(ck.as_ptr() as *const __m128i);
-        let lo = _mm_cmpgt_epu8_mask(v, _mm_set1_epi8(theta as i8)) as u32;
-        lo | ((ck[16] > theta) as u32) << 16 | ((ck[17] > theta) as u32) << 17
+        use std::arch::x86_64::{__m128i, _mm_cmpgt_epu8_mask, _mm_loadu_si128, _mm_set1_epi8};
+        let v = _mm_loadu_si128(ck.as_ptr().cast::<__m128i>());
+        let lo = u32::from(_mm_cmpgt_epu8_mask(v, _mm_set1_epi8(theta.cast_signed())));
+        lo | u32::from(ck[16] > theta) << 16 | u32::from(ck[17] > theta) << 17
     }
 }
 
 /// The largest `ck[m]` over the moves m in `mask` (0 if none).
 #[inline(always)]
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_ptr_alignment,
+    reason = "the low 16 moves; the low byte; unaligned load"
+)]
 fn max18(ck: &[u8; 18], mask: u32) -> u8 {
     let lo = unsafe {
-        use std::arch::x86_64::*;
-        let v = _mm_maskz_mov_epi8(mask as u16, _mm_loadu_si128(ck.as_ptr() as *const __m128i));
+        use std::arch::x86_64::{
+            __m128i, _mm_cvtsi128_si32, _mm_loadu_si128, _mm_maskz_mov_epi8, _mm_max_epu8,
+            _mm_srli_si128,
+        };
+        let v = _mm_maskz_mov_epi8(mask as u16, _mm_loadu_si128(ck.as_ptr().cast::<__m128i>()));
         let v = _mm_max_epu8(v, _mm_srli_si128(v, 8));
         let v = _mm_max_epu8(v, _mm_srli_si128(v, 4));
         let v = _mm_max_epu8(v, _mm_srli_si128(v, 2));
@@ -475,20 +496,21 @@ impl Lane {
         false
     }
 
+    #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
     fn extend_jobs(&mut self, s: &Solver) {
-        let mut out = std::mem::take(&mut self.jobs_tmp);
-        out.clear();
-        out.reserve(self.jobs.len() * 15);
         // Bounds of the new jobs: lookups are prefetched and resolved LAG
         // lookups later. Only X children need an inverse lookup: X2 keeps
         // the parent's inverse coset (`li` is inherited by the copy) and X'
         // shares the X sibling's (see `Node::tw`).
         const LAG: usize = 48;
+        let mut out = std::mem::take(&mut self.jobs_tmp);
+        out.clear();
+        out.reserve(self.jobs.len() * 15);
         let mut ring = [(0usize, 0u64, 0u8); 64];
         let (mut head, mut tail) = (0, 0);
         let resolve = |out: &mut Vec<Job>, (slot, idx, cd): (usize, u64, u8)| {
             let v = s.value(idx, cd);
-            if slot % 2 == 0 {
+            if slot.is_multiple_of(2) {
                 out[slot / 2].ln = v;
             } else {
                 out[slot / 2].li = v;
@@ -503,7 +525,7 @@ impl Lane {
             };
             while mm != 0 {
                 let m = mm.trailing_zeros() as usize;
-                mm &= mm - 1;
+                mm ^= mm.isolate_lowest_one();
                 let mut n = *j;
                 n.moves[n.len as usize] = m as u8;
                 n.len += 1;
@@ -513,7 +535,7 @@ impl Lane {
                 s.prefetch(idx);
                 ring[head % 64] = (2 * pos, idx, cd);
                 head += 1;
-                if m % 3 == 0 {
+                if m.is_multiple_of(3) {
                     let (idx, cd) = s.index(ci.premove_inv(m));
                     s.prefetch(idx);
                     ring[head % 64] = (2 * pos + 1, idx, cd);
@@ -588,6 +610,11 @@ impl Lane {
 
     /// The threshold on `ck` that selects about `FIRST` of all root
     /// children (estimated from a sample of the jobs).
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "a fraction of a count"
+    )]
     fn choose_theta(&self) -> u8 {
         let n = self.rs.jx.len();
         let step = if n >= 4096 { 8 } else { 1 };
@@ -600,12 +627,12 @@ impl Lane {
             total += 18;
         }
         total -= hist[0];
-        let limit = (total as f64 * FIRST) as u32;
+        let limit = (f64::from(total) * FIRST) as u32;
         let mut acc = 0;
-        for v in (1..256).rev() {
-            acc += hist[v];
+        for v in (1..=u8::MAX).rev() {
+            acc += hist[usize::from(v)];
             if acc > limit {
-                return v as u8;
+                return v;
             }
         }
         0
@@ -613,6 +640,13 @@ impl Lane {
 
     /// The first part of a split iteration: one entry per root child with
     /// `ck > theta`, by decreasing `ck` (ties in job and move order).
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        clippy::cast_ptr_alignment,
+        reason = "job indices are below 2^19 (19 bits of a run entry); the low 16 \
+                  moves; unaligned load"
+    )]
     fn build_first(&mut self) {
         self.rs.theta = self.choose_theta();
         let theta = self.rs.theta;
@@ -633,9 +667,13 @@ impl Lane {
             // SAFETY: k + 18 <= capacity; entries are written before
             // `set_len` covers them.
             unsafe {
-                use std::arch::x86_64::*;
+                use std::arch::x86_64::{
+                    __m128i, _mm512_add_epi32, _mm512_cvtepu8_epi32,
+                    _mm512_mask_compressstoreu_epi32, _mm512_or_si512, _mm512_set1_epi32,
+                    _mm512_setr_epi32, _mm512_slli_epi32, _mm_loadu_si128,
+                };
                 let out = self.rs.runs_tmp.as_mut_ptr().add(k);
-                let ck = _mm_loadu_si128(x.ck.as_ptr() as *const __m128i);
+                let ck = _mm_loadu_si128(x.ck.as_ptr().cast::<__m128i>());
                 let e = _mm512_or_si512(
                     _mm512_slli_epi32(_mm512_cvtepu8_epi32(ck), 24),
                     _mm512_add_epi32(
@@ -644,10 +682,10 @@ impl Lane {
                     ),
                 );
                 let c16 = cand as u16;
-                _mm512_mask_compressstoreu_epi32(out as *mut i32, c16, e);
+                _mm512_mask_compressstoreu_epi32(out.cast::<i32>(), c16, e);
                 let mut k2 = k + c16.count_ones() as usize;
                 for m in 16..18 {
-                    let e = (x.ck[m] as u32) << 24 | (ji as u32) << 5 | m as u32;
+                    let e = u32::from(x.ck[m]) << 24 | (ji as u32) << 5 | m as u32;
                     out.add(k2 - k).write(e);
                     k2 += (cand >> m & 1) as usize;
                 }
@@ -668,9 +706,13 @@ impl Lane {
     /// this iteration's first part included: a job whose best child ran
     /// without a solution is still more promising than one whose best child
     /// is weaker; measured 0.5% fewer nodes than the best of those left).
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "job indices are below 2^19 (19 bits of a run entry)"
+    )]
     fn build_rest(&mut self) {
         let n = self.rs.jx.len();
-        let tag = (self.target as u32) << 24;
+        let tag = u32::from(self.target) << 24;
         self.rs.runs_tmp.clear();
         self.rs.runs_tmp.reserve(n);
         let mut cnt = [0u32; 256];
@@ -684,7 +726,7 @@ impl Lane {
                 cnt[key as usize] += 1;
                 self.rs
                     .runs_tmp
-                    .push((key as u32) << 24 | (ji as u32) << 5 | RUN_ALL);
+                    .push(u32::from(key) << 24 | (ji as u32) << 5 | RUN_ALL);
             }
         }
         sort_runs(&mut self.rs.runs, &self.rs.runs_tmp, &mut cnt);
@@ -703,7 +745,7 @@ impl Lane {
         if self.rs.part == 0 {
             return true;
         }
-        let tag = (self.target as u32) << 24;
+        let tag = u32::from(self.target) << 24;
         (0..self.rs.jx.len()).all(|ji| self.side_moves(ji) & !done_now(&self.rs.jx[ji], tag) == 0)
     }
 
@@ -717,7 +759,7 @@ impl Lane {
         if self.rs.full {
             let root = &self.stack[0];
             let mask = self.rs.cur_mask;
-            let tag = (self.target as u32) << 24;
+            let tag = u32::from(self.target) << 24;
             // Children without statistics get `UNSEEN_CODE`: they run with
             // the mid-ranked children instead of last (with the rest key of
             // `build_rest`: -1.0% nodes on 20K random and 33K depth-18
@@ -771,11 +813,15 @@ impl Lane {
 
     /// Set up the root node of the next run of this iteration. Returns
     /// false if the iteration is exhausted.
+    #[expect(
+        clippy::many_single_char_names,
+        reason = "renamed in the lanes.rs sweep"
+    )]
     fn setup_run(&mut self) -> bool {
         if self.rs.part == 0 {
             return self.setup_job();
         }
-        let tag = (self.target as u32) << 24;
+        let tag = u32::from(self.target) << 24;
         loop {
             if self.rs.run_pos == self.rs.runs.len() {
                 if self.rs.part == 2 {
@@ -790,14 +836,14 @@ impl Lane {
             // The job vectors are too big for L2 and 20 lanes interleave
             // their streams: fetch the next entry's job early.
             unsafe {
-                use std::arch::x86_64::*;
+                use std::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};
                 let next = *self
                     .rs
                     .runs
                     .get_unchecked(self.rs.run_pos.min(self.rs.runs.len() - 1));
                 let nj = (next >> 5 & 0x7_FFFF) as usize;
-                _mm_prefetch(self.rs.jx.as_ptr().add(nj) as *const i8, _MM_HINT_T0);
-                _mm_prefetch(self.jobs.as_ptr().add(nj) as *const i8, _MM_HINT_T0);
+                _mm_prefetch(self.rs.jx.as_ptr().add(nj).cast::<i8>(), _MM_HINT_T0);
+                _mm_prefetch(self.jobs.as_ptr().add(nj).cast::<i8>(), _MM_HINT_T0);
             }
             let ji = (e >> 5 & 0x7_FFFF) as usize;
             let m = e & 31;
@@ -863,11 +909,11 @@ impl Lane {
             // their streams: fetch the next jobs' line early.
             let ahead = (self.job_pos + 8).min(self.jobs.len() - 1);
             unsafe {
-                use std::arch::x86_64::*;
-                _mm_prefetch(self.jobs.as_ptr().add(ahead) as *const i8, _MM_HINT_T0);
+                use std::arch::x86_64::{_mm_prefetch, _MM_HINT_ET0, _MM_HINT_T0};
+                _mm_prefetch(self.jobs.as_ptr().add(ahead).cast::<i8>(), _MM_HINT_T0);
                 if self.rs.full {
                     // (written at the end of the run)
-                    _mm_prefetch(self.rs.jx.as_ptr().add(ahead) as *const i8, _MM_HINT_ET0);
+                    _mm_prefetch(self.rs.jx.as_ptr().add(ahead).cast::<i8>(), _MM_HINT_ET0);
                 }
             }
             let r = self.target - j.len;
@@ -928,6 +974,15 @@ impl Lane {
     /// exhaustion and pop branches, mispredicted often, then do not also wait
     /// for store forwarding.
     #[inline(always)]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the search loop keeps its state in registers"
+    )]
+    #[expect(
+        clippy::many_single_char_names,
+        reason = "renamed in the lanes.rs sweep"
+    )]
+    #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
     fn advance(&mut self, s: &Solver) -> Step {
         let maxval = s.base + 3;
         let mut sp = self.sp;
@@ -949,10 +1004,12 @@ impl Lane {
             let mut live = 0;
             let done = lb > r || {
                 live = todo & !self.stack[sp].skip;
-                // (`bzhi` keeps all of `todo` if `live` is 0.)
-                // SAFETY: BMI2 is a target feature (see `coord::cocsep`).
+                // (`bzhi` keeps all of `todo` if `live` is 0. The std form,
+                // `todo & u32::MAX.unbounded_shr(32 - tz)`, costs a test and
+                // a cmov more for that case.)
+                // SAFETY: BMI2 is a target feature (see `.cargo/config.toml`).
                 let below = unsafe { std::arch::x86_64::_bzhi_u32(todo, live.trailing_zeros()) };
-                nodes += below.count_ones() as u64;
+                nodes += u64::from(below.count_ones());
                 todo ^= below;
                 live == 0
             };
@@ -992,7 +1049,7 @@ impl Lane {
             let m = live.trailing_zeros() as usize;
             // SAFETY: move masks are subsets of ALL_MOVES.
             unsafe { std::hint::assert_unchecked(m < 18) };
-            todo &= todo - 1;
+            todo ^= todo.isolate_lowest_one();
             let node = &mut self.stack[sp];
             node.todo = todo;
             let face = m / 3;
@@ -1003,6 +1060,8 @@ impl Lane {
             nodes += 1;
             let (a, b, lo) = (node.a, node.b, node.lo);
             // One test for the rare kinds: r1 == 0 (wraps) or r1 > maxval.
+            // (`!(1..=maxval).contains(&r1)` is the same test, but LLVM
+            // then allocates the loop's registers differently.)
             if r1.wrapping_sub(1) >= maxval {
                 if r1 == 0 {
                     // nodes with r == 1 always move the normal cube
@@ -1176,6 +1235,7 @@ impl Lane {
     /// no skipped moves, and its first move is an X move (move masks are
     /// whole faces, less half turns), which looks up the other side first.
     #[inline(always)]
+    #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
     fn push_advance(&mut self, pm: u8, po: u8, s: &Solver) -> Step {
         let mut node = self.child_node(pm, po);
         // SAFETY: see `advance`.
@@ -1191,9 +1251,9 @@ impl Lane {
         let m = todo.trailing_zeros() as usize;
         // SAFETY: move masks are subsets of ALL_MOVES.
         unsafe { std::hint::assert_unchecked(m < 18) };
-        debug_assert!(m % 3 == 0);
+        debug_assert!(m.is_multiple_of(3));
         let face = m / 3;
-        node.todo = todo & (todo - 1);
+        node.todo = todo ^ todo.isolate_lowest_one();
         self.stats.nodes += 1;
         let a2 = node.a.apply_move(m);
         let b2 = node.b.premove_inv(m);
@@ -1252,7 +1312,7 @@ impl Lane {
         let (same, todo) = if r1 == 1 {
             (pn, mm_m & mm_x)
         } else {
-            let s = mm_m.count_ones() < mm_x.count_ones() + pn as u32;
+            let s = mm_m.count_ones() < mm_x.count_ones() + u32::from(pn);
             (s, std::hint::select_unpredictable(s, mm_m, mm_x))
         };
         let child = Node {
@@ -1309,12 +1369,17 @@ impl Lane {
     }
 }
 
-/// `lb.max(v.saturating_sub(1))` for bounds below 128, as a signed max (no
-/// saturation needed).
+/// `lb.max(v.saturating_sub(1))`, as a signed max: `v - 1` is -1 for
+/// `v = 0` (no saturation needed).
+///
+/// Bounds are below 16 (4-bit table entries and group minima, corner depths
+/// below 16, `base + 3` at most 15), far below 128, where `v - 1` would
+/// wrap (debug builds check). The same max in `i32` would cost a register
+/// move more.
 #[inline(always)]
 fn max_dec(lb: u8, v: u8) -> u8 {
     debug_assert!(lb < 128 && v < 128);
-    (lb as i8).max(v as i8 - 1) as u8
+    lb.cast_signed().max(v.cast_signed() - 1).cast_unsigned()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1378,8 +1443,8 @@ fn done_now(x: &JobX, tag: u32) -> u32 {
 #[inline(always)]
 fn tw_unknown(tw: &[u8; 6]) -> u32 {
     let mut m = 0;
-    for f in 0..6 {
-        m |= ((tw[f] == 0xFF) as u32) << (3 * f + 2);
+    for (f, &value) in tw.iter().enumerate() {
+        m |= u32::from(value == 0xFF) << (3 * f + 2);
     }
     m
 }
@@ -1459,7 +1524,7 @@ pub fn run_lanes(
     // lane has one miss in flight with a whole round of slack.
     while nactive > 0 && !stop.load(Relaxed) {
         let mut gone: Option<*const Lane> = None;
-        for l in lanes[..nactive].iter_mut() {
+        for l in &mut lanes[..nactive] {
             let v = l.pending_value(s);
             let st = match l.phase {
                 Phase::WaitOther => {
@@ -1483,7 +1548,7 @@ pub fn run_lanes(
         }
         if let Some(l) = gone {
             // SAFETY: `l` points into `lanes`.
-            let li = unsafe { l.offset_from(lanes.as_ptr()) } as usize;
+            let li = unsafe { l.offset_from(lanes.as_ptr()) }.cast_unsigned();
             nactive -= 1;
             lanes.swap(li, nactive);
         }
@@ -1501,6 +1566,7 @@ mod tests {
     /// runs branch on the normal side, and an X' child runs with its X
     /// sibling or with X's other-side value known.
     #[test]
+    #[expect(clippy::cast_possible_truncation, reason = "random numbers")]
     fn split_runs_cover_each_child_once() {
         let mut rng = crate::cubie::Rng(11);
         for trial in 0..40 {
@@ -1510,7 +1576,7 @@ mod tests {
                 .map(|_| {
                     let mut moves = [0u8; 4];
                     let mut mm = ALL_MOVES;
-                    for mv in moves.iter_mut() {
+                    for mv in &mut moves {
                         let ms: Vec<u32> = (0..18).filter(|&m| mm >> m & 1 != 0).collect();
                         let m = ms[rng.next_u64() as usize % ms.len()];
                         *mv = m as u8;
@@ -1518,7 +1584,13 @@ mod tests {
                     }
                     // bounds at most the first target's remaining depth (13),
                     // some tight (half turns masked)
-                    let b = |r: u64| if r % 3 == 0 { 13 } else { (r % 13) as u8 };
+                    let b = |r: u64| {
+                        if r.is_multiple_of(3) {
+                            13
+                        } else {
+                            (r % 13) as u8
+                        }
+                    };
                     Job {
                         moves,
                         len: 4,
@@ -1563,16 +1635,16 @@ mod tests {
                     for m in 0..18 {
                         if root.todo >> m & 1 != 0 {
                             let y = rng.next_u64();
-                            l.cheur[m] = if y % 4 == 0 {
+                            l.cheur[m] = if y.is_multiple_of(4) {
                                 0.0
                             } else {
-                                HEUR_TERMS[(y % 40) as usize] * (y >> 8) as u8 as f32
+                                HEUR_TERMS[(y % 40) as usize] * f32::from((y >> 8) as u8)
                             };
                             // (An X value is only recorded if X passed: in a
                             // whole run at r = 13 a value can prune X; in a
                             // split iteration (r - 1 >= every value) none
                             // does.)
-                            if m % 3 == 0 && (iter > 0 || (y >> 24) % 4 != 0) {
+                            if m.is_multiple_of(3) && (iter > 0 || !(y >> 24).is_multiple_of(4)) {
                                 l.stack[0].tw[m / 3] = (y >> 16) as u8 % 14;
                             }
                         }
@@ -1623,6 +1695,11 @@ mod tests {
     }
 
     #[test]
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_precision_loss,
+        reason = "random numbers"
+    )]
     fn sort_jobs_matches_stable_sort() {
         let mut rng = crate::cubie::Rng(7);
         for n in [1usize, 2, 17, 1000, 5000] {

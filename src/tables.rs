@@ -1,6 +1,6 @@
 //! Pruning tables: cocsep data and the big H48 table.
 
-use crate::coord::*;
+use crate::coord::{cocsep, h11_key, reduce_key, N_CLASSES, N_COCSEP, N_MSPLIT, N_SLOTS};
 use crate::simd::Cube;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -24,51 +24,61 @@ pub struct Cocsep {
 }
 
 /// Packed cocsep entry: (class, ttrep, depth).
+#[must_use]
 #[inline(always)]
 pub fn cp_class(d: u32) -> usize {
     ((d >> 10) & 0xFFF) as usize
 }
+#[must_use]
 #[inline(always)]
 pub fn cp_ttrep(d: u32) -> usize {
     ((d >> 4) & 0x3F) as usize
 }
+#[must_use]
 #[inline(always)]
 pub fn cp_depth(d: u32) -> u8 {
     (d & 15) as u8
 }
 
+#[must_use]
 #[inline(always)]
 pub fn cd_class(d: u32) -> usize {
     (d >> 16) as usize
 }
+#[must_use]
 #[inline(always)]
 pub fn cd_ttrep(d: u32) -> usize {
     ((d >> 8) & 0xFF) as usize
 }
+#[must_use]
 #[inline(always)]
 pub fn cd_depth(d: u32) -> u8 {
     (d & 0xFF) as u8
 }
 
 impl Cocsep {
+    /// # Panics
+    /// If the BFS does not find the expected number of coordinates or
+    /// classes (a bug in the cube model).
+    #[must_use]
     pub fn generate() -> Cocsep {
         // BFS over the cocsep coordinate, keeping a representative cube.
         let mut depth = vec![0xFFu8; N_COCSEP];
         let mut repcube = vec![Cube::solved(); N_COCSEP];
         let mut order = Vec::with_capacity(N_COCSEP);
-        let s = cocsep(Cube::solved());
-        depth[s] = 0;
-        order.push(s);
+        let solved = cocsep(Cube::solved());
+        depth[solved] = 0;
+        order.push(solved);
         let mut head = 0;
         while head < order.len() {
             let i = order[head];
             head += 1;
             for m in 0..18 {
-                let n = repcube[i].apply_move(m);
-                let j = cocsep(n);
+                let next = repcube[i].apply_move(m);
+                let j = cocsep(next);
                 if depth[j] == 0xFF {
                     depth[j] = depth[i] + 1;
-                    repcube[j] = n;
+                    repcube[j] = next;
                     order.push(j);
                 }
             }
@@ -87,34 +97,33 @@ impl Cocsep {
             if class[i] != u32::MAX {
                 continue;
             }
-            let n = reps.len() as u32;
-            let r = repcube[i];
-            let mut ss = 0u64;
-            for t in 0..48 {
-                let d = r.transform(t);
-                let j = cocsep(d);
+            let new_class = u32::try_from(reps.len()).unwrap();
+            let rep = repcube[i];
+            let mut syms = 0u64;
+            for (t, &inv_t) in inv.iter().enumerate() {
+                let j = cocsep(rep.transform(t));
                 if class[j] == u32::MAX {
-                    class[j] = n;
-                    ttrep[j] = inv[t];
+                    class[j] = new_class;
+                    ttrep[j] = inv_t;
                 }
                 if j == i {
-                    ss |= 1 << t;
+                    syms |= 1 << t;
                 }
             }
             debug_assert_eq!(ttrep[i], 0);
-            reps.push(r);
-            selfsim.push(ss);
+            reps.push(rep);
+            selfsim.push(syms);
         }
         assert_eq!(reps.len(), N_CLASSES);
         let data: Vec<u32> = (0..N_COCSEP)
-            .map(|i| (class[i] << 16) | ((ttrep[i] as u32) << 8) | depth[i] as u32)
+            .map(|i| (class[i] << 16) | (u32::from(ttrep[i]) << 8) | u32::from(depth[i]))
             .collect();
         // 2 MiB: the kernel aligns it so that it gets one huge page.
         let packed = Mem::anon(2 << 20);
         let pb = unsafe { std::slice::from_raw_parts_mut(packed.ptr(), 3 * N_COCSEP + 1) };
         for i in 0..N_COCSEP {
             assert!(depth[i] < 16);
-            let p = (class[i] << 10) | ((ttrep[i] as u32) << 4) | depth[i] as u32;
+            let p = (class[i] << 10) | (u32::from(ttrep[i]) << 4) | u32::from(depth[i]);
             pb[3 * i..3 * i + 3].copy_from_slice(&p.to_le_bytes()[..3]);
         }
         Cocsep {
@@ -167,18 +176,21 @@ impl Cocsep {
     }
 
     /// Base of the packed entries (see `packed`).
+    #[must_use]
     pub fn packed_ptr(&self) -> *const u8 {
         self.packed.ptr()
     }
 
     /// Packed entry of cocsep coordinate `i` (see `cp_*`).
+    #[must_use]
     #[inline(always)]
     pub fn packed(&self, i: usize) -> u32 {
         debug_assert!(i < N_COCSEP);
-        unsafe { (self.packed.ptr().add(3 * i) as *const u32).read_unaligned() }
+        unsafe { self.packed.ptr().add(3 * i).cast::<u32>().read_unaligned() }
     }
 
     /// Full h11 key of a cube.
+    #[must_use]
     #[inline(always)]
     pub fn key11(&self, c: Cube) -> u64 {
         let d = unsafe { *self.data.get_unchecked(cocsep(c)) };
@@ -187,6 +199,7 @@ impl Cocsep {
     }
 
     /// hk table index of a cube.
+    #[must_use]
     #[inline(always)]
     pub fn index(&self, c: Cube, k: u32) -> u64 {
         reduce_key(self.key11(c), k)
@@ -206,6 +219,10 @@ unsafe impl Sync for Mem {}
 
 impl Mem {
     /// Anonymous memory, transparent huge pages requested.
+    ///
+    /// # Panics
+    /// If `mmap` fails.
+    #[must_use]
     pub fn anon(len: usize) -> Mem {
         // (Miri supports only these flags, and no `madvise`.)
         #[cfg(not(miri))]
@@ -225,7 +242,7 @@ impl Mem {
             #[cfg(not(miri))]
             libc::madvise(p, len, libc::MADV_HUGEPAGE);
             Mem {
-                ptr: p as *mut u8,
+                ptr: p.cast::<u8>(),
                 len,
             }
         }
@@ -234,6 +251,10 @@ impl Mem {
     /// Shared mapping of a file (e.g. on hugetlbfs, which gives 1GB pages).
     /// If `create`, the file is created/truncated to `len` and mapped
     /// writable, else mapped read-only.
+    ///
+    /// # Errors
+    /// If the file cannot be opened, sized or mapped, or is shorter than
+    /// `len`.
     pub fn file(path: &str, len: usize, create: bool) -> std::io::Result<Mem> {
         use std::os::unix::io::AsRawFd;
         // (Opened tables are mapped read-only: a stray write faults instead
@@ -254,7 +275,7 @@ impl Mem {
             };
             f.set_len(rounded as u64)?;
         }
-        let flen = f.metadata()?.len() as usize;
+        let flen = usize::try_from(f.metadata()?.len()).map_err(std::io::Error::other)?;
         if flen < len {
             return Err(std::io::Error::other(format!(
                 "table file {path} too small: {flen} < {len}"
@@ -278,24 +299,30 @@ impl Mem {
             }
             libc::madvise(p, flen, libc::MADV_HUGEPAGE);
             Ok(Mem {
-                ptr: p as *mut u8,
+                ptr: p.cast::<u8>(),
                 len: flen,
             })
         }
     }
 
+    #[must_use]
     pub fn ptr(&self) -> *mut u8 {
         self.ptr
     }
+    #[must_use]
     pub fn len(&self) -> usize {
         self.len
     }
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
+    #[must_use]
+    #[expect(clippy::cast_ptr_alignment, reason = "mappings are page aligned")]
     pub fn words(&self) -> &[AtomicU64] {
-        unsafe { std::slice::from_raw_parts(self.ptr as *const AtomicU64, self.len / 8) }
+        unsafe { std::slice::from_raw_parts(self.ptr.cast::<AtomicU64>(), self.len / 8) }
     }
+    #[must_use]
     pub fn bytes(&self) -> &[u8] {
         unsafe { std::slice::from_raw_parts(self.ptr, self.len) }
     }
@@ -304,7 +331,7 @@ impl Mem {
 impl Drop for Mem {
     fn drop(&mut self) {
         unsafe {
-            libc::munmap(self.ptr as *mut libc::c_void, self.len);
+            libc::munmap(self.ptr.cast::<libc::c_void>(), self.len);
         }
     }
 }
@@ -316,38 +343,44 @@ impl Drop for Mem {
 // ---------------------------------------------------------------------------
 
 pub const ROW_BYTES: u64 = 128;
-pub const WORDS_PER_ROW: u64 = 16;
+pub const WORDS_PER_ROW: usize = 16;
 
+#[must_use]
 pub fn h48_rows(k: u32) -> u64 {
     (N_CLASSES * N_MSPLIT) as u64 * (1u64 << k)
 }
 /// Size of the index space (including unused slots).
+#[must_use]
 pub fn h48_slots(k: u32) -> u64 {
     h48_rows(k) * N_SLOTS as u64
 }
+#[must_use]
 pub fn h48_bytes(k: u32) -> u64 {
     h48_rows(k) * ROW_BYTES
 }
 
 /// Default base value per h (cube48opt: 7 for h0, 8 for h2-3, 9 for h4-7, 10 above).
+#[must_use]
 pub fn default_base(k: u32) -> u8 {
     [7, 8, 8, 8, 9, 9, 9, 9, 10, 10, 10, 10][k as usize]
 }
 
 /// u64 word index and bit shift of an entry.
+#[must_use]
 #[inline(always)]
 pub fn entry_pos(idx: u64) -> (usize, u32) {
-    ((idx >> 5) as usize, ((idx & 31) * 2) as u32)
+    ((idx >> 5) as usize, (idx & 31) as u32 * 2)
 }
 
 /// Mask of the low bits of the 2-bit slots of word `w` that are real entries.
+#[must_use]
 #[inline(always)]
 pub fn entry_lo_mask(w: u64) -> u64 {
     let mut m = 0x5555_5555_5555_5555u64;
-    if w & 1 == 0 {
+    if w.is_multiple_of(2) {
         m &= !0x5; // slots 0, 1: group minimum
     }
-    if w % WORDS_PER_ROW == WORDS_PER_ROW - 1 {
+    if w % WORDS_PER_ROW as u64 == WORDS_PER_ROW as u64 - 1 {
         m &= !(1 << 62); // slot 511 unused
     }
     m
@@ -365,16 +398,19 @@ pub struct H48Table {
 }
 
 impl H48Table {
+    #[must_use]
     #[inline(always)]
     pub fn ptr(&self) -> *const u8 {
         self.mem.ptr()
     }
 
     /// Returns (2-bit code, group minimum).
+    #[must_use]
     #[inline(always)]
+    #[expect(clippy::cast_ptr_alignment, reason = "tables are page aligned")]
     pub fn get(&self, idx: u64) -> (u8, u8) {
         unsafe {
-            let p = self.mem.ptr() as *const u64;
+            let p = self.mem.ptr().cast_const().cast::<u64>();
             let w = (idx >> 5) as usize;
             let x = *p.add(w);
             let m = *p.add(w & !1) & 15;
@@ -387,33 +423,36 @@ impl H48Table {
         unsafe {
             let a = self.mem.ptr().add((idx >> 2) as usize);
             // NTA: each line is read once; less L2 pollution (cocsep data).
-            std::arch::x86_64::_mm_prefetch(a as *const i8, std::arch::x86_64::_MM_HINT_NTA);
+            std::arch::x86_64::_mm_prefetch(a.cast::<i8>(), std::arch::x86_64::_MM_HINT_NTA);
         }
     }
 
     /// Distribution of the 2-bit codes over real entries.
+    ///
+    /// # Panics
+    /// If a counting thread panics.
+    #[must_use]
     pub fn distribution(&self) -> [u64; 4] {
-        let words_total = h48_bytes(self.meta.k) / 8;
-        let nt = std::thread::available_parallelism()
-            .map(|x| x.get())
-            .unwrap_or(1) as u64;
-        let per = words_total.div_ceil(nt);
-        let words = self.mem.words();
+        let len = usize::try_from(h48_bytes(self.meta.k) / 8).expect("64-bit usize");
+        let words = &self.mem.words()[..len];
+        let per = len.div_ceil(crate::nthreads());
         let mut tot = [0u64; 4];
         std::thread::scope(|s| {
-            let hs: Vec<_> = (0..nt)
-                .map(|t| {
+            let hs: Vec<_> = words
+                .chunks(per)
+                .enumerate()
+                .map(|(t, chunk)| {
                     s.spawn(move || {
                         let mut d = [0u64; 4];
-                        for w in t * per..((t + 1) * per).min(words_total) {
-                            let x = words[w as usize].load(Ordering::Relaxed);
+                        for (w, word) in ((t * per) as u64..).zip(chunk) {
+                            let x = word.load(Ordering::Relaxed);
                             let m = entry_lo_mask(w);
                             let lo = x & m;
                             let hi = (x >> 1) & m;
-                            d[3] += (lo & hi).count_ones() as u64;
-                            d[2] += (!lo & hi).count_ones() as u64;
-                            d[1] += (lo & !hi).count_ones() as u64;
-                            d[0] += (m & !lo & !hi).count_ones() as u64;
+                            d[3] += u64::from((lo & hi).count_ones());
+                            d[2] += u64::from((!lo & hi).count_ones());
+                            d[1] += u64::from((lo & !hi).count_ones());
+                            d[0] += u64::from((m & !lo & !hi).count_ones());
                         }
                         d
                     })
@@ -456,6 +495,12 @@ fn build_dir() -> String {
     String::from_utf8_lossy(&buf[..len]).into_owned()
 }
 
+/// The meta file of a table file (for hugetlbfs files, which cannot hold
+/// small files, in the repository's `tables` directory).
+///
+/// # Panics
+/// If a hugetlbfs `path` has no file name.
+#[must_use]
 pub fn meta_path(path: &str) -> String {
     if path.starts_with("/mnt/huge") {
         let name = std::path::Path::new(path)
@@ -468,6 +513,10 @@ pub fn meta_path(path: &str) -> String {
     }
 }
 
+/// Write a table's `k` and `base`.
+///
+/// # Errors
+/// If the meta file cannot be written.
 pub fn write_meta(path: &str, m: &H48Meta) -> std::io::Result<()> {
     std::fs::write(meta_path(path), format!("{} {}\n", m.k, m.base))
 }
@@ -490,11 +539,11 @@ pub fn read_meta(path: &str) -> std::io::Result<H48Meta> {
         .split_whitespace()
         .map(|x| x.parse().map_err(|_| invalid()))
         .collect::<Result<_, _>>()?;
-    match v[..] {
-        [k, base] if k <= 11 && base <= 12 => Ok(H48Meta {
-            k,
-            base: u8::try_from(base).unwrap(),
-        }),
+    let [k, base] = v[..] else {
+        return Err(invalid());
+    };
+    match (k, u8::try_from(base)) {
+        (0..=11, Ok(base @ 0..=12)) => Ok(H48Meta { k, base }),
         _ => Err(invalid()),
     }
 }
@@ -502,9 +551,16 @@ pub fn read_meta(path: &str) -> std::io::Result<H48Meta> {
 impl H48Table {
     /// Open a table file. Files on hugetlbfs are mapped directly (1GB pages);
     /// other files are copied into anonymous huge-page memory.
+    ///
+    /// # Errors
+    /// If the table or its meta file cannot be read, or their sizes do not
+    /// match.
+    ///
+    /// # Panics
+    /// If reading a copied table fails half-way.
     pub fn open(path: &str) -> std::io::Result<H48Table> {
         let meta = read_meta(path)?;
-        let len = h48_bytes(meta.k) as usize;
+        let len = usize::try_from(h48_bytes(meta.k)).map_err(std::io::Error::other)?;
         // A file of another `k` (a stale or wrong meta) would give wrong,
         // possibly too high, bounds: its size must match (hugetlbfs files
         // are rounded up to whole 1 GiB pages).
@@ -554,8 +610,12 @@ impl H48Table {
         }
     }
 
+    /// Write the table and its meta file.
+    ///
+    /// # Errors
+    /// If a file cannot be written.
     pub fn save(&self, path: &str) -> std::io::Result<()> {
-        let len = h48_bytes(self.meta.k) as usize;
+        let len = usize::try_from(h48_bytes(self.meta.k)).map_err(std::io::Error::other)?;
         std::fs::write(path, &self.mem.bytes()[..len])?;
         write_meta(path, &self.meta)
     }

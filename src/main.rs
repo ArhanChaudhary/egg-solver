@@ -1,9 +1,8 @@
 //! Solve scrambles from stdin, one per line.
 //! Usage: cubeopt <table path>
-#![allow(clippy::needless_range_loop, clippy::manual_is_multiple_of)]
-use cubeopt::cubie::*;
+use cubeopt::cubie::{format_moves, parse_moves, CubieCube};
 use cubeopt::solver::Solver;
-use cubeopt::tables::*;
+use cubeopt::tables::{Cocsep, H48Table};
 use std::io::BufRead;
 
 fn main() {

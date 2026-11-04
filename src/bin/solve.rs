@@ -1,6 +1,5 @@
-#![allow(clippy::needless_range_loop, clippy::manual_is_multiple_of)]
 //! Solve scrambles read from stdin (one per line, e.g. `R3 B1 F2 L2 U3`, as
-//! in cube_solver_test) optimally with the work-sharing lanes
+//! in `cube_solver_test`) optimally with the work-sharing lanes
 //! (`lanes::share`).
 //!
 //! ```text
@@ -22,11 +21,11 @@
 //! `seconds` is the cube's time from its start to its solution (with -c 1,
 //! its latency). Every solution is verified; a wrong one is reported as
 //! `BAD <index>` and makes the exit status 1.
-use cubeopt::cubie::*;
+use cubeopt::cubie::{format_moves, parse_moves, CubieCube};
 use cubeopt::solver::{Solver, Stats};
-use cubeopt::tables::*;
+use cubeopt::tables::{Cocsep, H48Table};
 use std::io::{BufRead, Write};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
 
@@ -37,6 +36,7 @@ fn usage() -> ! {
     std::process::exit(2);
 }
 
+#[expect(clippy::cast_precision_loss, reason = "statistics")]
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
@@ -68,13 +68,11 @@ fn main() {
         if cubes.len() >= count {
             break;
         }
-        match parse_moves(&line) {
-            Some(ms) => cubes.push(CubieCube::SOLVED.apply_moves(&ms)),
-            None => {
-                eprintln!("line {}: cannot parse {line:?}", n + 1);
-                std::process::exit(2);
-            }
-        }
+        let Some(ms) = parse_moves(&line) else {
+            eprintln!("line {}: cannot parse {line:?}", n + 1);
+            std::process::exit(2);
+        };
+        cubes.push(CubieCube::SOLVED.apply_moves(&ms));
     }
     let cs = Cocsep::generate();
     let table = H48Table::open(&args[1]).expect("open table");
@@ -84,7 +82,7 @@ fn main() {
     let out = Mutex::new(std::io::stdout());
     let nodes = AtomicU64::new(0);
     let bad = AtomicBool::new(false);
-    let ndone = AtomicU64::new(0);
+    let ndone = AtomicUsize::new(0);
     let done = |i: usize, sol: Vec<u8>, st: Stats, dt: f64| {
         let ok = cubes[i].apply_moves(&sol) == CubieCube::SOLVED;
         nodes.fetch_add(st.nodes, Ordering::Relaxed);
@@ -107,11 +105,7 @@ fn main() {
     cubeopt::lanes::share::solve_all(&solver, &get, threads, lanes, max_active, &done);
     let wall = t0.elapsed().as_secs_f64();
     let n = cubes.len();
-    assert_eq!(
-        ndone.load(Ordering::Relaxed) as usize,
-        n,
-        "cubes not reported"
-    );
+    assert_eq!(ndone.load(Ordering::Relaxed), n, "cubes not reported");
     println!(
         "total {n} cubes wall {wall:.6} wall/cube {:.6} nodes/cube {:.0} threads {threads} lanes {lanes} concurrency {conc}",
         wall / n.max(1) as f64,

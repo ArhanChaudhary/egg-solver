@@ -1,6 +1,5 @@
 //! Generates move and symmetry constants (in the SIMD byte layout) from the
 //! geometric cube model in `src/cubie.rs`.
-#![allow(clippy::needless_range_loop, clippy::manual_is_multiple_of)]
 
 #[allow(dead_code)]
 #[path = "src/cubie.rs"]
@@ -10,11 +9,11 @@ use std::fmt::Write as _;
 
 fn simd_bytes(c: &cubie::CubieCube) -> [u8; 32] {
     let mut b = [0u8; 32];
-    for i in 0..8 {
-        b[i] = c.cp[i] | (c.co[i] << 5);
+    for (i, byte) in b[..8].iter_mut().enumerate() {
+        *byte = c.cp[i] | (c.co[i] << 5);
     }
-    for i in 0..12 {
-        b[16 + i] = c.ep[i] | (c.eo[i] << 4);
+    for (i, byte) in b[16..28].iter_mut().enumerate() {
+        *byte = c.ep[i] | (c.eo[i] << 4);
     }
     b
 }
@@ -30,13 +29,13 @@ fn main() {
     let mut s = String::new();
     let moves = cubie::move_cubes();
     writeln!(s, "pub const MOVES: [A32; 18] = [").unwrap();
-    for m in moves.iter() {
+    for m in moves {
         writeln!(s, "  {},", arr(&simd_bytes(m))).unwrap();
     }
     writeln!(s, "];").unwrap();
     // Orientation part of each move (the `o & ORIENT` term of `compose`).
     writeln!(s, "pub const MOVES_ORI: [A32; 18] = [").unwrap();
-    for m in moves.iter() {
+    for m in moves {
         let mut b = simd_bytes(m);
         for (i, x) in b.iter_mut().enumerate() {
             *x &= if i < 8 { 0x60 } else { 0x10 };
@@ -53,12 +52,12 @@ fn main() {
     writeln!(s, "];").unwrap();
     let syms = cubie::symmetries();
     writeln!(s, "pub static SYM_T: [A32; 48] = [").unwrap();
-    for y in syms.iter() {
+    for y in syms {
         writeln!(s, "  {},", arr(&simd_bytes(&y.t))).unwrap();
     }
     writeln!(s, "];").unwrap();
     writeln!(s, "pub static SYM_TINV: [A32; 48] = [").unwrap();
-    for y in syms.iter() {
+    for y in syms {
         writeln!(s, "  {},", arr(&simd_bytes(&y.tinv))).unwrap();
     }
     writeln!(s, "];").unwrap();
@@ -67,7 +66,7 @@ fn main() {
     // bit 7 = E-slice, bit 6 = S-slice, bit 4 = eo of T at j), bytes 32..64
     // are the position permutation Tinv (edge lane; 0x80 = zero elsewhere).
     writeln!(s, "pub const SYM_EDGE: [A64; 48] = [").unwrap();
-    for y in syms.iter() {
+    for y in syms {
         let t = simd_bytes(&y.t);
         let ti = simd_bytes(&y.tinv);
         let mut b = [0u8; 64];
@@ -95,7 +94,7 @@ fn main() {
         .collect();
     writeln!(s, "pub static SYM_INV: [u8; 48] = [{}];", inv.join(",")).unwrap();
     writeln!(s, "pub static SYM_MOVE_MAP: [[u8; 18]; 48] = [").unwrap();
-    for y in syms.iter() {
+    for y in syms {
         let v: Vec<String> = y.move_map.iter().map(|x| format!("{x}")).collect();
         writeln!(s, "  [{}],", v.join(",")).unwrap();
     }
