@@ -57,6 +57,7 @@ use crate::cubie::CubieCube;
 use crate::simd::Cube;
 use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES};
 use crate::symstart::SymFilter;
+use crossbeam_utils::CachePadded;
 use std::cell::UnsafeCell;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, AtomicUsize};
@@ -382,19 +383,15 @@ impl<T> Drop for SpinWrite<'_, T> {
     }
 }
 
-/// A value on cache lines of its own (atomics written by many threads).
+/// A value on cache lines of its own (atomics written by many threads):
+/// crossbeam's `CachePadded`, 128 bytes on x86-64 (the prefetcher pulls
+/// 64-byte lines in pairs) and aarch64.
 // Padding of the shared atomics, rarely written fields and free lists
 // (l6-share-2; screening run without it: bench share 787 vs 845/s at 48T).
-#[repr(align(128))]
-struct Pad<T>(T);
-
-impl<T> std::ops::Deref for Pad<T> {
-    type Target = T;
-    #[inline(always)]
-    fn deref(&self) -> &T {
-        &self.0
-    }
-}
+// CachePadded instead of our own `repr(align(128))` newtype: the same
+// layout and code on x86-64, neutral (-c 1 and bench share at 48T, 1T
+// share: within noise, d1).
+type Pad<T> = CachePadded<T>;
 
 /// A cube being solved by any number of lanes.
 struct CubeCtx {
@@ -766,14 +763,14 @@ impl<'a> Pool<'a> {
             cubes,
             max_active: max_active.max(1),
             nthreads: u32::try_from(nthreads.max(1)).unwrap_or(u32::MAX),
-            next: Pad(AtomicUsize::new(0)),
+            next: Pad::new(AtomicUsize::new(0)),
             no_fresh: AtomicBool::new(false),
-            active: Pad(AtomicUsize::new(0)),
-            open: Pad(SpinRw::new(Vec::new())),
-            open_count: Pad(AtomicUsize::new(0)),
+            active: Pad::new(AtomicUsize::new(0)),
+            open: Pad::new(SpinRw::new(Vec::new())),
+            open_count: Pad::new(AtomicUsize::new(0)),
             mail: (0..nthreads.max(1))
                 .map(|_| {
-                    Pad(Mailbox {
+                    Pad::new(Mailbox {
                         state: AtomicU8::new(IDLE),
                         piece: UnsafeCell::new(Piece {
                             ctx: None,
@@ -786,11 +783,11 @@ impl<'a> Pool<'a> {
                 })
                 .collect(),
             next_thread_id: AtomicUsize::new(0),
-            hungry: Pad(AtomicUsize::new(0)),
-            epoch: Pad(AtomicU64::new(0)),
-            solved: Pad(AtomicU64::new(0)),
-            spare: Pad(Mutex::new(Vec::new())),
-            bufs: Pad(Mutex::new(Vec::new())),
+            hungry: Pad::new(AtomicUsize::new(0)),
+            epoch: Pad::new(AtomicU64::new(0)),
+            solved: Pad::new(AtomicU64::new(0)),
+            spare: Pad::new(Mutex::new(Vec::new())),
+            bufs: Pad::new(Mutex::new(Vec::new())),
             counters: Mutex::new([0; NCOUNT]),
             trace: std::env::var_os("CUBE_TRACE").is_some(),
             trace_out: Mutex::new(String::new()),
@@ -2426,7 +2423,7 @@ impl Worker<'_, '_> {
     }
 
     fn mailbox(&self) -> Option<&Mailbox> {
-        self.pool.mail.get(self.id).map(|m| &m.0)
+        self.pool.mail.get(self.id).map(|m| &**m)
     }
 
     /// Ask for a piece.
@@ -3114,15 +3111,15 @@ impl Worker<'_, '_> {
                 root,
                 root_inverse,
                 sym_filter: solver.sym_filter(root, root_inverse),
-                claim: Pad(AtomicU64::new(0)),
-                task: Pad(AtomicU64::new(0)),
-                task_left: Pad(AtomicU32::new(0)),
-                outstanding: Pad(AtomicU64::new(0)),
+                claim: Pad::new(AtomicU64::new(0)),
+                task: Pad::new(AtomicU64::new(0)),
+                task_left: Pad::new(AtomicU32::new(0)),
+                outstanding: Pad::new(AtomicU64::new(0)),
                 done: AtomicBool::new(false),
-                phase_left: Pad(std::array::from_fn(|_| AtomicU64::new(0))),
+                phase_left: Pad::new(std::array::from_fn(|_| AtomicU64::new(0))),
                 trace: pool.trace,
-                parts: Pad(AtomicU32::new(1)),
-                rarely_written: Pad(RarelyWritten {
+                parts: Pad::new(AtomicU32::new(1)),
+                rarely_written: Pad::new(RarelyWritten {
                     pass_limit: AtomicU8::new(u8::MAX),
                     ..RarelyWritten::default()
                 }),
@@ -3379,7 +3376,7 @@ impl Worker<'_, '_> {
         // a thread waiting for a piece
         let pool = self.pool;
         let mailboxes = pool.mail.len();
-        let next = |k: usize| &pool.mail[(self.id + k) % mailboxes].0;
+        let next = |k: usize| &*pool.mail[(self.id + k) % mailboxes];
         let Some(mailbox) = (1..mailboxes).map(next).find(|mailbox| {
             mailbox.state.load(Relaxed) == WANT
                 && mailbox
