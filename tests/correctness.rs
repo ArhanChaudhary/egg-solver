@@ -338,6 +338,7 @@ fn share_few_cubes() {
 /// mailboxes, the open list, builds and cube hand-over): every solution
 /// optimal, every cube reported once.
 #[test]
+#[expect(clippy::cast_possible_truncation, reason = "moves < 18")]
 fn share_stress() {
     let mut rng = Rng(4244);
     let cs = cs_data();
