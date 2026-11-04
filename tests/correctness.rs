@@ -402,6 +402,41 @@ fn share_short_scrambles_are_optimal() {
     }
 }
 
+/// Scrambles of 1 to 14 moves in share mode, whose first pass (h0: one
+/// pass for the iterations from 10 up to 14, without barriers) reports a
+/// solution once the iterations below its length ended: as short as the
+/// recursive solver's, in batch and one cube at a time, with splits and
+/// donations.
+#[test]
+fn share_first_pass_finds_the_shortest_solutions() {
+    let mut rng = Rng(4245);
+    let mut cubes = Vec::new();
+    for len in 1..=14 {
+        for _ in 0..3 {
+            let ms: Vec<u8> = (0..len).map(|_| rng.below_u8(18)).collect();
+            cubes.push(CubieCube::SOLVED.apply_moves(&ms));
+        }
+    }
+    let want: Vec<usize> = par_solve(&cubes, h0()).iter().map(Vec::len).collect();
+    for (threads, nlanes, max_active) in [(4, 5, usize::MAX), (8, 3, 1), (3, 1, 2)] {
+        let (solutions, counters) = share_solve(&cubes, h0(), threads, nlanes, max_active);
+        for ((c, s), &n) in cubes.iter().zip(&solutions).zip(&want) {
+            assert_eq!(c.apply_moves(s), CubieCube::SOLVED);
+            assert_eq!(
+                s.len(),
+                n,
+                "{threads} threads {nlanes} lanes {max_active}: {counters}"
+            );
+        }
+        let count = |name: &str| -> u64 {
+            let fields: Vec<&str> = counters.split_whitespace().collect();
+            let i = fields.iter().position(|&x| x == name).unwrap();
+            fields[i + 1].parse().unwrap()
+        };
+        assert!(count("pass_solutions") > 0, "{counters}");
+    }
+}
+
 /// All conjugates of a cube and of its inverse (by the 48 symmetries) have
 /// the same optimal length: recursive, stream (odd lane counts) and share.
 #[test]

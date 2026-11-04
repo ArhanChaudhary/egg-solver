@@ -10,6 +10,11 @@
 //!   Threads claim jobs in chunks (one atomic per chunk, smaller chunks as
 //!   the iteration runs out) and start them in their lanes at job
 //!   boundaries.
+//! * A cube's first iterations, up to the first one with 3-move jobs (16
+//!   with h11), run as one pass on those jobs: each job once per iteration,
+//!   claimed in the order of the iterations but without barriers between
+//!   them. A solution is reported once the iterations below its length have
+//!   all ended.
 //! * Iteration T+1 is built (jobs extended, sorted by the statistics of
 //!   iteration T) by the thread that finishes the last job of iteration T. A
 //!   solution found in iteration T is therefore optimal and is reported at
@@ -87,6 +92,14 @@ struct Inner {
     /// over the job's pieces.
     stats: Vec<AtomicU32>,
     target: u8,
+    /// Iterations that the current one stands for: 1, or in a cube's first
+    /// pass (`build`) one phase per iteration up to `target`. Claim `entry`
+    /// is job `entry % phase_entries` in phase `entry / phase_entries`
+    /// (`entry_job`), whose target is `phase_target`.
+    phases: u32,
+    phase_entries: u32,
+    /// The jobs are new (the cube's first build): sorted by their bounds.
+    sort_by_bounds: bool,
     /// Buffers of the build in progress (from `Pool::bufs`).
     b: Bufs,
     /// (trace) When the current iteration's build started, its jobs were
@@ -299,6 +312,10 @@ struct CubeCtx {
     /// Solved (no more iterations; running jobs are dropped). (Written
     /// once: with the read-mostly fields.)
     done: AtomicBool,
+    /// In a first pass (`Inner::phases`): per phase, the entries (and
+    /// donated pieces) not yet ended, counted down by each thread when its
+    /// own have all ended (`Worker::phase_ended`).
+    phase_left: Pad<[AtomicU64; MAX_PHASES]>,
     trace: bool,
     /// Jobs of the current iteration: `count << 32 | next unclaimed`. One
     /// `fetch_add` claims a chunk; the count in the same word tells a late
@@ -322,6 +339,8 @@ struct CubeCtx {
     rarely_written: Pad<RarelyWritten>,
     /// (solution, seconds).
     result: Mutex<(Vec<u8>, f64)>,
+    /// A first pass's shortest solution so far.
+    pass: Mutex<PassState>,
     inner: UnsafeCell<Inner>,
     /// (trace) Per build task (stage - 1) * 256 + task: thread + 1, start and
     /// end (ms, f32 bits).
@@ -345,6 +364,20 @@ struct RarelyWritten {
     iteration_jobs: AtomicU64,
     iteration_donations: AtomicU64,
     iteration_splits: AtomicU64,
+    /// The length of a first pass's shortest solution so far (`u8::MAX`
+    /// if none): entries whose target is as long are dropped.
+    pass_limit: AtomicU8,
+}
+
+/// The solutions of a cube's first pass (`Inner::phases`): the shortest
+/// found so far (empty if none) until it is reported, its phase, and the
+/// number of leading phases whose entries have all ended. A solution is
+/// optimal once the phases below its own ended.
+#[derive(Default)]
+struct PassState {
+    candidate: Vec<u8>,
+    candidate_phase: u32,
+    phases_ended: u32,
 }
 
 // `inner` is only written by the builder while nobody else accesses it.
@@ -358,6 +391,9 @@ impl Inner {
             feasible: 0,
             stats: Vec::new(),
             target,
+            phases: 1,
+            phase_entries: 0,
+            sort_by_bounds: false,
             b: Bufs::default(),
             build_started: now,
             extended: now,
@@ -442,6 +478,8 @@ fn add_f32(stat: &AtomicU32, v: f32) {
 struct Piece {
     ctx: Option<Arc<CubeCtx>>,
     job: u32,
+    /// The phase of the donor's entry (`Inner::phases`).
+    phase: u8,
     depth: usize,
     nodes: [Node; MAXD],
 }
@@ -489,7 +527,8 @@ pub struct Pool<'a> {
     hungry: Pad<AtomicUsize>,
     /// Bumped whenever new work may be available.
     epoch: Pad<AtomicU64>,
-    /// Bumped whenever a cube is solved (lanes may have jobs to drop).
+    /// Bumped whenever a cube is solved or a first pass finds a shorter
+    /// solution (lanes may have jobs to drop).
     solved: Pad<AtomicU64>,
     /// Buffers of reported cubes, for new ones, and of builds.
     spare: Pad<Mutex<Vec<Inner>>>,
@@ -507,6 +546,8 @@ pub struct Pool<'a> {
     /// (trace) ns spent in `idle_wait`, summed over threads.
     idle_ns: AtomicU64,
     started: Instant,
+    /// Iterations a cube's first pass stands for, at most (`build`).
+    first_pass_span: u8,
     /// (Tests) Pause after publishing a fresh cube, so that other threads
     /// can solve and report it before its creator goes on.
     #[cfg(test)]
@@ -521,7 +562,7 @@ const TRACE_TASKS: u32 = 4;
 const TRACE_IDLE: u32 = 8;
 
 /// Event counters (summed over threads; see `Pool::counters`).
-const NCOUNT: usize = 13;
+const NCOUNT: usize = 14;
 const COUNT_NAMES: [&str; NCOUNT] = [
     "rounds",
     "lane_visits",
@@ -536,6 +577,7 @@ const COUNT_NAMES: [&str; NCOUNT] = [
     "refills",
     "refill_fails",
     "open_scans",
+    "pass_solutions",
 ];
 const C_ROUNDS: usize = 0;
 const C_VISITS: usize = 1;
@@ -550,6 +592,7 @@ const C_IDLE: usize = 9;
 const C_REFILL: usize = 10;
 const C_REFILL_FAIL: usize = 11;
 const C_SCANS: usize = 12;
+const C_PASS_SOLUTIONS: usize = 13;
 
 impl<'a> Pool<'a> {
     /// Solve `cubes(i)` for i = 0, 1, ... until it returns None, with at most
@@ -576,6 +619,7 @@ impl<'a> Pool<'a> {
                         piece: UnsafeCell::new(Piece {
                             ctx: None,
                             job: 0,
+                            phase: 0,
                             depth: 0,
                             nodes: [Lane::new().stack[0]; MAXD],
                         }),
@@ -597,6 +641,7 @@ impl<'a> Pool<'a> {
                 .unwrap_or(0),
             idle_ns: AtomicU64::new(0),
             started: Instant::now(),
+            first_pass_span: FIRST_PASS_SPAN,
             #[cfg(test)]
             pause_after_publish: false,
         }
@@ -809,6 +854,10 @@ struct Local {
     /// Jobs and pieces to count down from `outstanding` once none is
     /// pending.
     claimed: u64,
+    /// The same per phase of a first pass (`Inner::phases`), counted down
+    /// from `CubeCtx::phase_left`.
+    phase_pending: [u32; MAX_PHASES],
+    phase_claimed: [u64; MAX_PHASES],
     nodes: u64,
     lookups: u64,
     /// (trace) Of the current iteration.
@@ -827,6 +876,9 @@ struct SharedLane {
     /// The job's tree is shared with other lanes (split, donated or a
     /// piece): its statistic is added atomically.
     split: bool,
+    /// The phase of the job's entry (`Inner::phases`; 0 in other
+    /// iterations).
+    phase: u8,
     /// Lane counters at the start of the job.
     nodes_at_start: u64,
     lookups_at_start: u64,
@@ -850,6 +902,7 @@ impl SharedLane {
             slot: NO_SLOT,
             job: 0,
             split: false,
+            phase: 0,
             nodes_at_start: 0,
             lookups_at_start: 0,
             started: Instant::now(),
@@ -910,6 +963,25 @@ fn build(
     if !first {
         inner.target += 1;
     }
+    // The iterations up to the first one with jobs of `FIRST_PASS_JOB_LEN`
+    // moves (from a target at most `first_pass_span` below) run as one pass
+    // on its jobs, without barriers (`Inner::phases`): the ones below it
+    // are cheap and nearly never the last (17 of 1000 random states end in
+    // them), but their barriers, tails and builds each took ~0.03-0.12 ms of
+    // -c 1 at 48 threads. As one pass: -7.4% -c 1, -7.1% -c 0, +2.0% bench
+    // share at 48T (8 paired holds); 15/16/17-move scrambles -18/-43/-22%.
+    // (A job prefix cannot solve the cube: the target is a lower bound above
+    // the prefix length.)
+    let pass_target = solver.base + 3 + FIRST_PASS_JOB_LEN;
+    inner.phases = 1;
+    if inner.target < pass_target
+        && inner.target + pool.first_pass_span >= pass_target
+        && usize::from(inner.target) > solver.job_len(pass_target)
+    {
+        inner.phases = u32::from(pass_target - inner.target) + 1;
+        inner.target = pass_target;
+    }
+    inner.sort_by_bounds = first;
     let target = inner.target;
     // (As in `start_iteration`: the stack depth stays below the target.)
     assert!((target as usize) < MAXD);
@@ -973,10 +1045,16 @@ fn build(
     }
     inner.extended = Instant::now();
     if job_len > 0 && inner.jobs.len() >= SORT_MIN && parallel {
+        if inner.sort_by_bounds {
+            stats_from_bounds(&mut inner.jobs);
+        }
         inner.b = pool.take_bufs();
         inner.b.stats_from_atomics = from_atomics;
         start_sort(pool, inner, ctx);
         return true;
+    }
+    if inner.sort_by_bounds {
+        stats_from_bounds(&mut inner.jobs);
     }
     // (Serial builds use this thread's buffers: those of the pool were last
     // written by other threads.)
@@ -1067,6 +1145,30 @@ fn copy_stats(inner: &mut Inner) {
             prefetch(&inner.stats[(i + 512).min(n - 1)], false);
         }
         inner.jobs[i].stat = f32::from_bits(inner.stats[i].load(Relaxed));
+    }
+}
+
+/// Job length of a cube's first pass (`build`), and the most iterations
+/// below its target it stands for: from the targets 12 and 13 of random
+/// states (h11), the pass is for the iterations up to 16.
+const FIRST_PASS_JOB_LEN: u8 = 3;
+const FIRST_PASS_SPAN: u8 = 4;
+/// Most phases of a first pass (`first_pass_span` + 1 at most).
+const MAX_PHASES: usize = 8;
+const _: () = assert!((FIRST_PASS_SPAN as usize) < MAX_PHASES);
+
+/// Statistics of new jobs (no iteration ran them yet) for the sort, from
+/// their bounds: the largest bound lowest first (the largest trees), then
+/// the smallest. Only the order of the tails matters: the first pass is
+/// rarely the last iteration.
+fn stats_from_bounds(jobs: &mut [Job]) {
+    for job in jobs {
+        // (Bounds are below 16.)
+        let (largest, smallest) = (
+            job.normal_bound.max(job.inverse_bound).min(15),
+            job.normal_bound.min(job.inverse_bound),
+        );
+        job.stat = f32::from(256 - (u16::from(largest) << 4 | u16::from(smallest)));
     }
 }
 
@@ -1429,6 +1531,9 @@ fn build_task(
                 unsafe { bufs.out.set_len(children) };
                 std::mem::swap(&mut inner.jobs, &mut bufs.out);
                 inner.extended = Instant::now();
+                if inner.sort_by_bounds {
+                    stats_from_bounds(&mut inner.jobs);
+                }
                 if inner.jobs.len() >= SORT_MIN {
                     start_sort(pool, inner, ctx);
                 } else {
@@ -1458,7 +1563,17 @@ fn finish_build(pool: &Pool, ctx: &Arc<CubeCtx>) {
     // At least one job is claimed (an infeasible one is skipped): the
     // iteration ends when the claimed jobs end. (Only the feasible jobs are
     // claimed: part of l6-share-a, not measured alone.)
-    let claimed = inner.feasible.max(1) as u64;
+    let mut claimed = inner.feasible.max(1) as u64;
+    if inner.phases > 1 {
+        // (Each job once per phase.)
+        inner.phase_entries = u32::try_from(claimed).unwrap_or(u32::MAX);
+        for left in &ctx.phase_left[..inner.phases as usize] {
+            left.store(claimed, Relaxed);
+        }
+        *ctx.pass.lock().unwrap() = PassState::default();
+        ctx.rarely_written.pass_limit.store(u8::MAX, Relaxed);
+        claimed *= u64::from(inner.phases);
+    }
     ctx.outstanding.store(claimed, Relaxed);
     ctx.rarely_written.claims_ran_out_ns.store(0, Relaxed);
     inner.published = Instant::now();
@@ -1483,10 +1598,11 @@ fn trace_build(pool: &Pool, ctx: &CubeCtx, inner: &Inner, sorted: Instant) {
     tlog(
         pool,
         format_args!(
-            "trace cube {} T {} jobs {} feasible {} build {:.3} .. {:.3} ms \
+            "trace cube {} T {} phases {} jobs {} feasible {} build {:.3} .. {:.3} ms \
          (extended {:.3} sorted {:.3}){stages}",
             ctx.index,
             inner.target,
+            inner.phases,
             inner.jobs.len(),
             inner.feasible,
             ms(inner.build_started),
@@ -1559,6 +1675,26 @@ fn trace_found(pool: &Pool, ctx: &CubeCtx, sl: &SharedLane, active_lanes: usize,
             sl.lane.depth
         ),
     );
+}
+
+/// The job of claim `entry` of an iteration, its target and its phase (in a
+/// first pass, `Inner::phases`; else 0).
+#[inline(always)]
+#[expect(clippy::cast_possible_truncation, reason = "phases <= MAX_PHASES")]
+fn entry_job(inner: &Inner, entry: u32) -> (u32, u8, u8) {
+    if inner.phases == 1 {
+        return (entry, inner.target, 0);
+    }
+    let phase = entry / inner.phase_entries;
+    let job = entry - phase * inner.phase_entries;
+    (job, phase_target(inner, phase as u8), phase as u8)
+}
+
+/// The target of phase `phase` of the current iteration (`Inner::phases`).
+#[inline(always)]
+#[expect(clippy::cast_possible_truncation, reason = "phases <= MAX_PHASES")]
+fn phase_target(inner: &Inner, phase: u8) -> u8 {
+    inner.target - (inner.phases as u8 - 1) + phase
 }
 
 #[inline(always)]
@@ -1709,7 +1845,7 @@ impl Worker<'_, '_> {
     #[inline(never)]
     fn on_end(&mut self, i: usize, found: bool) -> bool {
         if found {
-            self.report(i);
+            self.found(i);
         }
         let slot = self.end_job(i, !found);
         if self.restart(i, Some(slot)) {
@@ -1730,13 +1866,81 @@ impl Worker<'_, '_> {
             }
             let found = match self.lanes[i].lane.advance_cold(self.solver) {
                 Step::Pending => return true,
-                st => matches!(st, Step::Found),
+                step => matches!(step, Step::Found),
             };
             if found {
-                self.report(i);
+                self.found(i);
             }
             prefer = Some(self.end_job(i, !found));
         }
+    }
+
+    /// Lane `i` found a solution (its job ends). In a first pass, it is
+    /// reported if the phases below its own have all ended (it is optimal),
+    /// else kept if it is the pass's shortest so far: the entries as long
+    /// are then dropped (`take`, `cancel_done`).
+    fn found(&mut self, i: usize) {
+        let sl = &self.lanes[i];
+        let ctx = &self.locals[sl.slot].as_ref().unwrap().ctx;
+        if ctx.inner().phases == 1 {
+            self.report(i);
+            return;
+        }
+        let ctx = ctx.clone();
+        let solution = sl.lane.reconstruct();
+        let phase = u32::from(sl.phase);
+        let mut pass = ctx.pass.lock().unwrap();
+        if phase <= pass.phases_ended {
+            drop(pass);
+            self.report_pass(&ctx, solution);
+            return;
+        }
+        if pass.candidate.is_empty() || phase < pass.candidate_phase {
+            ctx.rarely_written.pass_limit.store(sl.lane.target, Relaxed);
+            pass.candidate = solution;
+            pass.candidate_phase = phase;
+            drop(pass);
+            self.pool.solved.fetch_add(1, Release);
+        }
+    }
+
+    /// The entries of a phase of `ctx`'s first pass have all ended: report
+    /// its shortest solution if the phases below it have all ended now.
+    fn phase_done(&mut self, ctx: &CubeCtx) {
+        let phases = ctx.inner().phases;
+        let mut pass = ctx.pass.lock().unwrap();
+        while pass.phases_ended < phases
+            && ctx.phase_left[pass.phases_ended as usize].load(Acquire) == 0
+        {
+            pass.phases_ended += 1;
+        }
+        if !pass.candidate.is_empty() && pass.candidate_phase <= pass.phases_ended {
+            let solution = std::mem::take(&mut pass.candidate);
+            drop(pass);
+            self.report_pass(ctx, solution);
+        }
+    }
+
+    /// Report `solution` of `ctx`'s first pass (optimal: no shorter one is
+    /// left), unless the cube is solved already.
+    fn report_pass(&mut self, ctx: &CubeCtx, solution: Vec<u8>) {
+        if ctx.done.swap(true, AcqRel) {
+            return;
+        }
+        let seconds = ctx.started.elapsed().as_secs_f64();
+        if self.pool.trace {
+            tlog(
+                self.pool,
+                format_args!(
+                    "trace cube {} found {:.3} ms (first pass) length {}",
+                    ctx.index,
+                    seconds * 1e3,
+                    solution.len()
+                ),
+            );
+        }
+        self.counts[C_PASS_SOLUTIONS] += 1;
+        self.publish_solution(ctx, solution, seconds);
     }
 
     /// Record lane `i`'s solution if it is the first for its cube.
@@ -1751,12 +1955,34 @@ impl Worker<'_, '_> {
         if self.pool.trace {
             trace_found(self.pool, ctx, sl, self.active_lanes, seconds);
         }
+        self.publish_solution(ctx, solution, seconds);
+    }
+
+    /// `ctx` is solved (`done` was set by this thread): publish the result.
+    fn publish_solution(&self, ctx: &CubeCtx, solution: Vec<u8>, seconds: f64) {
         *ctx.result.lock().unwrap() = (solution, seconds);
         self.pool.active.fetch_sub(1, AcqRel);
         self.pool.epoch.fetch_add(1, Release);
         self.pool.solved.fetch_add(1, Release);
         // The "unsolved" part (this thread still holds one).
         ctx.parts.fetch_sub(1, AcqRel);
+    }
+
+    /// The end of a first pass (no job outstanding): report its shortest
+    /// solution, if it has one left (it is optimal: all phases ended).
+    /// Returns whether the cube is solved.
+    fn pass_solution(&mut self, ctx: &CubeCtx) -> bool {
+        // SAFETY: no job of the cube is outstanding (only the builder runs).
+        let inner = unsafe { &*ctx.inner.get() };
+        if inner.phases == 1 {
+            return false;
+        }
+        let solution = std::mem::take(&mut ctx.pass.lock().unwrap().candidate);
+        if solution.is_empty() {
+            return false;
+        }
+        self.report_pass(ctx, solution);
+        true
     }
 
     /// Account for the end of lane `i`'s job; returns its slot.
@@ -1772,8 +1998,12 @@ impl Worker<'_, '_> {
         // The job's statistic is the sum of its per-child statistics, as stream
         // mode records them for c7's child ordering (part of c7-childsplit: -6..-8%
         // nodes in stream mode; share mode keeps whole-job order, not measured here).
-        if stat {
-            let job_stat = &loc.ctx.inner().stats[sl.job as usize];
+        let inner = loc.ctx.inner();
+        let phases = inner.phases;
+        // (In a first pass, only the last phase's entries give statistics:
+        // its target is the next iteration's.)
+        if stat && u32::from(sl.phase) + 1 == phases {
+            let job_stat = &inner.stats[sl.job as usize];
             if sl.split {
                 add_f32(job_stat, sl.lane.job_stat);
             } else {
@@ -1782,6 +2012,11 @@ impl Worker<'_, '_> {
             }
         }
         loc.pending -= 1;
+        if phases > 1 {
+            let phase = usize::from(sl.phase);
+            loc.phase_pending[phase] -= 1;
+            self.phase_ended(slot, phase);
+        }
         slot
     }
 
@@ -1891,35 +2126,69 @@ impl Worker<'_, '_> {
             loc.pending -= loc.end - loc.next;
             loc.next = loc.end;
         }
-        while loc.next < loc.end {
-            let job = loc.next;
+        loop {
+            let loc = self.locals[slot].as_mut().unwrap();
+            if loc.next >= loc.end {
+                return false;
+            }
+            let entry = loc.next;
             loc.next += 1;
             let ctx = &*loc.ctx;
             let inner = ctx.inner();
+            let (job, target, phase) = entry_job(inner, entry);
+            let phases = inner.phases;
+            let job_entry = inner.jobs[job as usize];
+            // (A first pass's entries that are infeasible in their phase are
+            // skipped before the job's cubes are made, and those as long as
+            // a solution found are of no use.)
+            let skip = phases > 1
+                && (job_entry.normal_bound.max(job_entry.inverse_bound) + job_entry.len > target
+                    || target >= ctx.rarely_written.pass_limit.load(Relaxed));
             let sl = &mut self.lanes[li];
             let lane = &mut sl.lane;
-            lane.root = ctx.root;
-            lane.root_inverse = ctx.root_inverse;
-            lane.target = inner.target;
-            lane.jobs[0] = inner.jobs[job as usize];
-            lane.job_pos = 0;
-            if lane.setup_job() {
-                // (The jobs and statistics were fetched when claimed.)
-                self.counts[C_JOBS] += 1;
-                sl.slot = slot;
-                sl.job = job;
-                sl.split = false;
-                sl.nodes_at_start = lane.stats.nodes;
-                sl.lookups_at_start = lane.stats.lookups;
-                if self.pool.trace {
-                    sl.started = Instant::now();
+            if !skip {
+                lane.root = ctx.root;
+                lane.root_inverse = ctx.root_inverse;
+                lane.target = target;
+                lane.jobs[0] = job_entry;
+                lane.job_pos = 0;
+                if lane.setup_job() {
+                    // (The jobs and statistics were fetched when claimed.)
+                    self.counts[C_JOBS] += 1;
+                    sl.slot = slot;
+                    sl.job = job;
+                    sl.split = false;
+                    sl.phase = phase;
+                    sl.nodes_at_start = lane.stats.nodes;
+                    sl.lookups_at_start = lane.stats.lookups;
+                    if self.pool.trace {
+                        sl.started = Instant::now();
+                    }
+                    return true;
                 }
-                return true;
             }
             // infeasible (statistic 0, as in stream mode)
             loc.pending -= 1;
+            if phases > 1 {
+                loc.phase_pending[usize::from(phase)] -= 1;
+                self.phase_ended(slot, usize::from(phase));
+            }
         }
-        false
+    }
+
+    /// An entry (or piece) of phase `phase` of `slot`'s first pass ended: if
+    /// none of this thread's is left, count them down from the cube's, and
+    /// if they were the last, the phase ended (`phase_done`).
+    fn phase_ended(&mut self, slot: usize, phase: usize) {
+        let loc = self.locals[slot].as_mut().unwrap();
+        if loc.phase_pending[phase] != 0 || loc.phase_claimed[phase] == 0 {
+            return;
+        }
+        let ended = std::mem::take(&mut loc.phase_claimed[phase]);
+        if loc.ctx.phase_left[phase].fetch_sub(ended, AcqRel) == ended {
+            let ctx = loc.ctx.clone();
+            self.phase_done(&ctx);
+        }
     }
 
     /// Claim more jobs of the cube in `slot` (none must be unstarted).
@@ -1935,13 +2204,28 @@ impl Worker<'_, '_> {
         loc.end = first + count;
         loc.pending += count;
         loc.claimed += u64::from(count);
+        let inner = loc.ctx.inner();
+        let mut jobs = (first, loc.end);
+        if inner.phases > 1 {
+            // (A first pass's entries: per phase, all the jobs again.)
+            let per_phase = inner.phase_entries;
+            let mut entry = first;
+            while entry < loc.end {
+                let phase = entry / per_phase;
+                let phase_end = ((phase + 1) * per_phase).min(loc.end);
+                loc.phase_pending[phase as usize] += phase_end - entry;
+                loc.phase_claimed[phase as usize] += u64::from(phase_end - entry);
+                entry = phase_end;
+            }
+            let base = first / per_phase * per_phase;
+            jobs = (first - base, (loc.end - base).min(per_phase));
+        }
         // The claimed jobs and their statistics (written at their ends):
         // the lines were written by other threads (the jobs by the build,
         // the statistics by the publication), and lanes take the jobs one
         // after another. (l6-share-2; screening run without it: -c 1 3.06 vs
         // 2.36-2.42 ms, bench share 799 vs 845/s at 48T.)
-        let inner = loc.ctx.inner();
-        let (first, end) = (first as usize, loc.end as usize);
+        let (first, end) = (jobs.0 as usize, jobs.1 as usize);
         for i in (first..end).step_by(4) {
             prefetch(&inner.jobs[i], false);
         }
@@ -1990,6 +2274,9 @@ impl Worker<'_, '_> {
         if loc.ctx.outstanding.fetch_sub(claimed, AcqRel) == claimed && !loc.ctx.done.load(Acquire)
         {
             let ctx = loc.ctx.clone();
+            if self.pass_solution(&ctx) {
+                return;
+            }
             self.counts[C_BUILDS] += 1;
             if build(
                 &mut self.scratch,
@@ -2056,6 +2343,8 @@ impl Worker<'_, '_> {
             end: 0,
             pending: 0,
             claimed: 0,
+            phase_pending: [0; MAX_PHASES],
+            phase_claimed: [0; MAX_PHASES],
             nodes: 0,
             lookups: 0,
             iteration_nodes: 0,
@@ -2113,10 +2402,15 @@ impl Worker<'_, '_> {
                 task_left: Pad(AtomicU32::new(0)),
                 outstanding: Pad(AtomicU64::new(0)),
                 done: AtomicBool::new(false),
+                phase_left: Pad(std::array::from_fn(|_| AtomicU64::new(0))),
                 trace: pool.trace,
                 parts: Pad(AtomicU32::new(1)),
-                rarely_written: Pad(RarelyWritten::default()),
+                rarely_written: Pad(RarelyWritten {
+                    pass_limit: AtomicU8::new(u8::MAX),
+                    ..RarelyWritten::default()
+                }),
                 result: Mutex::new((vec![], 0.0)),
+                pass: Mutex::new(PassState::default()),
                 task_log: (0..1024).map(|_| Default::default()).collect(),
                 thread_done_ns: (0..pool.nthreads).map(|_| AtomicU64::new(0)).collect(),
                 inner: UnsafeCell::new(inner),
@@ -2180,14 +2474,14 @@ impl Worker<'_, '_> {
         if mailbox.state.load(Acquire) != FULL {
             return false;
         }
-        let (ctx, job) = {
+        let (ctx, job, phase) = {
             // SAFETY: `FULL`: the slot is ours until we store `IDLE`.
             let piece = unsafe { &mut *mailbox.piece.get() };
             // (The lane is idle: its stack is free.)
             let lane = &mut self.lanes[li].lane;
             lane.stack[..=piece.depth].copy_from_slice(&piece.nodes[..=piece.depth]);
             lane.depth = piece.depth;
-            (piece.ctx.take().unwrap(), piece.job)
+            (piece.ctx.take().unwrap(), piece.job, piece.phase)
         };
         mailbox.state.store(IDLE, Release);
         // (A solved cube's outstanding count no longer matters.)
@@ -2201,17 +2495,22 @@ impl Worker<'_, '_> {
         loc.pending += 1;
         loc.claimed += 1;
         let inner = ctx.inner();
+        if inner.phases > 1 {
+            loc.phase_pending[usize::from(phase)] += 1;
+            loc.phase_claimed[usize::from(phase)] += 1;
+        }
         let sl = &mut self.lanes[li];
         let lane = &mut sl.lane;
         lane.jobs[0] = inner.jobs[job as usize];
         lane.job_pos = 0;
-        lane.target = inner.target;
+        lane.target = phase_target(inner, phase);
         lane.root = ctx.root;
         lane.root_inverse = ctx.root_inverse;
         lane.child_stats = [0.0; 18];
         sl.slot = slot;
         sl.job = job;
         sl.split = true;
+        sl.phase = phase;
         sl.nodes_at_start = lane.stats.nodes;
         sl.lookups_at_start = lane.stats.lookups;
         sl.started = Instant::now();
@@ -2280,6 +2579,7 @@ impl Worker<'_, '_> {
         to.lane.root_inverse = from.lane.root_inverse;
         to.slot = from.slot;
         to.job = from.job;
+        to.phase = from.phase;
         to.split = true;
         from.split = true;
         to.nodes_at_start = to.lane.stats.nodes;
@@ -2287,6 +2587,9 @@ impl Worker<'_, '_> {
         to.started = Instant::now();
         let loc = self.locals[from.slot].as_mut().unwrap();
         loc.pending += 1;
+        if loc.ctx.inner().phases > 1 {
+            loc.phase_pending[usize::from(from.phase)] += 1;
+        }
         if self.pool.trace_bits & TRACE_COUNTERS != 0 {
             loc.ctx
                 .rarely_written
@@ -2328,6 +2631,9 @@ impl Worker<'_, '_> {
         // (The job is outstanding, so the iteration cannot end before the
         // piece is counted.)
         ctx.outstanding.fetch_add(1, Relaxed);
+        if ctx.inner().phases > 1 {
+            ctx.phase_left[usize::from(sl.phase)].fetch_add(1, Relaxed);
+        }
         if pool.trace_bits & TRACE_COUNTERS != 0 {
             ctx.rarely_written.iteration_donations.fetch_add(1, Relaxed);
         }
@@ -2341,6 +2647,7 @@ impl Worker<'_, '_> {
             piece.nodes[depth].todo = give;
             piece.ctx = Some(ctx);
             piece.job = sl.job;
+            piece.phase = sl.phase;
             piece.depth = depth;
         }
         sl.lane.stack[depth].todo &= !give;
@@ -2385,13 +2692,19 @@ impl Worker<'_, '_> {
         self.split_backoff = 0;
     }
 
-    /// Drop the jobs of solved cubes.
+    /// Drop the jobs of solved cubes (and a first pass's entries as long as
+    /// its shortest solution so far).
     fn cancel_done(&mut self) {
         let mut i = self.active_lanes;
         while i > 0 {
             i -= 1;
-            let slot = self.lanes[i].slot;
-            if !self.locals[slot].as_ref().unwrap().ctx.done.load(Relaxed) {
+            let sl = &self.lanes[i];
+            let ctx = &self.locals[sl.slot].as_ref().unwrap().ctx;
+            // (A first pass's entries as long as its shortest solution so
+            // far are of no use.)
+            if !ctx.done.load(Relaxed)
+                && sl.lane.target < ctx.rarely_written.pass_limit.load(Relaxed)
+            {
                 continue;
             }
             let slot = self.end_job(i, false);
@@ -2476,9 +2789,23 @@ mod tests {
         max_active: usize,
         pause_after_publish: bool,
     ) -> Vec<Vec<u8>> {
+        solve_with_pool_counted(solver, cubes, (threads, nlanes, max_active), |pool| {
+            pool.pause_after_publish = pause_after_publish;
+        })
+        .0
+    }
+
+    /// `solve_with_pool` with (threads, lanes, cubes in progress) and a
+    /// change to the pool's settings; also returns its event counters.
+    fn solve_with_pool_counted(
+        solver: &Solver,
+        cubes: &[CubieCube],
+        (threads, nlanes, max_active): (usize, usize, usize),
+        settings: impl FnOnce(&mut Pool),
+    ) -> (Vec<Vec<u8>>, [u64; NCOUNT]) {
         let get = |i: usize| cubes.get(i).copied();
         let mut pool = Pool::new(&get, max_active, threads);
-        pool.pause_after_publish = pause_after_publish;
+        settings(&mut pool);
         let solutions = Mutex::new(vec![None; cubes.len()]);
         let stop = AtomicBool::new(false);
         std::thread::scope(|scope| {
@@ -2501,11 +2828,13 @@ mod tests {
             }
         });
         let solutions = solutions.into_inner().unwrap();
-        solutions
+        let solutions = solutions
             .into_iter()
             .enumerate()
             .map(|(i, s)| s.unwrap_or_else(|| panic!("cube {i} not reported")))
-            .collect()
+            .collect();
+        let counts = *pool.counters.lock().unwrap();
+        (solutions, counts)
     }
 
     /// A fresh cube solved and reported by other threads as soon as it is
@@ -2569,6 +2898,49 @@ mod tests {
                     optimal[i],
                     "cube {i}: {threads} threads, {nlanes} lanes, {max_active} cubes"
                 );
+            }
+        }
+    }
+
+    /// A cube's first pass, for the iterations from its lower bound up to the
+    /// first with 3-move jobs (8 here), notes the solutions shorter than its
+    /// target too, and reports the shortest when it ends: as short as
+    /// `Solver::solve`, also when the pass is shared by lanes and threads.
+    #[test]
+    fn share_first_pass_reports_the_shortest_solution() {
+        let corners = Cocsep::truncated(4);
+        let table = H48Table::zeroed(0, 2);
+        let solver = Solver::new(&corners, &table);
+        let mut rng = crate::cubie::Rng(91);
+        let count = if cfg!(miri) { 3 } else { 40 };
+        let cubes: Vec<CubieCube> = (0..count)
+            .map(|i| {
+                let moves: Vec<u8> = (0..4 + i % 4)
+                    .map(|_| u8::try_from(rng.below(18)).unwrap())
+                    .collect();
+                CubieCube::SOLVED.apply_moves(&moves)
+            })
+            .collect();
+        let optimal: Vec<usize> = cubes.iter().map(|c| solver.solve(c).0.len()).collect();
+        let configs: &[(usize, usize, usize)] = if cfg!(miri) {
+            &[(2, 2, 1)]
+        } else {
+            &[(1, 1, 1), (3, 2, 1), (8, 3, 2), (4, 2, usize::MAX)]
+        };
+        for &config in configs {
+            let (solutions, counts) = solve_with_pool_counted(&solver, &cubes, config, |_| {});
+            for (i, (cube, solution)) in cubes.iter().zip(&solutions).enumerate() {
+                assert_eq!(cube.apply_moves(solution), CubieCube::SOLVED, "cube {i}");
+                assert_eq!(solution.len(), optimal[i], "cube {i}: {config:?}");
+            }
+            assert!(counts[C_PASS_SOLUTIONS] > 0, "{config:?}: {counts:?}");
+            // Without first passes: the same lengths.
+            let (solutions, counts) = solve_with_pool_counted(&solver, &cubes, config, |pool| {
+                pool.first_pass_span = 0;
+            });
+            assert_eq!(counts[C_PASS_SOLUTIONS], 0);
+            for (i, solution) in solutions.iter().enumerate() {
+                assert_eq!(solution.len(), optimal[i], "cube {i}: {config:?}");
             }
         }
     }
