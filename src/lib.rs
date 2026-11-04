@@ -25,6 +25,7 @@ pub mod cubie;
 pub mod gen;
 pub mod hot;
 pub mod lanes;
+pub mod parallel;
 pub mod prefetch;
 /// The cube type and the hot path's small tables: AVX2 on x86 (`simd.rs`),
 /// else the portable backend (NEON on aarch64, scalar elsewhere).

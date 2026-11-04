@@ -32,8 +32,9 @@ fn aligned32(bytes: &[u8; 32]) -> String {
 }
 
 /// The cube backend for the target: `x86` (AVX2 + BMI2, `simd.rs`), `neon`
-/// (aarch64) or `scalar` (anything else, or the `scalar` feature); the last
-/// two are `portable/`. Set as `cfg(backend = "...")`.
+/// (aarch64), `wasm` (wasm32 with SIMD128) or `scalar` (anything else, or
+/// the `scalar` feature); all but `x86` are `portable/`. Set as
+/// `cfg(backend = "...")`.
 fn backend(has: impl Fn(&str) -> bool) -> &'static str {
     let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
     if std::env::var_os("CARGO_FEATURE_SCALAR").is_some() {
@@ -42,6 +43,8 @@ fn backend(has: impl Fn(&str) -> bool) -> &'static str {
         "x86"
     } else if arch == "aarch64" && has("neon") {
         "neon"
+    } else if arch == "wasm32" && has("simd128") {
+        "wasm"
     } else {
         "scalar"
     }
@@ -52,7 +55,9 @@ fn main() {
     println!("cargo:rerun-if-changed=build.rs");
     let features = std::env::var("CARGO_CFG_TARGET_FEATURE").unwrap_or_default();
     let has = |f: &str| features.split(',').any(|x| x == f);
-    println!("cargo::rustc-check-cfg=cfg(backend, values(\"x86\", \"neon\", \"scalar\"))");
+    println!(
+        "cargo::rustc-check-cfg=cfg(backend, values(\"x86\", \"neon\", \"wasm\", \"scalar\"))"
+    );
     println!("cargo::rustc-check-cfg=cfg(avx512)");
     let backend = backend(has);
     println!("cargo::rustc-cfg=backend=\"{backend}\"");

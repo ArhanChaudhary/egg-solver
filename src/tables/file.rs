@@ -281,19 +281,17 @@ pub fn chunk_hashes(data: &[u8], threads: usize) -> Vec<u64> {
         h
     }
     let n = data.len().div_ceil(CHECKSUM_CHUNK);
-    let mut hashes = vec![0u64; n];
-    let per = n.div_ceil(threads.max(1)).max(1);
-    std::thread::scope(|s| {
-        for (t, out) in hashes.chunks_mut(per).enumerate() {
-            s.spawn(move || {
-                for (i, h) in out.iter_mut().enumerate() {
-                    let start = (t * per + i) * CHECKSUM_CHUNK;
-                    *h = chunk_hash(&data[start..(start + CHECKSUM_CHUNK).min(data.len())]);
-                }
-            });
-        }
-    });
-    hashes
+    let threads = threads.clamp(1, n.max(1));
+    let per = n.div_ceil(threads);
+    crate::parallel::on_threads(threads, |t| {
+        (t * per..((t + 1) * per).min(n))
+            .map(|i| {
+                let start = i * CHECKSUM_CHUNK;
+                chunk_hash(&data[start..(start + CHECKSUM_CHUNK).min(data.len())])
+            })
+            .collect::<Vec<u64>>()
+    })
+    .concat()
 }
 
 /// The checksum of `len` bytes of data from its `chunk_hashes` (so that a
@@ -315,8 +313,9 @@ pub fn checksum(data: &[u8], threads: usize) -> u64 {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LoadMode {
     /// `Map` for files on hugetlbfs or `/dev/shm` (already in memory) and on
-    /// non-Linux systems; `Copy` for other files on Linux (anonymous memory
-    /// gets transparent huge pages reliably, the page cache may not).
+    /// other unix systems; `Copy` for other files on Linux (anonymous memory
+    /// gets transparent huge pages reliably, the page cache may not) and
+    /// where there are no file mappings (WASI, Windows).
     Auto,
     /// Map the file read-only (shared with other processes using it).
     Map,
@@ -375,8 +374,8 @@ impl LoadOptions {
     pub fn mode_for(&self, path: &str) -> LoadMode {
         match self.mode {
             LoadMode::Auto => {
-                if !cfg!(target_os = "linux") || path.starts_with("/dev/shm") || is_hugetlbfs(path)
-                {
+                let in_memory = path.starts_with("/dev/shm") || is_hugetlbfs(path);
+                if cfg!(unix) && (!cfg!(target_os = "linux") || in_memory) {
                     LoadMode::Map
                 } else {
                     LoadMode::Copy
@@ -484,8 +483,7 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore = "files")]
     fn trailer_write_keeps_data() {
-        let path = std::env::temp_dir()
-            .join(format!("cubeopt-trailer-{}", std::process::id()))
+        let path = crate::tables::scratch_path("trailer")
             .to_string_lossy()
             .into_owned();
         let data: Vec<u8> = (0..10_000u32).map(|i| (i % 251) as u8).collect();

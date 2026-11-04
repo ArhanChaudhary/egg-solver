@@ -24,3 +24,15 @@ opt-level = 3
 pedantic = { level = "warn", priority = -1 }
 # Hot kernels use `#[inline(always)]` deliberately (measured).
 inline_always = "allow"
+
+# The WebAssembly module (`wasm/`, see README.md "WebAssembly"); `cargo
+# build` here still builds only this package.
+[workspace]
+members = [".", "wasm"]
+
+# The WebAssembly module's build (`wasm/build.sh`): release without debug
+# info, for a small `.wasm`.
+[profile.wasm-release]
+inherits = "release"
+debug = 0
+strip = true

@@ -1,13 +1,27 @@
 //! Cache prefetch hints for every target: `prefetch*` on x86, `prfm` on
-//! aarch64, nothing elsewhere (wasm has no prefetch). A prefetch never
-//! faults and has no effect on the program's state, so the pointers need not
-//! be valid.
+//! aarch64, nothing elsewhere (wasm has no prefetch; there `read_once` is a
+//! load). A prefetch never faults and has no effect on the program's state,
+//! so the pointers need not be valid (except for `read_once`).
 
 /// Prefetch for a read used once (table lookups): x86 `prefetchnta`
 /// (measured better than T0 for the table, ebd6c20: +2.6%), aarch64
-/// `pldl1strm`.
+/// `pldl1strm`, wasm32 a one-byte load (below).
+///
+/// # Safety
+/// `p` points into an allocation: on wasm32 its byte is read.
 #[inline(always)]
-pub fn read_once<T>(p: *const T) {
+pub unsafe fn read_once<T>(p: *const T) {
+    // wasm has no prefetch, but a load whose value is dropped starts the
+    // cache miss just the same: the CPU runs on past it (the next lanes)
+    // while it is pending. (Measured when added, h6, 100 depth-17 cubes, 1
+    // thread, 40 lanes: wasmtime +53% (187.4/190.7 s -> 122.4/125.1 s), V8
+    // +45% with its optimizing compiler (188.8 -> 130.6 s). Clamping `p`
+    // into linear memory instead of requiring it valid cost 2-4%.)
+    #[cfg(target_arch = "wasm32")]
+    // SAFETY: as the caller promises.
+    unsafe {
+        std::ptr::read_volatile(p.cast::<u8>());
+    }
     #[cfg(target_arch = "x86_64")]
     // SAFETY: see the module docs.
     unsafe {

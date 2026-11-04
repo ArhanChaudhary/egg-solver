@@ -243,7 +243,16 @@ impl Cocsep {
 pub struct Memory {
     ptr: *mut u8,
     len: usize,
+    /// (wasm32) Bytes of the pages that `ptr` starts: at least `len`.
+    #[cfg(all(not(unix), target_arch = "wasm32"))]
+    pages_len: usize,
 }
+
+/// wasm32 linear memory never shrinks: the pages of the largest dropped
+/// `Memory` (address, bytes), for the next one that fits (e.g. a table
+/// loaded again).
+#[cfg(all(not(unix), target_arch = "wasm32"))]
+static SPARE_PAGES: std::sync::Mutex<(usize, usize)> = std::sync::Mutex::new((0, 0));
 // (A plain block of memory: shared read-only, or written with atomics.)
 unsafe impl Send for Memory {}
 unsafe impl Sync for Memory {}
@@ -280,20 +289,60 @@ impl Memory {
         }
     }
 
-    /// Zeroed memory from the allocator, where there is no `mmap` (wasm).
+    /// Zeroed memory where there is no `mmap` (wasm, see `try_anonymous`).
     ///
     /// # Panics
-    /// If the allocation fails.
+    /// If there is not enough memory.
     #[cfg(not(unix))]
     #[must_use]
     pub fn anonymous(len: usize) -> Memory {
-        // SAFETY: a non-zero size; freed with the same layout in `drop`.
-        let ptr = unsafe { std::alloc::alloc_zeroed(Memory::layout(len)) };
-        assert!(!ptr.is_null(), "out of memory");
-        Memory { ptr, len }
+        Memory::try_anonymous(len).expect("out of memory")
     }
 
-    #[cfg(not(unix))]
+    /// Zeroed memory from the allocator, or `None` if there is not enough.
+    #[cfg(all(not(unix), not(target_arch = "wasm32")))]
+    #[must_use]
+    pub fn try_anonymous(len: usize) -> Option<Memory> {
+        // SAFETY: a non-zero size; freed with the same layout in `drop`.
+        let ptr = unsafe { std::alloc::alloc_zeroed(Memory::layout(len)) };
+        (!ptr.is_null()).then_some(Memory { ptr, len })
+    }
+
+    /// Zeroed whole pages of wasm32 linear memory (`memory.grow`), or `None`
+    /// if the engine has no more (at most 4 GiB in all). Not from the
+    /// allocator: it cannot hand out more than `isize::MAX` (2 GiB) at
+    /// once, and h7 is 3.6 GiB.
+    #[cfg(all(not(unix), target_arch = "wasm32"))]
+    #[must_use]
+    pub fn try_anonymous(len: usize) -> Option<Memory> {
+        const PAGE: usize = 1 << 16;
+        let pages_len = len.max(1).checked_next_multiple_of(PAGE)?;
+        let mut spare = SPARE_PAGES
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let (address, pages_len) = if spare.1 >= pages_len {
+            let (address, spare_len) = std::mem::take(&mut *spare);
+            // SAFETY: the pages of a dropped `Memory`, used by nobody else.
+            unsafe {
+                std::ptr::write_bytes(std::ptr::with_exposed_provenance_mut::<u8>(address), 0, len);
+            }
+            (address, spare_len)
+        } else {
+            let first_page = core::arch::wasm32::memory_grow::<0>(pages_len / PAGE);
+            if first_page == usize::MAX {
+                return None;
+            }
+            // (Fresh pages are zero.)
+            (first_page * PAGE, pages_len)
+        };
+        Some(Memory {
+            ptr: std::ptr::with_exposed_provenance_mut(address),
+            len,
+            pages_len,
+        })
+    }
+
+    #[cfg(all(not(unix), not(target_arch = "wasm32")))]
     fn layout(len: usize) -> std::alloc::Layout {
         std::alloc::Layout::from_size_align(len.max(1), 4096).expect("table size")
     }
@@ -447,13 +496,25 @@ impl Memory {
         self.len == 0
     }
     /// The memory as 64-bit words, for the table generator's atomic updates.
+    ///
+    /// # Panics
+    /// On 32-bit targets, if the memory is larger than a slice can be
+    /// (`isize::MAX` bytes: 2 GiB).
     #[must_use]
     #[expect(clippy::cast_ptr_alignment, reason = "mappings are page aligned")]
     pub fn words(&self) -> &[AtomicU64] {
+        #[cfg(target_pointer_width = "32")]
+        assert!(isize::try_from(self.len).is_ok(), "no slice of over 2 GiB");
         unsafe { std::slice::from_raw_parts(self.ptr.cast::<AtomicU64>(), self.len / 8) }
     }
+    /// The memory as bytes.
+    ///
+    /// # Panics
+    /// As `words`.
     #[must_use]
     pub fn bytes(&self) -> &[u8] {
+        #[cfg(target_pointer_width = "32")]
+        assert!(isize::try_from(self.len).is_ok(), "no slice of over 2 GiB");
         unsafe { std::slice::from_raw_parts(self.ptr, self.len) }
     }
 }
@@ -465,10 +526,19 @@ impl Drop for Memory {
         unsafe {
             libc::munmap(self.ptr.cast::<libc::c_void>(), self.len);
         }
-        #[cfg(not(unix))]
+        #[cfg(all(not(unix), not(target_arch = "wasm32")))]
         // SAFETY: allocated by `anonymous` with this layout.
         unsafe {
             std::alloc::dealloc(self.ptr, Memory::layout(self.len));
+        }
+        #[cfg(all(not(unix), target_arch = "wasm32"))]
+        {
+            let mut spare = SPARE_PAGES
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            if self.pages_len > spare.1 {
+                *spare = (self.ptr.expose_provenance(), self.pages_len);
+            }
         }
     }
 }
@@ -574,7 +644,10 @@ impl H48Table {
     pub fn prefetch(&self, index: u64) {
         // NTA: each line is read once; less L2 pollution (cocsep data).
         // (+2.6% at 48T when added, prefetch-nta.)
-        crate::prefetch::read_once(self.memory.ptr().wrapping_add((index >> 2) as usize));
+        // SAFETY: an entry of the table (indices are below its size).
+        unsafe {
+            crate::prefetch::read_once(self.memory.ptr().wrapping_add((index >> 2) as usize));
+        }
     }
 
     /// Distribution of the 2-bit codes over real entries.
@@ -597,34 +670,26 @@ impl H48Table {
 pub fn distribution(words: &[AtomicU64], threads: usize) -> [u64; 4] {
     let per_thread = words.len().div_ceil(threads.max(1)).max(1);
     let mut total = [0u64; 4];
-    std::thread::scope(|s| {
-        let handles: Vec<_> = words
-            .chunks(per_thread)
-            .enumerate()
-            .map(|(t, chunk)| {
-                s.spawn(move || {
-                    let mut counts = [0u64; 4];
-                    for (w, word) in ((t * per_thread) as u64..).zip(chunk) {
-                        let bits = word.load(Ordering::Relaxed);
-                        let mask = entry_low_bits(w);
-                        let lo = bits & mask;
-                        let hi = (bits >> 1) & mask;
-                        counts[3] += u64::from((lo & hi).count_ones());
-                        counts[2] += u64::from((!lo & hi).count_ones());
-                        counts[1] += u64::from((lo & !hi).count_ones());
-                        counts[0] += u64::from((mask & !lo & !hi).count_ones());
-                    }
-                    counts
-                })
-            })
-            .collect();
-        for handle in handles {
-            let counts = handle.join().unwrap();
-            for (sum, count) in total.iter_mut().zip(counts) {
-                *sum += count;
-            }
+    let chunks: Vec<&[AtomicU64]> = words.chunks(per_thread).collect();
+    let counts = crate::parallel::on_threads(chunks.len(), |t| {
+        let mut counts = [0u64; 4];
+        for (w, word) in ((t * per_thread) as u64..).zip(chunks.get(t).copied().unwrap_or(&[])) {
+            let bits = word.load(Ordering::Relaxed);
+            let mask = entry_low_bits(w);
+            let lo = bits & mask;
+            let hi = (bits >> 1) & mask;
+            counts[3] += u64::from((lo & hi).count_ones());
+            counts[2] += u64::from((!lo & hi).count_ones());
+            counts[1] += u64::from((lo & !hi).count_ones());
+            counts[0] += u64::from((mask & !lo & !hi).count_ones());
         }
+        counts
     });
+    for thread_counts in counts {
+        for (sum, count) in total.iter_mut().zip(thread_counts) {
+            *sum += count;
+        }
+    }
     total
 }
 
@@ -771,6 +836,75 @@ impl H48Table {
         Ok(H48Table { memory, meta })
     }
 
+    /// A table from the bytes of a table file already in `memory` (the data,
+    /// then its trailer in the last 4 KiB; e.g. a file fetched into
+    /// WebAssembly memory), checked as `open` checks a file: the trailer's
+    /// `k`, base and data size against the size, and with `verify` the
+    /// data's checksum, if the trailer records one (`threads` threads).
+    ///
+    /// # Errors
+    /// If there is no valid trailer, the size does not match it, or the
+    /// checksum differs.
+    ///
+    /// # Panics
+    /// Never (offsets within the memory fit in `usize`).
+    pub fn from_file_memory(
+        memory: Memory,
+        verify: bool,
+        threads: usize,
+    ) -> std::io::Result<H48Table> {
+        let invalid = |what: String| std::io::Error::new(std::io::ErrorKind::InvalidData, what);
+        let file_len = memory.len() as u64;
+        let trailer_start = file_len
+            .checked_sub(file::TRAILER_BYTES)
+            .ok_or_else(|| invalid(format!("{file_len} bytes: not a table file")))?;
+        // (Slices of at most 1 GiB: wasm32 has no slices over 2 GiB, h7 is
+        // 3.6 GiB.)
+        let piece = |start: u64, len: u64| -> &[u8] {
+            // SAFETY: within the memory (callers keep `start + len` at most
+            // `file_len`), which is ours and not written meanwhile.
+            unsafe {
+                std::slice::from_raw_parts(
+                    memory
+                        .ptr()
+                        .add(usize::try_from(start).expect("within the memory")),
+                    usize::try_from(len).expect("a short piece"),
+                )
+            }
+        };
+        let trailer = file::Trailer::parse(piece(trailer_start, file::TRAILER_BYTES))?
+            .ok_or_else(|| invalid("no table trailer at the end".to_string()))?;
+        let meta = checked_meta(trailer.k, u32::from(trailer.base))
+            .filter(|meta| trailer.data_bytes == h48_bytes(meta.k))
+            .ok_or_else(|| invalid(format!("bad table trailer {trailer:?}")))?;
+        // (As in `open_with`; hugetlbfs files have up to a page of slack.)
+        let data_len = trailer.data_bytes;
+        if trailer_start < data_len || trailer_start >= data_len + file::HUGE_PAGE {
+            return Err(invalid(format!(
+                "{file_len} bytes, but h{} needs {data_len} and a trailer",
+                meta.k
+            )));
+        }
+        if let (true, Some(want)) = (verify, trailer.checksum) {
+            // (Pieces of whole checksum chunks: the same chunk hashes as one
+            // slice of all the data.)
+            let piece_len = (file::CHECKSUM_CHUNK << 10) as u64;
+            let hashes: Vec<u64> = (0..data_len.div_ceil(piece_len))
+                .flat_map(|i| {
+                    let start = i * piece_len;
+                    file::chunk_hashes(piece(start, piece_len.min(data_len - start)), threads)
+                })
+                .collect();
+            let got = file::combine_hashes(data_len, &hashes);
+            if got != want {
+                return Err(invalid(format!(
+                    "checksum {got:016x}, the trailer says {want:016x}: the data is damaged"
+                )));
+            }
+        }
+        Ok(H48Table { memory, meta })
+    }
+
     /// An all-zero table (every bound is then the corner depth), for unit
     /// tests with `Cocsep::truncated`.
     #[cfg(test)]
@@ -853,6 +987,23 @@ fn read_parallel(table_file: &std::fs::File, memory: &Memory, len: usize) {
     });
 }
 
+/// A fresh path for a test's scratch file: in the temporary folder, named by
+/// the process (WASI has neither a temporary folder nor process ids: there it
+/// is under `$TMPDIR` or `/tmp`, which the runner preopens, named by the time).
+#[cfg(test)]
+pub(crate) fn scratch_path(name: &str) -> std::path::PathBuf {
+    #[cfg(not(target_os = "wasi"))]
+    let (dir, id) = (std::env::temp_dir(), u128::from(std::process::id()));
+    #[cfg(target_os = "wasi")]
+    let (dir, id) = (
+        std::path::PathBuf::from(std::env::var("TMPDIR").unwrap_or_else(|_| "/tmp".into())),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_nanos()),
+    );
+    dir.join(format!("cubeopt-{name}-{id}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -863,7 +1014,7 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore = "files")]
     fn table_meta_and_size_are_checked() {
-        let dir = std::env::temp_dir().join(format!("cubeopt-meta-{}", std::process::id()));
+        let dir = scratch_path("meta");
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("h0").to_string_lossy().into_owned();
         let len = h48_bytes(0);
@@ -881,10 +1032,53 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
+    /// A table file's bytes in memory (as JavaScript hands a fetched file to
+    /// wasm) give the table its trailer describes; damaged data is found
+    /// with `verify`, a wrong size or a missing trailer always.
+    #[test]
+    #[cfg_attr(miri, ignore = "a 29 MiB checksum is too slow under Miri")]
+    fn table_from_file_memory_is_checked() {
+        let data_len = usize::try_from(h48_bytes(0)).unwrap();
+        let file_of = |data: &dyn Fn(usize) -> u8, trailer: &file::Trailer, extra: usize| {
+            let memory = Memory::anonymous(data_len + extra + 4096);
+            // SAFETY: our own fresh memory, not yet shared.
+            let bytes = unsafe { std::slice::from_raw_parts_mut(memory.ptr(), memory.len()) };
+            for (i, b) in bytes[..data_len].iter_mut().enumerate() {
+                *b = data(i);
+            }
+            let end = bytes.len();
+            bytes[end - 4096..].copy_from_slice(&trailer.to_bytes());
+            memory
+        };
+        let pattern = |i: usize| u8::try_from(i % 251).unwrap();
+        let reference: Vec<u8> = (0..data_len).map(pattern).collect();
+        let trailer = file::Trailer {
+            k: 0,
+            base: 8,
+            data_bytes: data_len as u64,
+            distribution: None,
+            checksum: Some(file::checksum(&reference, 3)),
+        };
+        let table = H48Table::from_file_memory(file_of(&pattern, &trailer, 0), true, 2).unwrap();
+        assert_eq!((table.meta.k, table.meta.base), (0, 8));
+        assert_eq!(&table.memory.bytes()[..data_len], &reference[..]);
+        // (Room before the trailer is allowed, as on hugetlbfs.)
+        assert!(H48Table::from_file_memory(file_of(&pattern, &trailer, 8192), true, 1).is_ok());
+        let damaged = |i: usize| if i == 12_345 { 7 } else { pattern(i) };
+        assert!(H48Table::from_file_memory(file_of(&damaged, &trailer, 0), true, 1).is_err());
+        assert!(H48Table::from_file_memory(file_of(&damaged, &trailer, 0), false, 1).is_ok());
+        let wrong_k = file::Trailer { k: 1, ..trailer };
+        assert!(H48Table::from_file_memory(file_of(&pattern, &wrong_k, 0), false, 1).is_err());
+        let no_trailer = Memory::anonymous(data_len + 4096);
+        assert!(H48Table::from_file_memory(no_trailer, false, 1).is_err());
+        assert!(H48Table::from_file_memory(Memory::anonymous(100), false, 1).is_err());
+    }
+
     /// A table file opened for solving (hugetlbfs or /dev/shm) is mapped
     /// read-only.
     #[test]
     #[cfg_attr(miri, ignore = "files")]
+    #[cfg_attr(not(target_os = "linux"), ignore = "Linux mappings")]
     fn opened_table_file_is_read_only() {
         let path = format!("/dev/shm/cubeopt-test-{}-h0", std::process::id());
         let len = usize::try_from(h48_bytes(0)).unwrap();

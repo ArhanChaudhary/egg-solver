@@ -58,7 +58,14 @@ fn open_source(path: &str) -> H48Table {
     })
 }
 
+/// Peak resident memory of this process, in GiB (0 where unknown: WASI).
+#[cfg(not(unix))]
+fn peak_rss_gib() -> f64 {
+    0.0
+}
+
 /// Peak resident memory of this process, in GiB.
+#[cfg(unix)]
 fn peak_rss_gib() -> f64 {
     // SAFETY: `usage` is a valid out-pointer.
     let max_rss = unsafe {
@@ -267,16 +274,30 @@ fn create_table_file(path: &str, data_bytes: u64) -> std::fs::File {
     f
 }
 
+/// Write all of `data` at `offset` of `f`.
+#[cfg(unix)]
+fn write_all_at(f: &std::fs::File, data: &[u8], offset: u64) -> std::io::Result<()> {
+    std::os::unix::fs::FileExt::write_all_at(f, data, offset)
+}
+
+/// Write all of `data` at `offset` of `f` (a seek and a write, where there
+/// is no positioned write: WASI's is unstable).
+#[cfg(not(unix))]
+fn write_all_at(mut f: &std::fs::File, data: &[u8], offset: u64) -> std::io::Result<()> {
+    use std::io::{Seek, Write};
+    f.seek(std::io::SeekFrom::Start(offset))?;
+    f.write_all(data)
+}
+
 /// Write `data` at `offset`, in pieces whose writeback starts as soon as
 /// each is written and which are then dropped from the page cache (a table
 /// is written once, and read back later if at all): the dirty page cache
 /// stays small, and the disk stays busy.
 fn write_at(f: &std::fs::File, data: &[u8], offset: u64) {
-    use std::os::unix::fs::FileExt;
     let piece = 64 << 20;
     for (i, chunk) in data.chunks(piece).enumerate() {
         let at = offset + (i * piece) as u64;
-        f.write_all_at(chunk, at).expect("write table");
+        write_all_at(f, chunk, at).expect("write table");
         #[cfg(target_os = "linux")]
         // Start this piece's writeback; wait for the previous piece's and
         // drop it from the page cache.

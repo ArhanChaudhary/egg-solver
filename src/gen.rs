@@ -111,16 +111,12 @@ impl Generator<'_> {
     fn for_word_chunks(&self, words: usize, f: impl Fn(usize, usize) + Sync) {
         let chunk = WORDS_PER_ROW << 12;
         let next = AtomicUsize::new(0);
-        std::thread::scope(|s| {
-            for _ in 0..self.threads {
-                s.spawn(|| loop {
-                    let start = next.fetch_add(chunk, Relaxed);
-                    if start >= words {
-                        break;
-                    }
-                    f(start, (start + chunk).min(words));
-                });
+        crate::parallel::on_threads(self.threads, |_| loop {
+            let start = next.fetch_add(chunk, Relaxed);
+            if start >= words {
+                break;
             }
+            f(start, (start + chunk).min(words));
         });
     }
 
