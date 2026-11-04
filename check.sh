@@ -33,19 +33,28 @@ if [ "${CHECK_BACKENDS:-1}" != 0 ]; then
         fi
     done
     if grep -qx wasm32-wasip1-threads <<< "$installed"; then
+        # (Every wasm run has a time limit: a hang fails the check at once
+        # instead of holding the build lock.)
         wasmtime=${WASMTIME:-wasmtime}
-        export CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER="$wasmtime run -S threads=y -W threads=y,shared-memory=y --dir /tmp"
+        export CARGO_TARGET_WASM32_WASIP1_THREADS_RUNNER="timeout -s KILL 600 $wasmtime run -S threads=y -W threads=y,shared-memory=y --dir /tmp"
         cargo test --release --lib --target wasm32-wasip1-threads --no-run
         if command -v "$wasmtime" > /dev/null &&
             cargo test --release --lib --target wasm32-wasip1-threads -- --list > /dev/null 2>&1; then
-            cargo test --release --lib --target wasm32-wasip1-threads 2>&1 | tee "$log" | grep -E "^test result"
-            ! grep -qE "FAILED|panicked" "$log"
+            if ! cargo test --release --lib --target wasm32-wasip1-threads > "$log" 2>&1; then
+                tail -20 "$log" >&2
+                echo "check: wasm library tests failed (or hung: killed after 600 s)" >&2
+                exit 1
+            fi
+            grep -E "^test result" "$log"
         else
             echo "check: wasmtime with wasi-threads (v44 or older; WASMTIME=path) missing: wasm tests not run" >&2
         fi
         if grep -qx wasm32-wasip1 <<< "$installed" && command -v node > /dev/null; then
             wasm/build.sh > /dev/null
-            node wasm/test.mjs
+            if ! timeout -s KILL 300 node wasm/test.mjs; then
+                echo "check: wasm/test.mjs failed (or hung: killed after 300 s)" >&2
+                exit 1
+            fi
         else
             echo "check: node or target wasm32-wasip1 missing: wasm module not tested" >&2
         fi

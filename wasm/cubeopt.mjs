@@ -164,7 +164,13 @@ function sleep(ms) {
   }
 }
 
-/** The `thread-spawn` import of wasi-threads: hands the thread to an idle pool worker. */
+/**
+ * The `thread-spawn` import of wasi-threads: hands the thread to an idle pool
+ * worker. The module starts its threads once and never ends them (see
+ * `wasm/src/threads.rs`), so the pool has room for all of them. It must not
+ * wait for a worker: the spawning thread holds wasi-libc's thread list lock,
+ * which a thread needs to end.
+ */
 export function threadSpawn(control) {
   const slots = (control.length - 4) / 4;
   return (startArg) => {
@@ -294,7 +300,8 @@ export class Cubeopt {
       if (typeof SharedArrayBuffer === 'undefined') {
         throw new Error('the threads build needs SharedArrayBuffer (a cross-origin isolated page)');
       }
-      const limits = bytes ? importedMemoryLimits(bytes) : { initial: 17, maximum: 65536 };
+      // (The threads build imports all 4 GiB at once, see wasm/build.rs.)
+      const limits = bytes ? importedMemoryLimits(bytes) : { initial: 65535, maximum: 65536 };
       memory = new WebAssembly.Memory({ ...limits, shared: true });
       const cores = isNode
         ? (await import('node:os')).availableParallelism()

@@ -244,14 +244,14 @@ pub struct Memory {
     ptr: *mut u8,
     len: usize,
     /// (wasm32) Bytes of the pages that `ptr` starts: at least `len`.
-    #[cfg(all(not(unix), target_arch = "wasm32"))]
+    #[cfg(all(not(unix), target_arch = "wasm32", not(wasm_threads)))]
     pages_len: usize,
 }
 
 /// wasm32 linear memory never shrinks: the pages of the largest dropped
 /// `Memory` (address, bytes), for the next one that fits (e.g. a table
 /// loaded again).
-#[cfg(all(not(unix), target_arch = "wasm32"))]
+#[cfg(all(not(unix), target_arch = "wasm32", not(wasm_threads)))]
 static SPARE_PAGES: std::sync::Mutex<(usize, usize)> = std::sync::Mutex::new((0, 0));
 // (A plain block of memory: shared read-only, or written with atomics.)
 unsafe impl Send for Memory {}
@@ -308,11 +308,30 @@ impl Memory {
         (!ptr.is_null()).then_some(Memory { ptr, len })
     }
 
+    /// Zeroed page-aligned memory from wasi-libc (`posix_memalign`), or
+    /// `None` if there is not enough. The threads build's memory is all there
+    /// from the start and never grows (see `wasm/build.rs`), and C's
+    /// allocator, unlike Rust's, hands out more than `isize::MAX` (h7 is 3.6
+    /// GiB).
+    #[cfg(all(target_arch = "wasm32", wasm_threads))]
+    #[must_use]
+    pub fn try_anonymous(len: usize) -> Option<Memory> {
+        let mut ptr = std::ptr::null_mut();
+        // SAFETY: an out-pointer; the block is freed in `drop`.
+        if unsafe { libc::posix_memalign(&raw mut ptr, 4096, len.max(1)) } != 0 {
+            return None;
+        }
+        let ptr = ptr.cast::<u8>();
+        // SAFETY: `len` bytes of the fresh block.
+        unsafe { std::ptr::write_bytes(ptr, 0, len) };
+        Some(Memory { ptr, len })
+    }
+
     /// Zeroed whole pages of wasm32 linear memory (`memory.grow`), or `None`
     /// if the engine has no more (at most 4 GiB in all). Not from the
     /// allocator: it cannot hand out more than `isize::MAX` (2 GiB) at
     /// once, and h7 is 3.6 GiB.
-    #[cfg(all(not(unix), target_arch = "wasm32"))]
+    #[cfg(all(not(unix), target_arch = "wasm32", not(wasm_threads)))]
     #[must_use]
     pub fn try_anonymous(len: usize) -> Option<Memory> {
         const PAGE: usize = 1 << 16;
@@ -531,7 +550,12 @@ impl Drop for Memory {
         unsafe {
             std::alloc::dealloc(self.ptr, Memory::layout(self.len));
         }
-        #[cfg(all(not(unix), target_arch = "wasm32"))]
+        #[cfg(all(target_arch = "wasm32", wasm_threads))]
+        // SAFETY: from `posix_memalign` in `try_anonymous`, freed once.
+        unsafe {
+            libc::free(self.ptr.cast::<libc::c_void>());
+        }
+        #[cfg(all(not(unix), target_arch = "wasm32", not(wasm_threads)))]
         {
             let mut spare = SPARE_PAGES
                 .lock()
