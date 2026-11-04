@@ -6,7 +6,7 @@
 //! ```text
 //! Usage: solve <table> [-t threads] [-l lanes] [-c concurrency] [-n count]
 //!   -t  threads (default: all cores)
-//!   -l  interleaved lanes per thread (default 20)
+//!   -l  interleaved lanes per thread (default `lanes::DEFAULT_LANES`, 24)
 //!   -c  cubes in progress at once: 1 solves one cube at a time with all
 //!       threads (latency); 0 (default) solves the whole input as a batch
 //!   -n  solve only the first `count` scrambles
@@ -43,7 +43,7 @@ fn main() {
         usage();
     }
     let mut threads = cubeopt::nthreads();
-    let mut lanes = 20;
+    let mut lanes = cubeopt::lanes::DEFAULT_LANES;
     let mut conc = 0;
     let mut count = usize::MAX;
     let mut i = 2;

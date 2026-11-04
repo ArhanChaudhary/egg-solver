@@ -6,8 +6,8 @@
 //! prefetch and yields. Lanes are visited round-robin; a visit first
 //! resolves the lookup issued on the previous visit (the other side's value
 //! first, then the moved side's), then advances the lane to its next lookup.
-//! With 20 lanes (default) each miss gets a whole round of slack while only
-//! ~one miss per lane is in flight.
+//! With `DEFAULT_LANES` lanes each miss gets a whole round of slack while
+//! only ~one miss per lane is in flight.
 //!
 //! Since children are generated one at a time, sibling-face pruning skips
 //! the lookups of pruned siblings entirely.
@@ -45,6 +45,11 @@ const FIRST: f64 = 0.2;
 /// A first-part run takes the job's candidates whose `ck` is at most this
 /// much below its child's (fewer runs).
 const MERGE: u8 = 4;
+
+/// Lanes per thread unless asked otherwise. Each lane keeps one table miss
+/// in flight; 24 is about the fewest that hide the miss latency, at 1 and at
+/// 48 threads (numbers in the commit that set it). ~1.4 MB per lane.
+pub const DEFAULT_LANES: usize = 24;
 
 /// (128 bytes: two cache lines.)
 #[derive(Clone, Copy)]

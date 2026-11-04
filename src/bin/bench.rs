@@ -7,7 +7,8 @@
 //!       solves completed per second during the window (steady state).
 //!   bench <table> <scramble file | random:N:SEED> [count] [threads] [lanes]
 //!       Solves a fixed batch and verifies every solution.
-//! lanes = 0 uses the recursive single-cube solver; default 20.
+//! lanes = 0 uses the recursive single-cube solver; default
+//! `lanes::DEFAULT_LANES` (24).
 //! A last argument `share[:C]` uses the work-sharing mode (`lanes::share`)
 //! with at most C cubes in progress at once (default: threads * lanes; 1
 //! solves one cube at a time with all threads).
@@ -133,7 +134,9 @@ fn main() {
         let warm = arg(3, 3.0);
         let window = arg(4, 15.0);
         let threads = arg(5, cubeopt::nthreads() as f64) as usize;
-        let nlanes = arg(6, 20.0) as usize;
+        let nlanes: usize = a
+            .get(6)
+            .map_or(cubeopt::lanes::DEFAULT_LANES, |x| x.parse().unwrap());
         let seed = arg(7, 2026.0) as u64;
         let cubes = move |i: usize| {
             let mut rng = Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ (i as u64));
@@ -168,7 +171,9 @@ fn main() {
         cubes.truncate(n.parse().unwrap());
     }
     let threads = arg(4, cubeopt::nthreads() as f64) as usize;
-    let nlanes = arg(5, 20.0) as usize;
+    let nlanes: usize = a
+        .get(5)
+        .map_or(cubeopt::lanes::DEFAULT_LANES, |x| x.parse().unwrap());
     let get = |i: usize| cubes.get(i).copied();
     let (recs, el) = run(&solver, &get, threads, nlanes, None, share);
     assert_eq!(recs.len(), cubes.len(), "cubes not reported");
