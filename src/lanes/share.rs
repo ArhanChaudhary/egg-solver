@@ -1918,7 +1918,7 @@ impl Worker<'_, '_> {
         l.target = inner.target;
         l.root_c = ctx.root_c;
         l.root_ci = ctx.root_ci;
-        l.heur = 0.0;
+        l.cheur = [0.0; 18];
         sl.slot = slot as u32;
         sl.job = job;
         sl.split = true;
@@ -1978,7 +1978,7 @@ impl Worker<'_, '_> {
         tl.l.stack[d].todo = give;
         vl.l.stack[d].todo &= !give;
         tl.l.sp = d;
-        tl.l.heur = 0.0;
+        tl.l.cheur = [0.0; 18];
         tl.l.jobs[0] = vl.l.jobs[0];
         tl.l.job_pos = 0;
         tl.l.target = vl.l.target;
