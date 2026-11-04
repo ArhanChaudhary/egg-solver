@@ -13,6 +13,7 @@
 //! with at most C cubes in progress at once (default: threads * lanes; 1
 //! solves one cube at a time with all threads).
 use cubeopt::cubie::*;
+use cubeopt::lanes::share::Pool;
 use cubeopt::solver::{Solver, Stats};
 use cubeopt::tables::*;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
@@ -59,9 +60,9 @@ fn run(
                     });
                 };
                 if let Some(pool) = &pool {
-                    pool.run(solver, nlanes, &stop, record);
+                    share_thread(pool, solver, nlanes, &stop, record);
                 } else if nlanes > 0 {
-                    cubeopt::lanes::run_lanes(solver, cubes, &next, &stop, nlanes, record);
+                    stream_thread(solver, cubes, &next, &stop, nlanes, record);
                 } else {
                     while !stop.load(Ordering::Relaxed) {
                         let i = next.fetch_add(1, Ordering::Relaxed);
@@ -83,6 +84,33 @@ fn run(
         eprintln!("share: {}", pool.counters());
     }
     (recs.into_inner().unwrap(), t0.elapsed().as_secs_f64())
+}
+
+/// A thread of a share-mode run. (This and `stream_thread` are not inlined
+/// into `run`'s thread closure: each mode is compiled on its own, so changes
+/// to one cannot change the other's code, only where it is placed.)
+#[inline(never)]
+fn share_thread(
+    pool: &Pool,
+    solver: &Solver,
+    nlanes: usize,
+    stop: &AtomicBool,
+    record: impl FnMut(usize, Vec<u8>, Stats, f64),
+) {
+    pool.run(solver, nlanes, stop, record);
+}
+
+/// A thread of a stream-mode run (`run_lanes`).
+#[inline(never)]
+fn stream_thread(
+    solver: &Solver,
+    cubes: &(dyn Fn(usize) -> Option<CubieCube> + Sync),
+    next: &AtomicUsize,
+    stop: &AtomicBool,
+    nlanes: usize,
+    record: impl FnMut(usize, Vec<u8>, Stats, f64),
+) {
+    cubeopt::lanes::run_lanes(solver, cubes, next, stop, nlanes, record);
 }
 
 fn summary(recs: &[Rec]) {
