@@ -860,7 +860,8 @@ fn build(
     let parallel = pool.few() || pool.hungry.load(Relaxed) != 0;
     let len = inner.jobs[0].len as usize;
     // Sorted by the statistics as they are (not copied to the jobs first)?
-    // (The serial copy took ~90 us per build; part of l6-share-a.)
+    // (The serial copy took ~90 us per build; part of l6-share-a's -38.8% -c 1
+    // latency at 48T, not measured alone.)
     let from_atomics =
         !first && len >= job_len && job_len > 0 && parallel && inner.jobs.len() >= SORT_MIN;
     if !first && !from_atomics {
@@ -1642,6 +1643,9 @@ impl Worker<'_, '_> {
         loc.lookups += sl.lane.stats.lookups - sl.lookups_at_start;
         loc.iteration_nodes += sl.lane.stats.nodes - sl.nodes_at_start;
         loc.iteration_jobs += 1;
+        // The job's statistic is the sum of its per-child statistics, as stream
+        // mode records them for c7's child ordering (part of c7-childsplit: -6..-8%
+        // nodes in stream mode; share mode keeps whole-job order, not measured here).
         if stat {
             let job_stat = &loc.ctx.inner().stats[sl.job as usize];
             if sl.split {
