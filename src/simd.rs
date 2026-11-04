@@ -52,8 +52,10 @@ include!(concat!(env!("OUT_DIR"), "/consts.rs"));
 /// The small lookup tables of the move/index hot path in one static, so that
 /// all their accesses share one base register (x86 has no RIP-relative
 /// indexed addressing: separate statics cost an `lea` each per use; part of
-/// m3-hht's +3.5% at 48T when added).
-#[repr(C, align(64))]
+/// m3-hht's +3.5% at 48T when added). Aligned to a 4 KiB page so its
+/// placement relative to pages and cache sets is the same in every build
+/// (it moved with unrelated edits before; neutral on its own, see the commit).
+#[repr(C, align(4096))]
 pub struct HotTables {
     /// Shuffle of each move.
     pub moves: [Aligned32; 18],
