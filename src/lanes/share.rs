@@ -52,7 +52,7 @@
 //! l6-share-a and l6-share-2 brought one cube at a time to ~2.2 ms. The
 //! comments at each optimization give its own measured gain.
 
-use super::{job_weight, Job, Lane, Node, Phase, Step, MAXD};
+use super::{job_weight, moves_after, Job, Lane, Node, Phase, Step, MAXD, MAX_JOB_LEN};
 use crate::cubie::CubieCube;
 use crate::simd::Cube;
 use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES};
@@ -105,6 +105,27 @@ struct Inner {
     phase_entries: u32,
     /// The jobs are new (the cube's first build): sorted by their bounds.
     sort_by_bounds: bool,
+    /// The jobs record their leads (`lead_word`): the next iteration, on
+    /// the same jobs, is split. `leads_target`: the last iteration that did.
+    record_leads: bool,
+    leads_target: u8,
+    /// Per job, its lead from the last iteration that recorded them (indexed
+    /// like `jobs` and `stats`; `MAX_JOBS` long).
+    leads: Vec<AtomicU32>,
+    /// A split iteration (`Bufs::rest_children`): claim entry e runs
+    /// `runs[e]`, job `runs[e] as u32` (an index of `jobs`, which keep the
+    /// last iteration's order) with the root children `runs[e] >> 32`.
+    split: bool,
+    runs: Vec<u64>,
+    /// Split iterations: leads with codes above it run first.
+    lead_threshold: u8,
+    /// The tags (`lead_tag`) of the leads that this iteration's build reads
+    /// and that its jobs write; the cube's part of them (set per cube).
+    read_tag: u32,
+    write_tag: u32,
+    tag_base: u32,
+    /// Split iterations: the first-part runs (`runs[..first_runs]`).
+    first_runs: u32,
     /// Buffers of the build in progress (from `Pool::bufs`).
     b: Bufs,
     /// (trace) When the current iteration's build started, its jobs were
@@ -152,11 +173,21 @@ struct Bufs {
     splitters: Vec<u64>,
     bucket_counts: Vec<u32>,
     bucket_starts: Vec<u32>,
+    /// Split iterations: per job the root children of its rest run (all,
+    /// or those outside its lead group if it has a first-part run); per
+    /// chunk and lead bucket the first-part runs (then their positions);
+    /// the number of first-part runs.
+    rest_children: Vec<u32>,
+    lead_counts: Vec<u32>,
+    first_runs: usize,
     out_ptr: TaskPtr<Job>,
     keys_ptr: TaskPtr<u64>,
     keys_tmp_ptr: TaskPtr<u64>,
     key_buckets_ptr: TaskPtr<u8>,
     bucket_counts_ptr: TaskPtr<u32>,
+    rest_children_ptr: TaskPtr<u32>,
+    lead_counts_ptr: TaskPtr<u32>,
+    runs_ptr: TaskPtr<u64>,
 }
 
 /// The start of a build buffer that the tasks of a stage write at once, each
@@ -183,6 +214,7 @@ impl Bufs {
             keys: touched(MAX_JOBS, 0),
             keys_tmp: touched(MAX_JOBS, 0),
             key_buckets: touched(MAX_JOBS, 0),
+            rest_children: touched(MAX_JOBS, 0),
             ..Bufs::default()
         }
     }
@@ -456,6 +488,8 @@ impl Inner {
             inner.stats.resize_with(MAX_JOBS, || AtomicU32::new(0));
             inner.stats.clear();
         }
+        inner.leads.resize_with(MAX_JOBS, || AtomicU32::new(0));
+        inner.runs = touched(2 * MAX_JOBS, 0);
         inner
     }
 
@@ -469,6 +503,16 @@ impl Inner {
             phases: 1,
             phase_entries: 0,
             sort_by_bounds: false,
+            record_leads: false,
+            leads_target: 0,
+            leads: Vec::new(),
+            split: false,
+            runs: Vec::new(),
+            lead_threshold: u8::MAX,
+            read_tag: 0,
+            write_tag: 0,
+            tag_base: 0,
+            first_runs: 0,
             b: Bufs::default(),
             build_started: now,
             extended: now,
@@ -962,8 +1006,12 @@ struct SharedLane {
     /// `Worker::locals` slot of the cube of the current job (`NO_SLOT` if
     /// idle).
     slot: usize,
-    /// Index of the current job in the cube's job list.
+    /// Index of the current job in the cube's job list, and (trace) its
+    /// claim entry.
     job: u32,
+    entry: u32,
+    /// The root children of a run that records its job's lead (0: none).
+    lead_children: u32,
     /// The job's tree is shared with other lanes (split, donated or a
     /// piece): its statistic is added atomically.
     split: bool,
@@ -992,6 +1040,8 @@ impl SharedLane {
             lane,
             slot: NO_SLOT,
             job: 0,
+            entry: 0,
+            lead_children: 0,
             split: false,
             phase: 0,
             nodes_at_start: 0,
@@ -1089,6 +1139,12 @@ fn build(
     // latency at 48T, not measured alone.)
     let from_atomics =
         !first && len >= job_len && job_len > 0 && parallel && inner.jobs.len() >= SORT_MIN;
+    plan_leads(
+        inner,
+        first,
+        job_len == MAX_JOB_LEN && parallel,
+        from_atomics,
+    );
     if !first && !from_atomics {
         copy_stats(inner);
     }
@@ -1270,6 +1326,128 @@ const _: () = assert!((FIRST_PASS_SPAN as usize) < MAX_PHASES);
 /// depth-15/16 states -20/-28%; -c 0 and bench share neutral.
 fn first_pass_order(inner: &mut Inner) {
     inner.feasible = inner.jobs.len();
+}
+
+/// Split iterations: the fraction of jobs whose lead group (`lead_word`)
+/// runs first, all those first-part runs by decreasing lead code across
+/// jobs, before the rest of each job in the order of the job statistics.
+/// (Replay of 273 random states ending at T = 18 through share's claims,
+/// c11: the solution 0.70 ms into T = 18 on average instead of 0.80, median
+/// 0.28 instead of 0.50; 20/30/50/70% of the jobs: 0.72-0.75 ms; c7's full
+/// order, 0.69 ms with 1.6 runs per job.)
+const LEAD_FRACTION: f64 = 0.1;
+/// A job's lead group: its root children (normal side) whose statistic is
+/// at least this share of the best one's (one octave, 4 codes as c7's
+/// `MERGE_CODES`), with the X or X' sibling of each (`lead_of`). (Replay:
+/// 0, 2, 4 or 8 codes within 1%.)
+const LEAD_SHARE: f32 = 0.5;
+/// First-part runs are counting-sorted by their code in buckets of
+/// `1 << LEAD_SHIFT` codes (replay: as good as single codes).
+const LEAD_SHIFT: u32 = 2;
+const LEAD_BUCKETS: usize = 256 >> LEAD_SHIFT;
+
+/// A job's lead: a tag of the cube and iteration (6 bits, `lead_tag`), the
+/// best code of its root children (8 bits, `lead_of`) and its lead group
+/// (18 bits).
+fn lead_word(tag: u32, code: u8, group: u32) -> u32 {
+    tag << 26 | u32::from(code) << 18 | group
+}
+
+/// The tag of the leads that iteration `target` of a cube (`tag_base`)
+/// writes: leads in `Inner::leads` from other cubes or iterations are
+/// ignored (but for 1 in 64).
+fn lead_tag(tag_base: u32, target: u8) -> u32 {
+    (tag_base + u32::from(target)) % 64
+}
+
+/// The code and the group of a lead of the tag `tag` (None if it is
+/// another cube's or iteration's, or none).
+#[expect(clippy::cast_possible_truncation, reason = "the code's 8 bits")]
+fn lead_fields(lead: u32, tag: u32) -> Option<(u8, u32)> {
+    (lead >> 26 == tag && lead != 0).then_some(((lead >> 18) as u8, lead & ALL_MOVES))
+}
+
+/// The lead of a job whose run over its root children `children` (normal
+/// side) gave `child_stats`: the code (`quantize`) of its best child's
+/// statistic, weighted one code step up on faces 1, 3 and 5 (`ODD_FACE`, as
+/// `quantize18`), and its children whose weighted statistic is at least
+/// `LEAD_SHARE` of the best one's, with the X or X' sibling of each
+/// (`with_twins`). 0 (none) if no child has a statistic. On the statistics,
+/// not their codes: a few µops per job end.
+#[cfg(avx512)]
+#[expect(clippy::cast_possible_truncation, reason = "the low 16 moves")]
+fn lead_of(child_stats: &[f32; 18], children: u32, tag: u32) -> u32 {
+    use std::arch::x86_64::{
+        _mm512_loadu_ps, _mm512_mask_cmp_ps_mask, _mm512_maskz_mul_ps, _mm512_reduce_max_ps,
+        _mm512_set1_ps, _mm512_setr_ps, _CMP_GE_OQ,
+    };
+    const ODD: f32 = ODD_FACE;
+    let low = children as u16;
+    // SAFETY: AVX-512 is a target feature (`cfg(avx512)`); the load reads
+    // the first 16 statistics.
+    let (weighted, low_best) = unsafe {
+        let weights = _mm512_setr_ps(
+            1.0, 1.0, 1.0, ODD, ODD, ODD, 1.0, 1.0, 1.0, ODD, ODD, ODD, 1.0, 1.0, 1.0, ODD,
+        );
+        let weighted = _mm512_maskz_mul_ps(low, _mm512_loadu_ps(child_stats.as_ptr()), weights);
+        (weighted, _mm512_reduce_max_ps(weighted))
+    };
+    // (Moves 16 and 17 are on face 5.)
+    let high = |mv: usize| {
+        if children >> mv & 1 != 0 {
+            child_stats[mv] * ODD
+        } else {
+            0.0
+        }
+    };
+    let (stat16, stat17) = (high(16), high(17));
+    let best = low_best.max(stat16).max(stat17);
+    let code = super::quantize(best);
+    if code == 0 {
+        return 0;
+    }
+    let floor = best * LEAD_SHARE;
+    // SAFETY: as above.
+    let low_group =
+        unsafe { _mm512_mask_cmp_ps_mask::<_CMP_GE_OQ>(low, weighted, _mm512_set1_ps(floor)) };
+    let group =
+        u32::from(low_group) | u32::from(stat16 >= floor) << 16 | u32::from(stat17 >= floor) << 17;
+    lead_word(tag, code, with_twins(group) & children)
+}
+
+/// `lead_of` without AVX-512.
+#[cfg(not(avx512))]
+fn lead_of(child_stats: &[f32; 18], children: u32, tag: u32) -> u32 {
+    let weighted: [f32; 18] = std::array::from_fn(|mv| {
+        let weight = if mv / 3 % 2 == 1 { ODD_FACE } else { 1.0 };
+        if children >> mv & 1 != 0 {
+            child_stats[mv] * weight
+        } else {
+            0.0
+        }
+    });
+    let best = weighted.iter().copied().fold(0.0, f32::max);
+    let code = super::quantize(best);
+    if code == 0 {
+        return 0;
+    }
+    let floor = best * LEAD_SHARE;
+    let group = (0..18)
+        .filter(|&mv| children >> mv & 1 != 0 && weighted[mv] >= floor)
+        .fold(0, |group, mv| group | 1 << mv);
+    lead_word(tag, code, with_twins(group) & children)
+}
+
+/// The weight of a child's statistic on faces 1, 3 and 5 in `lead_of`:
+/// 2^(1/4), one step of `quantize`.
+const ODD_FACE: f32 = 1.189_207_1;
+
+/// `group` with the X and X' children of each face where it has one of
+/// them (an X' child runs without its X sibling only with X's other-side
+/// value, which a separate run lacks).
+fn with_twins(group: u32) -> u32 {
+    let x_moves = 0b001_001_001_001_001_001;
+    group | (group & x_moves) << 2 | group >> 2 & x_moves
 }
 
 /// Statistics of new jobs (no iteration ran them yet) for the sort of a
@@ -1472,6 +1650,12 @@ fn sort_setup(inner: &mut Inner) -> usize {
             prefetch(&inner.stats[sampled(x)], false);
         }
     }
+    if inner.split {
+        for x in 0..NBUCKETS * SAMPLE {
+            prefetch(&inner.leads[sampled(x)], false);
+        }
+        inner.lead_threshold = lead_threshold(inner, n);
+    }
     let bufs = &mut inner.b;
     let mut sample = std::mem::take(&mut bufs.splitters);
     sample.clear();
@@ -1506,7 +1690,110 @@ fn sort_setup(inner: &mut Inner) -> usize {
     bufs.key_buckets_ptr = TaskPtr(bufs.key_buckets.as_mut_ptr());
     bufs.bucket_counts_ptr = TaskPtr(bufs.bucket_counts.as_mut_ptr());
     bufs.out_ptr = TaskPtr(bufs.out.as_mut_ptr());
+    if inner.split {
+        bufs.lead_counts.clear();
+        bufs.lead_counts.resize(chunks * LEAD_BUCKETS, 0);
+        bufs.rest_children.clear();
+        inner.runs.clear();
+        assert!(n <= bufs.rest_children.capacity() && 2 * n <= inner.runs.capacity());
+        bufs.rest_children_ptr = TaskPtr(bufs.rest_children.as_mut_ptr());
+        bufs.lead_counts_ptr = TaskPtr(bufs.lead_counts.as_mut_ptr());
+        bufs.runs_ptr = TaskPtr(inner.runs.as_mut_ptr());
+    }
     chunks
+}
+
+/// The lead code above which a split iteration's `n` jobs have a first-part
+/// run: about `LEAD_FRACTION` of those with a lead, from the sample of
+/// `sort_setup`.
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "a fraction of a count"
+)]
+fn lead_threshold(inner: &Inner, n: usize) -> u8 {
+    let tag = inner.read_tag;
+    let mut histogram = [0u32; 256];
+    let mut total = 0u32;
+    for x in 0..NBUCKETS * SAMPLE {
+        let i = x * n / (NBUCKETS * SAMPLE);
+        if let Some((code, _)) = lead_fields(inner.leads[i].load(Relaxed), tag) {
+            histogram[usize::from(code)] += 1;
+            total += 1;
+        }
+    }
+    let limit = (f64::from(total) * LEAD_FRACTION) as u32;
+    let mut count = 0;
+    for code in (1..=u8::MAX).rev() {
+        count += histogram[usize::from(code)];
+        if count > limit {
+            return code;
+        }
+    }
+    u8::MAX
+}
+
+/// Set up lane `sl`'s run (claim entry `entry`) in an iteration that is
+/// split or records leads: its root children `children` (all of them
+/// except in a split job), and whether it records its job's lead (whole
+/// runs and first-part runs do).
+#[inline(never)]
+fn lead_run(sl: &mut SharedLane, inner: &Inner, entry: u32, children: u32) {
+    if children != ALL_MOVES {
+        // (The children are normal-side moves: a lead is recorded on the
+        // normal side, and the next iteration has the root there too, its
+        // bounds being below the remaining depth. A job's runs cover all
+        // its children in any case.)
+        sl.lane.stack[0].todo &= children;
+        // (A job's runs may end at once: its statistic is added.)
+        sl.split = true;
+    }
+    sl.lead_children = if children == ALL_MOVES || entry < inner.first_runs {
+        children
+    } else {
+        0
+    };
+}
+
+/// The job (an index of `Inner::jobs`) of a split iteration's run.
+#[inline(always)]
+#[expect(clippy::cast_possible_truncation, reason = "the low half")]
+fn run_job(run: u64) -> u32 {
+    run as u32
+}
+
+/// The root children of a split iteration's run.
+#[inline(always)]
+fn run_children(run: u64) -> u32 {
+    (run >> 32) as u32
+}
+
+/// Whether the new iteration of `inner` (the cube's first if `first`)
+/// records its jobs' leads (`record`: its jobs have their full length, and
+/// it is built in stages), and whether it is split (`sorted_in_stages`: its
+/// jobs are those of the last iteration, which recorded them). With h11: T = 17 records, T = 18 (the
+/// last iteration for 95% of the random states that reach it) is split and
+/// records, T = 19 is split, and so on.
+// Split iterations (c11): -2.9% -c 1 at 48T (7 paired holds, nodes -6.8%;
+// -c 0, bench share and the short sets neutral; 1T neutral).
+fn plan_leads(inner: &mut Inner, first: bool, record: bool, sorted_in_stages: bool) {
+    if first {
+        inner.leads_target = 0;
+    }
+    let has_leads = !inner.leads.is_empty();
+    inner.split = sorted_in_stages && has_leads && inner.leads_target + 1 == inner.target;
+    inner.read_tag = lead_tag(inner.tag_base, inner.leads_target);
+    inner.record_leads = !first && record && has_leads && inner.phases == 1;
+    if inner.record_leads {
+        inner.leads_target = inner.target;
+        inner.write_tag = lead_tag(inner.tag_base, inner.target);
+    }
+}
+
+/// The first-part bucket of a lead code (decreasing codes first).
+#[inline(always)]
+fn lead_bucket(code: u8) -> usize {
+    usize::from(u8::MAX - code) >> LEAD_SHIFT
 }
 
 /// Task `task` of sort stage `stage`.
@@ -1524,8 +1811,29 @@ unsafe fn sort_task(inner: &Inner, stage: usize, task: usize) {
             let hi = (lo + SORT_CHUNK).min(jobs.len());
             let (keys, key_buckets) = (bufs.keys_ptr.0, bufs.key_buckets_ptr.0);
             let mut counts = [0u32; NBUCKETS];
+            let mut lead_counts = [0u32; LEAD_BUCKETS];
             for i in lo..hi {
-                let key = sort_key(jobs, &inner.stats, bufs.stats_from_atomics, inner.target, i);
+                let mut key =
+                    sort_key(jobs, &inner.stats, bufs.stats_from_atomics, inner.target, i);
+                if inner.split {
+                    // A first-part run for a lead above the threshold; the
+                    // job's rest run (none if no child is left).
+                    let mut rest = ALL_MOVES;
+                    if let Some((code, group)) =
+                        lead_fields(inner.leads[i].load(Relaxed), inner.read_tag)
+                    {
+                        if code > inner.lead_threshold && key >> 63 == 0 {
+                            let bucket = lead_bucket(code);
+                            lead_counts[bucket] += 1;
+                            if moves_after(&jobs[i]) & !group == 0 {
+                                key |= 1 << 63;
+                            }
+                            // (With the bucket, for `ST_SCATTER`.)
+                            rest = ALL_MOVES & !group | (bucket as u32) << 24;
+                        }
+                    }
+                    *bufs.rest_children_ptr.0.add(i) = rest;
+                }
                 let bucket = bufs.splitters.partition_point(|&s| s <= key);
                 *keys.add(i) = key;
                 *key_buckets.add(i) = bucket as u8;
@@ -1533,6 +1841,10 @@ unsafe fn sort_task(inner: &Inner, stage: usize, task: usize) {
             }
             let bucket_counts = bufs.bucket_counts_ptr.0.add(task * NBUCKETS);
             std::ptr::copy_nonoverlapping(counts.as_ptr(), bucket_counts, NBUCKETS);
+            if inner.split {
+                let lead_out = bufs.lead_counts_ptr.0.add(task * LEAD_BUCKETS);
+                std::ptr::copy_nonoverlapping(lead_counts.as_ptr(), lead_out, LEAD_BUCKETS);
+            }
         }
         ST_SCATTER => {
             let lo = task * SORT_CHUNK;
@@ -1549,6 +1861,23 @@ unsafe fn sort_task(inner: &Inner, stage: usize, task: usize) {
                 *keys_tmp.add(*pos as usize) = *keys.add(i);
                 *pos += 1;
             }
+            if inner.split {
+                // The first-part runs, at their positions (`sort_stage_done`).
+                let lead_positions = std::slice::from_raw_parts_mut(
+                    bufs.lead_counts_ptr.0.add(task * LEAD_BUCKETS),
+                    LEAD_BUCKETS,
+                );
+                for i in lo..hi {
+                    let rest = *bufs.rest_children_ptr.0.add(i);
+                    if rest == ALL_MOVES {
+                        continue;
+                    }
+                    let group = ALL_MOVES & !rest;
+                    let pos = &mut lead_positions[(rest >> 24) as usize];
+                    *bufs.runs_ptr.0.add(*pos as usize) = i as u64 | u64::from(group) << 32;
+                    *pos += 1;
+                }
+            }
         }
         _ => {
             let lo = bufs.bucket_starts[task] as usize;
@@ -1557,6 +1886,16 @@ unsafe fn sort_task(inner: &Inner, stage: usize, task: usize) {
             // (Keys are distinct: the index breaks ties, as in a stable
             // sort.)
             run.sort_unstable();
+            if inner.split {
+                // The rest runs: job indices (the jobs stay in place).
+                let runs = bufs.runs_ptr.0.add(bufs.first_runs + lo);
+                for (p, &key) in run.iter().enumerate() {
+                    let i = key_index(key);
+                    let children = *bufs.rest_children_ptr.0.add(i) & ALL_MOVES;
+                    *runs.add(p) = i as u64 | u64::from(children) << 32;
+                }
+                return;
+            }
             let out = bufs.out_ptr.0.add(lo);
             for (p, &key) in run.iter().enumerate() {
                 if let Some(&ahead) = run.get(p + 16) {
@@ -1588,9 +1927,33 @@ fn sort_stage_done(inner: &mut Inner, stage: usize) -> Option<(usize, usize)> {
                 }
             }
             bufs.bucket_starts.push(pos);
+            if inner.split {
+                // The first-part runs by bucket, then chunk (job order).
+                let mut pos = 0u32;
+                for bucket in 0..LEAD_BUCKETS {
+                    for chunk in 0..chunks {
+                        let count = &mut bufs.lead_counts[chunk * LEAD_BUCKETS + bucket];
+                        (*count, pos) = (pos, pos + *count);
+                    }
+                }
+                bufs.first_runs = pos as usize;
+            }
             Some((ST_SCATTER, chunks))
         }
         ST_SCATTER => Some((ST_BUCKETS, NBUCKETS)),
+        _ if inner.split => {
+            let n = inner.jobs.len();
+            inner.first_runs = u32::try_from(bufs.first_runs).unwrap_or(u32::MAX);
+            // SAFETY: the tasks wrote the first-part runs and a rest run per
+            // job (and sorted `keys_tmp`).
+            unsafe {
+                inner.runs.set_len(bufs.first_runs + n);
+                inner.feasible = bufs.first_runs
+                    + std::slice::from_raw_parts(bufs.keys_tmp_ptr.0.cast_const(), n)
+                        .partition_point(|&k| k >> 63 == 0);
+            }
+            None
+        }
         _ => {
             let n = inner.jobs.len();
             // SAFETY: the tasks wrote all of `out` (and sorted `keys_tmp`).
@@ -1823,7 +2186,7 @@ fn trace_found(pool: &Pool, ctx: &CubeCtx, sl: &SharedLane, active_lanes: usize,
             seconds * 1e3,
             inner.published.elapsed().as_secs_f64() * 1e3,
             sl.lane.target,
-            sl.job,
+            sl.entry,
             next,
             inner.feasible,
             sl.started.saturating_duration_since(inner.published).as_secs_f64() * 1e3,
@@ -2161,6 +2524,11 @@ impl Worker<'_, '_> {
         // nodes in stream mode; share mode keeps whole-job order, not measured here).
         let inner = loc.ctx.inner();
         let phases = inner.phases;
+        if stat && inner.record_leads && sl.lead_children != 0 && sl.lane.stack[0].normal {
+            let children = moves_after(&inner.jobs[sl.job as usize]) & sl.lead_children;
+            let lead = lead_of(&sl.lane.child_stats, children, inner.write_tag);
+            inner.leads[sl.job as usize].store(lead, Relaxed);
+        }
         // (In a first pass, only the last phase's entries give statistics:
         // its target is the next iteration's.)
         if stat && u32::from(sl.phase) + 1 == phases {
@@ -2297,6 +2665,13 @@ impl Worker<'_, '_> {
             let ctx = &*loc.ctx;
             let inner = ctx.inner();
             let (job, target, phase) = entry_job(inner, entry);
+            // (A split iteration's run: a job and its root children.)
+            let (job, children) = if inner.split {
+                let run = inner.runs[job as usize];
+                (run_job(run), run_children(run))
+            } else {
+                (job, ALL_MOVES)
+            };
             let phases = inner.phases;
             let job_entry = inner.jobs[job as usize];
             // (A first pass's entries that are infeasible in their phase are
@@ -2322,8 +2697,12 @@ impl Worker<'_, '_> {
                     sl.phase = phase;
                     sl.nodes_at_start = lane.stats.nodes;
                     sl.lookups_at_start = lane.stats.lookups;
+                    if inner.split || inner.record_leads {
+                        lead_run(sl, inner, entry, children);
+                    }
                     if self.pool.trace {
                         sl.started = Instant::now();
+                        sl.entry = entry;
                     }
                     return true;
                 }
@@ -2387,6 +2766,14 @@ impl Worker<'_, '_> {
         // after another. (l6-share-2; screening run without it: -c 1 3.06 vs
         // 2.36-2.42 ms, bench share 799 vs 845/s at 48T.)
         let (first, end) = (jobs.0 as usize, jobs.1 as usize);
+        if inner.split {
+            // (The runs' jobs are scattered.)
+            for &run in &inner.runs[first..end] {
+                prefetch(&inner.jobs[run_job(run) as usize], false);
+                prefetch(&inner.stats[run_job(run) as usize], true);
+            }
+            return true;
+        }
         for i in (first..end).step_by(4) {
             prefetch(&inner.jobs[i], false);
         }
@@ -2395,6 +2782,11 @@ impl Worker<'_, '_> {
             prefetch(&inner.stats[i], true);
         }
         prefetch(&inner.stats[end - 1], true);
+        if inner.record_leads {
+            for i in (first..end).step_by(16) {
+                prefetch(&inner.leads[i], true);
+            }
+        }
         true
     }
 
@@ -2553,6 +2945,7 @@ impl Worker<'_, '_> {
             let spare = pool.spare.lock().unwrap().pop();
             let mut inner = spare.unwrap_or_else(Inner::touched);
             inner.target = bound.max(bound_inverse).max(1);
+            inner.tag_base = u32::try_from(index % 64).unwrap_or(0) * 4;
             let ctx = Arc::new(CubeCtx {
                 index,
                 started,
@@ -2671,6 +3064,8 @@ impl Worker<'_, '_> {
         lane.child_stats = [0.0; 18];
         sl.slot = slot;
         sl.job = job;
+        sl.entry = job;
+        sl.lead_children = 0;
         sl.split = true;
         sl.phase = phase;
         sl.nodes_at_start = lane.stats.nodes;
@@ -2750,6 +3145,9 @@ impl Worker<'_, '_> {
         to.lane.root_inverse = from.lane.root_inverse;
         to.slot = from.slot;
         to.job = from.job;
+        to.entry = from.entry;
+        to.lead_children = 0;
+        from.lead_children = 0;
         to.phase = from.phase;
         to.split = true;
         from.split = true;
@@ -3125,6 +3523,163 @@ mod tests {
                 assert_eq!(solution.len(), optimal[i], "cube {i}: {config:?}");
             }
         }
+    }
+
+    /// `lead_of` as written out per child.
+    #[test]
+    #[expect(clippy::cast_possible_truncation, reason = "random bits")]
+    fn lead_of_matches_scalar_lead() {
+        let mut rng = crate::cubie::Rng(5);
+        for _ in 0..2000 {
+            let children = rng.next_u64() as u32 & ALL_MOVES;
+            let mut stats = [0f32; 18];
+            for stat in &mut stats {
+                let r = rng.next_u64();
+                *stat = if r.is_multiple_of(3) {
+                    0.0
+                } else {
+                    f32::from((r >> 8) as u16) * 4.0
+                };
+            }
+            let weighted: Vec<f32> = (0..18)
+                .map(|mv| {
+                    let weight = if mv / 3 % 2 == 1 { 1.189_207_1 } else { 1.0 };
+                    if children >> mv & 1 != 0 {
+                        stats[mv] * weight
+                    } else {
+                        0.0
+                    }
+                })
+                .collect();
+            let best = weighted.iter().copied().fold(0f32, f32::max);
+            let code = super::super::quantize(best);
+            let mut group = 0u32;
+            for (mv, &stat) in weighted.iter().enumerate() {
+                if children >> mv & 1 != 0 && stat >= best * LEAD_SHARE {
+                    group |= 1 << mv;
+                }
+            }
+            for face in 0..6 {
+                if group >> (3 * face) & 0b101 != 0 {
+                    group |= 0b101 << (3 * face);
+                }
+            }
+            let want = if code == 0 {
+                0
+            } else {
+                lead_word(7, code, group & children)
+            };
+            assert_eq!(
+                lead_of(&stats, children, 7),
+                want,
+                "{stats:?} {children:#x}"
+            );
+        }
+    }
+
+    /// A split iteration's staged sort: each job's root children run once,
+    /// in its first-part run (a lead of the cube above the threshold: its
+    /// group) or its rest run; the first-part runs by decreasing lead
+    /// bucket, ties in job order; the rest runs in the order of `sort_key`
+    /// (a job without children left has none).
+    #[test]
+    #[expect(clippy::cast_possible_truncation, reason = "jobs from random bits")]
+    fn split_runs_cover_each_child_once() {
+        let mut rng = crate::cubie::Rng(23);
+        let n = if cfg!(miri) { 9000 } else { 30000 };
+        let tag = 5;
+        let mut inner = Inner::touched();
+        inner.jobs = (0..n)
+            .map(|i| {
+                let r = rng.next_u64();
+                Job {
+                    moves: [0, 3, 6, (r % 18) as u8],
+                    len: 4,
+                    normal_bound: (i % 13) as u8,
+                    inverse_bound: ((r >> 8) % 12) as u8,
+                    stat: 0.0,
+                }
+            })
+            .collect();
+        inner.stats.clear();
+        inner.stats.resize_with(n, || AtomicU32::new(0));
+        for i in 0..n {
+            let r = rng.next_u64();
+            let allowed = moves_after(&inner.jobs[i]);
+            let stat = f32::from((r >> 40) as u16 % 1000);
+            inner.stats[i].store(stat.to_bits(), Relaxed);
+            let code = 48 + (r >> 8) as u8 % 150;
+            let group = (r >> 20) as u32 & allowed | 1 << allowed.trailing_zeros();
+            let lead = match r % 10 {
+                0 => 0,
+                1 => lead_word(tag + 1, code, group),
+                // (all children in the group: no rest run)
+                2 => lead_word(tag, code, allowed),
+                _ => lead_word(tag, code, group),
+            };
+            inner.leads[i].store(lead, Relaxed);
+        }
+        inner.target = 16;
+        inner.split = true;
+        inner.read_tag = tag;
+        inner.b = Bufs::sized();
+        inner.b.stats_from_atomics = true;
+        let mut tasks = sort_setup(&mut inner);
+        let mut stage = ST_KEYS;
+        loop {
+            for task in (0..tasks).rev() {
+                // SAFETY: one task at a time.
+                unsafe { sort_task(&inner, stage, task) };
+            }
+            match sort_stage_done(&mut inner, stage) {
+                Some((next_stage, next_tasks)) => (stage, tasks) = (next_stage, next_tasks),
+                None => break,
+            }
+        }
+        let threshold = inner.lead_threshold;
+        assert!(threshold > 48 && threshold < 200, "{threshold}");
+        let first = inner.runs.len() - n;
+        let mut covered = vec![0u32; n];
+        let mut last = None;
+        for (e, &run) in inner.runs[..inner.feasible].iter().enumerate() {
+            let job = run_job(run) as usize;
+            let children = run_children(run) & moves_after(&inner.jobs[job]);
+            assert_eq!(covered[job] & children, 0, "job {job} child run twice");
+            covered[job] |= children;
+            if e < first {
+                let (code, group) = lead_fields(inner.leads[job].load(Relaxed), tag).unwrap();
+                assert!(code > threshold);
+                assert_eq!(run_children(run), group);
+                let order = Some((lead_bucket(code), job));
+                assert!(order > last);
+                last = order;
+            }
+        }
+        for (job, &mask) in covered.iter().enumerate() {
+            assert_eq!(mask, moves_after(&inner.jobs[job]), "job {job}");
+        }
+        // The rest runs: the jobs by `sort_key`, those without children
+        // left last (not claimed).
+        let mut want: Vec<(bool, u64, usize)> = (0..n)
+            .map(|i| {
+                let has_first = lead_fields(inner.leads[i].load(Relaxed), tag)
+                    .is_some_and(|(code, _)| code > threshold);
+                let rest = if has_first {
+                    ALL_MOVES & !(inner.leads[i].load(Relaxed) & ALL_MOVES)
+                } else {
+                    ALL_MOVES
+                };
+                let empty = moves_after(&inner.jobs[i]) & rest == 0;
+                (empty, sort_key(&inner.jobs, &inner.stats, true, 16, i), i)
+            })
+            .collect();
+        want.sort_unstable();
+        let got: Vec<usize> = inner.runs[first..]
+            .iter()
+            .map(|&run| run_job(run) as usize)
+            .collect();
+        assert!(got.iter().eq(want.iter().map(|w| &w.2)));
+        assert_eq!(inner.feasible, first + want.iter().filter(|w| !w.0).count());
     }
 
     /// The staged sort (its tasks run in any order within a stage) gives

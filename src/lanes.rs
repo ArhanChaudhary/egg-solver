@@ -1224,8 +1224,9 @@ impl Lane {
                 if depth == 0 {
                     // job finished
                     if self.shared {
+                        // (`child_stats` stays for `share`, which reads it at
+                        // the job's end and clears it at the next job's start.)
                         self.job_stat = sum18(&self.child_stats);
-                        self.child_stats = [0.0; 18];
                         self.stats.nodes += nodes;
                         return Step::JobDone;
                     }
