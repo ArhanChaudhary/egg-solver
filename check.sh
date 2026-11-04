@@ -13,9 +13,10 @@ cargo test --release 2>&1 | tee "$log" | grep -E "^test result"
 # NEON (macOS and Linux), the scalar fallback (any target; forced here by the
 # `scalar` feature) and wasm (SIMD128: WASI with and without threads, and the
 # library for wasm32-unknown-unknown). Their library tests run with the
-# scalar backend here, and with NEON under qemu and with wasm under wasmtime
-# (wasi-threads: up to v44) when installed. Skipped (with a note) where a
-# target or tool is missing; CHECK_BACKENDS=0 skips all.
+# scalar backend here, with NEON under qemu and with wasm under wasmtime
+# (wasi-threads: up to v44) when installed, and the wasm module (wasm/) gets a
+# smoke test in Node. Skipped (with a note) where a target or tool is missing;
+# CHECK_BACKENDS=0 skips all.
 if [ "${CHECK_BACKENDS:-1}" != 0 ]; then
     installed=$(rustup target list --installed 2>/dev/null || true)
     for target in aarch64-apple-darwin aarch64-unknown-linux-gnu wasm32-unknown-unknown \
@@ -26,6 +27,9 @@ if [ "${CHECK_BACKENDS:-1}" != 0 ]; then
             cargo clippy --release --lib --target $target -- -D warnings
         else
             cargo clippy --release --all-targets --target $target -- -D warnings
+        fi
+        if [[ $target == wasm32-wasip1* ]] && grep -qx "$target" <<< "$installed"; then
+            cargo clippy --release -p cubeopt-wasm --target $target -- -D warnings
         fi
     done
     if grep -qx wasm32-wasip1-threads <<< "$installed"; then
@@ -38,6 +42,12 @@ if [ "${CHECK_BACKENDS:-1}" != 0 ]; then
             ! grep -qE "FAILED|panicked" "$log"
         else
             echo "check: wasmtime with wasi-threads (v44 or older; WASMTIME=path) missing: wasm tests not run" >&2
+        fi
+        if grep -qx wasm32-wasip1 <<< "$installed" && command -v node > /dev/null; then
+            wasm/build.sh > /dev/null
+            node wasm/test.mjs
+        else
+            echo "check: node or target wasm32-wasip1 missing: wasm module not tested" >&2
         fi
     fi
     cargo clippy --release --all-targets --features scalar -- -D warnings

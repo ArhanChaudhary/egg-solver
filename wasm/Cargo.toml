@@ -1,0 +1,15 @@
+[package]
+name = "cubeopt-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "cubeopt as a WebAssembly module with a C ABI (see wasm/cubeopt.mjs)"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+cubeopt = { path = ".." }
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
