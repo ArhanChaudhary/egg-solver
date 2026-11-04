@@ -24,7 +24,7 @@
 //! `pext` (gather the bits under a mask) and `movemask` (gather the top bit
 //! of each byte), then looks the parts up in small tables.
 
-use crate::simd::{Cube, A64};
+use crate::simd::{Aligned64, Cube};
 #[cfg(miri)]
 use std::arch::x86_64::_pext_u64;
 use std::arch::x86_64::{
@@ -208,12 +208,12 @@ fn corner_fields(cube: Cube) -> (u64, u64) {
     let corners = cube.corners_u64();
     let (co_fields, tetrads): (u64, u64);
     unsafe {
-        let tabs = &crate::simd::TABS;
+        let tabs = &crate::simd::HOT_TABLES;
         // (Miri cannot run inline asm: the same pexts as intrinsics.)
         #[cfg(miri)]
         {
-            co_fields = _pext_u64(corners, tabs.pext_co);
-            tetrads = _pext_u64(corners, tabs.pext_sep);
+            co_fields = _pext_u64(corners, tabs.co_pext_mask);
+            tetrads = _pext_u64(corners, tabs.tetrad_pext_mask);
         }
         // (The masks are memory operands: no 64-bit immediates to load.)
         #[cfg(not(miri))]
@@ -224,8 +224,8 @@ fn corner_fields(cube: Cube) -> (u64, u64) {
             sep = lateout(reg) tetrads,
             x = in(reg) corners,
             t = in(reg) tabs,
-            oc = const std::mem::offset_of!(crate::simd::Tabs, pext_co),
-            os = const std::mem::offset_of!(crate::simd::Tabs, pext_sep),
+            oc = const std::mem::offset_of!(crate::simd::HotTables, co_pext_mask),
+            os = const std::mem::offset_of!(crate::simd::HotTables, tetrad_pext_mask),
             options(pure, readonly, nostack, preserves_flags)
         );
         std::hint::assert_unchecked(co_fields < 1 << 14 && tetrads < 1 << 8);
@@ -243,9 +243,9 @@ fn corner_fields(cube: Cube) -> (u64, u64) {
 pub fn cocsep(cube: Cube) -> usize {
     let (co_fields, tetrads) = corner_fields(cube);
     unsafe {
-        let tabs = &crate::simd::TABS;
-        (*tabs.co_lo.get_unchecked((co_fields & 0xFF) as usize)
-            + *tabs.co_hi.get_unchecked((co_fields >> 8) as usize)
+        let tabs = &crate::simd::HOT_TABLES;
+        (*tabs.co_low.get_unchecked((co_fields & 0xFF) as usize)
+            + *tabs.co_high.get_unchecked((co_fields >> 8) as usize)
             + u32::from(*tabs.rank8.get_unchecked(tetrads as usize))) as usize
     }
 }
@@ -261,10 +261,10 @@ pub fn cocsep(cube: Cube) -> usize {
 pub fn cocsep_x3(cube: Cube) -> usize {
     let (co_fields, tetrads) = corner_fields(cube);
     unsafe {
-        let tabs = &crate::simd::TABS;
-        (*tabs.co_lo3.get_unchecked((co_fields & 0xFF) as usize)
-            + *tabs.co_hi3.get_unchecked((co_fields >> 8) as usize)
-            + u32::from(*tabs.sep3.get_unchecked(tetrads as usize))) as usize
+        let tabs = &crate::simd::HOT_TABLES;
+        (*tabs.co_low_x3.get_unchecked((co_fields & 0xFF) as usize)
+            + *tabs.co_high_x3.get_unchecked((co_fields >> 8) as usize)
+            + u32::from(*tabs.tetrads_x3.get_unchecked(tetrads as usize))) as usize
     }
 }
 
@@ -326,8 +326,8 @@ pub fn edge_parts_sym(cube: Cube, sym: usize) -> (u64, u64, u64) {
 #[inline(always)]
 fn edge_parts_sym_raw(cube: Cube, sym: usize) -> (u64, u32, u64) {
     unsafe {
-        let tabs = &crate::simd::TABS;
-        let line: *const A64 = tabs.sym_edge.get_unchecked(sym);
+        let tabs = &crate::simd::HOT_TABLES;
+        let line: *const Aligned64 = tabs.sym_edges.get_unchecked(sym);
         let classify = _mm256_load_si256(line.cast());
         let positions = _mm256_load_si256(line.cast::<__m256i>().add(1));
         let classes = _mm256_xor_si256(_mm256_shuffle_epi8(classify, cube.0), cube.0);
@@ -352,7 +352,7 @@ fn edge_parts_sym_raw(cube: Cube, sym: usize) -> (u64, u32, u64) {
         // table, which saves a copy of `e_mask`.
         let non_e = e_mask ^ 0x0FFF_0000;
         let msplit = u64::from(*tabs.rank8.get_unchecked(_pext_u32(s_mask, non_e) as usize));
-        let eslot = u64::from(*tabs.eslot_c.get_unchecked((non_e >> 16) as usize));
+        let eslot = u64::from(*tabs.eslot_complement.get_unchecked((non_e >> 16) as usize));
         (msplit, eo_bits, eslot)
     }
 }

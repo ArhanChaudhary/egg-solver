@@ -169,7 +169,7 @@ fn main() {
     if a[2] == "stream" {
         let warm = arg(&a, 3, 3.0);
         let window = arg(&a, 4, 15.0);
-        let threads = arg(&a, 5, cubeopt::nthreads());
+        let threads = arg(&a, 5, cubeopt::thread_count());
         let nlanes = arg(&a, 6, cubeopt::lanes::DEFAULT_LANES);
         let seed: u64 = arg(&a, 7, 2026);
         let cubes = move |i: usize| {
@@ -204,7 +204,7 @@ fn main() {
     if let Some(n) = a.get(3) {
         cubes.truncate(n.parse().unwrap());
     }
-    let threads = arg(&a, 4, cubeopt::nthreads());
+    let threads = arg(&a, 4, cubeopt::thread_count());
     let nlanes = arg(&a, 5, cubeopt::lanes::DEFAULT_LANES);
     let get = |i: usize| cubes.get(i).copied();
     let (recs, el) = run(&solver, &get, threads, nlanes, None, share);

@@ -28,7 +28,7 @@
 //! normal side.
 
 use crate::cubie::{inverse_move, CubieCube};
-use crate::simd::{Cube, TABS};
+use crate::simd::{Cube, HOT_TABLES};
 use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES, NO_HALF};
 
 pub mod share;
@@ -314,7 +314,7 @@ static HEUR_TERMS: [f32; 64] = mk_heur_terms();
 
 /// `HEUR_TERMS[po] + HEUR_TERMS[pm]` at index `po << 4 | pm` (bounds are
 /// below 16; the same f32 sums as computed at run time). Used as
-/// `TABS.heur_pair`.
+/// `HOT_TABLES.heur_pair`.
 pub(crate) const HEUR_PAIR: [f32; 256] = {
     let t = mk_heur_terms();
     let mut r = [0f32; 256];
@@ -464,7 +464,7 @@ impl Lane {
             // SAFETY: job moves are moves.
             unsafe { std::hint::assert_unchecked(m < 18) };
             c = c.apply_move(m);
-            ci = ci.premove_inv(m);
+            ci = ci.premove_inverse(m);
         }
         (c, ci)
     }
@@ -536,7 +536,7 @@ impl Lane {
                 ring[head % 64] = (2 * pos, idx, cd);
                 head += 1;
                 if m.is_multiple_of(3) {
-                    let (idx, cd) = s.index(ci.premove_inv(m));
+                    let (idx, cd) = s.index(ci.premove_inverse(m));
                     s.prefetch(idx);
                     ring[head % 64] = (2 * pos + 1, idx, cd);
                     head += 1;
@@ -1037,7 +1037,7 @@ impl Lane {
                 // Sibling-face pruning on the child's bound (see `note_value`).
                 // SAFETY: moves are below 18.
                 unsafe { std::hint::assert_unchecked(f < 6) };
-                let keep = std::hint::select_unpredictable(lb > p.r, TABS.face_keep[f], !0);
+                let keep = std::hint::select_unpredictable(lb > p.r, HOT_TABLES.face_keep[f], !0);
                 lb = max_dec(p.lb, lb);
                 p.lb = lb;
                 r = p.r;
@@ -1073,7 +1073,7 @@ impl Lane {
                     continue;
                 }
                 let a2 = a.apply_move(m);
-                let b2 = b.premove_inv(m);
+                let b2 = b.premove_inverse(m);
                 let po = if kind == 1 { lo } else { 0 };
                 if po > r1 || a2.is_solved() {
                     continue;
@@ -1089,7 +1089,7 @@ impl Lane {
                 continue;
             }
             let a2 = a.apply_move(m);
-            let b2 = b.premove_inv(m);
+            let b2 = b.premove_inverse(m);
             let half = kind == 1;
             // (The pending child's move: the root child whose statistic
             // (`cheur`) a lookup counts for is `stack[1].m`, at the root as
@@ -1149,7 +1149,7 @@ impl Lane {
         unsafe { std::hint::assert_unchecked(self.sp < MAXD && face < 6) };
         let node = &mut self.stack[self.sp];
         node.lb = max_dec(node.lb, v);
-        node.todo &= std::hint::select_unpredictable(v > node.r, TABS.face_keep[face], !0);
+        node.todo &= std::hint::select_unpredictable(v > node.r, HOT_TABLES.face_keep[face], !0);
     }
 
     /// The X child `m` was pruned by its other-side value (`tw`), which its
@@ -1211,7 +1211,7 @@ impl Lane {
             std::hint::assert_unchecked(po < 16 && pm < 16);
             let c = self.stack[1].m as usize;
             std::hint::assert_unchecked(c < 18);
-            self.cheur[c] += TABS.heur_pair[(po as usize) << 4 | pm as usize];
+            self.cheur[c] += HOT_TABLES.heur_pair[(po as usize) << 4 | pm as usize];
         }
         let r1 = self.stack[self.sp].r - 1;
         let face = self.k_face as usize;
@@ -1256,7 +1256,7 @@ impl Lane {
         node.todo = todo ^ todo.isolate_lowest_one();
         self.stats.nodes += 1;
         let a2 = node.a.apply_move(m);
-        let b2 = node.b.premove_inv(m);
+        let b2 = node.b.premove_inverse(m);
         self.k_a = a2;
         self.k_b = b2;
         self.k_m = m as u8;
@@ -1298,7 +1298,7 @@ impl Lane {
         let r1 = node.r - 1;
         let pn = node.normal;
         // Allowed moves on the moved side and on the other side.
-        let mut mm_m = TABS.allowed_after[self.k_face as usize];
+        let mut mm_m = HOT_TABLES.allowed_after[self.k_face as usize];
         let mut mm_x = node.mm_o;
         if po == r1 {
             mm_m &= NO_HALF;
@@ -1331,7 +1331,7 @@ impl Lane {
         };
         #[cfg(debug_assertions)]
         {
-            let allowed = TABS.allowed_after[self.k_face as usize];
+            let allowed = HOT_TABLES.allowed_after[self.k_face as usize];
             let (c, ci, ln, li, mut mm_n, mut mm_i) = if pn {
                 (a2, b2, pm, po, allowed, node.mm_o)
             } else {

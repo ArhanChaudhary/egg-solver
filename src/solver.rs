@@ -3,7 +3,7 @@
 use crate::coord::{cocsep_x3, index_sym};
 use crate::cubie::{inverse_move, CubieCube};
 use crate::simd::Cube;
-use crate::tables::{cp_class, cp_depth, cp_ttrep, Cocsep, H48Table};
+use crate::tables::{packed_class, packed_depth, packed_sym_to_rep, Cocsep, H48Table};
 
 /// All 18 moves (the low 18 bits).
 pub const ALL_MOVES: u32 = u32::MAX.unbounded_shr(32 - 18);
@@ -118,8 +118,14 @@ impl<'a> Solver<'a> {
     pub(crate) fn index(&self, c: Cube) -> (u64, u8) {
         // `self.cs.packed(cocsep(c))`
         let d = unsafe { self.cptr.add(cocsep_x3(c)).cast::<u32>().read_unaligned() };
-        let idx = index_sym(c, cp_ttrep(d), cp_class(d), self.row_mul, self.eo_mask);
-        (idx, cp_depth(d))
+        let idx = index_sym(
+            c,
+            packed_sym_to_rep(d),
+            packed_class(d),
+            self.row_mul,
+            self.eo_mask,
+        );
+        (idx, packed_depth(d))
     }
 
     #[inline(always)]
@@ -185,7 +191,7 @@ impl<'a> Solver<'a> {
                 n.moves[n.len as usize] = m as u8;
                 n.len += 1;
                 n.c = j.c.apply_move(m);
-                n.ci = j.ci.premove_inv(m);
+                n.ci = j.ci.premove_inverse(m);
                 out.push(n);
             }
         }
@@ -353,7 +359,7 @@ impl<'a> Solver<'a> {
             ctx.stats.nodes += 1;
             kids[nk] = Kid {
                 c: a.apply_move(m),
-                i: b.premove_inv(m),
+                i: b.premove_inverse(m),
                 idx: 0,
                 m: m as u8,
                 pn: 0,
@@ -494,7 +500,7 @@ mod tests {
     use super::*;
     use crate::coord::cocsep;
     use crate::cubie::{conjugate, parse_moves, symmetries, Rng};
-    use crate::tables::cd_depth;
+    use crate::tables::entry_depth;
 
     /// The hot-path index (`Solver::index`: `cocsep_x3`, packed entries,
     /// `index_sym`) equals `Cocsep::index` for every `k`, symmetric cubes too.
@@ -527,7 +533,7 @@ mod tests {
                 let cube = Cube::from_cubie(c);
                 let (index, corner_bound) = solver.index(cube);
                 assert_eq!(index, corners.index(cube, k), "k {k}: {c:?}");
-                assert_eq!(corner_bound, cd_depth(corners.data[cocsep(cube)]));
+                assert_eq!(corner_bound, entry_depth(corners.entries[cocsep(cube)]));
             }
         }
     }

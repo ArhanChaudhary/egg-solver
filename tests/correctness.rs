@@ -2,7 +2,7 @@ use cubeopt::coord::cocsep;
 use cubeopt::cubie::{conjugate, parse_moves, symmetries, CubieCube, Rng};
 use cubeopt::simd::Cube;
 use cubeopt::solver::Solver;
-use cubeopt::tables::{cd_depth, Cocsep, H48Table};
+use cubeopt::tables::{entry_depth, Cocsep, H48Table};
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
@@ -13,7 +13,7 @@ fn cs_data() -> &'static Cocsep {
 
 fn h0() -> &'static H48Table {
     static T: OnceLock<H48Table> = OnceLock::new();
-    T.get_or_init(|| cubeopt::generate(cs_data(), 0, 8, None, &[], cubeopt::nthreads()).0)
+    T.get_or_init(|| cubeopt::generate(cs_data(), 0, 8, None, &[], cubeopt::thread_count()).0)
 }
 
 fn dataset(name: &str) -> Vec<CubieCube> {
@@ -31,7 +31,7 @@ fn par_solve(cubes: &[CubieCube], table: &H48Table) -> Vec<Vec<u8>> {
     let out = std::sync::Mutex::new(vec![vec![]; cubes.len()]);
     let next = std::sync::atomic::AtomicUsize::new(0);
     std::thread::scope(|s| {
-        for _ in 0..cubeopt::nthreads() {
+        for _ in 0..cubeopt::thread_count() {
             s.spawn(|| loop {
                 let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 if i >= cubes.len() {
@@ -73,7 +73,7 @@ fn ball(depth: u8) -> HashMap<[u8; 32], (Cube, u8)> {
 fn h0_table_matches_brute_force() {
     let cs = cs_data();
     let base = 3u8;
-    let (t, _) = cubeopt::generate(cs, 0, base, None, &[], cubeopt::nthreads());
+    let (t, _) = cubeopt::generate(cs, 0, base, None, &[], cubeopt::thread_count());
     let b = ball(5);
     let mut best: HashMap<u64, u8> = HashMap::new();
     for &(c, d) in b.values() {
@@ -114,7 +114,7 @@ fn reference_length(c: &CubieCube, cs: &Cocsep) -> usize {
         if depth == 0 {
             return c.is_solved();
         }
-        if cd_depth(cs.data[cocsep(c)]) > depth {
+        if entry_depth(cs.entries[cocsep(c)]) > depth {
             return false;
         }
         for m in 0..18 {

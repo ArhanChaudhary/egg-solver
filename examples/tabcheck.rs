@@ -17,7 +17,7 @@
 //! ```
 use cubeopt::coord::{cube_from_edge_key, split_index, N_SLOTS};
 use cubeopt::cubie::Rng;
-use cubeopt::tables::{cd_class, cd_ttrep, h48_rows, Cocsep, H48Table};
+use cubeopt::tables::{entry_class, entry_sym_to_rep, h48_rows, Cocsep, H48Table};
 use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
 
 /// Violations found, by kind.
@@ -66,7 +66,7 @@ fn main() {
                     };
                     let idx = rng.below(rows) * N_SLOTS as u64 + slot;
                     let (class, edge_key) = split_index(idx, k);
-                    let cube = cube_from_edge_key(cs.reps[class], edge_key);
+                    let cube = cube_from_edge_key(cs.representatives[class], edge_key);
                     let code = table.get(idx).0;
                     counts.samples.fetch_add(1, Relaxed);
                     counts.codes[usize::from(code)].fetch_add(1, Relaxed);
@@ -76,17 +76,21 @@ fn main() {
                     }
                     // Self-symmetric variants of the entry (the same coset seen
                     // through a symmetry fixing the class representative).
-                    let mut sym = cs.selfsim[class] & !1;
+                    let mut sym = cs.self_symmetries[class] & !1;
                     while sym != 0 {
                         let s = sym.trailing_zeros() as usize;
                         sym ^= sym.isolate_lowest_one();
                         let variant = cube.transform(s);
-                        let data = cs.data[cubeopt::coord::cocsep(variant)];
-                        debug_assert_eq!(cd_class(data), class);
+                        let data = cs.entries[cubeopt::coord::cocsep(variant)];
+                        debug_assert_eq!(entry_class(data), class);
                         let vidx = cs.index(variant, k);
                         if table.get(vidx).0 != code {
                             counts.variant_mismatch.fetch_add(1, Relaxed);
-                            report("variant", idx, format!("sym {s} ttrep {}", cd_ttrep(data)));
+                            report(
+                                "variant",
+                                idx,
+                                format!("sym {s} ttrep {}", entry_sym_to_rep(data)),
+                            );
                         }
                     }
                     let mut has_lower = false;

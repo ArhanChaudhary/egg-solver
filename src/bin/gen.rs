@@ -24,7 +24,7 @@ fn main() {
         .collect();
     let t = std::time::Instant::now();
     let cs = Cocsep::generate();
-    let (main, ds) = cubeopt::generate(&cs, k, base, Some(&out), &derived, cubeopt::nthreads());
+    let (main, ds) = cubeopt::generate(&cs, k, base, Some(&out), &derived, cubeopt::thread_count());
     eprintln!("generated in {:.1}s", t.elapsed().as_secs_f64());
     eprintln!(
         "h{} base {} distribution {:?}",

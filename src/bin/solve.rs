@@ -42,7 +42,7 @@ fn main() {
     if args.len() < 2 {
         usage();
     }
-    let mut threads = cubeopt::nthreads();
+    let mut threads = cubeopt::thread_count();
     let mut lanes = cubeopt::lanes::DEFAULT_LANES;
     let mut conc = 0;
     let mut count = usize::MAX;
