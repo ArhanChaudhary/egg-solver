@@ -326,6 +326,9 @@ struct CubeCtx {
     /// (trace) Per build task (stage - 1) * 256 + task: thread + 1, start and
     /// end (ms, f32 bits).
     task_log: Box<[[AtomicU32; 3]]>,
+    /// (trace) Per thread: ns from `started` when it last finished its
+    /// claimed jobs (`settle`).
+    thread_done_ns: Box<[AtomicU64]>,
 }
 
 #[derive(Default)]
@@ -492,13 +495,30 @@ pub struct Pool<'a> {
     spare: Pad<Mutex<Vec<Inner>>>,
     bufs: Pad<Mutex<Vec<Bufs>>>,
     counters: Mutex<[u64; NCOUNT]>,
-    /// Print a line per iteration and solution (env `CUBE_TRACE`).
+    /// Trace each iteration and solution (env `CUBE_TRACE` set): times,
+    /// threads' finish times and the solving job. `CUBE_TRACE` = 1 plus the
+    /// bits `TRACE_*` adds more, at a cost.
     trace: bool,
+    trace_bits: u32,
+    /// (trace) The lines, printed when the pool is dropped: printed at once,
+    /// with the counters, they took -c 1 from 2.0 to 2.9 ms per cube at 48
+    /// threads (timestamps alone, buffered: ~2%).
+    trace_out: Mutex<String>,
+    /// (trace) ns spent in `idle_wait`, summed over threads.
+    idle_ns: AtomicU64,
+    started: Instant,
     /// (Tests) Pause after publishing a fresh cube, so that other threads
     /// can solve and report it before its creator goes on.
     #[cfg(test)]
     pause_after_publish: bool,
 }
+
+/// `CUBE_TRACE` bits: nodes, jobs, splits and donations per iteration (atomics
+/// shared by all threads: +35% -c 1 latency at 48 threads), build tasks, time
+/// in `idle_wait`.
+const TRACE_COUNTERS: u32 = 2;
+const TRACE_TASKS: u32 = 4;
+const TRACE_IDLE: u32 = 8;
 
 /// Event counters (summed over threads; see `Pool::counters`).
 const NCOUNT: usize = 13;
@@ -570,6 +590,13 @@ impl<'a> Pool<'a> {
             bufs: Pad(Mutex::new(Vec::new())),
             counters: Mutex::new([0; NCOUNT]),
             trace: std::env::var_os("CUBE_TRACE").is_some(),
+            trace_out: Mutex::new(String::new()),
+            trace_bits: std::env::var("CUBE_TRACE")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0),
+            idle_ns: AtomicU64::new(0),
+            started: Instant::now(),
             #[cfg(test)]
             pause_after_publish: false,
         }
@@ -709,6 +736,38 @@ impl<'a> Pool<'a> {
     }
 }
 
+impl Drop for Pool<'_> {
+    fn drop(&mut self) {
+        if self.trace {
+            let out = std::mem::take(
+                &mut *self
+                    .trace_out
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner),
+            );
+            eprint!("{out}");
+            let wall = self.started.elapsed().as_secs_f64();
+            #[expect(clippy::cast_precision_loss, reason = "trace output")]
+            let idle = self.idle_ns.load(Relaxed) as f64 * 1e-9;
+            eprintln!(
+                "trace pool wall {wall:.6} s, idle {:.1}% of thread time",
+                idle / (wall * f64::from(self.nthreads)) * 100.0
+            );
+        }
+    }
+}
+
+/// (trace) Append a line to the pool's trace.
+fn tlog(pool: &Pool, args: std::fmt::Arguments) {
+    use std::fmt::Write;
+    let mut out = pool
+        .trace_out
+        .lock()
+        .unwrap_or_else(PoisonError::into_inner);
+    let _ = out.write_fmt(args);
+    out.push('\n');
+}
+
 /// `retain` predicate of the open list: drops (and unlists) the cubes with
 /// nothing left to claim.
 fn keep_open(ctx: &Arc<CubeCtx>) -> bool {
@@ -771,6 +830,8 @@ struct SharedLane {
     /// Lane counters at the start of the job.
     nodes_at_start: u64,
     lookups_at_start: u64,
+    /// (trace) When the job (or piece) started.
+    started: Instant,
 }
 
 impl SharedLane {
@@ -791,6 +852,7 @@ impl SharedLane {
             split: false,
             nodes_at_start: 0,
             lookups_at_start: 0,
+            started: Instant::now(),
         }
     }
 }
@@ -841,7 +903,7 @@ fn build(
     // `inner` until the iteration (or a build task) is published.
     let inner = unsafe { &mut *ctx.inner.get() };
     if pool.trace && !first {
-        trace_iteration(ctx, inner, now);
+        trace_iteration(pool, ctx, inner, now);
     }
     inner.build_started = now;
     inner.extended = now;
@@ -927,27 +989,65 @@ fn build(
     false
 }
 
-/// (trace) The end of `ctx`'s current iteration (`now`): its run (ms from
-/// the cube's start), when its claims ran out, its nodes, jobs, donations
-/// and splits.
+/// (trace) The end of `ctx`'s current iteration (`now`): when its threads
+/// finished, its run (ms from the cube's start), when its claims ran out
+/// (and its nodes, jobs, donations and splits).
 #[cold]
 #[expect(clippy::cast_precision_loss, reason = "trace output")]
-fn trace_iteration(ctx: &CubeCtx, inner: &Inner, now: Instant) {
+fn trace_iteration(pool: &Pool, ctx: &CubeCtx, inner: &Inner, now: Instant) {
     let rarely_written = &ctx.rarely_written;
     let ran_out_ms = rarely_written.claims_ran_out_ns.swap(0, Relaxed) as f64 * 1e-6;
     let nodes = rarely_written.iteration_nodes.swap(0, Relaxed);
     let seconds = (now - inner.published).as_secs_f64();
-    eprintln!(
-        "trace cube {} T {} ran {:.3} .. {:.3} ms, claims out at {ran_out_ms:.3}, \
-         nodes {nodes} jobs {} donated {} splits {} ({:.2} Gnodes/s)",
-        ctx.index,
-        inner.target,
-        (inner.published - ctx.started).as_secs_f64() * 1e3,
-        (now - ctx.started).as_secs_f64() * 1e3,
-        rarely_written.iteration_jobs.swap(0, Relaxed),
-        rarely_written.iteration_donations.swap(0, Relaxed),
-        rarely_written.iteration_splits.swap(0, Relaxed),
-        nodes as f64 / seconds * 1e-9
+    // Threads' finish times in this iteration (ms), sorted.
+    let published_ns = (inner.published - ctx.started).as_nanos();
+    let mut finish: Vec<f64> = ctx
+        .thread_done_ns
+        .iter()
+        .map(|t| t.swap(0, Relaxed))
+        .filter(|&t| u128::from(t) > published_ns)
+        .map(|t| t as f64 * 1e-6)
+        .collect();
+    finish.sort_by(f64::total_cmp);
+    let quantile = |percent: usize| {
+        finish
+            .get(finish.len().saturating_sub(1) * percent / 100)
+            .copied()
+            .unwrap_or(0.0)
+    };
+    tlog(
+        pool,
+        format_args!(
+            "trace cube {} T {} finish threads {} q10 {:.3} q50 {:.3} q90 {:.3} max {:.3}",
+            ctx.index,
+            inner.target,
+            finish.len(),
+            quantile(10),
+            quantile(50),
+            quantile(90),
+            quantile(100)
+        ),
+    );
+    let counters = if pool.trace_bits & TRACE_COUNTERS == 0 {
+        String::new()
+    } else {
+        format!(
+            ", nodes {nodes} jobs {} donated {} splits {} ({:.2} Gnodes/s)",
+            rarely_written.iteration_jobs.swap(0, Relaxed),
+            rarely_written.iteration_donations.swap(0, Relaxed),
+            rarely_written.iteration_splits.swap(0, Relaxed),
+            nodes as f64 / seconds * 1e-9
+        )
+    };
+    tlog(
+        pool,
+        format_args!(
+            "trace cube {} T {} ran {:.3} .. {:.3} ms, claims out at {ran_out_ms:.3}{counters}",
+            ctx.index,
+            inner.target,
+            (inner.published - ctx.started).as_secs_f64() * 1e3,
+            (now - ctx.started).as_secs_f64() * 1e3,
+        ),
     );
 }
 
@@ -1277,7 +1377,7 @@ fn build_task(
     // disjoint parts of the buffers (through the `*_ptr` copies), which are
     // read only in later stages.
     let inner = ctx.inner();
-    let start_ms = if pool.trace {
+    let start_ms = if pool.trace_bits & TRACE_TASKS != 0 {
         ctx.started.elapsed().as_secs_f32() * 1e3
     } else {
         0.0
@@ -1310,7 +1410,7 @@ fn build_task(
             _ => sort_task(inner, stage, task),
         }
     }
-    if pool.trace && task < 256 {
+    if pool.trace_bits & TRACE_TASKS != 0 && task < 256 {
         let end_ms = ctx.started.elapsed().as_secs_f32() * 1e3;
         if let Some(entry) = ctx.task_log.get((stage - 1) * 256 + task) {
             entry[0].store(u32::try_from(thread_id + 1).unwrap_or(u32::MAX), Relaxed);
@@ -1365,14 +1465,14 @@ fn finish_build(pool: &Pool, ctx: &Arc<CubeCtx>) {
     ctx.claim.store(claimed << 32, Release);
     pool.publish(ctx);
     if pool.trace {
-        trace_build(ctx, inner, sorted);
+        trace_build(pool, ctx, inner, sorted);
     }
 }
 
 /// (trace) The build of `ctx`'s current iteration: its times (ms from the
 /// cube's start), and per stage its tasks, threads and times.
 #[cold]
-fn trace_build(ctx: &CubeCtx, inner: &Inner, sorted: Instant) {
+fn trace_build(pool: &Pool, ctx: &CubeCtx, inner: &Inner, sorted: Instant) {
     let ms = |t: Instant| (t - ctx.started).as_secs_f64() * 1e3;
     let stages = if inner.sort_stages_ended[2] > inner.extended {
         let [keys, scatter, buckets] = inner.sort_stages_ended.map(ms);
@@ -1380,17 +1480,20 @@ fn trace_build(ctx: &CubeCtx, inner: &Inner, sorted: Instant) {
     } else {
         String::new()
     };
-    eprintln!(
-        "trace cube {} T {} jobs {} feasible {} build {:.3} .. {:.3} ms \
+    tlog(
+        pool,
+        format_args!(
+            "trace cube {} T {} jobs {} feasible {} build {:.3} .. {:.3} ms \
          (extended {:.3} sorted {:.3}){stages}",
-        ctx.index,
-        inner.target,
-        inner.jobs.len(),
-        inner.feasible,
-        ms(inner.build_started),
-        ms(Instant::now()),
-        ms(inner.extended),
-        ms(sorted)
+            ctx.index,
+            inner.target,
+            inner.jobs.len(),
+            inner.feasible,
+            ms(inner.build_started),
+            ms(Instant::now()),
+            ms(inner.extended),
+            ms(sorted)
+        ),
     );
     for stage in ST_EXT..=ST_BUCKETS {
         // (thread + 1, start, end)
@@ -1418,13 +1521,44 @@ fn trace_build(ctx: &CubeCtx, inner: &Inner, sorted: Instant) {
             .iter()
             .map(|task| task.2 - task.1)
             .fold(0f32, f32::max);
-        eprintln!(
-            "  stage {stage} tasks {} threads {} first {first:.3} last {last:.3} \
+        tlog(
+            pool,
+            format_args!(
+                "  stage {stage} tasks {} threads {} first {first:.3} last {last:.3} \
              sum {sum:.3} max {max:.3}",
-            tasks.len(),
-            threads.len()
+                tasks.len(),
+                threads.len()
+            ),
         );
     }
+}
+
+/// (trace) Lane `sl` (of a thread with `active_lanes` lanes) found the
+/// solution of `ctx`, `seconds` after its start: where in the iteration, the
+/// job's rank and start, and its nodes before the solution.
+#[cold]
+fn trace_found(pool: &Pool, ctx: &CubeCtx, sl: &SharedLane, active_lanes: usize, seconds: f64) {
+    // SAFETY: (trace) the iteration is still on.
+    let inner = unsafe { &*ctx.inner.get() };
+    let (_, next) = claim_fields(ctx.claim.load(Relaxed));
+    tlog(
+        pool,
+        format_args!(
+            "trace cube {} found {:.3} ms ({:.3} ms into T {}) job {} claimed {} feasible {} \
+             job started {:.3} ms into T, job nodes {} split {} active lanes {active_lanes} depth {}",
+            ctx.index,
+            seconds * 1e3,
+            inner.published.elapsed().as_secs_f64() * 1e3,
+            sl.lane.target,
+            sl.job,
+            next,
+            inner.feasible,
+            sl.started.saturating_duration_since(inner.published).as_secs_f64() * 1e3,
+            sl.lane.stats.nodes - sl.nodes_at_start,
+            sl.split,
+            sl.lane.depth
+        ),
+    );
 }
 
 #[inline(always)]
@@ -1615,15 +1749,7 @@ impl Worker<'_, '_> {
         let solution = sl.lane.reconstruct();
         let seconds = ctx.started.elapsed().as_secs_f64();
         if self.pool.trace {
-            // SAFETY: (trace) the iteration is still on.
-            let published = unsafe { (*ctx.inner.get()).published };
-            eprintln!(
-                "trace cube {} found {:.3} ms ({:.3} ms into T {})",
-                ctx.index,
-                seconds * 1e3,
-                published.elapsed().as_secs_f64() * 1e3,
-                sl.lane.target
-            );
+            trace_found(self.pool, ctx, sl, self.active_lanes, seconds);
         }
         *ctx.result.lock().unwrap() = (solution, seconds);
         self.pool.active.fetch_sub(1, AcqRel);
@@ -1785,6 +1911,9 @@ impl Worker<'_, '_> {
                 sl.split = false;
                 sl.nodes_at_start = lane.stats.nodes;
                 sl.lookups_at_start = lane.stats.lookups;
+                if self.pool.trace {
+                    sl.started = Instant::now();
+                }
                 return true;
             }
             // infeasible (statistic 0, as in stream mode)
@@ -1840,6 +1969,14 @@ impl Worker<'_, '_> {
         let claimed = loc.claimed;
         loc.claimed = 0;
         if self.pool.trace {
+            if let Some(t) = loc.ctx.thread_done_ns.get(self.id) {
+                t.store(
+                    u64::try_from(loc.ctx.started.elapsed().as_nanos()).unwrap_or(0),
+                    Relaxed,
+                );
+            }
+        }
+        if self.pool.trace_bits & TRACE_COUNTERS != 0 {
             loc.ctx
                 .rarely_written
                 .iteration_nodes
@@ -1981,6 +2118,7 @@ impl Worker<'_, '_> {
                 rarely_written: Pad(RarelyWritten::default()),
                 result: Mutex::new((vec![], 0.0)),
                 task_log: (0..1024).map(|_| Default::default()).collect(),
+                thread_done_ns: (0..pool.nthreads).map(|_| AtomicU64::new(0)).collect(),
                 inner: UnsafeCell::new(inner),
             });
             {
@@ -2076,6 +2214,7 @@ impl Worker<'_, '_> {
         sl.split = true;
         sl.nodes_at_start = lane.stats.nodes;
         sl.lookups_at_start = lane.stats.lookups;
+        sl.started = Instant::now();
         self.counts[C_PIECES] += 1;
         true
     }
@@ -2145,9 +2284,10 @@ impl Worker<'_, '_> {
         from.split = true;
         to.nodes_at_start = to.lane.stats.nodes;
         to.lookups_at_start = to.lane.stats.lookups;
+        to.started = Instant::now();
         let loc = self.locals[from.slot].as_mut().unwrap();
         loc.pending += 1;
-        if self.pool.trace {
+        if self.pool.trace_bits & TRACE_COUNTERS != 0 {
             loc.ctx
                 .rarely_written
                 .iteration_splits
@@ -2188,7 +2328,7 @@ impl Worker<'_, '_> {
         // (The job is outstanding, so the iteration cannot end before the
         // piece is counted.)
         ctx.outstanding.fetch_add(1, Relaxed);
-        if pool.trace {
+        if pool.trace_bits & TRACE_COUNTERS != 0 {
             ctx.rarely_written.iteration_donations.fetch_add(1, Relaxed);
         }
         {
@@ -2265,6 +2405,19 @@ impl Worker<'_, '_> {
     /// the pool is finished (or `stop` is set).
     #[inline(never)]
     fn idle_wait(&mut self, stop: &AtomicBool) -> bool {
+        let pool = self.pool;
+        let entered = (pool.trace_bits & TRACE_IDLE != 0).then(Instant::now);
+        let result = self.idle_wait_loop(stop);
+        if let Some(entered) = entered {
+            pool.idle_ns.fetch_add(
+                u64::try_from(entered.elapsed().as_nanos()).unwrap_or(0),
+                Relaxed,
+            );
+        }
+        result
+    }
+
+    fn idle_wait_loop(&mut self, stop: &AtomicBool) -> bool {
         let pool = self.pool;
         loop {
             if stop.load(Relaxed) || pool.finished() {
