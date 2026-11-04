@@ -17,6 +17,8 @@
 //! * `lanes`: the fast search: many cubes per thread, interleaved so that
 //!   table loads overlap; `lanes::share` lets all threads work on a few
 //!   cubes.
+//! * `symstart`: for cubes with a symmetry, one job of each class of
+//!   equivalent job prefixes.
 
 pub mod coord;
 pub mod cubie;
@@ -32,6 +34,7 @@ pub mod simd;
 #[path = "portable/mod.rs"]
 pub mod simd;
 pub mod solver;
+pub mod symstart;
 pub mod tables;
 
 /// The portable backend, compiled with the x86 one only for its tests (which

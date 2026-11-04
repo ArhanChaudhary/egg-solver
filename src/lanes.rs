@@ -39,6 +39,7 @@
 use crate::cubie::{inverse_move, CubieCube};
 use crate::simd::{Cube, HOT_TABLES};
 use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES, QUARTER_TURNS};
+use crate::symstart::SymFilter;
 
 pub mod share;
 
@@ -440,6 +441,9 @@ struct RunState {
     /// The current run: job index and children.
     current_job: usize,
     current_children: u32,
+    /// Symmetric-start filter of the lane's cube (`extend_jobs`; set by
+    /// `start`, or by share mode's builds).
+    sym_filter: SymFilter,
 }
 
 /// One lane: the search of one cube, as an explicit stack that can stop at
@@ -536,6 +540,7 @@ impl Lane {
                 theta: 0,
                 current_job: 0,
                 current_children: 0,
+                sym_filter: SymFilter::NONE,
             }),
             target: 0,
             stack: [node; MAXD],
@@ -582,6 +587,7 @@ impl Lane {
         }
         self.root = root;
         self.root_inverse = root.inverse();
+        self.run_state.sym_filter = solver.sym_filter(root, self.root_inverse);
         let normal_bound = solver.lower_bound(root);
         let inverse_bound = solver.lower_bound(self.root_inverse);
         self.jobs.clear();
@@ -610,6 +616,13 @@ impl Lane {
         // shares the X sibling's (see `Node::twin_values`). (Part of
         // m2-jobs' +4.3% at 48T when added.)
         const LAG: usize = 48;
+        // Symmetric start (`symstart`): children equivalent to earlier ones
+        // are left out (x-h48's symmetric test positions in stream mode, 8
+        // threads: -96.6% nodes, 28.9x solves/s). (With a filter, an X'
+        // child's X sibling may be left out: every child then looks up its
+        // own inverse bound.)
+        let filter = self.run_state.sym_filter;
+        let filtered = filter.is_active();
         let mut extended = std::mem::take(&mut self.jobs_tmp);
         extended.clear();
         extended.reserve(self.jobs.len() * 15);
@@ -636,13 +649,16 @@ impl Lane {
                 let mut child = *job;
                 child.moves[child.len as usize] = mv as u8;
                 child.len += 1;
+                if filtered && !filter.keep(&child.moves[..usize::from(child.len)]) {
+                    continue;
+                }
                 let position = extended.len();
                 extended.push(child);
                 let (index, corner_bound) = solver.index(cube.apply_move(mv));
                 solver.prefetch(index);
                 pending[head % 64] = (2 * position, index, corner_bound);
                 head += 1;
-                if mv.is_multiple_of(3) {
+                if mv.is_multiple_of(3) || filtered {
                     let (index, corner_bound) = solver.index(inverse.premove_inverse(mv));
                     solver.prefetch(index);
                     pending[head % 64] = (2 * position + 1, index, corner_bound);
@@ -659,11 +675,23 @@ impl Lane {
             tail += 1;
         }
         // X' follows its X sibling two places earlier (faces are whole).
-        for i in 0..extended.len() {
+        for i in 0..if filtered { 0 } else { extended.len() } {
             let job = &extended[i];
             if job.moves[job.len as usize - 1] % 3 == 2 {
                 extended[i].inverse_bound = extended[i - 2].inverse_bound;
             }
+        }
+        if filtered {
+            let root = self.root;
+            filter.dedup(
+                &mut extended,
+                |job| &job.moves[..usize::from(job.len)],
+                |job| {
+                    job.moves[..usize::from(job.len)]
+                        .iter()
+                        .fold(root, |cube, &mv| cube.apply_move(usize::from(mv)))
+                },
+            );
         }
         self.jobs_tmp = std::mem::replace(&mut self.jobs, extended);
     }

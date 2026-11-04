@@ -21,6 +21,7 @@
 use crate::coord::{cocsep_x3, index_sym};
 use crate::cubie::{inverse_move, CubieCube};
 use crate::simd::Cube;
+use crate::symstart::SymFilter;
 use crate::tables::{packed_class, packed_depth, packed_sym_to_rep, Cocsep, H48Table};
 
 /// All 18 moves (the low 18 bits).
@@ -65,6 +66,10 @@ pub struct Solver<'a> {
     eo_mask: u32,
     /// The table's base: codes 1..=3 mean `base + code`.
     pub(crate) base: u8,
+    /// Symmetric-start filtering of the job prefixes (`symstart`; here -29%
+    /// nodes on the 21 positions of `symmetric_start_keeps_optimal_lengths`,
+    /// h0); off only to compare against the unfiltered search.
+    pub sym_start: bool,
 }
 // `table_ptr` and `packed_ptr` point into `table` and `corners`, which are
 // shared read-only.
@@ -153,6 +158,17 @@ impl<'a> Solver<'a> {
             row_mul: 1 << (k + 9),
             eo_mask: u32::MAX.unbounded_shr(32 - k) << (28 - k),
             base: table.meta.base,
+            sym_start: true,
+        }
+    }
+
+    /// The job filter of a cube (`symstart`), or none if `sym_start` is off.
+    #[must_use]
+    pub fn sym_filter(&self, cube: Cube, inverse: Cube) -> SymFilter {
+        if self.sym_start {
+            SymFilter::new(cube, inverse)
+        } else {
+            SymFilter::NONE
         }
     }
 
@@ -222,9 +238,10 @@ impl<'a> Solver<'a> {
         }
     }
 
-    /// Extend jobs by one move; children inherit the parent's stat.
+    /// Extend jobs by one move; children inherit the parent's stat. Jobs
+    /// that `filter` drops (symmetric start) are left out.
     #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
-    fn extend_jobs(jobs: &[Job]) -> Vec<Job> {
+    fn extend_jobs(jobs: &[Job], filter: &SymFilter) -> Vec<Job> {
         let mut out = Vec::with_capacity(jobs.len() * 15);
         for j in jobs {
             let allowed = if j.len == 0 {
@@ -239,11 +256,19 @@ impl<'a> Solver<'a> {
                 let mut child = *j;
                 child.moves[child.len as usize] = mv as u8;
                 child.len += 1;
+                if !filter.keep(&child.moves[..usize::from(child.len)]) {
+                    continue;
+                }
                 child.cube = j.cube.apply_move(mv);
                 child.inverse = j.inverse.premove_inverse(mv);
                 out.push(child);
             }
         }
+        filter.dedup(
+            &mut out,
+            |job| &job.moves[..usize::from(job.len)],
+            |job| job.cube,
+        );
         out
     }
 
@@ -275,6 +300,7 @@ impl<'a> Solver<'a> {
         let inverse = cube.inverse();
         let normal_bound = self.lower_bound(cube);
         let inverse_bound = self.lower_bound(inverse);
+        let filter = self.sym_filter(cube, inverse);
         let mut state = SearchState {
             moves: [0; 32],
             n_moves: 0,
@@ -296,7 +322,7 @@ impl<'a> Solver<'a> {
         loop {
             let job_len = self.job_len(target);
             while (jobs[0].len as usize) < job_len {
-                jobs = Self::extend_jobs(&jobs);
+                jobs = Self::extend_jobs(&jobs, &filter);
                 self.job_bounds(&mut jobs);
             }
             if job_len > 0 {

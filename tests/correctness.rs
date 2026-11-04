@@ -586,3 +586,191 @@ fn dfs_generator_matches_bfs_and_brute_force() {
         assert_eq!((diff.codes, diff.group_minima), (0, 0), "{diff:?}");
     }
 }
+
+/// Positions with a symmetry (the first 13: random words in moves and move
+/// pairs fixed by a symmetry `t`) or an antisymmetry (the last 8:
+/// `A · t(A)⁻¹` for an involution `t`), with their optimal lengths (main's
+/// solver, h11). Their jobs have 1 to 4 moves with h0 base 8.
+const SYMMETRIC_CASES: [(&str, usize); 21] = [
+    (
+        "U2 D2 L' R U' D' R2 L' L' R' F' B' R L' L' R2 L' R' L' R2 L' R2",
+        12,
+    ),
+    (
+        "F' B' D' U2 L' R' U' L' R' D2 U2 L2 R2 U2 U D L2 R2 U D D2 D2 U2",
+        12,
+    ),
+    (
+        "L2 R2 R' L' D2 U2 F2 B' F' B' F' D U F B2 B F L R B2 F2 B F'",
+        12,
+    ),
+    (
+        "D' U' R' L L' R2 R R' L D2 U2 F B L' R2 R' L' U D L' L' R",
+        13,
+    ),
+    (
+        "R2 L' L' R' L R' U' D' R B2 F2 L2 R F' B' D' U' L' R L2 R2 L2 L2 R2 R2 L'",
+        13,
+    ),
+    (
+        "R2 L2 B2 F2 U U2 D2 D2 U' D' U R L D' U F2 B2 U2 D2 U' F2 B2 R L D U",
+        13,
+    ),
+    ("L' F2 B2 U D F B L' R2 L R2 L B F U' D' B' F' L R' R L", 14),
+    (
+        "R2 L2 U D F L' R' F2 B2 F2 B F' B2 F F B' L2 R2 B2 F' R L",
+        14,
+    ),
+    (
+        "D2 U2 D' D U2 U' D2 U' D' D' U U' D2 U D' F' B' R' L' U D2 L' R' D2 U F B",
+        14,
+    ),
+    (
+        "L' R' L' R R' D' U' R' L' L' R2 D' U' R B' F' R2 L U' D' L R",
+        15,
+    ),
+    (
+        "R' F' B' R R L R F' B' L' R L' L2 F' B' D U L L2 L R F' B'",
+        15,
+    ),
+    (
+        "L2 R2 F2 B' B F B B F F2 B' U D L' R' B2 F2 U2 D2 B2 F' L' R' F' B D' U'",
+        15,
+    ),
+    (
+        "R2 L2 D L R D2 D' U2 B2 F2 D2 U' B F D' U R L D2 U2 L2 R2 U D' U2 D2 D U L2 R2 U' D",
+        15,
+    ),
+    ("R' B' L' U B B2 R U' L' U L D' F2 F' L' U F D", 14),
+    ("D L' L R' B2 F' R' U U R R U' F' B2 U' D D' L", 12),
+    ("D2 B' B' R' D2 R D D' B F' R R' D' R2 D F F R2", 12),
+    ("D D2 L' R' D D' D' F' D2 U2 F' U' U' U R' L' U2 U", 12),
+    ("L' R D F' F2 R L2 B F' F' B U2 D F2 F' R D U'", 14),
+    ("F R' F2 U2 D2 R' F2 F2 D U' B2 B2 R U2 D2 B2 R B'", 14),
+    ("D2 D B F2 U' F' F2 B' F2 D2 U D2 D B D2 U' F' F2", 12),
+    ("R2 B B L' D D' D2 R' B' F D R2 R R' U F' F' D2", 12),
+];
+
+/// (length, nodes) of each of `cubes` in stream lanes (3 threads of 5).
+fn lanes_lengths_and_nodes(solver: &Solver, cubes: &[CubieCube]) -> Vec<(usize, u64)> {
+    let get = |i: usize| cubes.get(i).copied();
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let stop = std::sync::atomic::AtomicBool::new(false);
+    let out = std::sync::Mutex::new(vec![(0, 0); cubes.len()]);
+    std::thread::scope(|scope| {
+        for _ in 0..3 {
+            scope.spawn(|| {
+                cubeopt::lanes::run_lanes(solver, &get, &next, &stop, 5, |i, sol, stats, _| {
+                    assert_eq!(cubes[i].apply_moves(&sol), CubieCube::SOLVED);
+                    out.lock().unwrap()[i] = (sol.len(), stats.nodes);
+                });
+            });
+        }
+    });
+    out.into_inner().unwrap()
+}
+
+/// (length, nodes) of each of `cubes` in share mode (3 threads of 4 lanes,
+/// at most `max_active` cubes at once), and the pool's event counters.
+fn share_lengths_and_nodes(
+    solver: &Solver,
+    cubes: &[CubieCube],
+    max_active: usize,
+) -> (Vec<(usize, u64)>, String) {
+    let get = |i: usize| cubes.get(i).copied();
+    let stop = std::sync::atomic::AtomicBool::new(false);
+    let pool = cubeopt::lanes::share::Pool::new(&get, max_active, 3);
+    let out = std::sync::Mutex::new(vec![(0, 0); cubes.len()]);
+    std::thread::scope(|scope| {
+        for _ in 0..3 {
+            scope.spawn(|| {
+                pool.run(solver, 4, &stop, |i, sol, stats, _| {
+                    assert_eq!(cubes[i].apply_moves(&sol), CubieCube::SOLVED);
+                    out.lock().unwrap()[i] = (sol.len(), stats.nodes);
+                });
+            });
+        }
+    });
+    (out.into_inner().unwrap(), pool.counters())
+}
+
+/// Symmetric start (`symstart`) keeps the optimal lengths in every mode
+/// (share mode: in its first pass, h0's iterations up to 14, and after it)
+/// and searches fewer nodes; random states are not filtered (same nodes).
+#[test]
+fn symmetric_start_keeps_optimal_lengths() {
+    use cubeopt::symstart::SymFilter;
+    let cubes: Vec<CubieCube> = SYMMETRIC_CASES
+        .iter()
+        .map(|(scramble, _)| CubieCube::SOLVED.apply_moves(&parse_moves(scramble).unwrap()))
+        .collect();
+    let known: Vec<usize> = SYMMETRIC_CASES.iter().map(|case| case.1).collect();
+    // (Only the cubes with a symmetry are filtered.)
+    for (i, cubie) in cubes.iter().enumerate() {
+        let cube = Cube::from_cubie(cubie);
+        assert_eq!(SymFilter::new(cube, cube.inverse()).is_active(), i < 13);
+    }
+    let filtered = Solver::new(corners(), h0());
+    let mut plain = Solver::new(corners(), h0());
+    plain.sym_start = false;
+    // Recursive solver: lengths, and the nodes of each cube.
+    let solve_all = |solver: &Solver, cubes: &[CubieCube]| -> Vec<(usize, u64)> {
+        cubes
+            .iter()
+            .map(|cube| {
+                let (solution, stats) = solver.solve(cube);
+                assert_eq!(cube.apply_moves(&solution), CubieCube::SOLVED);
+                (solution.len(), stats.nodes)
+            })
+            .collect()
+    };
+    let lengths = |results: &[(usize, u64)]| results.iter().map(|r| r.0).collect::<Vec<_>>();
+    let nodes = |results: &[(usize, u64)]| results.iter().map(|r| r.1).sum::<u64>();
+    let want = solve_all(&plain, &cubes);
+    let got = solve_all(&filtered, &cubes);
+    assert_eq!(lengths(&want), known);
+    assert_eq!(lengths(&got), known);
+    assert!(
+        nodes(&got) < nodes(&want),
+        "{} vs {}",
+        nodes(&got),
+        nodes(&want)
+    );
+    // Stream lanes, with and without the filter.
+    let lanes_filtered = lanes_lengths_and_nodes(&filtered, &cubes);
+    let lanes_plain = lanes_lengths_and_nodes(&plain, &cubes);
+    assert_eq!(lengths(&lanes_filtered), known, "lanes");
+    assert_eq!(lengths(&lanes_plain), known, "lanes, no filter");
+    assert!(nodes(&lanes_filtered) < nodes(&lanes_plain), "lanes");
+    // Share mode, batch and one cube at a time.
+    let counter = |counters: &str, name: &str| -> u64 {
+        let fields: Vec<&str> = counters.split_whitespace().collect();
+        let i = fields.iter().position(|&field| field == name).unwrap();
+        fields[i + 1].parse().unwrap()
+    };
+    for max_active in [usize::MAX, 1] {
+        let (share_filtered, counters) = share_lengths_and_nodes(&filtered, &cubes, max_active);
+        assert_eq!(
+            lengths(&share_filtered),
+            known,
+            "share {max_active}: {counters}"
+        );
+        // (The first pass found the cubes of lengths 12 to 14.)
+        assert!(counter(&counters, "pass_solutions") > 0, "{counters}");
+        let (share_plain, _) = share_lengths_and_nodes(&plain, &cubes, max_active);
+        assert_eq!(
+            lengths(&share_plain),
+            known,
+            "share {max_active}, no filter"
+        );
+        // (Share mode's counts vary from run to run, by a few percent here; the
+        // filter takes about 30% off.)
+        assert!(
+            nodes(&share_filtered) < nodes(&share_plain),
+            "share {max_active}"
+        );
+    }
+    // Random states: never filtered, identical search.
+    let randoms: Vec<CubieCube> = dataset("depth15.txt").into_iter().take(10).collect();
+    assert_eq!(solve_all(&filtered, &randoms), solve_all(&plain, &randoms));
+}

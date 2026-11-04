@@ -56,6 +56,7 @@ use super::{job_weight, Job, Lane, Node, Phase, Step, MAXD};
 use crate::cubie::CubieCube;
 use crate::simd::Cube;
 use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES};
+use crate::symstart::SymFilter;
 use std::cell::UnsafeCell;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, AtomicUsize};
@@ -313,6 +314,8 @@ struct CubeCtx {
     /// The scrambled cube and its inverse.
     root: Cube,
     root_inverse: Cube,
+    /// Symmetric-start filter of the jobs (`symstart`).
+    sym_filter: SymFilter,
     /// Solved (no more iterations; running jobs are dropped). (Written
     /// once: with the read-mostly fields.)
     done: AtomicBool,
@@ -1009,12 +1012,21 @@ fn build(
         // (`scratch` gets the cube's buffer and ours, and returns them.)
         scratch.root = ctx.root;
         scratch.root_inverse = ctx.root_inverse;
+        scratch.run_state.sym_filter = ctx.sym_filter;
         std::mem::swap(&mut scratch.jobs, &mut inner.jobs);
         std::mem::swap(&mut scratch.jobs_tmp, &mut own_bufs.out);
-        // Moves left to add, in parallel.
+        // Moves left to add, in parallel. (Also for a first pass, and with a
+        // symmetric-start filter that only `keep`s: the tasks then count the
+        // kept children. On x-h48's 7 test positions with only a symmetry:
+        // -9.9% -c 1 at 48T against extending them serially, median of 4
+        // paired rounds of 70 cubes. Not with a filter that dedups, whose
+        // classes span the tasks; such cubes, like the superflip, keep few
+        // jobs.)
+        let parallel_extension = parallel && !ctx.sym_filter.dedups();
         let moves = loop {
             let (n, moves) = (scratch.jobs.len(), job_len - scratch.jobs[0].len as usize);
-            if moves == 0 || parallel && (moves == 1 && n >= EXT_MIN || moves == 2 && n >= EXT_MIN2)
+            if moves == 0
+                || parallel_extension && (moves == 1 && n >= EXT_MIN || moves == 2 && n >= EXT_MIN2)
             {
                 break moves;
             }
@@ -1036,7 +1048,7 @@ fn build(
             for parents in inner.jobs.chunks(chunk) {
                 bufs.child_offsets.push(offset);
                 for parent in parents {
-                    offset += nchildren(parent, moves);
+                    offset += kept_children(parent, moves, &ctx.sym_filter);
                 }
             }
             bufs.child_offsets.push(offset);
@@ -1222,6 +1234,41 @@ fn nchildren(job: &Job, moves: usize) -> u32 {
         (job.moves[job.len as usize - 1] / 3) as usize
     };
     COUNTS[face][moves]
+}
+
+/// The number of jobs `moves` (at most 2) moves longer than `job` that
+/// `filter` keeps (`extend_jobs`), for a filter that does not dedup.
+fn kept_children(job: &Job, moves: usize, filter: &SymFilter) -> u32 {
+    if filter.is_active() {
+        let mut prefix = job.moves;
+        count_kept(&mut prefix, usize::from(job.len), moves, filter)
+    } else {
+        nchildren(job, moves)
+    }
+}
+
+/// The number of extensions of `prefix[..len]` by `moves` moves that
+/// `filter` keeps at every level (cold: cubes with a symmetry).
+#[cold]
+#[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
+fn count_kept(prefix: &mut [u8; 4], len: usize, moves: usize, filter: &SymFilter) -> u32 {
+    if moves == 0 {
+        return 1;
+    }
+    let mut todo = if len == 0 {
+        ALL_MOVES
+    } else {
+        ALLOWED_AFTER[usize::from(prefix[len - 1] / 3)]
+    };
+    let mut count = 0;
+    while todo != 0 {
+        prefix[len] = todo.trailing_zeros() as u8;
+        todo ^= todo.isolate_lowest_one();
+        if filter.keep(&prefix[..=len]) {
+            count += count_kept(prefix, len + 1, moves - 1, filter);
+        }
+    }
+    count
 }
 
 /// Sort `jobs` for iteration `target` with `bufs` (an LSD radix sort
@@ -1515,6 +1562,9 @@ fn build_task(
                 let hi = (lo + chunk).min(inner.jobs.len());
                 scratch.root = ctx.root;
                 scratch.root_inverse = ctx.root_inverse;
+                // (Parallel extensions run only with a filter that does not
+                // dedup: the children that `kept_children` counted.)
+                scratch.run_state.sym_filter = ctx.sym_filter;
                 scratch.jobs.clear();
                 scratch.jobs.extend_from_slice(&inner.jobs[lo..hi]);
                 for _ in 0..inner.b.extension_moves {
@@ -2424,6 +2474,7 @@ impl Worker<'_, '_> {
                 started,
                 root,
                 root_inverse,
+                sym_filter: solver.sym_filter(root, root_inverse),
                 claim: Pad(AtomicU64::new(0)),
                 task: Pad(AtomicU64::new(0)),
                 task_left: Pad(AtomicU32::new(0)),
