@@ -7,6 +7,11 @@ edition = "2021"
 crossbeam-utils = "0.8"
 libc = "0.2"
 
+# parking_lot only where it can park a thread on stable Rust (not on wasm:
+# see lanes/share.rs).
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+parking_lot = "0.12"
+
 [features]
 # Force the portable scalar backend (to test it on any machine).
 scalar = []
