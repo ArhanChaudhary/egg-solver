@@ -176,16 +176,73 @@ impl<T> Default for TaskPtr<T> {
 }
 
 impl Bufs {
+    /// The buffers of staged builds (`Pool::bufs`), touched (`touched`).
     fn sized() -> Bufs {
         Bufs {
-            out: Vec::with_capacity(JOBS_CAP),
-            keys: Vec::with_capacity(MAX_JOBS),
-            keys_tmp: Vec::with_capacity(MAX_JOBS),
-            key_buckets: Vec::with_capacity(MAX_JOBS),
+            out: touched(JOBS_CAP, EMPTY_JOB),
+            keys: touched(MAX_JOBS, 0),
+            keys_tmp: touched(MAX_JOBS, 0),
+            key_buckets: touched(MAX_JOBS, 0),
+            ..Bufs::default()
+        }
+    }
+
+    /// A worker's own buffers (serial builds). Its job buffer is touched
+    /// (job buffers change hands), its sort keys grow when needed (serial
+    /// sorts of long job lists only run with many cubes in progress, one
+    /// thread each). Its key buckets (43 KB) are touched too, though serial
+    /// sorts do not use them: then the thread's malloc arena grows when the
+    /// thread starts. The arenas also serve the big buffers (strace: glibc
+    /// raised its mmap threshold when a 4.9 MB block was freed at startup),
+    /// and otherwise they grew page by page (mprotect) during the first
+    /// cubes' builds: the parallel extension to 4-move jobs of the first 50
+    /// cubes still took 0.18-0.26 ms instead of 0.05 (solve -c 1,
+    /// `random_move_17f`, 48T; 0.04 ms without this touch but with glibc's
+    /// `top_pad` at 4 MB). All sort buffers touched: the same, but a
+    /// 48-thread pool took 0.73 ms instead of 0.42 ms more to start.
+    fn own() -> Bufs {
+        Bufs {
+            out: touched(JOBS_CAP, EMPTY_JOB),
+            key_buckets: touched(MAX_JOBS, 0),
             ..Bufs::default()
         }
     }
 }
+
+/// An empty vector of `capacity` elements whose pages were all written once.
+/// Vectors only reserved left the pages of their unused tail fresh, and job
+/// buffers change hands (cube, builder, pooled buffers): a pool's first
+/// cubes took page faults in their parallel builds, where faulting threads
+/// wait for each other (the extension to 4-move jobs took 0.26 ms instead of
+/// 0.02 ms for about half of the first 50 cubes of `solve -c 1` at 48T).
+// With `WARM_BUFFERS` and `Bufs::own` (c11): -c 1 at 48T -8.1% on 17-move
+// scrambles, -9.6% on depth-17 states, -0.7% on 500 random states (7 paired
+// holds); a 48-thread pool starts 0.42 ms later.
+fn touched<T: Clone>(capacity: usize, value: T) -> Vec<T> {
+    let mut v = Vec::with_capacity(capacity);
+    // (Miri: not needed, and slow.)
+    if !cfg!(miri) {
+        v.resize(capacity, value);
+        std::hint::black_box(&mut v);
+        v.clear();
+    }
+    v
+}
+
+/// A job slot's value before it is written.
+const EMPTY_JOB: Job = Job {
+    moves: [0; 4],
+    len: 0,
+    normal_bound: 0,
+    inverse_bound: 0,
+    stat: 0.0,
+};
+
+/// Touched buffers made for each of the first threads of a pool when it
+/// starts (`Pool::run`), so that the first cubes find them in `Pool::spare`
+/// and `Pool::bufs` (with -c 1, two cubes overlap and builds are one at a
+/// time).
+const WARM_BUFFERS: usize = 3;
 
 /// A reader-writer spin lock. The threads of a pool have cores of their
 /// own and hold it briefly: waiting must not sleep (with `std`'s lock,
@@ -391,6 +448,17 @@ struct PassState {
 unsafe impl Sync for CubeCtx {}
 
 impl Inner {
+    /// An iteration's buffers at full size, touched (`touched`).
+    fn touched() -> Inner {
+        let mut inner = Inner::new(touched(JOBS_CAP, EMPTY_JOB), 0);
+        inner.stats.reserve_exact(MAX_JOBS);
+        if !cfg!(miri) {
+            inner.stats.resize_with(MAX_JOBS, || AtomicU32::new(0));
+            inner.stats.clear();
+        }
+        inner
+    }
+
     fn new(jobs: Vec<Job>, target: u8) -> Inner {
         let now = Instant::now();
         Inner {
@@ -664,16 +732,32 @@ impl<'a> Pool<'a> {
         stop: &AtomicBool,
         mut done: impl FnMut(usize, Vec<u8>, Stats, f64),
     ) {
+        let id = self.next_thread_id.fetch_add(1, Relaxed);
+        if id < WARM_BUFFERS {
+            let inner = Inner::touched();
+            let mut bufs = Bufs::sized();
+            bufs.pooled = true;
+            // (Buffers only: a panic of a thread holding them does not
+            // matter.)
+            self.spare
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push(inner);
+            self.bufs
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .push(bufs);
+        }
         let mut worker = Worker {
             pool: self,
             solver,
-            id: self.next_thread_id.fetch_add(1, Relaxed),
+            id,
             done: &mut done,
             lanes: (0..nlanes.max(1)).map(|_| SharedLane::new()).collect(),
             active_lanes: 0,
             locals: Vec::new(),
             scratch: Box::new(Lane::new()),
-            bufs: Bufs::sized(),
+            bufs: Bufs::own(),
             epoch: 0,
             solved: 0,
             split_wait: 0,
@@ -2467,7 +2551,7 @@ impl Worker<'_, '_> {
             let bound = solver.lower_bound(root);
             let bound_inverse = solver.lower_bound(root_inverse);
             let spare = pool.spare.lock().unwrap().pop();
-            let mut inner = spare.unwrap_or_else(|| Inner::new(Vec::with_capacity(JOBS_CAP), 0));
+            let mut inner = spare.unwrap_or_else(Inner::touched);
             inner.target = bound.max(bound_inverse).max(1);
             let ctx = Arc::new(CubeCtx {
                 index,
