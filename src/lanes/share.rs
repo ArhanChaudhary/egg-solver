@@ -1763,6 +1763,9 @@ fn split_moves(todo: u32, current_face: u8) -> Option<u32> {
     (give != 0).then_some(give)
 }
 
+// `Worker::rounds`'s section (see `crate::hot`).
+crate::hot_section!(".text.hot_share", crate::hot::SHARE_PAD);
+
 impl Worker<'_, '_> {
     fn run(&mut self, stop: &AtomicBool) {
         let mut round = 0u32;
@@ -1786,11 +1789,13 @@ impl Worker<'_, '_> {
     /// Visit the active lanes round-robin (as `run_lanes` does) until none
     /// is left (true) or `stop` is set (false). Job ends are handled by
     /// `on_end` (which may swap another lane into position i), the rest
-    /// once per round by `maintain`. (Kept apart from the cold code.)
+    /// once per round by `maintain`. (Kept apart from the cold code, and
+    /// placed at a fixed offset of a 64-byte line: see `crate::hot`.)
     // The solver is a parameter (noalias: the table pointer stays in a
     // register): -3.0% -c 0, -2.6% -c 1, +3.8% bench share at 48T, -2.0% -c 0
     // at 1T (l6-share-2).
     #[inline(never)]
+    #[unsafe(link_section = ".text.hot_share")]
     fn rounds(&mut self, solver: &Solver, stop: &AtomicBool, round: &mut u32) -> bool {
         while self.active_lanes > 0 {
             let mut i = 0;

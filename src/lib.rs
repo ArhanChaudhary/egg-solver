@@ -20,6 +20,7 @@
 pub mod coord;
 pub mod cubie;
 pub mod gen;
+pub mod hot;
 pub mod lanes;
 pub mod simd;
 pub mod solver;

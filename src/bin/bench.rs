@@ -113,8 +113,13 @@ fn share_thread(
     pool.run(solver, lanes, stop, record);
 }
 
+// `stream_thread`'s section: it starts at a fixed offset of a 64-byte line
+// in every build (see `cubeopt::hot`).
+cubeopt::hot_section!(".text.hot_stream", cubeopt::hot::STREAM_PAD);
+
 /// A thread of a stream-mode run (`run_lanes`).
 #[inline(never)]
+#[unsafe(link_section = ".text.hot_stream")]
 fn stream_thread(
     solver: &Solver,
     cubes: &(dyn Fn(usize) -> Option<CubieCube> + Sync),
