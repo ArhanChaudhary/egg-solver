@@ -227,10 +227,21 @@ mod cross_check {
                 assert_eq!(p.transform(sym).to_bytes(), x.transform(sym).to_bytes());
                 assert_eq!(p.compose(pi).to_bytes(), x.compose(xi).to_bytes());
                 for mask in [0, !0] {
-                    assert_eq!(
-                        Cube::child_lookup(p, pi, mv, mask).to_bytes(),
-                        X86Cube::child_lookup(x, xi, mv, mask).to_bytes()
-                    );
+                    // SAFETY: `mv < 18`.
+                    unsafe {
+                        assert_eq!(
+                            Cube::child_lookup(p, pi, mv, mask).to_bytes(),
+                            X86Cube::child_lookup(x, xi, mv, mask).to_bytes()
+                        );
+                        assert_eq!(
+                            p.apply_move_unchecked(mv).to_bytes(),
+                            x.apply_move_unchecked(mv).to_bytes()
+                        );
+                        assert_eq!(
+                            pi.premove_inverse_unchecked(mv).to_bytes(),
+                            xi.premove_inverse_unchecked(mv).to_bytes()
+                        );
+                    }
                 }
                 assert_eq!(p.is_solved(), x.is_solved());
             }

@@ -296,14 +296,31 @@ impl Cube {
     }
 
     /// This cube followed by move `mv`.
+    ///
+    /// # Panics
+    /// If `mv` is not a move (below 18).
     #[inline(always)]
     #[must_use]
     pub fn apply_move(self, mv: usize) -> Cube {
+        assert!(mv < 18, "not a move");
+        // SAFETY: checked above.
+        unsafe { self.apply_move_unchecked(mv) }
+    }
+
+    /// `apply_move` without the bounds check of the move tables (for the
+    /// search loops, whose moves come from move masks).
+    ///
+    /// # Safety
+    /// `mv < 18`.
+    #[inline(always)]
+    #[must_use]
+    pub unsafe fn apply_move_unchecked(self, mv: usize) -> Cube {
         // `compose` with the move's orientation term precomputed (2-3 µops
         // less per child; part of m1-micro's +2.2% at 48T).
+        // SAFETY: `mv < 18` (the caller's contract); AVX2 is enabled.
         unsafe {
-            let moved = _mm256_shuffle_epi8(self.0, load(&HOT_TABLES.moves[mv]));
-            let sum = _mm256_add_epi8(moved, load(&HOT_TABLES.move_orients[mv]));
+            let moved = _mm256_shuffle_epi8(self.0, load(HOT_TABLES.moves.get_unchecked(mv)));
+            let sum = _mm256_add_epi8(moved, load(HOT_TABLES.move_orients.get_unchecked(mv)));
             let wrapped = _mm256_sub_epi8(sum, load(&ORIENT_WRAP));
             Cube(_mm256_min_epu8(sum, wrapped))
         }
@@ -311,10 +328,26 @@ impl Cube {
 
     /// Given the inverse of a cube `c` (`self`), the inverse of `c` followed
     /// by move `mv`: the inverse move applied *before* `self`.
+    ///
+    /// # Panics
+    /// If `mv` is not a move (below 18).
     #[inline(always)]
     #[must_use]
     pub fn premove_inverse(self, mv: usize) -> Cube {
-        Cube(load(&HOT_TABLES.inverse_moves[mv])).compose(self)
+        assert!(mv < 18, "not a move");
+        // SAFETY: checked above.
+        unsafe { self.premove_inverse_unchecked(mv) }
+    }
+
+    /// `premove_inverse` without the bounds check of the move table.
+    ///
+    /// # Safety
+    /// `mv < 18`.
+    #[inline(always)]
+    #[must_use]
+    pub unsafe fn premove_inverse_unchecked(self, mv: usize) -> Cube {
+        // SAFETY: `mv < 18` (the caller's contract).
+        Cube(load(unsafe { HOT_TABLES.inverse_moves.get_unchecked(mv) })).compose(self)
     }
 
     /// Negate the corner twists (mod 3), i.e. swap twists 1 and 2: the two
@@ -436,12 +469,21 @@ impl Cube {
     /// (`x_move_mask` all ones), else `moved.apply_move(mv)` (`x_move_mask`
     /// 0). One composition of selected operands instead of both cubes and a
     /// select (`apply_move` is `compose` with the move's shuffle).
+    ///
+    /// # Safety
+    /// `mv < 18`.
     #[must_use]
     #[inline(always)]
-    pub fn child_lookup(moved: Cube, other: Cube, mv: usize, x_move_mask: u32) -> Cube {
-        let inverse_move = Cube(load(&HOT_TABLES.inverse_moves[mv]));
+    pub unsafe fn child_lookup(moved: Cube, other: Cube, mv: usize, x_move_mask: u32) -> Cube {
+        // SAFETY: `mv < 18` (the caller's contract).
+        let (inverse_move, move_cube) = unsafe {
+            (
+                Cube(load(HOT_TABLES.inverse_moves.get_unchecked(mv))),
+                Cube(load(HOT_TABLES.moves.get_unchecked(mv))),
+            )
+        };
         let left = Cube::select_mask(x_move_mask, inverse_move, moved);
-        let right = Cube::select_mask(x_move_mask, other, Cube(load(&HOT_TABLES.moves[mv])));
+        let right = Cube::select_mask(x_move_mask, other, move_cube);
         left.compose(right)
     }
 
@@ -489,15 +531,17 @@ mod tests {
                     a.apply_move(mv).inverse()
                 );
                 let (inverse_a, inverse_b) = (sa.inverse(), sb.inverse());
-                assert_eq!(Cube::child_lookup(sa, inverse_b, mv, 0), sa.apply_move(mv));
-                assert_eq!(
-                    Cube::child_lookup(sa, inverse_b, mv, !0),
-                    inverse_b.premove_inverse(mv)
-                );
-                assert_eq!(
-                    Cube::child_lookup(inverse_a, sb, mv, !0),
-                    sb.premove_inverse(mv)
-                );
+                // SAFETY: `mv < 18`.
+                let lookup =
+                    |moved, other, mask| unsafe { Cube::child_lookup(moved, other, mv, mask) };
+                assert_eq!(lookup(sa, inverse_b, 0), sa.apply_move(mv));
+                assert_eq!(lookup(sa, inverse_b, !0), inverse_b.premove_inverse(mv));
+                assert_eq!(lookup(inverse_a, sb, !0), sb.premove_inverse(mv));
+                // SAFETY: `mv < 18`.
+                unsafe {
+                    assert_eq!(sa.apply_move_unchecked(mv), sa.apply_move(mv));
+                    assert_eq!(sa.premove_inverse_unchecked(mv), sa.premove_inverse(mv));
+                }
             }
             for (t, sym) in syms.iter().enumerate() {
                 assert_eq!(sa.transform(t).to_cubie(), conjugate(&a, sym));

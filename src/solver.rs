@@ -176,6 +176,8 @@ impl<'a> Solver<'a> {
     #[inline(always)]
     pub(crate) fn index(&self, cube: Cube) -> (u64, u8) {
         // `self.corners.packed(cocsep(cube))`
+        // SAFETY: `cocsep_x3` is 3 * a coordinate below `N_COCSEP`, and the
+        // packed table has 3 * N_COCSEP + 1 bytes (4-byte reads).
         let packed = unsafe {
             self.packed_ptr
                 .add(cocsep_x3(cube))
@@ -198,6 +200,8 @@ impl<'a> Solver<'a> {
     #[expect(clippy::cast_ptr_alignment, reason = "tables are page aligned")]
     pub(crate) fn value(&self, index: u64, corner_bound: u8) -> u8 {
         // `H48Table::get` through the cached pointer.
+        // SAFETY: indexes are of the table (`index`), whose words are all
+        // in its memory.
         let (code, group_min) = unsafe {
             let words = self.table_ptr.cast::<u64>();
             let w = (index >> 5) as usize;

@@ -118,8 +118,10 @@ struct Job {
 /// Face weight compensating for D/L/B prefixes having fewer continuations.
 #[inline(always)]
 fn job_weight(job: &Job) -> f32 {
-    // (branchless: the face parity is unpredictable)
-    [47525.0, 58206.0][((job.moves[job.len as usize - 1] / 3) % 2) as usize]
+    // (branchless: the face parity is unpredictable; the last move's index
+    // masked to the array, which leaves the 1 to 4 moves of a weighed job
+    // as they are: no bounds check per job of a sort)
+    [47525.0, 58206.0][((job.moves[(job.len as usize).wrapping_sub(1) & 3] / 3) % 2) as usize]
 }
 
 /// The bits of `stat * job_weight` (`sort_jobs` sorts by decreasing key).
@@ -150,7 +152,8 @@ fn sort_jobs(jobs: &mut Vec<Job>, out: &mut Vec<Job>) {
         let mask = u64::MAX.unbounded_shr(64 - bits);
         let mut counts = [0u32; 2048];
         for &key in &keys {
-            counts[((key >> shift) & mask) as usize] += 1;
+            // SAFETY: `mask` has at most 11 bits.
+            unsafe { *counts.get_unchecked_mut(((key >> shift) & mask) as usize) += 1 };
         }
         if counts.iter().any(|&count| count as usize == n) {
             continue; // all keys share this digit
@@ -161,13 +164,22 @@ fn sort_jobs(jobs: &mut Vec<Job>, out: &mut Vec<Job>) {
         }
         for &key in &keys {
             let digit = ((key >> shift) & mask) as usize;
-            scratch[counts[digit] as usize] = key;
-            counts[digit] += 1;
+            // SAFETY: the counts are of the keys' digits: each position
+            // is below `n = scratch.len()` (and the digit below 2048).
+            unsafe {
+                let position = counts.get_unchecked_mut(digit);
+                *scratch.get_unchecked_mut(*position as usize) = key;
+                *position += 1;
+            }
         }
         std::mem::swap(&mut keys, &mut scratch);
     }
     out.clear();
-    out.extend(keys.iter().map(|&key| jobs[key as u32 as usize]));
+    // SAFETY: the low half of a key is the index of its job.
+    out.extend(
+        keys.iter()
+            .map(|&key| *unsafe { jobs.get_unchecked(key as u32 as usize) }),
+    );
     std::mem::swap(jobs, out);
 }
 
@@ -567,11 +579,11 @@ impl Lane {
         let mut inverse = self.root_inverse;
         for i in 0..job.len as usize {
             let mv = job.moves[i & 3] as usize;
-            // SAFETY: job moves are moves. (A range hint, not an index here:
-            // `apply_move` and `premove_inverse` index the move tables.)
-            unsafe { std::hint::assert_unchecked(mv < 18) };
-            cube = cube.apply_move(mv);
-            inverse = inverse.premove_inverse(mv);
+            // SAFETY: job moves are moves (below 18).
+            unsafe {
+                cube = cube.apply_move_unchecked(mv);
+                inverse = inverse.premove_inverse_unchecked(mv);
+            }
         }
         (cube, inverse)
     }
@@ -716,7 +728,10 @@ impl Lane {
             assert!((self.target as usize) < MAXD);
             let job_len = solver.job_len(self.target);
             let mut extended = false;
-            while (self.jobs[0].len as usize) < job_len {
+            // SAFETY: a lane always has jobs (the root job, or at least one
+            // child of each kept job).
+            debug_assert!(!self.jobs.is_empty());
+            while (unsafe { self.jobs.get_unchecked(0) }.len as usize) < job_len {
                 self.extend_jobs(solver);
                 extended = true;
             }
@@ -869,11 +884,14 @@ impl Lane {
         for &entry in &self.run_state.runs_tmp {
             counts[(entry >> 24) as usize] += 1;
         }
-        sort_runs(
-            &mut self.run_state.runs,
-            &self.run_state.runs_tmp,
-            &mut counts,
-        );
+        // SAFETY: `counts` are of the entries' keys.
+        unsafe {
+            sort_runs(
+                &mut self.run_state.runs,
+                &self.run_state.runs_tmp,
+                &mut counts,
+            );
+        }
         self.run_state.run_pos = 0;
     }
 
@@ -888,28 +906,45 @@ impl Lane {
     )]
     fn build_rest(&mut self) {
         let n_jobs = self.run_state.child_orders.len();
+        debug_assert_eq!(n_jobs, self.jobs.len());
         let tag = u32::from(self.target) << 24;
         self.run_state.runs_tmp.clear();
         self.run_state.runs_tmp.reserve(n_jobs);
         let mut counts = [0u32; 256];
+        let mut n_runs = 0;
         for job in 0..n_jobs {
-            let order = &self.run_state.child_orders[job];
-            let remaining = self.side_moves(job) & !done_now(order, tag);
+            // SAFETY: `job < n_jobs`, and `child_orders` has an entry per
+            // job. (The writes below go through a raw pointer, after which
+            // the length would be reloaded and checked.)
+            let order = unsafe { self.run_state.child_orders.get_unchecked(job) };
+            let remaining = unsafe { self.side_moves_unchecked(job) } & !done_now(order, tag);
             if remaining != 0 {
                 // The job's best code of all its children, not only of those
                 // left (-0.5% nodes on 20K random and 33K depth-18 cubes).
                 let key = max_code(&order.codes, ALL_MOVES);
                 counts[key as usize] += 1;
-                self.run_state
-                    .runs_tmp
-                    .push(u32::from(key) << 24 | (job as u32) << 5 | RUN_ALL);
+                // SAFETY: at most one entry per job: `n_runs < n_jobs <=
+                // capacity` (no capacity check per entry).
+                unsafe {
+                    self.run_state
+                        .runs_tmp
+                        .as_mut_ptr()
+                        .add(n_runs)
+                        .write(u32::from(key) << 24 | (job as u32) << 5 | RUN_ALL);
+                }
+                n_runs += 1;
             }
         }
-        sort_runs(
-            &mut self.run_state.runs,
-            &self.run_state.runs_tmp,
-            &mut counts,
-        );
+        // SAFETY: the first `n_runs` entries were written.
+        unsafe { self.run_state.runs_tmp.set_len(n_runs) };
+        // SAFETY: `counts` are of the entries' keys.
+        unsafe {
+            sort_runs(
+                &mut self.run_state.runs,
+                &self.run_state.runs_tmp,
+                &mut counts,
+            );
+        }
         self.run_state.run_pos = 0;
     }
 
@@ -917,6 +952,16 @@ impl Lane {
     #[inline(always)]
     fn side_moves(&self, job: usize) -> u32 {
         moves_after(&self.jobs[job])
+    }
+
+    /// `side_moves` without the bounds check.
+    ///
+    /// # Safety
+    /// `job < self.jobs.len()`.
+    #[inline(always)]
+    unsafe fn side_moves_unchecked(&self, job: usize) -> u32 {
+        // SAFETY: the caller's contract.
+        moves_after(unsafe { self.jobs.get_unchecked(job) })
     }
 
     /// Whether every child of every feasible job root was run in this
@@ -936,8 +981,13 @@ impl Lane {
     #[inline(always)]
     fn finish_run(&mut self) {
         let job = self.run_state.current_job;
+        // SAFETY (every `get_unchecked(job)` below): the run's job is one of
+        // `jobs` (`setup_job`, `setup_run`), and with `full` `child_orders`
+        // has an entry per job.
+        debug_assert!(job < self.jobs.len());
+        debug_assert!(!self.run_state.full || job < self.run_state.child_orders.len());
         let stat: f32 = sum18(&self.child_stats);
-        self.jobs[job].stat = stat;
+        unsafe { self.jobs.get_unchecked_mut(job) }.stat = stat;
         if self.run_state.full {
             let root = &self.stack[0];
             let children = self.run_state.current_children;
@@ -946,7 +996,8 @@ impl Lane {
             // the mid-ranked children instead of last (with the rest key of
             // `build_rest`: -1.0% nodes on 20K random and 33K depth-18
             // cubes, +0.6% 48T).
-            let codes = quantize18(&self.child_stats, moves_after(&self.jobs[job]) & children);
+            let allowed = unsafe { self.side_moves_unchecked(job) };
+            let codes = quantize18(&self.child_stats, allowed & children);
             debug_assert!(root.normal);
             let order = if self.run_state.part == 0 {
                 // A whole run: the entry is all new (not read: it is not
@@ -958,7 +1009,7 @@ impl Lane {
                     _pad: 0,
                 }
             } else {
-                let order = &self.run_state.child_orders[job];
+                let order = unsafe { self.run_state.child_orders.get_unchecked(job) };
                 let mut merged = order.codes;
                 for mv in 0..18 {
                     if children >> mv & 1 != 0 {
@@ -972,7 +1023,7 @@ impl Lane {
                     _pad: 0,
                 }
             };
-            self.run_state.child_orders[job] = order;
+            *unsafe { self.run_state.child_orders.get_unchecked_mut(job) } = order;
         }
     }
 
@@ -1001,7 +1052,8 @@ impl Lane {
         }
         let tag = u32::from(self.target) << 24;
         loop {
-            if self.run_state.run_pos == self.run_state.runs.len() {
+            // (`>=`, not `==`: then the index below needs no check.)
+            if self.run_state.run_pos >= self.run_state.runs.len() {
                 if self.run_state.part == 2 {
                     return false;
                 }
@@ -1013,6 +1065,8 @@ impl Lane {
             self.run_state.run_pos += 1;
             // The job vectors are too big for L2 and the lanes interleave
             // their streams: fetch the next entry's job early (part of c7).
+            // SAFETY: `runs` is not empty here and the position is clamped
+            // below its length; entries index `child_orders` and `jobs`.
             unsafe {
                 let next = *self
                     .run_state
@@ -1024,9 +1078,15 @@ impl Lane {
             }
             let job_index = (entry >> 5 & 0x7_FFFF) as usize;
             let mv = entry & 31;
-            let order = self.run_state.child_orders[job_index];
+            // SAFETY (`job_index` here and below): run entries are built from
+            // the indices of `child_orders`, which has an entry per job (the
+            // jobs do not change between the builds of the runs and their
+            // use: split iterations run on the previous iteration's jobs).
+            debug_assert!(job_index < self.jobs.len());
+            debug_assert!(job_index < self.run_state.child_orders.len());
+            let order = *unsafe { self.run_state.child_orders.get_unchecked(job_index) };
             let done = done_now(&order, tag);
-            let allowed = self.side_moves(job_index);
+            let allowed = unsafe { self.side_moves_unchecked(job_index) };
             let mut children;
             if mv == RUN_ALL {
                 children = allowed & !done;
@@ -1036,7 +1096,8 @@ impl Lane {
                 }
                 // the child, with the job's candidates at most `MERGE_CODES`
                 // below it (those above were run before)
-                let threshold = order.codes[mv as usize]
+                // SAFETY: a run entry's move is below 18 (or `RUN_ALL`).
+                let threshold = unsafe { *order.codes.get_unchecked(mv as usize) }
                     .saturating_sub(MERGE_CODES + 1)
                     .max(self.run_state.theta);
                 children = (codes_above(&order.codes, threshold) & !done) | 1 << mv;
@@ -1052,7 +1113,7 @@ impl Lane {
             // looked up and X' needs no value.)
             let unknown = unknown_twins(&order.twin_values);
             children |= (children & unknown) >> 2 & !done;
-            let job = self.jobs[job_index];
+            let job = *unsafe { self.jobs.get_unchecked(job_index) };
             let remaining_depth = self.target - job.len;
             debug_assert!(
                 job.normal_bound < remaining_depth && job.inverse_bound < remaining_depth
@@ -1084,11 +1145,14 @@ impl Lane {
     /// Returns false if the iteration is exhausted.
     fn setup_job(&mut self) -> bool {
         while self.job_pos < self.jobs.len() {
-            let job = self.jobs[self.job_pos];
+            // SAFETY: `job_pos < jobs.len()`.
+            let job = *unsafe { self.jobs.get_unchecked(self.job_pos) };
             // The job vector is too big for L2 and the lanes interleave
             // their streams: fetch the next jobs' line early (part of
             // m2-jobs' +4.3% at 48T when added).
             let ahead = (self.job_pos + 8).min(self.jobs.len() - 1);
+            // SAFETY: `ahead < jobs.len()`, and with `full` `child_orders` has
+            // an entry per job.
             unsafe {
                 crate::prefetch::read(self.jobs.as_ptr().add(ahead));
                 if self.run_state.full {
@@ -1103,20 +1167,21 @@ impl Lane {
                 || job.inverse_bound > remaining_depth
                 || (job.len > 0 && cube.is_solved())
             {
-                self.jobs[self.job_pos].stat = 0.0;
-                if self.run_state.full {
-                    self.run_state.child_orders[self.job_pos] = NO_CHILD_ORDER;
+                // SAFETY: `job_pos < jobs.len()` (the loop condition), and
+                // with `full` `child_orders` has an entry per job.
+                unsafe {
+                    self.jobs.get_unchecked_mut(self.job_pos).stat = 0.0;
+                    if self.run_state.full {
+                        *self.run_state.child_orders.get_unchecked_mut(self.job_pos) =
+                            NO_CHILD_ORDER;
+                    }
                 }
                 self.job_pos += 1;
                 continue;
             }
             self.run_state.current_job = self.job_pos;
             self.run_state.current_children = ALL_MOVES;
-            let mut normal_moves = if job.len == 0 {
-                ALL_MOVES
-            } else {
-                ALLOWED_AFTER[(job.moves[job.len as usize - 1] / 3) as usize]
-            };
+            let mut normal_moves = moves_after(&job);
             let mut inverse_moves = ALL_MOVES;
             if job.inverse_bound == remaining_depth {
                 normal_moves &= QUARTER_TURNS;
@@ -1189,7 +1254,10 @@ impl Lane {
         // SAFETY (every `get_unchecked(depth)` of `stack` below): the depth
         // stays below the target, and `start_iteration` asserts that the
         // target is below MAXD. (No bounds checks in the lane loop: +1.1% at
-        // 48T when added, m2-nobc.)
+        // 48T when added, m2-nobc. None left on the search loops' paths at
+        // all, with the unchecked move tables and the job and run paths:
+        // -3.3% instructions per node, stream +3.2% at 1T and +1.3% at 48T,
+        // m8's unsafe pass on def2cd0.)
         let (mut todo, mut lower_bound, mut remaining_depth) = {
             let top = unsafe { self.stack.get_unchecked(depth) };
             (top.todo, top.lower_bound, top.remaining_depth)
@@ -1257,18 +1325,16 @@ impl Lane {
                 parent.todo = todo;
                 continue;
             }
-            // (The move just counted, now removed from `todo`.)
+            // (The move just counted, now removed from `todo`.) Below 18:
+            // move masks are subsets of ALL_MOVES (relied on by every
+            // unchecked use of `mv` below).
             let mv = live.trailing_zeros() as usize;
-            // SAFETY: move masks are subsets of ALL_MOVES. (A range hint,
-            // not an index here: `apply_move`, `premove_inverse`,
-            // `child_lookup` and `note_value` index with `mv` and the face.)
-            unsafe { std::hint::assert_unchecked(mv < 18) };
             let node = unsafe { self.stack.get_unchecked_mut(depth) };
             node.todo = todo;
             // Face and kind by table, not a division (part of m7's µop stack:
             // +1.5% at 1T averaged over code offsets, even at 48T).
-            // SAFETY: `mv < 18` (above); the tables hold faces below 6 and
-            // kinds below 3.
+            // SAFETY: `mv < 18`; the tables hold faces below 6 and kinds
+            // below 3 (value-range hints).
             let (face, kind) = unsafe {
                 let face = usize::from(*HOT_TABLES.move_face.get_unchecked(mv));
                 let kind = usize::from(*HOT_TABLES.move_kind.get_unchecked(mv));
@@ -1287,15 +1353,20 @@ impl Lane {
             if child_remaining.wrapping_sub(1) >= max_value {
                 if child_remaining == 0 {
                     // (nodes with one move left always move the normal cube)
-                    if moved.apply_move(mv).is_solved() {
+                    // SAFETY: `mv < 18` (and in the two calls below).
+                    if unsafe { moved.apply_move_unchecked(mv) }.is_solved() {
                         self.pending_move = mv as u8;
                         self.stats.nodes += nodes;
                         return Step::Found;
                     }
                     continue;
                 }
-                let moved_child = moved.apply_move(mv);
-                let other_child = other.premove_inverse(mv);
+                let (moved_child, other_child) = unsafe {
+                    (
+                        moved.apply_move_unchecked(mv),
+                        other.premove_inverse_unchecked(mv),
+                    )
+                };
                 let other_bound = if kind == 1 { other_side_bound } else { 0 };
                 if other_bound > child_remaining || moved_child.is_solved() {
                     continue;
@@ -1320,8 +1391,10 @@ impl Lane {
             // it (part of m7's µop stack: +1.5% at 1T averaged over code
             // offsets, even at 48T).
             // SAFETY: `mv < 18`.
-            let x_move_mask = unsafe { *HOT_TABLES.x_move_mask.get_unchecked(mv) };
-            let looked_up = Cube::child_lookup(moved, other, mv, x_move_mask);
+            let looked_up = unsafe {
+                let x_move_mask = *HOT_TABLES.x_move_mask.get_unchecked(mv);
+                Cube::child_lookup(moved, other, mv, x_move_mask)
+            };
             self.pending_cube = looked_up;
             self.pending_move = mv as u8;
             // X looks up the other side first. X2 and X' know the other
@@ -1457,9 +1530,12 @@ impl Lane {
         // resolve patch, +4.6% at 48T, +0.9% at 1T.)
         self.stack[self.depth].twin_values[face] = other_bound;
         // (The moved cube only now that X passed: see `advance`.)
-        let moved_child = self.stack[self.depth]
-            .moved
-            .apply_move(usize::from(self.pending_move));
+        // SAFETY: the pending move is a move (and hinted above).
+        let moved_child = unsafe {
+            self.stack[self.depth]
+                .moved
+                .apply_move_unchecked(usize::from(self.pending_move))
+        };
         self.pending_cube = moved_child;
         let (index, corner_bound) = solver.index(moved_child);
         if corner_bound > child_remaining {
@@ -1519,10 +1595,15 @@ impl Lane {
     fn push_advance(&mut self, moved_bound: u8, other_bound: u8, solver: &Solver) -> Step {
         // (The pending lookup was the moved side's, so `pending_cube` is the
         // moved cube; the other one is computed only now.)
-        // SAFETY: the depth is below MAXD (see `advance`).
-        let other_child = unsafe { self.stack.get_unchecked(self.depth) }
-            .other
-            .premove_inverse(usize::from(self.pending_move));
+        // SAFETY: the depth is below MAXD (see `advance`); the pending move
+        // is a move (below 18; with the bounds check, one compare and branch
+        // more per pushed node).
+        let other_child = unsafe {
+            self.stack
+                .get_unchecked(self.depth)
+                .other
+                .premove_inverse_unchecked(usize::from(self.pending_move))
+        };
         let mut node = self.child_node(self.pending_cube, other_child, moved_bound, other_bound);
         self.depth += 1;
         let todo = node.todo;
@@ -1534,12 +1615,11 @@ impl Lane {
             unsafe { *self.stack.get_unchecked_mut(self.depth) = node };
             return self.advance_cold(solver);
         }
+        // (Below 18: move masks are subsets of ALL_MOVES.)
         let mv = todo.trailing_zeros() as usize;
-        // SAFETY: move masks are subsets of ALL_MOVES. (A range hint, not an
-        // index here: for `apply_move`, `premove_inverse` and `note_value`.)
-        unsafe { std::hint::assert_unchecked(mv < 18) };
         debug_assert!(mv.is_multiple_of(3));
-        // SAFETY: `mv < 18`; the table holds faces below 6.
+        // SAFETY: `mv < 18`; the table holds faces below 6 (a value-range
+        // hint).
         let face = unsafe {
             let face = usize::from(*HOT_TABLES.move_face.get_unchecked(mv));
             std::hint::assert_unchecked(face < 6);
@@ -1548,7 +1628,8 @@ impl Lane {
         node.todo = todo ^ todo.isolate_lowest_one();
         self.stats.nodes += 1;
         // (An X move: only the other side's cube, looked up first.)
-        let other_child = node.other.premove_inverse(mv);
+        // SAFETY: `mv < 18`.
+        let other_child = unsafe { node.other.premove_inverse_unchecked(mv) };
         self.pending_cube = other_child;
         self.pending_move = mv as u8;
         let (index, corner_bound) = solver.index(other_child);
@@ -1778,7 +1859,15 @@ fn moves_after(job: &Job) -> u32 {
     if job.len == 0 {
         ALL_MOVES
     } else {
-        ALLOWED_AFTER[(job.moves[job.len as usize - 1] / 3) as usize]
+        debug_assert!(job.len <= 4 && job.moves[job.len as usize - 1] < 18);
+        // SAFETY: a job has at most 4 moves, each below 18 (so its face is
+        // below 6).
+        unsafe {
+            let last = *job.moves.get_unchecked(job.len as usize - 1);
+            *HOT_TABLES
+                .allowed_after
+                .get_unchecked(usize::from(last / 3))
+        }
     }
 }
 
@@ -1803,21 +1892,27 @@ fn unknown_twins(twin_values: &[u8; 6]) -> u32 {
     moves
 }
 
-/// Counting sort of run entries by decreasing key (stable); `counts` holds
-/// the number of entries per key.
-fn sort_runs(runs: &mut Vec<u32>, unsorted: &[u32], counts: &mut [u32; 256]) {
+/// Counting sort of run entries by decreasing key (stable).
+///
+/// # Safety
+/// `counts` holds the number of entries of `unsorted` per key.
+unsafe fn sort_runs(runs: &mut Vec<u32>, unsorted: &[u32], counts: &mut [u32; 256]) {
     let mut sum = 0;
     for count in counts.iter_mut().rev() {
         (*count, sum) = (sum, sum + *count);
     }
     runs.clear();
-    runs.resize(unsorted.len(), 0);
+    runs.reserve(unsorted.len());
     for &entry in unsorted {
         let key = (entry >> 24) as usize;
-        // SAFETY: counts[key] < runs.len() by construction.
-        unsafe { *runs.get_unchecked_mut(counts[key] as usize) = entry };
+        // SAFETY: counts[key] < unsorted.len() <= capacity by construction
+        // (the counts are of `unsorted`'s keys).
+        unsafe { runs.as_mut_ptr().add(counts[key] as usize).write(entry) };
         counts[key] += 1;
     }
+    // SAFETY: the entries are a permutation of `unsorted`: every one of
+    // the first `unsorted.len()` was written (no zero fill first).
+    unsafe { runs.set_len(unsorted.len()) };
 }
 
 /// Solve cubes `cubes(i)` for i taken from the shared counter `next`, with
@@ -1868,9 +1963,14 @@ pub fn run_lanes(
     // The active lanes are `lanes[..n_active]` (no per-visit activity test:
     // +1.9% when added, part of m4-micro's +7.7% at 48T).
     let mut n_active = 0;
-    for index in 0..n_lanes {
+    for index in 0..lanes.len() {
         if refill(&mut lanes[index], &mut done) {
-            lanes.swap(index, n_active);
+            // SAFETY: `n_active <= index < lanes.len()` (`ptr::swap` allows
+            // the two to be the same lane).
+            unsafe {
+                let base = lanes.as_mut_ptr();
+                std::ptr::swap(base.add(index), base.add(n_active));
+            }
             n_active += 1;
         }
     }
@@ -1880,7 +1980,8 @@ pub fn run_lanes(
     // 48T over the 3-phase lockstep when added, single-pass.)
     while n_active > 0 && !stop.load(Relaxed) {
         let mut gone: Option<*const Lane> = None;
-        for lane in &mut lanes[..n_active] {
+        // SAFETY: `n_active <= lanes.len()`.
+        for lane in unsafe { lanes.get_unchecked_mut(..n_active) } {
             let value = lane.pending_value(solver);
             let outcome = match lane.phase {
                 Phase::WaitOther => {
@@ -1903,10 +2004,14 @@ pub fn run_lanes(
             }
         }
         if let Some(lane) = gone {
-            // SAFETY: `lane` points into `lanes`.
-            let index = unsafe { lane.offset_from(lanes.as_ptr()) }.cast_unsigned();
             n_active -= 1;
-            lanes.swap(index, n_active);
+            // SAFETY: `lane` points into `lanes[..=n_active]` (one of the
+            // active lanes before the decrement).
+            unsafe {
+                let base = lanes.as_mut_ptr();
+                let index = lane.offset_from(base.cast_const()).cast_unsigned();
+                std::ptr::swap(base.add(index), base.add(n_active));
+            }
         }
     }
 }
