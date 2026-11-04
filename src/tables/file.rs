@@ -407,12 +407,21 @@ pub fn save_tuned_lanes(table: &str, best: &[(usize, usize)]) -> std::io::Result
     Ok(path)
 }
 
-/// Lanes per thread for a table of `k`, when not tuned: measured at 1 and
-/// 48 threads on Zen 5 (see the commit that set them).
+/// Lanes per thread for a table of `k`, when not tuned (`bench tune`).
+/// Smaller tables gain from more lanes (measured, solves/s, 24 -> 40 lanes):
+/// h7 +10% at 1T (2.017 -> 2.217) and at 8 threads (15.43 -> 17.07), also
+/// on 1 GiB pages (2.017 -> 2.283 at 1T: not a TLB effect); h8 equal at 1T,
+/// +8.6% at 8 threads (26.73 -> 29.10); h6 equal (+4.5% at 1T, -1 to -5%
+/// at 8 threads). h11 keeps `lanes::DEFAULT_LANES`, 24 (tuned at 1 and 48
+/// threads; 40 is 3.4% slower at 8 threads, 197.9 -> 191.2). h9 and h10
+/// (no RAM for them here) get 32, in between.
 #[must_use]
 pub fn untuned_lanes(k: u32) -> usize {
-    let _ = k;
-    crate::lanes::DEFAULT_LANES
+    match k {
+        0..=8 => 40,
+        9 | 10 => 32,
+        _ => crate::lanes::DEFAULT_LANES,
+    }
 }
 
 /// The default lanes per thread for `threads` threads on the table at

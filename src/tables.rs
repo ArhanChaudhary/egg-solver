@@ -499,7 +499,14 @@ pub fn h48_bytes(k: u32) -> u64 {
     h48_rows(k) * ROW_BYTES
 }
 
-/// Default base value per h (cube48opt: 7 for h0, 8 for h2-3, 9 for h4-7, 10 above).
+/// Default base value per k (`gen <k> auto`; cube48opt's, confirmed for h4..h8
+/// by nodes/cube on random:200:2026 and by solve speed). Base 9 for h4..h6
+/// (23-67% fewer nodes than base 8, 7-44% fewer than base 10; h6 at 1T and 8
+/// threads 15-20% faster than with base 10); h7: base 10 has 3.5% fewer
+/// nodes, but with 40 lanes is 4-9% faster at 1T and 6.3% slower at 8
+/// threads: a tie, so base 9 (generated in 30 s instead of 5 min on 8
+/// cores); h8: base 10 (10% fewer nodes than base 9); h9, h10 as h8 and h11
+/// (base 11: +10% nodes, x-h48); h0..h3 not measured.
 #[must_use]
 pub fn default_base(k: u32) -> u8 {
     [7, 8, 8, 8, 9, 9, 9, 9, 10, 10, 10, 10][k as usize]
