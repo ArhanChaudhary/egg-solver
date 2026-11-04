@@ -497,7 +497,8 @@ impl Lane {
         let mut inverse = self.root_inverse;
         for i in 0..job.len as usize {
             let mv = job.moves[i & 3] as usize;
-            // SAFETY: job moves are moves.
+            // SAFETY: job moves are moves. (A range hint, not an index here:
+            // `apply_move` and `premove_inverse` index the move tables.)
             unsafe { std::hint::assert_unchecked(mv < 18) };
             cube = cube.apply_move(mv);
             inverse = inverse.premove_inverse(mv);
@@ -1068,24 +1069,23 @@ impl Lane {
     fn advance(&mut self, solver: &Solver) -> Step {
         let max_value = solver.base + 3;
         let mut depth = self.depth;
-        // SAFETY: the depth is bounded by the target (< MAXD).
-        unsafe { std::hint::assert_unchecked(depth < MAXD) };
+        // SAFETY (every `get_unchecked(depth)` of `stack` below): the depth
+        // stays below the target, and `start_iteration` asserts that the
+        // target is below MAXD.
         let (mut todo, mut lower_bound, mut remaining_depth) = {
-            let top = &self.stack[depth];
+            let top = unsafe { self.stack.get_unchecked(depth) };
             (top.todo, top.lower_bound, top.remaining_depth)
         };
         // Nodes generated (added to `stats` on return).
         let mut nodes = 0;
         loop {
-            // SAFETY: as above (`depth` is `self.depth`).
-            unsafe { std::hint::assert_unchecked(depth < MAXD) };
             // X' moves known to be pruned (`skip`) are reached, and counted,
             // up to the next move to generate (all of them if there is
             // none). The bounds do not change in between (their value was
             // already noted).
             let mut live = 0;
             let done = lower_bound > remaining_depth || {
-                live = todo & !self.stack[depth].skip;
+                live = todo & !unsafe { self.stack.get_unchecked(depth) }.skip;
                 // (`bzhi` keeps all of `todo` if `live` is 0. The std form,
                 // `todo & u32::MAX.unbounded_shr(32 - tz)`, costs a test and
                 // a cmov more for that case.)
@@ -1097,7 +1097,7 @@ impl Lane {
             };
             if done {
                 // (The node is done: its `todo` is not needed any more.)
-                let mv = self.stack[depth].mv;
+                let mv = unsafe { self.stack.get_unchecked(depth) }.mv;
                 if depth == 0 {
                     // job finished
                     if self.shared {
@@ -1108,21 +1108,21 @@ impl Lane {
                     }
                     self.next_run(solver);
                     depth = self.depth;
-                    let top = &self.stack[depth];
+                    let top = unsafe { self.stack.get_unchecked(depth) };
                     (todo, lower_bound, remaining_depth) =
                         (top.todo, top.lower_bound, top.remaining_depth);
                     continue;
                 }
                 depth -= 1;
                 self.depth = depth;
-                let parent = &mut self.stack[depth];
+                let parent = unsafe { self.stack.get_unchecked_mut(depth) };
                 let parent_face = (mv / 3) as usize;
                 // Sibling-face pruning on the child's bound (see `note_value`).
-                // SAFETY: moves are below 18.
-                unsafe { std::hint::assert_unchecked(parent_face < 6) };
+                // SAFETY: moves are below 18, faces below 6.
+                let face_keep = unsafe { *HOT_TABLES.face_keep.get_unchecked(parent_face) };
                 let keep = std::hint::select_unpredictable(
                     lower_bound > parent.remaining_depth,
-                    HOT_TABLES.face_keep[parent_face],
+                    face_keep,
                     !0,
                 );
                 lower_bound = max_child_bound(parent.lower_bound, lower_bound);
@@ -1134,10 +1134,12 @@ impl Lane {
             }
             // (The lowest move of `todo` now.)
             let mv = live.trailing_zeros() as usize;
-            // SAFETY: move masks are subsets of ALL_MOVES.
+            // SAFETY: move masks are subsets of ALL_MOVES. (A range hint,
+            // not an index here: `apply_move`, `premove_inverse` and
+            // `note_value` index with `mv` and `mv / 3`.)
             unsafe { std::hint::assert_unchecked(mv < 18) };
             todo ^= todo.isolate_lowest_one();
-            let node = &mut self.stack[depth];
+            let node = unsafe { self.stack.get_unchecked_mut(depth) };
             node.todo = todo;
             let face = mv / 3;
             // (`mv % 3`, from `face`: LLVM would divide again.)
@@ -1173,7 +1175,7 @@ impl Lane {
                 self.pending_face = face as u8;
                 self.push_child(0, other_bound);
                 depth = self.depth;
-                let top = &self.stack[depth];
+                let top = unsafe { self.stack.get_unchecked(depth) };
                 (todo, lower_bound, remaining_depth) =
                     (top.todo, top.lower_bound, top.remaining_depth);
                 continue;
@@ -1184,7 +1186,9 @@ impl Lane {
             // (The pending child's move: the root child whose statistic
             // (`child_stats`) a lookup counts for is `stack[1].mv`, at the
             // root as well. A pushed child overwrites it with the same move.)
-            self.stack[depth + 1].mv = mv as u8;
+            // SAFETY: this node has a child, so depth + 1 is at most the
+            // target, which is below MAXD.
+            unsafe { self.stack.get_unchecked_mut(depth + 1) }.mv = mv as u8;
             self.pending_moved = moved_child;
             self.pending_other = other_child;
             self.pending_move = mv as u8;
@@ -1196,7 +1200,14 @@ impl Lane {
             // above it are skipped), so they look up the moved side.
             // Selected without branching on the move kind.
             let other_first = kind == 0;
-            let twin = self.stack[depth].twin_values[face];
+            // SAFETY: `face = mv / 3 < 6`.
+            let twin = unsafe {
+                *self
+                    .stack
+                    .get_unchecked(depth)
+                    .twin_values
+                    .get_unchecked(face)
+            };
             // (LLVM would branch on `half` to skip the twin value's load.)
             let other_bound = std::hint::select_unpredictable(half, other_side_bound, twin);
             debug_assert!(other_first || other_bound <= child_remaining);
@@ -1209,7 +1220,7 @@ impl Lane {
                 } else {
                     self.note_value(face, corner_bound.max(other_bound));
                 }
-                let top = &self.stack[depth];
+                let top = unsafe { self.stack.get_unchecked(depth) };
                 (todo, lower_bound) = (top.todo, top.lower_bound);
                 continue;
             }
@@ -1239,24 +1250,24 @@ impl Lane {
     /// learned on a face after it is dropped.)
     #[inline(always)]
     fn note_value(&mut self, face: usize, value: u8) {
-        // SAFETY: see `advance`.
-        unsafe { std::hint::assert_unchecked(self.depth < MAXD && face < 6) };
-        let node = &mut self.stack[self.depth];
+        // SAFETY: the depth is below MAXD (see `advance`); `face` is the
+        // face of a move, below 6.
+        let (node, face_keep) = unsafe {
+            (
+                self.stack.get_unchecked_mut(self.depth),
+                *HOT_TABLES.face_keep.get_unchecked(face),
+            )
+        };
         node.lower_bound = max_child_bound(node.lower_bound, value);
-        node.todo &= std::hint::select_unpredictable(
-            value > node.remaining_depth,
-            HOT_TABLES.face_keep[face],
-            !0,
-        );
+        node.todo &= std::hint::select_unpredictable(value > node.remaining_depth, face_keep, !0);
     }
 
     /// The X child `mv` was pruned by its other-side value, which its X'
     /// sibling shares (its twin value): mark the X' child as pruned.
     #[inline(always)]
     fn skip_xprime(&mut self, mv: usize) {
-        // SAFETY: see `advance`.
-        unsafe { std::hint::assert_unchecked(self.depth < MAXD) };
-        self.stack[self.depth].skip |= 4 << mv;
+        // SAFETY: the depth is below MAXD (see `advance`).
+        unsafe { self.stack.get_unchecked_mut(self.depth) }.skip |= 4 << mv;
     }
 
     /// The pending lookup's value. Loaded before the phase dispatch, whose
@@ -1271,7 +1282,10 @@ impl Lane {
     /// sets the phase).
     #[inline(always)]
     fn resolve_other(&mut self, other_bound: u8, solver: &Solver) -> bool {
-        // SAFETY: see `advance`.
+        // SAFETY: see `advance`. (A hint, not `get_unchecked` at the two
+        // indexes below: the facts also reach the inlined `note_value` and
+        // `skip_xprime`; with `get_unchecked` here the share loop had 39 more
+        // instructions and 9 more stack operands, the stream loop 11 and 5.)
         unsafe {
             std::hint::assert_unchecked(
                 self.depth < MAXD && self.pending_move < 18 && self.pending_face < 6,
@@ -1302,25 +1316,19 @@ impl Lane {
     /// Resolve the moved side's lookup and advance the lane.
     #[inline(always)]
     fn resolve_moved(&mut self, moved_bound: u8, solver: &Solver) -> Step {
-        // SAFETY: see `advance`.
-        unsafe {
-            std::hint::assert_unchecked(
-                self.depth < MAXD && self.pending_move < 18 && self.pending_face < 6,
-            );
-        }
         self.stats.lookups += 1;
         let other_bound = self.pending_other_bound;
         // SAFETY: bounds are below 16 (4-bit table entries and corner
         // depths, or base + 3; the twin value is known for every X' move
-        // reached); moves are below 18.
+        // reached), so the pair index is below 256; moves are below 18.
         unsafe {
-            std::hint::assert_unchecked(other_bound < 16 && moved_bound < 16);
             let root_child = self.stack[1].mv as usize;
-            std::hint::assert_unchecked(root_child < 18);
-            self.child_stats[root_child] +=
-                HOT_TABLES.stat_pairs[(other_bound as usize) << 4 | moved_bound as usize];
+            let pair = (other_bound as usize) << 4 | moved_bound as usize;
+            *self.child_stats.get_unchecked_mut(root_child) +=
+                *HOT_TABLES.stat_pairs.get_unchecked(pair);
         }
-        let child_remaining = self.stack[self.depth].remaining_depth - 1;
+        // SAFETY: the depth is below MAXD (see `advance`).
+        let child_remaining = unsafe { self.stack.get_unchecked(self.depth) }.remaining_depth - 1;
         let face = self.pending_face as usize;
         self.note_value(face, moved_bound.max(other_bound));
         // (Only a cube with bound 0 can be solved.)
@@ -1346,19 +1354,19 @@ impl Lane {
     #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
     fn push_advance(&mut self, moved_bound: u8, other_bound: u8, solver: &Solver) -> Step {
         let mut node = self.child_node(moved_bound, other_bound);
-        // SAFETY: see `advance`.
-        unsafe { std::hint::assert_unchecked(self.depth + 1 < MAXD) };
         self.depth += 1;
         let todo = node.todo;
         let child_remaining = node.remaining_depth.wrapping_sub(1);
         // (Rare kinds as in `advance`: `child_remaining` 0 or above the
         // largest table value.)
         if todo == 0 || child_remaining.wrapping_sub(1) >= solver.base + 3 {
-            self.stack[self.depth] = node;
+            // SAFETY: the child's depth is at most the target, below MAXD.
+            unsafe { *self.stack.get_unchecked_mut(self.depth) = node };
             return self.advance_cold(solver);
         }
         let mv = todo.trailing_zeros() as usize;
-        // SAFETY: move masks are subsets of ALL_MOVES.
+        // SAFETY: move masks are subsets of ALL_MOVES. (A range hint, not an
+        // index here: for `apply_move`, `premove_inverse` and `note_value`.)
         unsafe { std::hint::assert_unchecked(mv < 18) };
         debug_assert!(mv.is_multiple_of(3));
         let face = mv / 3;
@@ -1370,7 +1378,8 @@ impl Lane {
         self.pending_other = other_child;
         self.pending_move = mv as u8;
         let (index, corner_bound) = solver.index(other_child);
-        self.stack[self.depth] = node;
+        // SAFETY: as above.
+        unsafe { *self.stack.get_unchecked_mut(self.depth) = node };
         if corner_bound > child_remaining {
             self.note_value(face, corner_bound);
             self.skip_xprime(mv);
@@ -1389,10 +1398,9 @@ impl Lane {
     #[inline(always)]
     fn push_child(&mut self, moved_bound: u8, other_bound: u8) {
         let child = self.child_node(moved_bound, other_bound);
-        // SAFETY: see `advance`.
-        unsafe { std::hint::assert_unchecked(self.depth + 1 < MAXD) };
         self.depth += 1;
-        self.stack[self.depth] = child;
+        // SAFETY: the child's depth is at most the target, below MAXD.
+        unsafe { *self.stack.get_unchecked_mut(self.depth) = child };
     }
 
     /// The pending child as a node (see `push_child`): `make_node` of the
@@ -1400,14 +1408,18 @@ impl Lane {
     /// and the other side (no branch or select on the node's side).
     #[inline(always)]
     fn child_node(&self, moved_bound: u8, other_bound: u8) -> Node {
-        // SAFETY: see `advance`.
-        unsafe { std::hint::assert_unchecked(self.depth + 1 < MAXD && self.pending_face < 6) };
         let (moved, other) = (self.pending_moved, self.pending_other);
-        let parent = &self.stack[self.depth];
+        // SAFETY: the depth is below MAXD (see `advance`).
+        let parent = unsafe { self.stack.get_unchecked(self.depth) };
         let child_remaining = parent.remaining_depth - 1;
         let parent_normal = parent.normal;
         // Allowed moves on the moved side and on the other side.
-        let mut moved_moves = HOT_TABLES.allowed_after[self.pending_face as usize];
+        // SAFETY: the pending face is below 6.
+        let mut moved_moves = unsafe {
+            *HOT_TABLES
+                .allowed_after
+                .get_unchecked(self.pending_face as usize)
+        };
         let mut other_side_moves = parent.other_moves;
         if other_bound == child_remaining {
             moved_moves &= QUARTER_TURNS;

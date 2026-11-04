@@ -228,6 +228,8 @@ fn corner_fields(cube: Cube) -> (u64, u64) {
             os = const std::mem::offset_of!(crate::simd::HotTables, tetrad_pext_mask),
             options(pure, readonly, nostack, preserves_flags)
         );
+        // (A range hint, not an index here: the lookups of `cocsep` and
+        // `cocsep_x3` are unchecked already.)
         std::hint::assert_unchecked(co_fields < 1 << 14 && tetrads < 1 << 8);
     }
     (co_fields, tetrads)
