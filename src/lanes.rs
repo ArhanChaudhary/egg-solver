@@ -97,15 +97,15 @@ struct Job {
 }
 
 #[inline(always)]
-fn job_weight(j: &Job) -> f32 {
+fn job_weight(job: &Job) -> f32 {
     // face weight (branchless: the face parity is unpredictable)
-    [47525.0, 58206.0][((j.moves[j.len as usize - 1] / 3) % 2) as usize]
+    [47525.0, 58206.0][((job.moves[job.len as usize - 1] / 3) % 2) as usize]
 }
 
 /// The bits of `stat * job_weight` (`sort_jobs` sorts by decreasing key).
 #[inline(always)]
-fn job_key(j: &Job) -> u32 {
-    (j.stat * job_weight(j)).to_bits()
+fn job_key(job: &Job) -> u32 {
+    (job.stat * job_weight(job)).to_bits()
 }
 
 /// Sort jobs by decreasing `stat * job_weight`, stably: the same order as
@@ -124,29 +124,29 @@ fn sort_jobs(jobs: &mut Vec<Job>, out: &mut Vec<Job>) {
         .enumerate()
         .map(|(i, j)| (u64::from(!job_key(j)) << 32) | i as u64)
         .collect();
-    let mut tmp = vec![0u64; n];
+    let mut scratch = vec![0u64; n];
     for (shift, bits) in [(32u32, 11u32), (43, 11), (54, 10)] {
         let mask = u64::MAX.unbounded_shr(64 - bits);
-        let mut cnt = [0u32; 2048];
-        for &k in &keys {
-            cnt[((k >> shift) & mask) as usize] += 1;
+        let mut counts = [0u32; 2048];
+        for &key in &keys {
+            counts[((key >> shift) & mask) as usize] += 1;
         }
-        if cnt.iter().any(|&c| c as usize == n) {
+        if counts.iter().any(|&count| count as usize == n) {
             continue; // all keys share this digit
         }
         let mut sum = 0;
-        for c in &mut cnt {
-            (*c, sum) = (sum, sum + *c);
+        for count in &mut counts {
+            (*count, sum) = (sum, sum + *count);
         }
-        for &k in &keys {
-            let d = ((k >> shift) & mask) as usize;
-            tmp[cnt[d] as usize] = k;
-            cnt[d] += 1;
+        for &key in &keys {
+            let digit = ((key >> shift) & mask) as usize;
+            scratch[counts[digit] as usize] = key;
+            counts[digit] += 1;
         }
-        std::mem::swap(&mut keys, &mut tmp);
+        std::mem::swap(&mut keys, &mut scratch);
     }
     out.clear();
-    out.extend(keys.iter().map(|&k| jobs[k as u32 as usize]));
+    out.extend(keys.iter().map(|&key| jobs[key as u32 as usize]));
     std::mem::swap(jobs, out);
 }
 
@@ -189,9 +189,9 @@ const RUN_ALL: u32 = 31;
 /// Monotone 8-bit code of a non-negative statistic: 4 steps per octave
 /// (exponent and top two mantissa bits of the f32), 0 below 1.
 #[inline(always)]
-fn quantize(x: f32) -> u8 {
+fn quantize(stat: f32) -> u8 {
     // (Saturating at both ends: exponents below 127 and codes above 255.)
-    u8::try_from((x.to_bits() >> 21).saturating_sub(127 * 4)).unwrap_or(u8::MAX)
+    u8::try_from((stat.to_bits() >> 21).saturating_sub(127 * 4)).unwrap_or(u8::MAX)
 }
 
 /// The `ChildOrder::ck` codes of the statistics `x` of a root's children:
@@ -202,8 +202,8 @@ fn quantize(x: f32) -> u8 {
 /// at least 2 * 8.)
 #[inline(always)]
 #[expect(clippy::cast_ptr_alignment, reason = "unaligned store")]
-fn quantize18(x: &[f32; 18], children: u32) -> [u8; 18] {
-    let mut r = [0u8; 18];
+fn quantize18(stats: &[f32; 18], children: u32) -> [u8; 18] {
+    let mut codes = [0u8; 18];
     unsafe {
         use std::arch::x86_64::{
             __m128i, _mm512_castps_si512, _mm512_cvtusepi32_epi8, _mm512_loadu_ps,
@@ -211,53 +211,56 @@ fn quantize18(x: &[f32; 18], children: u32) -> [u8; 18] {
             _mm512_sub_epi32, _mm_add_epi8, _mm_mask_adds_epu8, _mm_mask_mov_epi8, _mm_set1_epi8,
             _mm_setr_epi8, _mm_storeu_si128, _mm_test_epi8_mask,
         };
-        let v = _mm512_loadu_ps(x.as_ptr());
-        let q = _mm512_sub_epi32(
-            _mm512_srli_epi32(_mm512_castps_si512(v), 21),
+        let values = _mm512_loadu_ps(stats.as_ptr());
+        let code = _mm512_sub_epi32(
+            _mm512_srli_epi32(_mm512_castps_si512(values), 21),
             _mm512_set1_epi32(127 * 4),
         );
-        let q = _mm512_cvtusepi32_epi8(_mm512_max_epi32(q, _mm512_setzero_si512()));
-        let odd = _mm_setr_epi8(0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1);
-        let seen = _mm_test_epi8_mask(q, q);
-        let q = _mm_mask_adds_epu8(q, seen, q, odd);
-        let unseen = _mm_add_epi8(_mm_set1_epi8(UNSEEN_CODE.cast_signed()), odd);
+        let code = _mm512_cvtusepi32_epi8(_mm512_max_epi32(code, _mm512_setzero_si512()));
+        let odd_faces = _mm_setr_epi8(0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1);
+        let seen = _mm_test_epi8_mask(code, code);
+        let code = _mm_mask_adds_epu8(code, seen, code, odd_faces);
+        let unseen = _mm_add_epi8(_mm_set1_epi8(UNSEEN_CODE.cast_signed()), odd_faces);
         #[expect(clippy::cast_possible_truncation, reason = "moves 0..16")]
-        let children_lo = children as u16;
-        let q = _mm_mask_mov_epi8(q, !seen & children_lo, unseen);
-        _mm_storeu_si128(r.as_mut_ptr().cast::<__m128i>(), q);
+        let children_low = children as u16;
+        let code = _mm_mask_mov_epi8(code, !seen & children_low, unseen);
+        _mm_storeu_si128(codes.as_mut_ptr().cast::<__m128i>(), code);
     }
     // (moves 16 and 17 are on face 5)
-    for m in 16..18 {
-        let q = quantize(x[m]);
-        let q = if q == 0 && children >> m & 1 != 0 {
+    for mv in 16..18 {
+        let code = quantize(stats[mv]);
+        let code = if code == 0 && children >> mv & 1 != 0 {
             UNSEEN_CODE
         } else {
-            q
+            code
         };
-        r[m] = q.saturating_add(u8::from(q != 0));
+        codes[mv] = code.saturating_add(u8::from(code != 0));
     }
-    r
+    codes
 }
 
 /// The sum of 18 statistics (a tree of additions: off the latency of a
 /// sequential sum).
 #[inline(always)]
-fn sum18(x: &[f32; 18]) -> f32 {
+fn sum18(stats: &[f32; 18]) -> f32 {
     unsafe {
         use std::arch::x86_64::{_mm512_loadu_ps, _mm512_reduce_add_ps};
-        _mm512_reduce_add_ps(_mm512_loadu_ps(x.as_ptr())) + (x[16] + x[17])
+        _mm512_reduce_add_ps(_mm512_loadu_ps(stats.as_ptr())) + (stats[16] + stats[17])
     }
 }
 
 /// Bit mask of the moves m with `ck[m] > theta`.
 #[inline(always)]
 #[expect(clippy::cast_ptr_alignment, reason = "unaligned load")]
-fn codes_above(ck: &[u8; 18], theta: u8) -> u32 {
+fn codes_above(codes: &[u8; 18], threshold: u8) -> u32 {
     unsafe {
         use std::arch::x86_64::{__m128i, _mm_cmpgt_epu8_mask, _mm_loadu_si128, _mm_set1_epi8};
-        let v = _mm_loadu_si128(ck.as_ptr().cast::<__m128i>());
-        let lo = u32::from(_mm_cmpgt_epu8_mask(v, _mm_set1_epi8(theta.cast_signed())));
-        lo | u32::from(ck[16] > theta) << 16 | u32::from(ck[17] > theta) << 17
+        let low = _mm_loadu_si128(codes.as_ptr().cast::<__m128i>());
+        let mask = u32::from(_mm_cmpgt_epu8_mask(
+            low,
+            _mm_set1_epi8(threshold.cast_signed()),
+        ));
+        mask | u32::from(codes[16] > threshold) << 16 | u32::from(codes[17] > threshold) << 17
     }
 }
 
@@ -269,45 +272,48 @@ fn codes_above(ck: &[u8; 18], theta: u8) -> u32 {
     clippy::cast_ptr_alignment,
     reason = "the low 16 moves; the low byte; unaligned load"
 )]
-fn max_code(ck: &[u8; 18], mask: u32) -> u8 {
-    let lo = unsafe {
+fn max_code(codes: &[u8; 18], moves: u32) -> u8 {
+    let low_max = unsafe {
         use std::arch::x86_64::{
             __m128i, _mm_cvtsi128_si32, _mm_loadu_si128, _mm_maskz_mov_epi8, _mm_max_epu8,
             _mm_srli_si128,
         };
-        let v = _mm_maskz_mov_epi8(mask as u16, _mm_loadu_si128(ck.as_ptr().cast::<__m128i>()));
-        let v = _mm_max_epu8(v, _mm_srli_si128(v, 8));
-        let v = _mm_max_epu8(v, _mm_srli_si128(v, 4));
-        let v = _mm_max_epu8(v, _mm_srli_si128(v, 2));
-        let v = _mm_max_epu8(v, _mm_srli_si128(v, 1));
-        _mm_cvtsi128_si32(v) as u8
+        let low = _mm_maskz_mov_epi8(
+            moves as u16,
+            _mm_loadu_si128(codes.as_ptr().cast::<__m128i>()),
+        );
+        let low = _mm_max_epu8(low, _mm_srli_si128(low, 8));
+        let low = _mm_max_epu8(low, _mm_srli_si128(low, 4));
+        let low = _mm_max_epu8(low, _mm_srli_si128(low, 2));
+        let low = _mm_max_epu8(low, _mm_srli_si128(low, 1));
+        _mm_cvtsi128_si32(low) as u8
     };
-    let b16 = if mask >> 16 & 1 != 0 { ck[16] } else { 0 };
-    let b17 = if mask >> 17 & 1 != 0 { ck[17] } else { 0 };
-    lo.max(b16).max(b17)
+    let code16 = if moves >> 16 & 1 != 0 { codes[16] } else { 0 };
+    let code17 = if moves >> 17 & 1 != 0 { codes[17] } else { 0 };
+    low_max.max(code16).max(code17)
 }
 
 /// Job statistic contribution of a lookup value h: 8^(16-h). Steeper than
 /// cube48opt's 2^(12-h); measured ~2% fewer nodes (saturating beyond 8^).
 const fn stat_terms() -> [f32; 64] {
-    let mut t = [0f32; 64];
-    let mut h = 0;
-    while h < 64 {
-        let mut v = 1f32;
-        let mut i = h;
+    let mut terms = [0f32; 64];
+    let mut value = 0;
+    while value < 64 {
+        let mut term = 1f32;
+        let mut i = value;
         while i < 16 {
-            v *= 8.0;
+            term *= 8.0;
             i += 1;
         }
         let mut i = 16;
-        while i < h {
-            v /= 8.0;
+        while i < value {
+            term /= 8.0;
             i += 1;
         }
-        t[h] = v;
-        h += 1;
+        terms[value] = term;
+        value += 1;
     }
-    t
+    terms
 }
 #[cfg(test)]
 static STAT_TERMS: [f32; 64] = stat_terms();
@@ -456,109 +462,109 @@ impl Lane {
     }
 
     #[inline(always)]
-    fn job_cubes(&self, j: &Job) -> (Cube, Cube) {
-        let mut c = self.root;
-        let mut ci = self.root_inverse;
-        for k in 0..j.len as usize {
-            let m = j.moves[k & 3] as usize;
+    fn job_cubes(&self, job: &Job) -> (Cube, Cube) {
+        let mut cube = self.root;
+        let mut inverse = self.root_inverse;
+        for i in 0..job.len as usize {
+            let mv = job.moves[i & 3] as usize;
             // SAFETY: job moves are moves.
-            unsafe { std::hint::assert_unchecked(m < 18) };
-            c = c.apply_move(m);
-            ci = ci.premove_inverse(m);
+            unsafe { std::hint::assert_unchecked(mv < 18) };
+            cube = cube.apply_move(mv);
+            inverse = inverse.premove_inverse(mv);
         }
-        (c, ci)
+        (cube, inverse)
     }
 
     /// Start solving a cube. Returns true if it is already solved.
-    fn start(&mut self, s: &Solver, cube: &CubieCube, index: usize) -> bool {
+    fn start(&mut self, solver: &Solver, cube: &CubieCube, index: usize) -> bool {
         self.cube_index = index;
         self.stats = Stats::default();
         self.solution.clear();
-        let c = Cube::from_cubie(cube);
-        if c.is_solved() {
+        let root = Cube::from_cubie(cube);
+        if root.is_solved() {
             return true;
         }
-        self.root = c;
-        self.root_inverse = c.inverse();
-        let ln = s.lower_bound(c);
-        let li = s.lower_bound(self.root_inverse);
+        self.root = root;
+        self.root_inverse = root.inverse();
+        let normal_bound = solver.lower_bound(root);
+        let inverse_bound = solver.lower_bound(self.root_inverse);
         self.jobs.clear();
         self.jobs.push(Job {
             moves: [0; 4],
             len: 0,
-            normal_bound: ln,
-            inverse_bound: li,
+            normal_bound,
+            inverse_bound,
             stat: 0.0,
         });
-        self.target = ln.max(li).max(1);
+        self.target = normal_bound.max(inverse_bound).max(1);
         self.run_state.full = false;
-        self.start_iteration(s);
+        self.start_iteration(solver);
         false
     }
 
     #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
-    fn extend_jobs(&mut self, s: &Solver) {
+    fn extend_jobs(&mut self, solver: &Solver) {
         // Bounds of the new jobs: lookups are prefetched and resolved LAG
         // lookups later. Only X children need an inverse lookup: X2 keeps
         // the parent's inverse coset (`li` is inherited by the copy) and X'
         // shares the X sibling's (see `Node::tw`).
         const LAG: usize = 48;
-        let mut out = std::mem::take(&mut self.jobs_tmp);
-        out.clear();
-        out.reserve(self.jobs.len() * 15);
-        let mut ring = [(0usize, 0u64, 0u8); 64];
+        let mut extended = std::mem::take(&mut self.jobs_tmp);
+        extended.clear();
+        extended.reserve(self.jobs.len() * 15);
+        let mut pending = [(0usize, 0u64, 0u8); 64];
         let (mut head, mut tail) = (0, 0);
-        let resolve = |out: &mut Vec<Job>, (slot, idx, cd): (usize, u64, u8)| {
-            let v = s.value(idx, cd);
+        let resolve = |extended: &mut Vec<Job>, (slot, index, corner_bound): (usize, u64, u8)| {
+            let value = solver.value(index, corner_bound);
             if slot.is_multiple_of(2) {
-                out[slot / 2].normal_bound = v;
+                extended[slot / 2].normal_bound = value;
             } else {
-                out[slot / 2].inverse_bound = v;
+                extended[slot / 2].inverse_bound = value;
             }
         };
-        for j in &self.jobs {
-            let (c, ci) = self.job_cubes(j);
-            let mut mm = if j.len == 0 {
+        for job in &self.jobs {
+            let (cube, inverse) = self.job_cubes(job);
+            let mut todo = if job.len == 0 {
                 ALL_MOVES
             } else {
-                ALLOWED_AFTER[(j.moves[j.len as usize - 1] / 3) as usize]
+                ALLOWED_AFTER[(job.moves[job.len as usize - 1] / 3) as usize]
             };
-            while mm != 0 {
-                let m = mm.trailing_zeros() as usize;
-                mm ^= mm.isolate_lowest_one();
-                let mut n = *j;
-                n.moves[n.len as usize] = m as u8;
-                n.len += 1;
-                let pos = out.len();
-                out.push(n);
-                let (idx, cd) = s.index(c.apply_move(m));
-                s.prefetch(idx);
-                ring[head % 64] = (2 * pos, idx, cd);
+            while todo != 0 {
+                let mv = todo.trailing_zeros() as usize;
+                todo ^= todo.isolate_lowest_one();
+                let mut child = *job;
+                child.moves[child.len as usize] = mv as u8;
+                child.len += 1;
+                let position = extended.len();
+                extended.push(child);
+                let (index, corner_bound) = solver.index(cube.apply_move(mv));
+                solver.prefetch(index);
+                pending[head % 64] = (2 * position, index, corner_bound);
                 head += 1;
-                if m.is_multiple_of(3) {
-                    let (idx, cd) = s.index(ci.premove_inverse(m));
-                    s.prefetch(idx);
-                    ring[head % 64] = (2 * pos + 1, idx, cd);
+                if mv.is_multiple_of(3) {
+                    let (index, corner_bound) = solver.index(inverse.premove_inverse(mv));
+                    solver.prefetch(index);
+                    pending[head % 64] = (2 * position + 1, index, corner_bound);
                     head += 1;
                 }
                 while head - tail > LAG {
-                    resolve(&mut out, ring[tail % 64]);
+                    resolve(&mut extended, pending[tail % 64]);
                     tail += 1;
                 }
             }
         }
         while tail < head {
-            resolve(&mut out, ring[tail % 64]);
+            resolve(&mut extended, pending[tail % 64]);
             tail += 1;
         }
         // X' follows its X sibling two places earlier (faces are whole).
-        for i in 0..out.len() {
-            let j = &out[i];
-            if j.moves[j.len as usize - 1] % 3 == 2 {
-                out[i].inverse_bound = out[i - 2].inverse_bound;
+        for i in 0..extended.len() {
+            let job = &extended[i];
+            if job.moves[job.len as usize - 1] % 3 == 2 {
+                extended[i].inverse_bound = extended[i - 2].inverse_bound;
             }
         }
-        self.jobs_tmp = std::mem::replace(&mut self.jobs, out);
+        self.jobs_tmp = std::mem::replace(&mut self.jobs, extended);
     }
 
     /// Start the iteration with target `self.target` (or a later one, if
@@ -572,24 +578,24 @@ impl Lane {
     /// across jobs (`build_first`), then each job's remaining children, by
     /// decreasing best statistic (`build_rest`). Other iterations run whole
     /// jobs by decreasing statistic, as solver does.
-    fn start_iteration(&mut self, s: &Solver) {
+    fn start_iteration(&mut self, solver: &Solver) {
         loop {
             // The stack depth stays below the target (relied on by the
             // unchecked indexing in `advance`); 20 moves always suffice.
             assert!((self.target as usize) < MAXD);
-            let jl = s.job_len(self.target);
-            let mut ext = false;
-            while (self.jobs[0].len as usize) < jl {
-                self.extend_jobs(s);
-                ext = true;
+            let job_len = solver.job_len(self.target);
+            let mut extended = false;
+            while (self.jobs[0].len as usize) < job_len {
+                self.extend_jobs(solver);
+                extended = true;
             }
             let was_full = self.run_state.full;
-            self.run_state.full = jl == MAX_JOB_LEN && !self.shared;
-            if self.run_state.full && was_full && !ext {
+            self.run_state.full = job_len == MAX_JOB_LEN && !self.shared;
+            if self.run_state.full && was_full && !extended {
                 self.build_first();
                 self.run_state.part = 1;
             } else {
-                if jl > 0 {
+                if job_len > 0 {
                     sort_jobs(&mut self.jobs, &mut self.jobs_tmp);
                 }
                 if self.run_state.full {
@@ -618,23 +624,23 @@ impl Lane {
         reason = "a fraction of a count"
     )]
     fn choose_theta(&self) -> u8 {
-        let n = self.run_state.child_orders.len();
-        let step = if n >= 4096 { 8 } else { 1 };
-        let mut hist = [0u32; 256];
+        let n_jobs = self.run_state.child_orders.len();
+        let step = if n_jobs >= 4096 { 8 } else { 1 };
+        let mut histogram = [0u32; 256];
         let mut total = 0u32;
-        for x in self.run_state.child_orders.iter().step_by(step) {
-            for &q in &x.codes {
-                hist[q as usize] += 1;
+        for order in self.run_state.child_orders.iter().step_by(step) {
+            for &code in &order.codes {
+                histogram[code as usize] += 1;
             }
             total += 18;
         }
-        total -= hist[0];
+        total -= histogram[0];
         let limit = (f64::from(total) * FIRST_FRACTION) as u32;
-        let mut acc = 0;
-        for v in (1..=u8::MAX).rev() {
-            acc += hist[usize::from(v)];
-            if acc > limit {
-                return v;
+        let mut count = 0;
+        for code in (1..=u8::MAX).rev() {
+            count += histogram[usize::from(code)];
+            if count > limit {
+                return code;
             }
         }
         0
@@ -652,19 +658,19 @@ impl Lane {
     fn build_first(&mut self) {
         self.run_state.theta = self.choose_theta();
         let theta = self.run_state.theta;
-        let n = self.run_state.child_orders.len();
+        let n_jobs = self.run_state.child_orders.len();
         self.run_state.runs_tmp.clear();
-        self.run_state.runs_tmp.reserve(n + 64);
-        let mut cnt = [0u32; 256];
-        let mut k = 0;
-        for ji in 0..n {
+        self.run_state.runs_tmp.reserve(n_jobs + 64);
+        let mut counts = [0u32; 256];
+        let mut n_runs = 0;
+        for job in 0..n_jobs {
             // SAFETY: ji < n.
-            let x = unsafe { self.run_state.child_orders.get_unchecked(ji) };
-            let cand = codes_above(&x.codes, theta);
-            if self.run_state.runs_tmp.capacity() < k + 32 {
+            let order = unsafe { self.run_state.child_orders.get_unchecked(job) };
+            let candidates = codes_above(&order.codes, theta);
+            if self.run_state.runs_tmp.capacity() < n_runs + 32 {
                 // SAFETY: the first k entries were written.
-                unsafe { self.run_state.runs_tmp.set_len(k) };
-                self.run_state.runs_tmp.reserve(n + 64);
+                unsafe { self.run_state.runs_tmp.set_len(n_runs) };
+                self.run_state.runs_tmp.reserve(n_jobs + 64);
             }
             // SAFETY: k + 18 <= capacity; entries are written before
             // `set_len` covers them.
@@ -674,32 +680,36 @@ impl Lane {
                     _mm512_mask_compressstoreu_epi32, _mm512_or_si512, _mm512_set1_epi32,
                     _mm512_setr_epi32, _mm512_slli_epi32, _mm_loadu_si128,
                 };
-                let out = self.run_state.runs_tmp.as_mut_ptr().add(k);
-                let ck = _mm_loadu_si128(x.codes.as_ptr().cast::<__m128i>());
-                let e = _mm512_or_si512(
-                    _mm512_slli_epi32(_mm512_cvtepu8_epi32(ck), 24),
+                let dst = self.run_state.runs_tmp.as_mut_ptr().add(n_runs);
+                let codes = _mm_loadu_si128(order.codes.as_ptr().cast::<__m128i>());
+                let entry = _mm512_or_si512(
+                    _mm512_slli_epi32(_mm512_cvtepu8_epi32(codes), 24),
                     _mm512_add_epi32(
-                        _mm512_set1_epi32((ji as i32) << 5),
+                        _mm512_set1_epi32((job as i32) << 5),
                         _mm512_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
                     ),
                 );
-                let c16 = cand as u16;
-                _mm512_mask_compressstoreu_epi32(out.cast::<i32>(), c16, e);
-                let mut k2 = k + c16.count_ones() as usize;
-                for m in 16..18 {
-                    let e = u32::from(x.codes[m]) << 24 | (ji as u32) << 5 | m as u32;
-                    out.add(k2 - k).write(e);
-                    k2 += (cand >> m & 1) as usize;
+                let low_candidates = candidates as u16;
+                _mm512_mask_compressstoreu_epi32(dst.cast::<i32>(), low_candidates, entry);
+                let mut end = n_runs + low_candidates.count_ones() as usize;
+                for mv in 16..18 {
+                    let entry = u32::from(order.codes[mv]) << 24 | (job as u32) << 5 | mv as u32;
+                    dst.add(end - n_runs).write(entry);
+                    end += (candidates >> mv & 1) as usize;
                 }
-                k = k2;
+                n_runs = end;
             }
         }
         // SAFETY: the first k entries were written.
-        unsafe { self.run_state.runs_tmp.set_len(k) };
-        for &e in &self.run_state.runs_tmp {
-            cnt[(e >> 24) as usize] += 1;
+        unsafe { self.run_state.runs_tmp.set_len(n_runs) };
+        for &entry in &self.run_state.runs_tmp {
+            counts[(entry >> 24) as usize] += 1;
         }
-        sort_runs(&mut self.run_state.runs, &self.run_state.runs_tmp, &mut cnt);
+        sort_runs(
+            &mut self.run_state.runs,
+            &self.run_state.runs_tmp,
+            &mut counts,
+        );
         self.run_state.run_pos = 0;
     }
 
@@ -713,32 +723,36 @@ impl Lane {
         reason = "job indices are below 2^19 (19 bits of a run entry)"
     )]
     fn build_rest(&mut self) {
-        let n = self.run_state.child_orders.len();
+        let n_jobs = self.run_state.child_orders.len();
         let tag = u32::from(self.target) << 24;
         self.run_state.runs_tmp.clear();
-        self.run_state.runs_tmp.reserve(n);
-        let mut cnt = [0u32; 256];
-        for ji in 0..n {
-            let x = &self.run_state.child_orders[ji];
-            let rest = self.side_moves(ji) & !done_now(x, tag);
-            if rest != 0 {
+        self.run_state.runs_tmp.reserve(n_jobs);
+        let mut counts = [0u32; 256];
+        for job in 0..n_jobs {
+            let order = &self.run_state.child_orders[job];
+            let remaining = self.side_moves(job) & !done_now(order, tag);
+            if remaining != 0 {
                 // The job's best code of all its children, not only of those
                 // left (-0.5% nodes on 20K random and 33K depth-18 cubes).
-                let key = max_code(&x.codes, ALL_MOVES);
-                cnt[key as usize] += 1;
+                let key = max_code(&order.codes, ALL_MOVES);
+                counts[key as usize] += 1;
                 self.run_state
                     .runs_tmp
-                    .push(u32::from(key) << 24 | (ji as u32) << 5 | RUN_ALL);
+                    .push(u32::from(key) << 24 | (job as u32) << 5 | RUN_ALL);
             }
         }
-        sort_runs(&mut self.run_state.runs, &self.run_state.runs_tmp, &mut cnt);
+        sort_runs(
+            &mut self.run_state.runs,
+            &self.run_state.runs_tmp,
+            &mut counts,
+        );
         self.run_state.run_pos = 0;
     }
 
     /// The root children of job `ji` in a split iteration (normal side).
     #[inline(always)]
-    fn side_moves(&self, ji: usize) -> u32 {
-        moves_after(&self.jobs[ji])
+    fn side_moves(&self, job: usize) -> u32 {
+        moves_after(&self.jobs[job])
     }
 
     /// Whether every child of every feasible job root was run in this
@@ -748,52 +762,53 @@ impl Lane {
             return true;
         }
         let tag = u32::from(self.target) << 24;
-        (0..self.run_state.child_orders.len())
-            .all(|ji| self.side_moves(ji) & !done_now(&self.run_state.child_orders[ji], tag) == 0)
+        (0..self.run_state.child_orders.len()).all(|job| {
+            self.side_moves(job) & !done_now(&self.run_state.child_orders[job], tag) == 0
+        })
     }
 
     /// Record the run just finished: the job's statistic, and in split
     /// iterations' setting its children's statistics, `tw` and `done`.
     #[inline(always)]
     fn finish_run(&mut self) {
-        let ji = self.run_state.current_job;
+        let job = self.run_state.current_job;
         let stat: f32 = sum18(&self.child_stats);
-        self.jobs[ji].stat = stat;
+        self.jobs[job].stat = stat;
         if self.run_state.full {
             let root = &self.stack[0];
-            let mask = self.run_state.current_children;
+            let children = self.run_state.current_children;
             let tag = u32::from(self.target) << 24;
             // Children without statistics get `UNSEEN_CODE`: they run with
             // the mid-ranked children instead of last (with the rest key of
             // `build_rest`: -1.0% nodes on 20K random and 33K depth-18
             // cubes, +0.6% 48T).
-            let q = quantize18(&self.child_stats, moves_after(&self.jobs[ji]) & mask);
+            let codes = quantize18(&self.child_stats, moves_after(&self.jobs[job]) & children);
             debug_assert!(root.normal);
-            let x = if self.run_state.part == 0 {
+            let order = if self.run_state.part == 0 {
                 // A whole run: the entry is all new (not read: it is not
                 // in the cache).
                 ChildOrder {
-                    codes: q,
+                    codes,
                     twin_values: root.twin_values,
                     done: tag | ALL_MOVES,
                     _pad: 0,
                 }
             } else {
-                let x = &self.run_state.child_orders[ji];
-                let mut ck = x.codes;
-                for m in 0..18 {
-                    if mask >> m & 1 != 0 {
-                        ck[m] = q[m];
+                let order = &self.run_state.child_orders[job];
+                let mut merged = order.codes;
+                for mv in 0..18 {
+                    if children >> mv & 1 != 0 {
+                        merged[mv] = codes[mv];
                     }
                 }
                 ChildOrder {
-                    codes: ck,
+                    codes: merged,
                     twin_values: root.twin_values,
-                    done: tag | done_now(x, tag) | mask,
+                    done: tag | done_now(order, tag) | children,
                     _pad: 0,
                 }
             };
-            self.run_state.child_orders[ji] = x;
+            self.run_state.child_orders[job] = order;
         }
     }
 
@@ -802,7 +817,7 @@ impl Lane {
     /// the search loop's registers.
     #[cold]
     #[inline(never)]
-    fn next_run(&mut self, s: &Solver) {
+    fn next_run(&mut self, solver: &Solver) {
         self.finish_run();
         if self.run_state.part == 0 {
             self.job_pos += 1;
@@ -810,16 +825,12 @@ impl Lane {
         if !self.setup_run() {
             debug_assert!(self.iteration_covered());
             self.target += 1;
-            self.start_iteration(s);
+            self.start_iteration(solver);
         }
     }
 
     /// Set up the root node of the next run of this iteration. Returns
     /// false if the iteration is exhausted.
-    #[expect(
-        clippy::many_single_char_names,
-        reason = "renamed in the lanes.rs sweep"
-    )]
     fn setup_run(&mut self) -> bool {
         if self.run_state.part == 0 {
             return self.setup_job();
@@ -834,7 +845,7 @@ impl Lane {
                 self.run_state.part = 2;
                 continue;
             }
-            let e = self.run_state.runs[self.run_state.run_pos];
+            let entry = self.run_state.runs[self.run_state.run_pos];
             self.run_state.run_pos += 1;
             // The job vectors are too big for L2 and 20 lanes interleave
             // their streams: fetch the next entry's job early.
@@ -844,31 +855,35 @@ impl Lane {
                     .run_state
                     .runs
                     .get_unchecked(self.run_state.run_pos.min(self.run_state.runs.len() - 1));
-                let nj = (next >> 5 & 0x7_FFFF) as usize;
+                let next_job = (next >> 5 & 0x7_FFFF) as usize;
                 _mm_prefetch(
-                    self.run_state.child_orders.as_ptr().add(nj).cast::<i8>(),
+                    self.run_state
+                        .child_orders
+                        .as_ptr()
+                        .add(next_job)
+                        .cast::<i8>(),
                     _MM_HINT_T0,
                 );
-                _mm_prefetch(self.jobs.as_ptr().add(nj).cast::<i8>(), _MM_HINT_T0);
+                _mm_prefetch(self.jobs.as_ptr().add(next_job).cast::<i8>(), _MM_HINT_T0);
             }
-            let ji = (e >> 5 & 0x7_FFFF) as usize;
-            let m = e & 31;
-            let x = self.run_state.child_orders[ji];
-            let done = done_now(&x, tag);
-            let side = self.side_moves(ji);
-            let mut mask;
-            if m == RUN_ALL {
-                mask = side & !done;
+            let job_index = (entry >> 5 & 0x7_FFFF) as usize;
+            let mv = entry & 31;
+            let order = self.run_state.child_orders[job_index];
+            let done = done_now(&order, tag);
+            let allowed = self.side_moves(job_index);
+            let mut children;
+            if mv == RUN_ALL {
+                children = allowed & !done;
             } else {
-                if done >> m & 1 != 0 {
+                if done >> mv & 1 != 0 {
                     continue; // run with an earlier entry's group
                 }
                 // the child, with the job's candidates at most `MERGE_CODES` below
                 // it (those above were run before)
-                let lo = x.codes[m as usize]
+                let threshold = order.codes[mv as usize]
                     .saturating_sub(MERGE_CODES + 1)
                     .max(self.run_state.theta);
-                mask = (codes_above(&x.codes, lo) & !done) | 1 << m;
+                children = (codes_above(&order.codes, threshold) & !done) | 1 << mv;
             }
             // An X' child needs its X sibling's other-side value (`tw`):
             // from this run or recorded by an earlier one (every
@@ -878,29 +893,31 @@ impl Lane {
             // root child, r - 1 being at least the largest bound, so an X
             // run earlier in it recorded its value; with r - 1 above it the
             // root's children are not looked up and X' needs no value.)
-            let unknown = unknown_twins(&x.twin_values);
-            mask |= (mask & unknown) >> 2 & !done;
-            let j = self.jobs[ji];
-            let r = self.target - j.len;
-            debug_assert!(j.normal_bound < r && j.inverse_bound < r);
-            let (c, ci) = self.job_cubes(&j);
+            let unknown = unknown_twins(&order.twin_values);
+            children |= (children & unknown) >> 2 & !done;
+            let job = self.jobs[job_index];
+            let remaining_depth = self.target - job.len;
+            debug_assert!(
+                job.normal_bound < remaining_depth && job.inverse_bound < remaining_depth
+            );
+            let (cube, inverse) = self.job_cubes(&job);
             self.child_stats = [0.0; 18];
-            self.run_state.current_job = ji;
-            self.run_state.current_children = mask;
+            self.run_state.current_job = job_index;
+            self.run_state.current_children = children;
             self.depth = 0;
             self.stack[0] = Node {
-                moved: c,
-                other: ci,
-                other_side_bound: j.inverse_bound,
+                moved: cube,
+                other: inverse,
+                other_side_bound: job.inverse_bound,
                 other_moves: ALL_MOVES,
-                todo: side & mask,
+                todo: allowed & children,
                 skip: 0,
-                remaining_depth: r,
+                remaining_depth,
                 normal: true,
                 lower_bound: 0,
                 mv: 0,
                 mv_normal: true,
-                twin_values: x.twin_values,
+                twin_values: order.twin_values,
             };
             return true;
         }
@@ -910,7 +927,7 @@ impl Lane {
     /// Returns false if the iteration is exhausted.
     fn setup_job(&mut self) -> bool {
         while self.job_pos < self.jobs.len() {
-            let j = self.jobs[self.job_pos];
+            let job = self.jobs[self.job_pos];
             // The job vector is too big for L2 and 20 lanes interleave
             // their streams: fetch the next jobs' line early.
             let ahead = (self.job_pos + 8).min(self.jobs.len() - 1);
@@ -925,10 +942,13 @@ impl Lane {
                     );
                 }
             }
-            let r = self.target - j.len;
+            let remaining_depth = self.target - job.len;
             self.child_stats = [0.0; 18];
-            let (c, ci) = self.job_cubes(&j);
-            if j.normal_bound > r || j.inverse_bound > r || (j.len > 0 && c.is_solved()) {
+            let (cube, inverse) = self.job_cubes(&job);
+            if job.normal_bound > remaining_depth
+                || job.inverse_bound > remaining_depth
+                || (job.len > 0 && cube.is_solved())
+            {
                 self.jobs[self.job_pos].stat = 0.0;
                 if self.run_state.full {
                     self.run_state.child_orders[self.job_pos] = NO_CHILD_ORDER;
@@ -938,30 +958,34 @@ impl Lane {
             }
             self.run_state.current_job = self.job_pos;
             self.run_state.current_children = ALL_MOVES;
-            let mut mm_n = if j.len == 0 {
+            let mut normal_moves = if job.len == 0 {
                 ALL_MOVES
             } else {
-                ALLOWED_AFTER[(j.moves[j.len as usize - 1] / 3) as usize]
+                ALLOWED_AFTER[(job.moves[job.len as usize - 1] / 3) as usize]
             };
-            let mut mm_i = ALL_MOVES;
-            if j.inverse_bound == r {
-                mm_n &= QUARTER_TURNS;
+            let mut inverse_moves = ALL_MOVES;
+            if job.inverse_bound == remaining_depth {
+                normal_moves &= QUARTER_TURNS;
             }
-            if j.normal_bound == r {
-                mm_i &= QUARTER_TURNS;
+            if job.normal_bound == remaining_depth {
+                inverse_moves &= QUARTER_TURNS;
             }
             self.depth = 0;
             self.stack[0] = if self.run_state.full {
                 // Full-length jobs branch on the normal side, which their
                 // statistics per child (`ChildOrder::ck`) refer to.
                 Node {
-                    moved: c,
-                    other: ci,
-                    other_side_bound: j.inverse_bound,
-                    other_moves: mm_i,
-                    todo: if r == 1 { mm_n & mm_i } else { mm_n },
+                    moved: cube,
+                    other: inverse,
+                    other_side_bound: job.inverse_bound,
+                    other_moves: inverse_moves,
+                    todo: if remaining_depth == 1 {
+                        normal_moves & inverse_moves
+                    } else {
+                        normal_moves
+                    },
                     skip: 0,
-                    remaining_depth: r,
+                    remaining_depth,
                     normal: true,
                     lower_bound: 0,
                     mv: 0,
@@ -970,13 +994,13 @@ impl Lane {
                 }
             } else {
                 make_node(
-                    c,
-                    ci,
-                    j.normal_bound,
-                    j.inverse_bound,
-                    mm_n,
-                    mm_i,
-                    r,
+                    cube,
+                    inverse,
+                    job.normal_bound,
+                    job.inverse_bound,
+                    normal_moves,
+                    inverse_moves,
+                    remaining_depth,
                     0,
                     true,
                 )
@@ -997,32 +1021,28 @@ impl Lane {
         clippy::too_many_lines,
         reason = "the search loop keeps its state in registers"
     )]
-    #[expect(
-        clippy::many_single_char_names,
-        reason = "renamed in the lanes.rs sweep"
-    )]
     #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
-    fn advance(&mut self, s: &Solver) -> Step {
-        let maxval = s.base + 3;
-        let mut sp = self.depth;
+    fn advance(&mut self, solver: &Solver) -> Step {
+        let max_value = solver.base + 3;
+        let mut depth = self.depth;
         // SAFETY: the depth is bounded by the target (< MAXD).
-        unsafe { std::hint::assert_unchecked(sp < MAXD) };
-        let (mut todo, mut lb, mut r) = {
-            let n = &self.stack[sp];
-            (n.todo, n.lower_bound, n.remaining_depth)
+        unsafe { std::hint::assert_unchecked(depth < MAXD) };
+        let (mut todo, mut lower_bound, mut remaining_depth) = {
+            let top = &self.stack[depth];
+            (top.todo, top.lower_bound, top.remaining_depth)
         };
         // Nodes generated (added to `stats` on return).
         let mut nodes = 0;
         loop {
             // SAFETY: as above (`sp` is `self.depth`).
-            unsafe { std::hint::assert_unchecked(sp < MAXD) };
+            unsafe { std::hint::assert_unchecked(depth < MAXD) };
             // X' moves known to be pruned (`skip`) are reached, and counted,
             // up to the next move to generate (all of them if there is
             // none). The bounds do not change in between (their value was
             // already noted).
             let mut live = 0;
-            let done = lb > r || {
-                live = todo & !self.stack[sp].skip;
+            let done = lower_bound > remaining_depth || {
+                live = todo & !self.stack[depth].skip;
                 // (`bzhi` keeps all of `todo` if `live` is 0. The std form,
                 // `todo & u32::MAX.unbounded_shr(32 - tz)`, costs a test and
                 // a cmov more for that case.)
@@ -1034,8 +1054,8 @@ impl Lane {
             };
             if done {
                 // (The node is done: its `todo` is not needed any more.)
-                let m = self.stack[sp].mv;
-                if sp == 0 {
+                let mv = self.stack[depth].mv;
+                if depth == 0 {
                     // job finished
                     if self.shared {
                         self.job_stat = sum18(&self.child_stats);
@@ -1043,113 +1063,116 @@ impl Lane {
                         self.stats.nodes += nodes;
                         return Step::JobDone;
                     }
-                    self.next_run(s);
-                    sp = self.depth;
-                    let n = &self.stack[sp];
-                    (todo, lb, r) = (n.todo, n.lower_bound, n.remaining_depth);
+                    self.next_run(solver);
+                    depth = self.depth;
+                    let top = &self.stack[depth];
+                    (todo, lower_bound, remaining_depth) =
+                        (top.todo, top.lower_bound, top.remaining_depth);
                     continue;
                 }
-                sp -= 1;
-                self.depth = sp;
-                let p = &mut self.stack[sp];
-                let f = (m / 3) as usize;
+                depth -= 1;
+                self.depth = depth;
+                let parent = &mut self.stack[depth];
+                let parent_face = (mv / 3) as usize;
                 // Sibling-face pruning on the child's bound (see `note_value`).
                 // SAFETY: moves are below 18.
-                unsafe { std::hint::assert_unchecked(f < 6) };
+                unsafe { std::hint::assert_unchecked(parent_face < 6) };
                 let keep = std::hint::select_unpredictable(
-                    lb > p.remaining_depth,
-                    HOT_TABLES.face_keep[f],
+                    lower_bound > parent.remaining_depth,
+                    HOT_TABLES.face_keep[parent_face],
                     !0,
                 );
-                lb = max_child_bound(p.lower_bound, lb);
-                p.lower_bound = lb;
-                r = p.remaining_depth;
-                todo = p.todo & keep;
-                p.todo = todo;
+                lower_bound = max_child_bound(parent.lower_bound, lower_bound);
+                parent.lower_bound = lower_bound;
+                remaining_depth = parent.remaining_depth;
+                todo = parent.todo & keep;
+                parent.todo = todo;
                 continue;
             }
             // (The lowest move of `todo` now.)
-            let m = live.trailing_zeros() as usize;
+            let mv = live.trailing_zeros() as usize;
             // SAFETY: move masks are subsets of ALL_MOVES.
-            unsafe { std::hint::assert_unchecked(m < 18) };
+            unsafe { std::hint::assert_unchecked(mv < 18) };
             todo ^= todo.isolate_lowest_one();
-            let node = &mut self.stack[sp];
+            let node = &mut self.stack[depth];
             node.todo = todo;
-            let face = m / 3;
+            let face = mv / 3;
             // (`m % 3`, from `face`: LLVM would divide again.)
-            let kind = m - 3 * face;
-            let r1 = r - 1;
+            let kind = mv - 3 * face;
+            let child_remaining = remaining_depth - 1;
             // (No sibling-face check: such faces were removed from `todo`.)
             nodes += 1;
-            let (a, b, lo) = (node.moved, node.other, node.other_side_bound);
+            let (moved, other, other_side_bound) = (node.moved, node.other, node.other_side_bound);
             // One test for the rare kinds: r1 == 0 (wraps) or r1 > maxval.
             // (`!(1..=maxval).contains(&r1)` is the same test, but LLVM
             // then allocates the loop's registers differently.)
-            if r1.wrapping_sub(1) >= maxval {
-                if r1 == 0 {
+            if child_remaining.wrapping_sub(1) >= max_value {
+                if child_remaining == 0 {
                     // nodes with r == 1 always move the normal cube
-                    if a.apply_move(m).is_solved() {
-                        self.pending_move = m as u8;
+                    if moved.apply_move(mv).is_solved() {
+                        self.pending_move = mv as u8;
                         self.stats.nodes += nodes;
                         return Step::Found;
                     }
                     continue;
                 }
-                let a2 = a.apply_move(m);
-                let b2 = b.premove_inverse(m);
-                let po = if kind == 1 { lo } else { 0 };
-                if po > r1 || a2.is_solved() {
+                let moved_child = moved.apply_move(mv);
+                let other_child = other.premove_inverse(mv);
+                let other_bound = if kind == 1 { other_side_bound } else { 0 };
+                if other_bound > child_remaining || moved_child.is_solved() {
                     continue;
                 }
-                self.pending_moved = a2;
-                self.pending_other = b2;
-                self.pending_move = m as u8;
+                self.pending_moved = moved_child;
+                self.pending_other = other_child;
+                self.pending_move = mv as u8;
                 self.pending_face = face as u8;
-                self.push_child(0, po);
-                sp = self.depth;
-                let n = &self.stack[sp];
-                (todo, lb, r) = (n.todo, n.lower_bound, n.remaining_depth);
+                self.push_child(0, other_bound);
+                depth = self.depth;
+                let top = &self.stack[depth];
+                (todo, lower_bound, remaining_depth) =
+                    (top.todo, top.lower_bound, top.remaining_depth);
                 continue;
             }
-            let a2 = a.apply_move(m);
-            let b2 = b.premove_inverse(m);
+            let moved_child = moved.apply_move(mv);
+            let other_child = other.premove_inverse(mv);
             let half = kind == 1;
             // (The pending child's move: the root child whose statistic
             // (`child_stats`) a lookup counts for is `stack[1].mv`, at the root as
             // well. A pushed child overwrites it with the same move.)
-            self.stack[sp + 1].mv = m as u8;
-            self.pending_moved = a2;
-            self.pending_other = b2;
-            self.pending_move = m as u8;
+            self.stack[depth + 1].mv = mv as u8;
+            self.pending_moved = moved_child;
+            self.pending_other = other_child;
+            self.pending_move = mv as u8;
             // X looks up the other side first. X2 and X' know the other
             // side's value: X2 keeps the node's (a half turn keeps the other
             // side's coset), X' shares its X sibling's (`tw`); both are at
             // most r1 (half turns are masked out when `lo` is tight, X'
             // moves with `tw > r1` are skipped), so they look up the moved
             // side. Selected without branching on the move kind.
-            let other = kind == 0;
-            let tw = self.stack[sp].twin_values[face];
+            let other_first = kind == 0;
+            let twin = self.stack[depth].twin_values[face];
             // (LLVM would branch on `half` to skip the `tw` load.)
-            let po = std::hint::select_unpredictable(half, lo, tw);
-            debug_assert!(other || po <= r1);
-            let (idx, cd) = s.index(Cube::select(other, b2, a2));
-            if cd > r1 {
-                if other {
-                    self.note_value(face, cd);
-                    self.skip_xprime(m);
+            let other_bound = std::hint::select_unpredictable(half, other_side_bound, twin);
+            debug_assert!(other_first || other_bound <= child_remaining);
+            let (index, corner_bound) =
+                solver.index(Cube::select(other_first, other_child, moved_child));
+            if corner_bound > child_remaining {
+                if other_first {
+                    self.note_value(face, corner_bound);
+                    self.skip_xprime(mv);
                 } else {
-                    self.note_value(face, cd.max(po));
+                    self.note_value(face, corner_bound.max(other_bound));
                 }
-                let n = &self.stack[sp];
-                (todo, lb) = (n.todo, n.lower_bound);
+                let top = &self.stack[depth];
+                (todo, lower_bound) = (top.todo, top.lower_bound);
                 continue;
             }
             self.pending_face = face as u8;
-            self.pending_other_bound = po;
-            self.pending_index = idx;
-            self.pending_corner_bound = cd;
-            s.prefetch(idx);
-            self.phase = if other {
+            self.pending_other_bound = other_bound;
+            self.pending_index = index;
+            self.pending_corner_bound = corner_bound;
+            solver.prefetch(index);
+            self.phase = if other_first {
                 Phase::WaitOther
             } else {
                 Phase::WaitMoved
@@ -1167,13 +1190,13 @@ impl Lane {
     /// else the face would have been dropped before this child was
     /// generated; and nothing is learned on a face after it is dropped.)
     #[inline(always)]
-    fn note_value(&mut self, face: usize, v: u8) {
+    fn note_value(&mut self, face: usize, value: u8) {
         // SAFETY: see `advance`.
         unsafe { std::hint::assert_unchecked(self.depth < MAXD && face < 6) };
         let node = &mut self.stack[self.depth];
-        node.lower_bound = max_child_bound(node.lower_bound, v);
+        node.lower_bound = max_child_bound(node.lower_bound, value);
         node.todo &= std::hint::select_unpredictable(
-            v > node.remaining_depth,
+            value > node.remaining_depth,
             HOT_TABLES.face_keep[face],
             !0,
         );
@@ -1182,24 +1205,24 @@ impl Lane {
     /// The X child `m` was pruned by its other-side value (`tw`), which its
     /// X' sibling shares: mark the X' child as pruned.
     #[inline(always)]
-    fn skip_xprime(&mut self, m: usize) {
+    fn skip_xprime(&mut self, mv: usize) {
         // SAFETY: see `advance`.
         unsafe { std::hint::assert_unchecked(self.depth < MAXD) };
-        self.stack[self.depth].skip |= 4 << m;
+        self.stack[self.depth].skip |= 4 << mv;
     }
 
     /// The pending lookup's value. Loaded before the phase dispatch, whose
     /// mispredicts then do not delay it.
     #[inline(always)]
-    fn pending_value(&self, s: &Solver) -> u8 {
-        s.value(self.pending_index, self.pending_corner_bound)
+    fn pending_value(&self, solver: &Solver) -> u8 {
+        solver.value(self.pending_index, self.pending_corner_bound)
     }
 
     /// Resolve the other side's lookup of an X child. Returns whether the
     /// moved side's lookup is now pending (else the lane is to advance, which
     /// sets the phase).
     #[inline(always)]
-    fn resolve_other(&mut self, po: u8, s: &Solver) -> bool {
+    fn resolve_other(&mut self, other_bound: u8, solver: &Solver) -> bool {
         // SAFETY: see `advance`.
         unsafe {
             std::hint::assert_unchecked(
@@ -1207,30 +1230,30 @@ impl Lane {
             );
         }
         self.stats.lookups += 1;
-        let r1 = self.stack[self.depth].remaining_depth - 1;
+        let child_remaining = self.stack[self.depth].remaining_depth - 1;
         let face = self.pending_face as usize;
-        if po > r1 {
-            self.note_value(face, po);
+        if other_bound > child_remaining {
+            self.note_value(face, other_bound);
             self.skip_xprime(self.pending_move as usize);
             return false;
         }
-        self.stack[self.depth].twin_values[face] = po;
-        let (idx, cd) = s.index(self.pending_moved);
-        if cd > r1 {
-            self.note_value(face, cd.max(po));
+        self.stack[self.depth].twin_values[face] = other_bound;
+        let (index, corner_bound) = solver.index(self.pending_moved);
+        if corner_bound > child_remaining {
+            self.note_value(face, corner_bound.max(other_bound));
             return false;
         }
-        self.pending_other_bound = po;
-        self.pending_index = idx;
-        self.pending_corner_bound = cd;
-        s.prefetch(idx);
+        self.pending_other_bound = other_bound;
+        self.pending_index = index;
+        self.pending_corner_bound = corner_bound;
+        solver.prefetch(index);
         self.phase = Phase::WaitMoved;
         true
     }
 
     /// Resolve the moved side's lookup and advance the lane.
     #[inline(always)]
-    fn resolve_moved(&mut self, pm: u8, s: &Solver) -> Step {
+    fn resolve_moved(&mut self, moved_bound: u8, solver: &Solver) -> Step {
         // SAFETY: see `advance`.
         unsafe {
             std::hint::assert_unchecked(
@@ -1238,30 +1261,31 @@ impl Lane {
             );
         }
         self.stats.lookups += 1;
-        let po = self.pending_other_bound;
+        let other_bound = self.pending_other_bound;
         // SAFETY: bounds are below 16 (4-bit table entries and corner
         // depths, or base + 3; `tw` is known for every X' move reached);
         // moves are below 18.
         unsafe {
-            std::hint::assert_unchecked(po < 16 && pm < 16);
-            let c = self.stack[1].mv as usize;
-            std::hint::assert_unchecked(c < 18);
-            self.child_stats[c] += HOT_TABLES.stat_pairs[(po as usize) << 4 | pm as usize];
+            std::hint::assert_unchecked(other_bound < 16 && moved_bound < 16);
+            let root_child = self.stack[1].mv as usize;
+            std::hint::assert_unchecked(root_child < 18);
+            self.child_stats[root_child] +=
+                HOT_TABLES.stat_pairs[(other_bound as usize) << 4 | moved_bound as usize];
         }
-        let r1 = self.stack[self.depth].remaining_depth - 1;
+        let child_remaining = self.stack[self.depth].remaining_depth - 1;
         let face = self.pending_face as usize;
-        self.note_value(face, pm.max(po));
+        self.note_value(face, moved_bound.max(other_bound));
         // (Only a cube with bound 0 can be solved.)
-        if pm > r1 || (pm == 0 && self.pending_moved.is_solved()) {
-            return self.advance(s);
+        if moved_bound > child_remaining || (moved_bound == 0 && self.pending_moved.is_solved()) {
+            return self.advance(solver);
         }
-        self.push_advance(pm, po, s)
+        self.push_advance(moved_bound, other_bound, solver)
     }
 
     /// `advance` out of line, for rare paths (and a lane's first lookup).
     #[inline(never)]
-    fn advance_cold(&mut self, s: &Solver) -> Step {
-        self.advance(s)
+    fn advance_cold(&mut self, solver: &Solver) -> Step {
+        self.advance(solver)
     }
 
     /// Push the pending child and advance into it. Its first child is
@@ -1271,41 +1295,41 @@ impl Lane {
     /// whole faces, less half turns), which looks up the other side first.
     #[inline(always)]
     #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
-    fn push_advance(&mut self, pm: u8, po: u8, s: &Solver) -> Step {
-        let mut node = self.child_node(pm, po);
+    fn push_advance(&mut self, moved_bound: u8, other_bound: u8, solver: &Solver) -> Step {
+        let mut node = self.child_node(moved_bound, other_bound);
         // SAFETY: see `advance`.
         unsafe { std::hint::assert_unchecked(self.depth + 1 < MAXD) };
         self.depth += 1;
         let todo = node.todo;
-        let r1 = node.remaining_depth.wrapping_sub(1);
+        let child_remaining = node.remaining_depth.wrapping_sub(1);
         // (Rare kinds as in `advance`: r1 == 0 or r1 > maxval.)
-        if todo == 0 || r1.wrapping_sub(1) >= s.base + 3 {
+        if todo == 0 || child_remaining.wrapping_sub(1) >= solver.base + 3 {
             self.stack[self.depth] = node;
-            return self.advance_cold(s);
+            return self.advance_cold(solver);
         }
-        let m = todo.trailing_zeros() as usize;
+        let mv = todo.trailing_zeros() as usize;
         // SAFETY: move masks are subsets of ALL_MOVES.
-        unsafe { std::hint::assert_unchecked(m < 18) };
-        debug_assert!(m.is_multiple_of(3));
-        let face = m / 3;
+        unsafe { std::hint::assert_unchecked(mv < 18) };
+        debug_assert!(mv.is_multiple_of(3));
+        let face = mv / 3;
         node.todo = todo ^ todo.isolate_lowest_one();
         self.stats.nodes += 1;
-        let a2 = node.moved.apply_move(m);
-        let b2 = node.other.premove_inverse(m);
-        self.pending_moved = a2;
-        self.pending_other = b2;
-        self.pending_move = m as u8;
-        let (idx, cd) = s.index(b2);
+        let moved_child = node.moved.apply_move(mv);
+        let other_child = node.other.premove_inverse(mv);
+        self.pending_moved = moved_child;
+        self.pending_other = other_child;
+        self.pending_move = mv as u8;
+        let (index, corner_bound) = solver.index(other_child);
         self.stack[self.depth] = node;
-        if cd > r1 {
-            self.note_value(face, cd);
-            self.skip_xprime(m);
-            return self.advance_cold(s);
+        if corner_bound > child_remaining {
+            self.note_value(face, corner_bound);
+            self.skip_xprime(mv);
+            return self.advance_cold(solver);
         }
         self.pending_face = face as u8;
-        self.pending_index = idx;
-        self.pending_corner_bound = cd;
-        s.prefetch(idx);
+        self.pending_index = index;
+        self.pending_corner_bound = corner_bound;
+        solver.prefetch(index);
         self.phase = Phase::WaitOther;
         Step::Pending
     }
@@ -1313,8 +1337,8 @@ impl Lane {
     /// Push the pending child (`pending_moved`, `pending_other`, `pending_move`) with bounds for the moved
     /// side (`pm`) and the other side (`po`).
     #[inline(always)]
-    fn push_child(&mut self, pm: u8, po: u8) {
-        let child = self.child_node(pm, po);
+    fn push_child(&mut self, moved_bound: u8, other_bound: u8) {
+        let child = self.child_node(moved_bound, other_bound);
         // SAFETY: see `advance`.
         unsafe { std::hint::assert_unchecked(self.depth + 1 < MAXD) };
         self.depth += 1;
@@ -1325,87 +1349,121 @@ impl Lane {
     /// child's normal and inverse cubes, worked out in terms of the moved
     /// and the other side (no branch or select on the node's side).
     #[inline(always)]
-    fn child_node(&self, pm: u8, po: u8) -> Node {
+    fn child_node(&self, moved_bound: u8, other_bound: u8) -> Node {
         // SAFETY: see `advance`.
         unsafe { std::hint::assert_unchecked(self.depth + 1 < MAXD && self.pending_face < 6) };
-        let (a2, b2) = (self.pending_moved, self.pending_other);
-        let node = &self.stack[self.depth];
-        let r1 = node.remaining_depth - 1;
-        let pn = node.normal;
+        let (moved, other) = (self.pending_moved, self.pending_other);
+        let parent = &self.stack[self.depth];
+        let child_remaining = parent.remaining_depth - 1;
+        let parent_normal = parent.normal;
         // Allowed moves on the moved side and on the other side.
-        let mut mm_m = HOT_TABLES.allowed_after[self.pending_face as usize];
-        let mut mm_x = node.other_moves;
-        if po == r1 {
-            mm_m &= QUARTER_TURNS;
+        let mut moved_moves = HOT_TABLES.allowed_after[self.pending_face as usize];
+        let mut other_side_moves = parent.other_moves;
+        if other_bound == child_remaining {
+            moved_moves &= QUARTER_TURNS;
         }
-        if pm == r1 {
-            mm_x &= QUARTER_TURNS;
+        if moved_bound == child_remaining {
+            other_side_moves &= QUARTER_TURNS;
         }
         // Whether the child generates its children on the moved side, as
         // `make_node` chooses (fewer moves; ties go to the normal cube; at
         // r == 1 the normal cube, with the moves allowed on both sides).
-        let (same, todo) = if r1 == 1 {
-            (pn, mm_m & mm_x)
+        let (moved_side, todo) = if child_remaining == 1 {
+            (parent_normal, moved_moves & other_side_moves)
         } else {
-            let s = mm_m.count_ones() < mm_x.count_ones() + u32::from(pn);
-            (s, std::hint::select_unpredictable(s, mm_m, mm_x))
+            let moved_has_fewer =
+                moved_moves.count_ones() < other_side_moves.count_ones() + u32::from(parent_normal);
+            (
+                moved_has_fewer,
+                std::hint::select_unpredictable(moved_has_fewer, moved_moves, other_side_moves),
+            )
         };
         let child = Node {
-            moved: Cube::select(same, a2, b2),
-            other: Cube::select(same, b2, a2),
-            other_side_bound: std::hint::select_unpredictable(same, po, pm),
-            other_moves: std::hint::select_unpredictable(same, mm_x, mm_m),
+            moved: Cube::select(moved_side, moved, other),
+            other: Cube::select(moved_side, other, moved),
+            other_side_bound: std::hint::select_unpredictable(moved_side, other_bound, moved_bound),
+            other_moves: std::hint::select_unpredictable(moved_side, other_side_moves, moved_moves),
             todo,
             skip: 0,
-            remaining_depth: r1,
-            normal: pn == same,
+            remaining_depth: child_remaining,
+            normal: parent_normal == moved_side,
             lower_bound: 0,
             mv: self.pending_move,
-            mv_normal: pn,
+            mv_normal: parent_normal,
             twin_values: [0xFF; 6],
         };
         #[cfg(debug_assertions)]
         {
             let allowed = HOT_TABLES.allowed_after[self.pending_face as usize];
-            let (c, ci, ln, li, mut mm_n, mut mm_i) = if pn {
-                (a2, b2, pm, po, allowed, node.other_moves)
-            } else {
-                (b2, a2, po, pm, node.other_moves, allowed)
-            };
-            if li == r1 {
-                mm_n &= QUARTER_TURNS;
+            let (cube, inverse, normal_bound, inverse_bound, mut normal_moves, mut inverse_moves) =
+                if parent_normal {
+                    (
+                        moved,
+                        other,
+                        moved_bound,
+                        other_bound,
+                        allowed,
+                        parent.other_moves,
+                    )
+                } else {
+                    (
+                        other,
+                        moved,
+                        other_bound,
+                        moved_bound,
+                        parent.other_moves,
+                        allowed,
+                    )
+                };
+            if inverse_bound == child_remaining {
+                normal_moves &= QUARTER_TURNS;
             }
-            if ln == r1 {
-                mm_i &= QUARTER_TURNS;
+            if normal_bound == child_remaining {
+                inverse_moves &= QUARTER_TURNS;
             }
-            let w = make_node(c, ci, ln, li, mm_n, mm_i, r1, self.pending_move, pn);
-            debug_assert!(
-                w.moved == child.moved && w.other == child.other && w.normal == child.normal
+            let reference = make_node(
+                cube,
+                inverse,
+                normal_bound,
+                inverse_bound,
+                normal_moves,
+                inverse_moves,
+                child_remaining,
+                self.pending_move,
+                parent_normal,
             );
             debug_assert!(
-                (w.other_side_bound, w.other_moves, w.todo)
-                    == (child.other_side_bound, child.other_moves, child.todo)
+                reference.moved == child.moved
+                    && reference.other == child.other
+                    && reference.normal == child.normal
+            );
+            debug_assert!(
+                (
+                    reference.other_side_bound,
+                    reference.other_moves,
+                    reference.todo
+                ) == (child.other_side_bound, child.other_moves, child.todo)
             );
         }
         child
     }
 
     fn reconstruct(&self) -> Vec<u8> {
-        let j = &self.jobs[self.run_state.current_job];
-        let mut normal: Vec<u8> = j.moves[..j.len as usize].to_vec();
-        let mut pre: Vec<u8> = Vec::new();
-        for n in &self.stack[1..=self.depth] {
-            if n.mv_normal {
-                normal.push(n.mv);
+        let job = &self.jobs[self.run_state.current_job];
+        let mut moves: Vec<u8> = job.moves[..job.len as usize].to_vec();
+        let mut premoves: Vec<u8> = Vec::new();
+        for node in &self.stack[1..=self.depth] {
+            if node.mv_normal {
+                moves.push(node.mv);
             } else {
-                pre.push(n.mv);
+                premoves.push(node.mv);
             }
         }
-        normal.push(self.pending_move);
-        for &m in pre.iter().rev() {
-            normal.push(inverse_move(m));
+        moves.push(self.pending_move);
+        for &mv in premoves.iter().rev() {
+            moves.push(inverse_move(mv));
         }
-        normal
+        moves
     }
 }
 
@@ -1417,43 +1475,46 @@ impl Lane {
 /// wrap (debug builds check). The same max in `i32` would cost a register
 /// move more.
 #[inline(always)]
-fn max_child_bound(lb: u8, v: u8) -> u8 {
-    debug_assert!(lb < 128 && v < 128);
-    lb.cast_signed().max(v.cast_signed() - 1).cast_unsigned()
+fn max_child_bound(lower_bound: u8, value: u8) -> u8 {
+    debug_assert!(lower_bound < 128 && value < 128);
+    lower_bound
+        .cast_signed()
+        .max(value.cast_signed() - 1)
+        .cast_unsigned()
 }
 
 #[allow(clippy::too_many_arguments)]
 #[inline(always)]
 fn make_node(
-    c: Cube,
-    ci: Cube,
-    ln: u8,
-    li: u8,
-    mm_n: u32,
-    mm_i: u32,
-    r: u8,
-    m: u8,
+    cube: Cube,
+    inverse: Cube,
+    normal_bound: u8,
+    inverse_bound: u8,
+    normal_moves: u32,
+    inverse_moves: u32,
+    remaining_depth: u8,
+    mv: u8,
     mv_normal: bool,
 ) -> Node {
-    let (normal, todo) = if r == 1 {
-        (true, mm_n & mm_i)
-    } else if mm_n.count_ones() <= mm_i.count_ones() {
-        (true, mm_n)
+    let (normal, todo) = if remaining_depth == 1 {
+        (true, normal_moves & inverse_moves)
+    } else if normal_moves.count_ones() <= inverse_moves.count_ones() {
+        (true, normal_moves)
     } else {
-        (false, mm_i)
+        (false, inverse_moves)
     };
     // (Selected without branching: the side choice is data.)
     Node {
-        moved: Cube::select(normal, c, ci),
-        other: Cube::select(normal, ci, c),
-        other_side_bound: std::hint::select_unpredictable(normal, li, ln),
-        other_moves: std::hint::select_unpredictable(normal, mm_i, mm_n),
+        moved: Cube::select(normal, cube, inverse),
+        other: Cube::select(normal, inverse, cube),
+        other_side_bound: std::hint::select_unpredictable(normal, inverse_bound, normal_bound),
+        other_moves: std::hint::select_unpredictable(normal, inverse_moves, normal_moves),
         todo,
         skip: 0,
-        remaining_depth: r,
+        remaining_depth,
         normal,
         lower_bound: 0,
-        mv: m,
+        mv,
         mv_normal,
         twin_values: [0xFF; 6],
     }
@@ -1461,19 +1522,19 @@ fn make_node(
 
 /// The moves allowed at a job's root by its last move.
 #[inline(always)]
-fn moves_after(j: &Job) -> u32 {
-    if j.len == 0 {
+fn moves_after(job: &Job) -> u32 {
+    if job.len == 0 {
         ALL_MOVES
     } else {
-        ALLOWED_AFTER[(j.moves[j.len as usize - 1] / 3) as usize]
+        ALLOWED_AFTER[(job.moves[job.len as usize - 1] / 3) as usize]
     }
 }
 
 /// `ChildOrder::done`'s children run in the iteration of `tag` (`target << 24`).
 #[inline(always)]
-fn done_now(x: &ChildOrder, tag: u32) -> u32 {
-    if x.done & 0xFF00_0000 == tag {
-        x.done & ALL_MOVES
+fn done_now(order: &ChildOrder, tag: u32) -> u32 {
+    if order.done & 0xFF00_0000 == tag {
+        order.done & ALL_MOVES
     } else {
         0
     }
@@ -1481,28 +1542,28 @@ fn done_now(x: &ChildOrder, tag: u32) -> u32 {
 
 /// The X' moves of the faces whose `tw` is unknown.
 #[inline(always)]
-fn unknown_twins(tw: &[u8; 6]) -> u32 {
-    let mut m = 0;
-    for (f, &value) in tw.iter().enumerate() {
-        m |= u32::from(value == 0xFF) << (3 * f + 2);
+fn unknown_twins(twin_values: &[u8; 6]) -> u32 {
+    let mut moves = 0;
+    for (face, &value) in twin_values.iter().enumerate() {
+        moves |= u32::from(value == 0xFF) << (3 * face + 2);
     }
-    m
+    moves
 }
 
 /// Counting sort of run entries by decreasing key (stable); `cnt` holds
 /// the number of entries per key.
-fn sort_runs(runs: &mut Vec<u32>, tmp: &[u32], cnt: &mut [u32; 256]) {
+fn sort_runs(runs: &mut Vec<u32>, unsorted: &[u32], counts: &mut [u32; 256]) {
     let mut sum = 0;
-    for c in cnt.iter_mut().rev() {
-        (*c, sum) = (sum, sum + *c);
+    for count in counts.iter_mut().rev() {
+        (*count, sum) = (sum, sum + *count);
     }
     runs.clear();
-    runs.resize(tmp.len(), 0);
-    for &e in tmp {
-        let k = (e >> 24) as usize;
+    runs.resize(unsorted.len(), 0);
+    for &entry in unsorted {
+        let key = (entry >> 24) as usize;
         // SAFETY: cnt[k] < runs.len() by construction.
-        unsafe { *runs.get_unchecked_mut(cnt[k] as usize) = e };
-        cnt[k] += 1;
+        unsafe { *runs.get_unchecked_mut(counts[key] as usize) = entry };
+        counts[key] += 1;
     }
 }
 
@@ -1511,25 +1572,25 @@ fn sort_runs(runs: &mut Vec<u32>, tmp: &[u32], cnt: &mut [u32; 256]) {
 /// stats, seconds)` for every solved cube. Stops when `cubes` returns None
 /// for all lanes or when `stop` is set.
 pub fn run_lanes(
-    s: &Solver,
+    solver: &Solver,
     cubes: &(dyn Fn(usize) -> Option<CubieCube> + Sync),
     next: &std::sync::atomic::AtomicUsize,
     stop: &std::sync::atomic::AtomicBool,
-    nlanes: usize,
+    n_lanes: usize,
     mut done: impl FnMut(usize, Vec<u8>, Stats, f64),
 ) {
     use std::sync::atomic::Ordering::Relaxed;
     use std::time::Instant;
-    let mut lanes: Vec<Lane> = (0..nlanes).map(|_| Lane::new()).collect();
+    let mut lanes: Vec<Lane> = (0..n_lanes).map(|_| Lane::new()).collect();
     // Give lane `l` a new cube; returns false if there are none left.
-    let fetch = |l: &mut Lane, done: &mut dyn FnMut(usize, Vec<u8>, Stats, f64)| -> bool {
+    let fetch = |lane: &mut Lane, done: &mut dyn FnMut(usize, Vec<u8>, Stats, f64)| -> bool {
         loop {
             let i = next.fetch_add(1, Relaxed);
             let Some(cube) = cubes(i) else {
                 return false;
             };
-            l.started = Instant::now();
-            if l.start(s, &cube, i) {
+            lane.started = Instant::now();
+            if lane.start(solver, &cube, i) {
                 done(i, vec![], Stats::default(), 0.0);
                 continue;
             }
@@ -1538,59 +1599,59 @@ pub fn run_lanes(
     };
     // Give lane `l` a new cube and advance it to its first lookup (past
     // solutions found on the way); returns false if there are no cubes left.
-    let refill = |l: &mut Lane, done: &mut dyn FnMut(usize, Vec<u8>, Stats, f64)| -> bool {
+    let refill = |lane: &mut Lane, done: &mut dyn FnMut(usize, Vec<u8>, Stats, f64)| -> bool {
         loop {
-            if !fetch(l, done) {
+            if !fetch(lane, done) {
                 return false;
             }
-            if let Step::Pending = l.advance_cold(s) {
+            if let Step::Pending = lane.advance_cold(solver) {
                 return true;
             }
-            let sol = l.reconstruct();
-            let dt = l.started.elapsed().as_secs_f64();
-            done(l.cube_index, sol, l.stats, dt);
+            let solution = lane.reconstruct();
+            let seconds = lane.started.elapsed().as_secs_f64();
+            done(lane.cube_index, solution, lane.stats, seconds);
         }
     };
     // The active lanes are `lanes[..nactive]` (no per-visit activity test).
-    let mut nactive = 0;
-    for li in 0..nlanes {
-        if refill(&mut lanes[li], &mut done) {
-            lanes.swap(li, nactive);
-            nactive += 1;
+    let mut n_active = 0;
+    for index in 0..n_lanes {
+        if refill(&mut lanes[index], &mut done) {
+            lanes.swap(index, n_active);
+            n_active += 1;
         }
     }
     // Single-pass round-robin: each visit resolves the lookup the lane
     // issued one round earlier, then advances it to its next lookup. Every
     // lane has one miss in flight with a whole round of slack.
-    while nactive > 0 && !stop.load(Relaxed) {
+    while n_active > 0 && !stop.load(Relaxed) {
         let mut gone: Option<*const Lane> = None;
-        for l in &mut lanes[..nactive] {
-            let v = l.pending_value(s);
-            let st = match l.phase {
+        for lane in &mut lanes[..n_active] {
+            let value = lane.pending_value(solver);
+            let outcome = match lane.phase {
                 Phase::WaitOther => {
-                    if l.resolve_other(v, s) {
+                    if lane.resolve_other(value, solver) {
                         continue;
                     }
-                    l.advance(s)
+                    lane.advance(solver)
                 }
-                Phase::WaitMoved => l.resolve_moved(v, s),
+                Phase::WaitMoved => lane.resolve_moved(value, solver),
             };
-            if let Step::Found = st {
-                let sol = l.reconstruct();
-                let dt = l.started.elapsed().as_secs_f64();
-                done(l.cube_index, sol, l.stats, dt);
-                if !refill(l, &mut done) {
+            if let Step::Found = outcome {
+                let solution = lane.reconstruct();
+                let seconds = lane.started.elapsed().as_secs_f64();
+                done(lane.cube_index, solution, lane.stats, seconds);
+                if !refill(lane, &mut done) {
                     // (The rest of the round waits for the next one.)
-                    gone = Some(l);
+                    gone = Some(lane);
                     break;
                 }
             }
         }
-        if let Some(l) = gone {
+        if let Some(lane) = gone {
             // SAFETY: `l` points into `lanes`.
-            let li = unsafe { l.offset_from(lanes.as_ptr()) }.cast_unsigned();
-            nactive -= 1;
-            lanes.swap(li, nactive);
+            let index = unsafe { lane.offset_from(lanes.as_ptr()) }.cast_unsigned();
+            n_active -= 1;
+            lanes.swap(index, n_active);
         }
     }
 }
@@ -1712,26 +1773,26 @@ mod tests {
     /// code of a move on faces 1, 3 and 5 gets one step more.
     #[test]
     fn quantize18_codes_unseen_children() {
-        let mut x = [0f32; 18];
-        x[0] = STAT_TERMS[12] * 2.0;
-        x[4] = STAT_TERMS[13] + STAT_TERMS[11];
-        x[9] = STAT_TERMS[10];
-        x[17] = STAT_TERMS[12];
+        let mut stats = [0f32; 18];
+        stats[0] = STAT_TERMS[12] * 2.0;
+        stats[4] = STAT_TERMS[13] + STAT_TERMS[11];
+        stats[9] = STAT_TERMS[10];
+        stats[17] = STAT_TERMS[12];
         // (all faces but face 2: moves 16 and 17 included)
         let children = ALLOWED_AFTER[2];
-        let q = quantize18(&x, children);
-        for m in 0..18 {
-            let face_step = u8::from((m / 3) % 2 == 1);
-            let want = if x[m] > 0.0 {
-                quantize(x[m]) + face_step
-            } else if children >> m & 1 != 0 {
+        let codes = quantize18(&stats, children);
+        for mv in 0..18 {
+            let face_step = u8::from((mv / 3) % 2 == 1);
+            let want = if stats[mv] > 0.0 {
+                quantize(stats[mv]) + face_step
+            } else if children >> mv & 1 != 0 {
                 UNSEEN_CODE + face_step
             } else {
                 0
             };
-            assert_eq!(q[m], want, "move {m}");
+            assert_eq!(codes[mv], want, "move {mv}");
         }
-        assert!(q[0] > 0 && q[16] == UNSEEN_CODE + 1 && q[7] == 0);
+        assert!(codes[0] > 0 && codes[16] == UNSEEN_CODE + 1 && codes[7] == 0);
     }
 
     #[test]
