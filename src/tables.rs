@@ -34,7 +34,8 @@ pub struct Cocsep {
     pub distribution: Vec<u64>,
     /// Hot-path copy of `entries` packed into 3 bytes per entry (25% less
     /// L2 footprint): `class << 10 | sym_to_rep << 4 | depth` (+1 pad byte),
-    /// on a transparent huge page (one TLB entry instead of ~113).
+    /// on a transparent huge page (one TLB entry instead of ~113). (+2.8% at
+    /// 48T when added, with the direct index, packed-cocsep.)
     packed: Memory,
 }
 
@@ -276,7 +277,8 @@ impl Memory {
         }
     }
 
-    /// Shared mapping of a file (e.g. on hugetlbfs, which gives 1GB pages).
+    /// Shared mapping of a file (e.g. on hugetlbfs, which gives 1GB pages;
+    /// not measured separately).
     /// If `create`, the file is created/truncated to `len` and mapped
     /// writable, else mapped read-only.
     ///
@@ -368,7 +370,8 @@ impl Drop for Memory {
 // ---------------------------------------------------------------------------
 // H48 table (cube48opt layout): 128-byte rows of 512 2-bit slots, one row
 // per (class, msplit, eoK); the row is indexed by eslot. Each 16-byte group
-// (64 slots) reserves slots 0-1 for a 4-bit minimum over the group.
+// (64 slots) reserves slots 0-1 for a 4-bit minimum over the group. (Neutral
+// at h11 when added; -71% nodes with h0, eslice-groups.)
 // ---------------------------------------------------------------------------
 
 pub const ROW_BYTES: u64 = 128;
@@ -459,6 +462,7 @@ impl H48Table {
         unsafe {
             let line = self.memory.ptr().add((index >> 2) as usize);
             // NTA: each line is read once; less L2 pollution (cocsep data).
+            // (+2.6% at 48T when added, prefetch-nta.)
             std::arch::x86_64::_mm_prefetch(line.cast::<i8>(), std::arch::x86_64::_MM_HINT_NTA);
         }
     }

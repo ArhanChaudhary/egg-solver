@@ -35,7 +35,8 @@ include!(concat!(env!("OUT_DIR"), "/consts.rs"));
 
 /// The small lookup tables of the move/index hot path in one static, so that
 /// all their accesses share one base register (x86 has no RIP-relative
-/// indexed addressing: separate statics cost an `lea` each per use).
+/// indexed addressing: separate statics cost an `lea` each per use; part of
+/// m3-hht's +3.5% at 48T when added).
 #[repr(C, align(64))]
 pub struct HotTables {
     /// Shuffle of each move.
@@ -225,7 +226,8 @@ impl Cube {
             let sum = _mm256_add_epi8(moved, other_orient);
             let wrapped = _mm256_sub_epi8(sum, load(&ORIENT_WRAP));
             // Bytes outside USED_BYTES are left as garbage (they never feed
-            // back into used bytes); `equals` and `to_bytes` mask them.
+            // back into used bytes); `equals` and `to_bytes` mask them. (Part
+            // of m1-micro's +2.2% at 48T.)
             Cube(_mm256_min_epu8(sum, wrapped))
         }
     }
@@ -234,7 +236,8 @@ impl Cube {
     #[inline(always)]
     #[must_use]
     pub fn apply_move(self, mv: usize) -> Cube {
-        // `compose` with the move's orientation term precomputed.
+        // `compose` with the move's orientation term precomputed (2-3 µops
+        // less per child; part of m1-micro's +2.2% at 48T).
         unsafe {
             let moved = _mm256_shuffle_epi8(self.0, load(&HOT_TABLES.moves[mv]));
             let sum = _mm256_add_epi8(moved, load(&HOT_TABLES.move_orients[mv]));
@@ -269,7 +272,8 @@ impl Cube {
     /// Inverse cube (vcube's method). The permutation part is `c^27719`,
     /// computed by an addition chain of shuffles: 27720 = lcm(1, ..., 12) is
     /// a multiple of the order of every permutation of 12 or fewer pieces.
-    /// Then the orientations are moved and negated.
+    /// Then the orientations are moved and negated. (Not measured
+    /// separately.)
     #[inline(always)]
     #[must_use]
     pub fn inverse(self) -> Cube {
@@ -341,7 +345,7 @@ impl Cube {
     }
 
     /// `if condition { if_true } else { if_false }`, as a byte blend (no
-    /// branch).
+    /// branch; part of skip-sibling's +13.6% at 48T).
     #[inline(always)]
     #[must_use]
     pub fn select(condition: bool, if_true: Cube, if_false: Cube) -> Cube {

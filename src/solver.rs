@@ -15,7 +15,8 @@
 //!
 //! The first moves of each iteration are split into "jobs" (prefixes of up
 //! to 4 moves), sorted by how promising they were in the last iteration,
-//! so that the last iteration tends to find its solution early.
+//! so that the last iteration tends to find its solution early (-36% nodes,
+//! +46% at 48T on a batch when added, job-order).
 
 use crate::coord::{cocsep_x3, index_sym};
 use crate::cubie::{inverse_move, CubieCube};
@@ -53,11 +54,13 @@ pub static ALLOWED_AFTER: [u32; 6] = ALLOWED_AFTER_CONST;
 pub struct Solver<'a> {
     pub corners: &'a Cocsep,
     pub table: &'a H48Table,
-    /// `table.ptr()`, cached (saves a dependent load per prefetch/lookup).
+    /// `table.ptr()`, cached (saves a dependent load per prefetch/lookup;
+    /// with `value` and `prefetch`, part of m1-micro's +2.2% at 48T).
     table_ptr: *const u8,
     /// `corners.packed_ptr()`, cached (saves a dependent load per index).
     packed_ptr: *const u8,
-    /// `coord::index_sym` constants of the table's `k`.
+    /// `coord::index_sym` constants of the table's `k` (with `packed_ptr`,
+    /// part of m6-micro's index patch: +0.7% at 1T, -0.4% at 48T).
     row_mul: u64,
     eo_mask: u32,
     /// The table's base: codes 1..=3 mean `base + code`.
@@ -199,6 +202,7 @@ impl<'a> Solver<'a> {
         unsafe {
             let line = self.table_ptr.add((index >> 2) as usize);
             // NTA: each line is read once; less L2 pollution (cocsep data).
+            // (+2.6% at 48T when added, prefetch-nta.)
             std::arch::x86_64::_mm_prefetch(line.cast::<i8>(), std::arch::x86_64::_MM_HINT_NTA);
         }
     }
@@ -246,7 +250,8 @@ impl<'a> Solver<'a> {
         out
     }
 
-    /// Compute the root bounds of jobs, prefetching in batches.
+    /// Compute the root bounds of jobs, prefetching in batches (+2.4%
+    /// throughput, +1.8% on a 48T batch when added, job-bounds).
     fn job_bounds(&self, jobs: &mut [Job]) {
         for chunk in jobs.chunks_mut(32) {
             let mut lookups = [(0u64, 0u8); 64];
@@ -362,7 +367,8 @@ impl<'a> Solver<'a> {
     /// lower bound on the child's true distance, and the true distance
     /// changes by at most one per move, so (a) a child value `v` bounds this
     /// node by `v - 1` and (b) bounds same-face siblings (one move apart) by
-    /// `v - 1` as well.
+    /// `v - 1` as well. (Both: -17.7% nodes, +7.5% throughput when added,
+    /// sibling-prune.)
     #[allow(clippy::too_many_arguments)]
     fn search(
         &self,
@@ -379,7 +385,9 @@ impl<'a> Solver<'a> {
             return Self::last_move(state, cube, normal_moves & inverse_moves);
         }
         let child_remaining = remaining_depth - 1;
-        // Move the side with fewer moves to try (ties: the normal cube).
+        // Move the side with fewer moves to try (ties: the normal cube; as
+        // the other search techniques of the first version, not measured
+        // separately).
         let normal = normal_moves.count_ones() <= inverse_moves.count_ones();
         let (moved, other, allowed, other_side_bound) = if normal {
             (cube, inverse, normal_moves, inverse_bound)

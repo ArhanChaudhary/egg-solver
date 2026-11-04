@@ -2,17 +2,19 @@
 //!
 //! A table lookup misses the cache (the table is 58 GiB) and costs hundreds
 //! of cycles. Instead of waiting, each thread runs several independent
-//! "lanes"; each lane solves its own
-//! cube with an explicit-stack DFS that generates one child at a time and
-//! stops whenever it needs a table lookup: it computes the index, issues a
-//! prefetch and yields. Lanes are visited round-robin; a visit first
-//! resolves the lookup issued on the previous visit, then advances the lane
-//! to its next lookup. As in `solver`, a node moves one side (the normal
-//! cube or its inverse): a child's "moved side" got the move, its "other
-//! side" the matching premove; a child needs both sides' bounds (the other
-//! side's first, then the moved side's).
-//! With `DEFAULT_LANES` lanes each miss gets a whole round of slack while
-//! only ~one miss per lane is in flight.
+//! "lanes"; each lane solves its own cube with an explicit-stack DFS that
+//! generates one child at a time and stops whenever it needs a table
+//! lookup: it computes the index, issues a prefetch and yields. Lanes are
+//! visited round-robin; a visit first resolves the lookup issued on the
+//! previous visit, then advances the lane to its next lookup. With
+//! `DEFAULT_LANES` lanes each miss gets a whole round of slack while only
+//! ~one miss per lane is in flight. (Lanes: +57% at 48T over the recursive
+//! solver when added, opt/lanes.)
+//!
+//! As in `solver`, a node moves one side (the normal cube or its inverse):
+//! a child's "moved side" got the move, its "other side" the matching
+//! premove; a child needs both sides' bounds (the other side's first, then
+//! the moved side's).
 //!
 //! Since children are generated one at a time, sibling-face pruning skips
 //! the lookups of pruned siblings entirely.
@@ -23,13 +25,14 @@
 //! soon as the bound is noted (instead of testing every child), an X' child
 //! pruned by its X sibling's other-side value is marked in `skip` and only
 //! counted when reached, and the remaining children (X: other side first;
-//! X2, X': moved side) are set up without branching on the move kind.
+//! X2, X': moved side) are set up without branching on the move kind. (The
+//! three together: +13.6% at 48T when added, skip-sibling.)
 //!
 //! The search logic (masks, tight-bound tricks, side choice, sibling
 //! pruning, back-jumps, job ordering) mirrors `solver.rs` (read that first:
-//! it is the same search, recursive), except that in
-//! stream mode the iterations on unchanged full-length jobs (the likely last
-//! ones) order (job, root child) pairs across jobs by per-child statistics
+//! it is the same search, recursive), except that in stream mode the
+//! iterations on unchanged full-length jobs (the likely last ones) order
+//! (job, root child) pairs across jobs by per-child statistics
 //! (`Lane::start_iteration`), and full-length job roots branch on the
 //! normal side.
 
@@ -55,10 +58,13 @@ const MERGE_CODES: u8 = 4;
 
 /// Lanes per thread unless asked otherwise. Each lane keeps one table miss
 /// in flight; 24 is about the fewest that hide the miss latency, at 1 and at
-/// 48 threads (numbers in the commit that set it). ~1.4 MB per lane.
+/// 48 threads. ~1.4 MB per lane. (24 vs 20 lanes: +3.3% at 48T, +9.7% at 1T
+/// when set, 0b35690.)
 pub const DEFAULT_LANES: usize = 24;
 
 /// A search node on a lane's explicit stack (128 bytes: two cache lines).
+/// Its cubes and bounds are stored by role, moved and other side, not as
+/// normal and inverse (+0.5% when added, part of m4-micro's +7.7% at 48T).
 #[derive(Clone, Copy)]
 #[repr(align(64))]
 struct Node {
@@ -91,12 +97,14 @@ struct Node {
     /// (the subgroup whose cosets the table indexes), and the other side's
     /// coordinate only depends on the coset H X^-1 b. Only written when it
     /// is at most `remaining_depth - 1`: otherwise X' is in `skip` and never
-    /// generated.
+    /// generated. (Sharing the X and X' lookup: -29% lookups, +10% at 48T
+    /// when added, twin-lookup.)
     twin_values: [u8; 6],
 }
 
 /// A move prefix searched as a unit (see `solver::Job`); the cubes are
-/// recomputed from the lane's root when the job runs (`job_cubes`).
+/// recomputed from the lane's root when the job runs (`job_cubes`), which
+/// keeps a job at 12 bytes (not measured separately).
 #[derive(Clone, Copy)]
 struct Job {
     moves: [u8; 4],
@@ -123,7 +131,8 @@ fn job_key(job: &Job) -> u32 {
 /// a stable `sort_by` with `total_cmp`, since the keys are non-negative
 /// floats, whose bit patterns order like their values. LSD radix sort of
 /// (inverted key, index) pairs, then a gather into `out` (scratch, swapped
-/// with `jobs`). ~43K jobs; much cheaper than a comparison sort.
+/// with `jobs`). ~43K jobs; much cheaper than a comparison sort (part of
+/// m2-jobs' +4.3% at 48T when added).
 #[expect(
     clippy::cast_possible_truncation,
     reason = "`usize` is 64 bits; the low half of a key is the job's index"
@@ -210,9 +219,9 @@ fn quantize(stat: f32) -> u8 {
 /// The `ChildOrder::codes` of the statistics of a root's children:
 /// `quantize`, or `UNSEEN_CODE` for the children in `children` with code 0,
 /// plus one step (saturating) for moves on faces 1, 3 and 5. Those children
-/// have 12 children instead of 15 (as the face weight of `job_weight`);
-/// measured 0.6% fewer nodes. (Code 0 means statistic 0: every lookup adds
-/// at least 2 * 8.)
+/// have 12 children instead of 15 (as the face weight of `job_weight`;
+/// -0.6% nodes when added, part of c7). (Code 0 means statistic 0: every
+/// lookup adds at least 2 * 8.)
 #[inline(always)]
 #[expect(clippy::cast_ptr_alignment, reason = "unaligned store")]
 fn quantize18(stats: &[f32; 18], children: u32) -> [u8; 18] {
@@ -308,7 +317,8 @@ fn max_code(codes: &[u8; 18], moves: u32) -> u8 {
 }
 
 /// Job statistic contribution of each lookup value h: 8^(16-h). Steeper
-/// than cube48opt's 2^(12-h); measured ~2% fewer nodes.
+/// than cube48opt's 2^(12-h) (-2.1% nodes, +2.8% at 48T when added,
+/// stat-weight).
 const fn stat_terms() -> [f32; 64] {
     let mut terms = [0f32; 64];
     let mut value = 0;
@@ -335,6 +345,7 @@ static STAT_TERMS: [f32; 64] = stat_terms();
 /// `STAT_TERMS[other] + STAT_TERMS[moved]` at index `other << 4 | moved`
 /// (the two bounds of a child, below 16; the same f32 sums as computed at
 /// run time): one lookup per child. Used as `HOT_TABLES.stat_pairs`.
+/// (Neutral when added, m4-micro.)
 pub(crate) const STAT_PAIRS: [f32; 256] = {
     let terms = stat_terms();
     let mut pairs = [0f32; 256];
@@ -347,7 +358,8 @@ pub(crate) const STAT_PAIRS: [f32; 256] = {
 };
 
 /// Which lookup of the pending child a lane waits for. (Encoded so that the
-/// phase of a new lookup is the `other_first` flag.)
+/// phase of a new lookup is the `other_first` flag: +1.7% when added, part
+/// of m4-micro's +7.7% at 48T.)
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 enum Phase {
@@ -406,7 +418,8 @@ pub struct Lane {
     pending_moved: Cube,
     pending_other: Cube,
     pending_move: u8,
-    /// `pending_move / 3`.
+    /// `pending_move / 3`, kept (no division per resolve: +1.2% when added,
+    /// part of m4-micro's +7.7% at 48T).
     pending_face: u8,
     /// Table index and corner bound of the pending lookup.
     pending_index: u64,
@@ -542,7 +555,8 @@ impl Lane {
         // bound); slot 2i is job i's normal bound, 2i + 1 its inverse one).
         // Only X children need an inverse lookup: X2 keeps the parent's
         // inverse coset (`inverse_bound` is inherited by the copy) and X'
-        // shares the X sibling's (see `Node::twin_values`).
+        // shares the X sibling's (see `Node::twin_values`). (Part of
+        // m2-jobs' +4.3% at 48T when added.)
         const LAG: usize = 48;
         let mut extended = std::mem::take(&mut self.jobs_tmp);
         extended.clear();
@@ -613,6 +627,8 @@ impl Lane {
     /// statistic across jobs (`build_first`), then each job's remaining
     /// children, by decreasing best statistic (`build_rest`). Other
     /// iterations run whole jobs by decreasing statistic, as `solver` does.
+    /// (This split ordering: -6..-8% nodes, +4.4% at 1T, +0.5% at 48T when
+    /// merged, c7-childsplit.)
     fn start_iteration(&mut self, solver: &Solver) {
         loop {
             // The stack depth stays below the target (relied on by the
@@ -852,7 +868,7 @@ impl Lane {
 
     /// The run finished: record it and set up the next one (of the next
     /// iteration if this one is exhausted). Out of line and cold, to keep
-    /// the search loop's registers.
+    /// the search loop's registers (part of c7; not measured separately).
     #[cold]
     #[inline(never)]
     fn next_run(&mut self, solver: &Solver) {
@@ -886,7 +902,7 @@ impl Lane {
             let entry = self.run_state.runs[self.run_state.run_pos];
             self.run_state.run_pos += 1;
             // The job vectors are too big for L2 and the lanes interleave
-            // their streams: fetch the next entry's job early.
+            // their streams: fetch the next entry's job early (part of c7).
             unsafe {
                 use std::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};
                 let next = *self
@@ -968,7 +984,8 @@ impl Lane {
         while self.job_pos < self.jobs.len() {
             let job = self.jobs[self.job_pos];
             // The job vector is too big for L2 and the lanes interleave
-            // their streams: fetch the next jobs' line early.
+            // their streams: fetch the next jobs' line early (part of
+            // m2-jobs' +4.3% at 48T when added).
             let ahead = (self.job_pos + 8).min(self.jobs.len() - 1);
             unsafe {
                 use std::arch::x86_64::{_mm_prefetch, _MM_HINT_ET0, _MM_HINT_T0};
@@ -1012,7 +1029,8 @@ impl Lane {
             self.depth = 0;
             self.stack[0] = if self.run_state.full {
                 // Full-length jobs branch on the normal side, which their
-                // statistics per child (`ChildOrder::codes`) refer to.
+                // statistics per child (`ChildOrder::codes`) refer to (part
+                // of c7).
                 Node {
                     moved: cube,
                     other: inverse,
@@ -1059,7 +1077,8 @@ impl Lane {
     /// The depth and the top node's `todo`, `lower_bound` and
     /// `remaining_depth` are kept in registers across the loop (and written
     /// through to the stack): the exhaustion and pop branches, mispredicted
-    /// often, then do not also wait for store forwarding.
+    /// often, then do not also wait for store forwarding (+2.7% at 48T,
+    /// +1.8% at 1T when added, p5-sched).
     #[inline(always)]
     #[expect(
         clippy::too_many_lines,
@@ -1071,12 +1090,14 @@ impl Lane {
         let mut depth = self.depth;
         // SAFETY (every `get_unchecked(depth)` of `stack` below): the depth
         // stays below the target, and `start_iteration` asserts that the
-        // target is below MAXD.
+        // target is below MAXD. (No bounds checks in the lane loop: +1.1% at
+        // 48T when added, m2-nobc.)
         let (mut todo, mut lower_bound, mut remaining_depth) = {
             let top = unsafe { self.stack.get_unchecked(depth) };
             (top.todo, top.lower_bound, top.remaining_depth)
         };
-        // Nodes generated (added to `stats` on return).
+        // Nodes generated (added to `stats` on return; part of p5-sched's
+        // +3.2% at 48T, +1.6% at 1T).
         let mut nodes = 0;
         loop {
             // X' moves known to be pruned (`skip`) are reached, and counted,
@@ -1084,11 +1105,14 @@ impl Lane {
             // none). The bounds do not change in between (their value was
             // already noted).
             let mut live = 0;
+            // (Back-jump: a bound above the moves left ends the node. Not
+            // measured separately here; see `Solver::search`.)
             let done = lower_bound > remaining_depth || {
                 live = todo & !unsafe { self.stack.get_unchecked(depth) }.skip;
                 // (`bzhi` keeps all of `todo` if `live` is 0. The std form,
                 // `todo & u32::MAX.unbounded_shr(32 - tz)`, costs a test and
-                // a cmov more for that case.)
+                // a cmov more for that case. Counting the skipped moves with
+                // bzhi: +1.3% at 1T when added, m6-micro.)
                 // SAFETY: BMI2 is a target feature (see `.cargo/config.toml`).
                 let below = unsafe { std::arch::x86_64::_bzhi_u32(todo, live.trailing_zeros()) };
                 nodes += u64::from(below.count_ones());
@@ -1142,7 +1166,8 @@ impl Lane {
             let node = unsafe { self.stack.get_unchecked_mut(depth) };
             node.todo = todo;
             let face = mv / 3;
-            // (`mv % 3`, from `face`: LLVM would divide again.)
+            // (`mv % 3`, from `face`: LLVM would divide again. Part of
+            // m6-micro's resolve patch, +4.6% at 48T, +0.9% at 1T.)
             let kind = mv - 3 * face;
             let child_remaining = remaining_depth - 1;
             // (No sibling-face check: such faces were removed from `todo`.)
@@ -1152,7 +1177,8 @@ impl Lane {
             // or `child_remaining > max_value`, where no lookup can prune.
             // (`!(1..=max_value).contains(&child_remaining)` is the same
             // test, but LLVM then allocates the loop's registers
-            // differently.)
+            // differently. The one test: +1.1% when added, part of
+            // m4-micro's +7.7% at 48T.)
             if child_remaining.wrapping_sub(1) >= max_value {
                 if child_remaining == 0 {
                     // (nodes with one move left always move the normal cube)
@@ -1198,7 +1224,8 @@ impl Lane {
             // both are at most `child_remaining` (half turns are masked out
             // when `other_side_bound` is tight, X' moves with a twin value
             // above it are skipped), so they look up the moved side.
-            // Selected without branching on the move kind.
+            // Selected without branching on the move kind (part of
+            // skip-sibling's +13.6% at 48T).
             let other_first = kind == 0;
             // SAFETY: `face = mv / 3 < 6`.
             let twin = unsafe {
@@ -1208,7 +1235,8 @@ impl Lane {
                     .twin_values
                     .get_unchecked(face)
             };
-            // (LLVM would branch on `half` to skip the twin value's load.)
+            // (LLVM would branch on `half` to skip the twin value's load.
+            // The select: part of m3-hht's +3.5% at 48T.)
             let other_bound = std::hint::select_unpredictable(half, other_side_bound, twin);
             debug_assert!(other_first || other_bound <= child_remaining);
             let (index, corner_bound) =
@@ -1247,7 +1275,9 @@ impl Lane {
     /// dropped from `todo`. (Only `value` matters, not the face's earlier
     /// values: they were all at most `remaining_depth`, else the face would
     /// have been dropped before this child was generated; and nothing is
-    /// learned on a face after it is dropped.)
+    /// learned on a face after it is dropped.) (Dropping the per-face
+    /// maxima for this: +2.6% at 48T, +1.0% at 1T when added; the face cut as
+    /// a select of `face_keep`: +1.4% at 1T; both m6-micro.)
     #[inline(always)]
     fn note_value(&mut self, face: usize, value: u8) {
         // SAFETY: the depth is below MAXD (see `advance`); `face` is the
@@ -1271,7 +1301,7 @@ impl Lane {
     }
 
     /// The pending lookup's value. Loaded before the phase dispatch, whose
-    /// mispredicts then do not delay it.
+    /// mispredicts then do not delay it (part of m3-hht's +3.5% at 48T).
     #[inline(always)]
     fn pending_value(&self, solver: &Solver) -> u8 {
         solver.value(self.pending_index, self.pending_corner_bound)
@@ -1299,6 +1329,8 @@ impl Lane {
             self.skip_xprime(self.pending_move as usize);
             return false;
         }
+        // (The twin value is stored only once X passed: part of m6-micro's
+        // resolve patch, +4.6% at 48T, +0.9% at 1T.)
         self.stack[self.depth].twin_values[face] = other_bound;
         let (index, corner_bound) = solver.index(self.pending_moved);
         if corner_bound > child_remaining {
@@ -1331,14 +1363,16 @@ impl Lane {
         let child_remaining = unsafe { self.stack.get_unchecked(self.depth) }.remaining_depth - 1;
         let face = self.pending_face as usize;
         self.note_value(face, moved_bound.max(other_bound));
-        // (Only a cube with bound 0 can be solved.)
+        // (Only a cube with bound 0 can be solved: part of m6-micro's resolve
+        // patch.)
         if moved_bound > child_remaining || (moved_bound == 0 && self.pending_moved.is_solved()) {
             return self.advance(solver);
         }
         self.push_advance(moved_bound, other_bound, solver)
     }
 
-    /// `advance` out of line, for rare paths (and a lane's first lookup).
+    /// `advance` out of line, for rare paths (and a lane's first lookup; no
+    /// idle phase: part of p5-sched's +3.2% at 48T, +1.6% at 1T).
     #[inline(never)]
     fn advance_cold(&mut self, solver: &Solver) -> Step {
         self.advance(solver)
@@ -1350,6 +1384,7 @@ impl Lane {
     /// = 0) and
     /// no skipped moves, and its first move is an X move (move masks are
     /// whole faces, less half turns), which looks up the other side first.
+    /// (Within noise when measured: +0.9% at 1T, +0.6% at 48T, p5-sched.)
     #[inline(always)]
     #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
     fn push_advance(&mut self, moved_bound: u8, other_bound: u8, solver: &Solver) -> Step {
@@ -1405,7 +1440,8 @@ impl Lane {
 
     /// The pending child as a node (see `push_child`): `make_node` of the
     /// child's normal and inverse cubes, worked out in terms of the moved
-    /// and the other side (no branch or select on the node's side).
+    /// and the other side (no branch or select on the node's side: +0.3% at
+    /// 1T, "neutral" per its merge, m6-micro).
     #[inline(always)]
     fn child_node(&self, moved_bound: u8, other_bound: u8) -> Node {
         let (moved, other) = (self.pending_moved, self.pending_other);
@@ -1541,7 +1577,8 @@ impl Lane {
 /// Bounds are below 16 (4-bit table entries and group minima, corner depths
 /// below 16, `base + 3` at most 15), far below 128, where `value - 1` would
 /// wrap (debug builds check). The same max in `i32` would cost a register
-/// move more.
+/// move more. (The signed max: part of m6-micro's resolve patch, +4.6% at
+/// 48T, +0.9% at 1T.)
 #[inline(always)]
 fn max_child_bound(lower_bound: u8, value: u8) -> u8 {
     debug_assert!(lower_bound < 128 && value < 128);
@@ -1683,7 +1720,8 @@ pub fn run_lanes(
             done(lane.cube_index, solution, lane.stats, seconds);
         }
     };
-    // The active lanes are `lanes[..n_active]` (no per-visit activity test).
+    // The active lanes are `lanes[..n_active]` (no per-visit activity test:
+    // +1.9% when added, part of m4-micro's +7.7% at 48T).
     let mut n_active = 0;
     for index in 0..n_lanes {
         if refill(&mut lanes[index], &mut done) {
@@ -1693,7 +1731,8 @@ pub fn run_lanes(
     }
     // Single-pass round-robin: each visit resolves the lookup the lane
     // issued one round earlier, then advances it to its next lookup. Every
-    // lane has one miss in flight with a whole round of slack.
+    // lane has one miss in flight with a whole round of slack. (+15.9% at
+    // 48T over the 3-phase lockstep when added, single-pass.)
     while n_active > 0 && !stop.load(Relaxed) {
         let mut gone: Option<*const Lane> = None;
         for lane in &mut lanes[..n_active] {

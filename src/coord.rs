@@ -172,7 +172,7 @@ pub static RANK8: [u8; 256] = RANK8_CONST;
 pub static UNRANK8: [u8; 70] = unrank8_table();
 
 /// `co_rank_table` pre-multiplied by `N_CSEP` (saves a multiply on the
-/// cube -> cocsep data dependency chain).
+/// cube -> cocsep data dependency chain; part of m1-micro's +2.2% at 48T).
 #[expect(
     clippy::cast_possible_truncation,
     reason = "`N_CSEP` is 70 (no `try_from` in const fns)"
@@ -215,7 +215,8 @@ fn corner_fields(cube: Cube) -> (u64, u64) {
             co_fields = _pext_u64(corners, tabs.co_pext_mask);
             tetrads = _pext_u64(corners, tabs.tetrad_pext_mask);
         }
-        // (The masks are memory operands: no 64-bit immediates to load.)
+        // (The masks are memory operands: no 64-bit immediates to load;
+        // +1.7% when added, part of m4-micro's +7.7% at 48T.)
         #[cfg(not(miri))]
         std::arch::asm!(
             "pext {co2}, {x}, qword ptr [{t} + {oc}]",
@@ -253,7 +254,8 @@ pub fn cocsep(cube: Cube) -> usize {
 }
 
 /// `3 * cocsep(cube)` (the byte offset of its packed entry), from tables
-/// scaled by 3 (no multiply on the index path).
+/// scaled by 3 (no multiply on the index path; part of m6-micro's index
+/// patch: +0.7% at 1T, -0.4% at 48T).
 #[must_use]
 #[inline(always)]
 #[expect(
@@ -307,7 +309,8 @@ pub fn edge_key(cube: Cube) -> u64 {
 /// orientations of the conjugate are built: one shuffle classifies each
 /// piece `p` as `T[p]` (E/S flags, eo of T), xor adds the cube's eo, and a
 /// second shuffle applies the position permutation `Tinv`, whose eo is
-/// added on the eo path only.
+/// added on the eo path only. (Instead of a full conjugation: +5.5% at 48T
+/// when added, edge-conj.)
 #[must_use]
 #[inline(always)]
 pub fn edge_key_sym(cube: Cube, sym: usize) -> u64 {
@@ -337,7 +340,8 @@ fn edge_parts_sym_raw(cube: Cube, sym: usize) -> (u64, u32, u64) {
         // Masks of edge positions 0..12, in bits 16..28 (all else zero).
         let e_mask = _mm256_movemask_epi8(conj).cast_unsigned();
         // asm: LLVM would turn movemask(conj + conj) into vptestmb + kmovd,
-        // which is ~1.5 cycles longer on Zen 5 (this mask feeds the pext).
+        // which is ~1.5 cycles longer on Zen 5 (this mask feeds the pext;
+        // part of m1-micro's +2.2% at 48T).
         let doubled = _mm256_add_epi8(conj, conj);
         let s_mask: u32;
         #[cfg(miri)]
@@ -362,7 +366,9 @@ fn edge_parts_sym_raw(cube: Cube, sym: usize) -> (u64, u32, u64) {
 /// `index_from_parts(class, edge_parts_sym(cube, sym), k)`, with the shifts
 /// by `k` done as a multiply by `row_mul` = `1 << (k + 9)` and a pext by
 /// `eo_mask` = the top `k` eo bits, `((1 << k) - 1) << (28 - k)` (memory
-/// operands: no variable shift counts to keep in registers).
+/// operands: no variable shift counts to keep in registers). (The index
+/// straight from the parts: part of packed-cocsep's +2.8% at 48T; the
+/// multiply and pext: part of m6-micro's index patch.)
 #[must_use]
 #[inline(always)]
 pub fn index_sym(cube: Cube, sym: usize, class: usize, row_mul: u64, eo_mask: u32) -> u64 {

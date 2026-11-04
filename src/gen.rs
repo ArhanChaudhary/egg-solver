@@ -12,7 +12,8 @@
 //!
 //! Each level runs forward (expand the frontier's neighbors) while the
 //! frontier is small, and backward (search each unvisited entry's
-//! neighbors for a frontier entry) once most entries are reached.
+//! neighbors for a frontier entry) once most entries are reached (not
+//! measured separately).
 
 use crate::coord::{cocsep, cube_from_edge_key, h11_key, reduce_key, split_index};
 use crate::simd::Cube;
