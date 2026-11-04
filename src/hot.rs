@@ -23,9 +23,12 @@
 pub const STREAM_PAD: usize = pad(option_env!("CUBEOPT_STREAM_PAD"), 16);
 
 /// Offset of the share mode's round loop (`share::Worker::rounds`) in its
-/// 64-byte line: 0. (At 48T the four pads were within the noise, +-0.3%;
-/// at 1T share, 0 against 48: +1.7 +0.1 +0.0%.)
-pub const SHARE_PAD: usize = pad(option_env!("CUBEOPT_SHARE_PAD"), 0);
+/// 64-byte line: 16. (With the loop visiting the lanes by pointer, m8 on
+/// def2cd0, 1T share against main at its pad 0, 2 pairs per pad: 0 +1.3
+/// +1.8%, 16 +5.3 +3.2%, 32 +1.6 +1.0%, 48 +1.7 +1.9%. Before: at 48T the
+/// four pads were within the noise, +-0.3%; at 1T share, 0 against 48:
+/// +1.7 +0.1 +0.0%.)
+pub const SHARE_PAD: usize = pad(option_env!("CUBEOPT_SHARE_PAD"), 16);
 
 /// The value of a pad build variable (decimal), or `default`.
 ///

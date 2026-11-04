@@ -2322,16 +2322,27 @@ impl Worker<'_, '_> {
     )]
     fn rounds(&mut self, solver: &Solver, stop: &AtomicBool, round: &mut u32) -> bool {
         while self.active_lanes > 0 {
-            let mut i = 0;
             let mut active = self.active_lanes;
-            while i < active {
-                // SAFETY: i < active_lanes <= lanes.len().
-                let lane = unsafe { &mut self.lanes.get_unchecked_mut(i).lane };
+            // The lanes by pointer (`next` to `end`), as in `run_lanes`: an
+            // index cost a multiply (by the lane's size) at the start of
+            // every visit's value chain. (With m8's unsafe pass, whose loop
+            // alone was -1.3% in share mode at 1T, and share pad 16, on
+            // def2cd0: share +2.5% at 1T; -c 1 -2.1%, -c 0 -2.5%, bench share
+            // +2.5% at 48T.) The pointers are made again after `on_end`,
+            // which may swap lanes.
+            let mut lanes = self.lanes.as_mut_ptr();
+            // SAFETY: `active <= lanes.len()`.
+            let (mut next, mut end) = (lanes, unsafe { lanes.add(active) });
+            while next < end {
+                // SAFETY: `next` is one of the active lanes, and nothing
+                // else accesses it during the visit.
+                let lane = unsafe { &mut (*next).lane };
                 let value = lane.pending_value(solver);
                 let outcome = match lane.phase {
                     Phase::WaitOther => {
                         if lane.resolve_other(value, solver) {
-                            i += 1;
+                            // SAFETY: at most one past the active lanes.
+                            next = unsafe { next.add(1) };
                             continue;
                         }
                         lane.advance(solver)
@@ -2339,12 +2350,18 @@ impl Worker<'_, '_> {
                     Phase::WaitMoved => lane.resolve_moved(value, solver),
                 };
                 match outcome {
-                    Step::Pending => i += 1,
+                    // SAFETY: as above.
+                    Step::Pending => next = unsafe { next.add(1) },
                     outcome => {
+                        // SAFETY: `next` points into `lanes`.
+                        let mut i = unsafe { next.offset_from(lanes) }.cast_unsigned();
                         if self.on_end(i, matches!(outcome, Step::Found)) {
                             i += 1;
                         }
                         active = self.active_lanes;
+                        lanes = self.lanes.as_mut_ptr();
+                        // SAFETY: `i <= active <= lanes.len()`.
+                        (next, end) = unsafe { (lanes.add(i), lanes.add(active)) };
                     }
                 }
             }
