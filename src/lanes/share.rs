@@ -125,11 +125,27 @@ struct Bufs {
     splitters: Vec<u64>,
     hist: Vec<u32>,
     groups: Vec<u32>,
-    out_ptr: usize,
-    keys_ptr: usize,
-    tmp_ptr: usize,
-    bids_ptr: usize,
-    hist_ptr: usize,
+    out_ptr: TaskPtr<Job>,
+    keys_ptr: TaskPtr<u64>,
+    tmp_ptr: TaskPtr<u64>,
+    bids_ptr: TaskPtr<u8>,
+    hist_ptr: TaskPtr<u32>,
+}
+
+/// The start of a build buffer that the tasks of a stage write at once, each
+/// its own part (through a raw pointer: references to the whole buffer
+/// would alias).
+#[derive(Clone, Copy)]
+struct TaskPtr<T>(*mut T);
+
+// SAFETY: the build stages order the accesses (`build_task`).
+unsafe impl<T> Send for TaskPtr<T> {}
+unsafe impl<T> Sync for TaskPtr<T> {}
+
+impl<T> Default for TaskPtr<T> {
+    fn default() -> Self {
+        TaskPtr(std::ptr::null_mut())
+    }
 }
 
 impl Bufs {
@@ -827,7 +843,7 @@ fn build(
             b.ext_off.push(off);
             b.out.clear();
             assert!(off as usize <= b.out.capacity());
-            b.out_ptr = b.out.as_mut_ptr() as usize;
+            b.out_ptr = TaskPtr(b.out.as_mut_ptr());
             open_stage(pool, ctx, ST_EXT, b.ext_off.len() - 1);
             return true;
         }
@@ -1030,11 +1046,11 @@ fn sort_setup(inner: &mut Inner) -> usize {
     b.bids.clear();
     b.out.clear();
     assert!(n <= b.bids.capacity() && n <= b.out.capacity());
-    b.keys_ptr = b.keys.as_mut_ptr() as usize;
-    b.tmp_ptr = b.keys_tmp.as_mut_ptr() as usize;
-    b.bids_ptr = b.bids.as_mut_ptr() as usize;
-    b.hist_ptr = b.hist.as_mut_ptr() as usize;
-    b.out_ptr = b.out.as_mut_ptr() as usize;
+    b.keys_ptr = TaskPtr(b.keys.as_mut_ptr());
+    b.tmp_ptr = TaskPtr(b.keys_tmp.as_mut_ptr());
+    b.bids_ptr = TaskPtr(b.bids.as_mut_ptr());
+    b.hist_ptr = TaskPtr(b.hist.as_mut_ptr());
+    b.out_ptr = TaskPtr(b.out.as_mut_ptr());
     nch
 }
 
@@ -1050,7 +1066,7 @@ unsafe fn sort_task(inner: &Inner, stage: u64, c: usize) {
         ST_KEYS => {
             let lo = c * SORT_CHUNK;
             let hi = (lo + SORT_CHUNK).min(jobs.len());
-            let (keys, bids) = (b.keys_ptr as *mut u64, b.bids_ptr as *mut u8);
+            let (keys, bids) = (b.keys_ptr.0, b.bids_ptr.0);
             let mut h = [0u32; NBUCKETS];
             for i in lo..hi {
                 let k = sort_key(jobs, &inner.stats, b.direct, inner.target, i);
@@ -1059,18 +1075,15 @@ unsafe fn sort_task(inner: &Inner, stage: u64, c: usize) {
                 *bids.add(i) = bk as u8;
                 h[bk] += 1;
             }
-            let hist = (b.hist_ptr as *mut u32).add(c * NBUCKETS);
+            let hist = b.hist_ptr.0.add(c * NBUCKETS);
             std::ptr::copy_nonoverlapping(h.as_ptr(), hist, NBUCKETS);
         }
         ST_SCATTER => {
             let lo = c * SORT_CHUNK;
             let hi = (lo + SORT_CHUNK).min(jobs.len());
-            let (keys, tmp) = (b.keys_ptr as *const u64, b.tmp_ptr as *mut u64);
-            let bids = b.bids_ptr as *const u8;
-            let off = std::slice::from_raw_parts_mut(
-                (b.hist_ptr as *mut u32).add(c * NBUCKETS),
-                NBUCKETS,
-            );
+            let (keys, tmp) = (b.keys_ptr.0.cast_const(), b.tmp_ptr.0);
+            let bids = b.bids_ptr.0.cast_const();
+            let off = std::slice::from_raw_parts_mut(b.hist_ptr.0.add(c * NBUCKETS), NBUCKETS);
             for i in lo..hi {
                 let o = &mut off[*bids.add(i) as usize];
                 *tmp.add(*o as usize) = *keys.add(i);
@@ -1079,11 +1092,11 @@ unsafe fn sort_task(inner: &Inner, stage: u64, c: usize) {
         }
         _ => {
             let (lo, hi) = (b.groups[c] as usize, b.groups[c + 1] as usize);
-            let run = std::slice::from_raw_parts_mut((b.tmp_ptr as *mut u64).add(lo), hi - lo);
+            let run = std::slice::from_raw_parts_mut(b.tmp_ptr.0.add(lo), hi - lo);
             // (Keys are distinct: the index breaks ties, as in a stable
             // sort.)
             run.sort_unstable();
-            let out = (b.out_ptr as *mut Job).add(lo);
+            let out = b.out_ptr.0.add(lo);
             for (p, &k) in run.iter().enumerate() {
                 if let Some(&k) = run.get(p + 16) {
                     prefetch(&jobs[key_index(k)], false);
@@ -1122,7 +1135,7 @@ fn sort_stage_done(inner: &mut Inner, stage: u64) -> Option<(u64, usize)> {
             // SAFETY: the tasks wrote all of `out` (and sorted `keys_tmp`).
             unsafe {
                 b.out.set_len(n);
-                inner.nf = std::slice::from_raw_parts(b.tmp_ptr as *const u64, n)
+                inner.nf = std::slice::from_raw_parts(b.tmp_ptr.0.cast_const(), n)
                     .partition_point(|&k| k >> 63 == 0);
             }
             std::mem::swap(&mut inner.jobs, &mut b.out);
@@ -1169,7 +1182,7 @@ fn build_task(sc: &mut Lane, s: &Solver, pool: &Pool, ctx: &Arc<CubeCtx>, tid: u
                 let b = &inner.b;
                 let (o, e) = (b.ext_off[c] as usize, b.ext_off[c + 1] as usize);
                 assert_eq!(sc.jobs.len(), e - o);
-                let out = (b.out_ptr as *mut Job).add(o);
+                let out = b.out_ptr.0.add(o);
                 std::ptr::copy_nonoverlapping(sc.jobs.as_ptr(), out, e - o);
             }
             _ => sort_task(inner, stage, c),

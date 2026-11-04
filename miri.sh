@@ -25,9 +25,7 @@ run "$strict" cubie::tests::symmetry > "$logs/1" &
 run "$strict" cubie::tests --skip symmetry > "$logs/2" &
 run "$strict" simd:: coord:: solver:: tables:: > "$logs/3" &
 run "$strict" lanes::tests:: > "$logs/4" &
-# The parallel sort passes its buffers as integers (`*_ptr: usize`), which
-# strict provenance rejects.
-run "-Zmiri-permissive-provenance -Zmiri-symbolic-alignment-check" lanes::share::tests::staged > "$logs/5" &
+run "$strict" lanes::share::tests::staged > "$logs/5" &
 run "$strict -Zmiri-many-seeds=$seeds" lanes::share::tests::share_ > "$logs/6" &
 wait
 cat "$logs"/*
