@@ -1,8 +1,10 @@
 //! Scalar ("cubie level") cube model, derived from 3D geometry.
 //!
-//! This module is not performance critical. It is the ground truth from which
-//! the fast SIMD representation, the move tables and the 48 symmetries are
-//! derived, and against which they are tested.
+//! A cube state is described piece by piece: which corner/edge piece sits in
+//! each position, and how it is twisted (corners: 0..3) or flipped (edges:
+//! 0..2). This module is not performance critical. It is the ground truth
+//! from which the fast SIMD representation (`simd`), the move tables and the
+//! 48 symmetries are derived, and against which they are tested.
 //!
 //! Piece numbering follows nissy so that cheap bit tricks give the H48
 //! coordinates:
@@ -11,12 +13,15 @@
 //!
 //! Axes: x points to R, y to U, z to F.
 //!
-//! Composition convention: `a.mul(&b)` is "a then b"; `cp[i]` is the piece in
-//! position `i`, so `(a*b).cp[i] = a.cp[b.cp[i]]`.
+//! Composition convention: `a.compose(&b)` is "a then b". `corner_perm[i]`
+//! is the piece in position `i`, so
+//! `a.compose(&b).corner_perm[i] = a.corner_perm[b.corner_perm[i]]`.
 
-pub type V3 = [i32; 3];
+/// An integer 3D vector (positions, normals).
+pub type Vec3 = [i32; 3];
 
-pub const CORNER_POS: [V3; 8] = [
+/// Centers of the 8 corner positions.
+pub const CORNER_POSITIONS: [Vec3; 8] = [
     [1, 1, 1],    // UFR
     [-1, 1, -1],  // UBL
     [-1, -1, 1],  // DFL
@@ -27,7 +32,8 @@ pub const CORNER_POS: [V3; 8] = [
     [-1, -1, -1], // DBL
 ];
 
-pub const EDGE_POS: [V3; 12] = [
+/// Centers of the 12 edge positions.
+pub const EDGE_POSITIONS: [Vec3; 12] = [
     [0, 1, 1],   // UF
     [0, 1, -1],  // UB
     [0, -1, -1], // DB
@@ -42,8 +48,11 @@ pub const EDGE_POS: [V3; 12] = [
     [1, 0, -1],  // BR
 ];
 
-/// Faces in move order: U, D, R, L, F, B. Moves are `3*face + (quarter turns - 1)`.
-pub const FACE_NORMAL: [V3; 6] = [
+/// Outward normals of the faces in move order: U, D, R, L, F, B.
+///
+/// Move `m` turns face `m / 3` clockwise by `m % 3 + 1` quarter turns (so
+/// the moves are U U2 U' D D2 D' ... B').
+pub const FACE_NORMALS: [Vec3; 6] = [
     [0, 1, 0],
     [0, -1, 0],
     [1, 0, 0],
@@ -51,159 +60,174 @@ pub const FACE_NORMAL: [V3; 6] = [
     [0, 0, 1],
     [0, 0, -1],
 ];
-pub const FACE_CHARS: [char; 6] = ['U', 'D', 'R', 'L', 'F', 'B'];
+/// Face letters in move order.
+pub const FACE_NAMES: [char; 6] = ['U', 'D', 'R', 'L', 'F', 'B'];
 
+/// A cube state, piece by piece.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct CubieCube {
-    pub cp: [u8; 8],
-    pub co: [u8; 8],
-    pub ep: [u8; 12],
-    pub eo: [u8; 12],
+    /// The corner piece in each corner position.
+    pub corner_perm: [u8; 8],
+    /// The twist of each corner position's piece: by how many clockwise
+    /// steps (0..3) its U/D sticker is turned away from the U/D face.
+    pub corner_orient: [u8; 8],
+    /// The edge piece in each edge position.
+    pub edge_perm: [u8; 12],
+    /// Whether each edge position's piece is flipped (0 or 1).
+    pub edge_orient: [u8; 12],
 }
 
 impl CubieCube {
     pub const SOLVED: CubieCube = CubieCube {
-        cp: [0, 1, 2, 3, 4, 5, 6, 7],
-        co: [0; 8],
-        ep: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-        eo: [0; 12],
+        corner_perm: [0, 1, 2, 3, 4, 5, 6, 7],
+        corner_orient: [0; 8],
+        edge_perm: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+        edge_orient: [0; 12],
     };
 
-    /// "self then other".
+    /// "`self` then `other`".
     #[must_use]
-    pub fn mul(&self, o: &CubieCube) -> CubieCube {
-        let mut r = CubieCube::SOLVED;
+    pub fn compose(&self, other: &CubieCube) -> CubieCube {
+        let mut result = CubieCube::SOLVED;
         for i in 0..8 {
-            r.cp[i] = self.cp[o.cp[i] as usize];
-            r.co[i] = (self.co[o.cp[i] as usize] + o.co[i]) % 3;
+            let from = usize::from(other.corner_perm[i]);
+            result.corner_perm[i] = self.corner_perm[from];
+            result.corner_orient[i] = (self.corner_orient[from] + other.corner_orient[i]) % 3;
         }
         for i in 0..12 {
-            r.ep[i] = self.ep[o.ep[i] as usize];
-            r.eo[i] = (self.eo[o.ep[i] as usize] + o.eo[i]) % 2;
+            let from = usize::from(other.edge_perm[i]);
+            result.edge_perm[i] = self.edge_perm[from];
+            result.edge_orient[i] = (self.edge_orient[from] + other.edge_orient[i]) % 2;
         }
-        r
+        result
     }
 
+    /// The state that undoes this one: `c.compose(&c.inverse())` is solved.
     #[must_use]
     pub fn inverse(&self) -> CubieCube {
-        let mut r = CubieCube::SOLVED;
-        for (i, (&piece, &orient)) in (0..).zip(self.cp.iter().zip(&self.co)) {
-            r.cp[usize::from(piece)] = i;
-            r.co[usize::from(piece)] = (3 - orient) % 3;
+        let mut result = CubieCube::SOLVED;
+        let corners = self.corner_perm.iter().zip(&self.corner_orient);
+        for (i, (&piece, &orient)) in (0..).zip(corners) {
+            result.corner_perm[usize::from(piece)] = i;
+            result.corner_orient[usize::from(piece)] = (3 - orient) % 3;
         }
-        for (i, (&piece, &orient)) in (0..).zip(self.ep.iter().zip(&self.eo)) {
-            r.ep[usize::from(piece)] = i;
-            r.eo[usize::from(piece)] = orient;
+        let edges = self.edge_perm.iter().zip(&self.edge_orient);
+        for (i, (&piece, &orient)) in (0..).zip(edges) {
+            result.edge_perm[usize::from(piece)] = i;
+            result.edge_orient[usize::from(piece)] = orient;
         }
-        r
+        result
     }
 
-    /// Negate all corner orientations (used for mirror conjugation).
+    /// Negate all corner twists (mod 3): a mirror reverses the turning
+    /// direction (see `conjugate`).
     #[must_use]
-    pub fn invert_co(&self) -> CubieCube {
-        let mut r = *self;
-        for i in 0..8 {
-            r.co[i] = (3 - r.co[i]) % 3;
+    pub fn negate_corner_orient(&self) -> CubieCube {
+        let mut result = *self;
+        for orient in &mut result.corner_orient {
+            *orient = (3 - *orient) % 3;
         }
-        r
+        result
     }
 
+    /// This state followed by move `mv` (0..18).
     #[must_use]
-    pub fn apply_move(&self, m: usize) -> CubieCube {
-        self.mul(&move_cubes()[m])
+    pub fn apply_move(&self, mv: usize) -> CubieCube {
+        self.compose(&move_cubes()[mv])
     }
 
+    /// This state followed by a move sequence.
     #[must_use]
-    pub fn apply_moves(&self, ms: &[u8]) -> CubieCube {
-        let mut c = *self;
-        for &m in ms {
-            c = c.apply_move(m as usize);
+    pub fn apply_moves(&self, moves: &[u8]) -> CubieCube {
+        let mut cube = *self;
+        for &mv in moves {
+            cube = cube.apply_move(usize::from(mv));
         }
-        c
+        cube
     }
 
+    /// Parity (0 even, 1 odd) of the corner permutation.
     #[must_use]
     pub fn corner_parity(&self) -> u32 {
-        perm_parity(&self.cp)
+        permutation_parity(&self.corner_perm)
     }
 
+    /// Parity (0 even, 1 odd) of the edge permutation.
     #[must_use]
     pub fn edge_parity(&self) -> u32 {
-        perm_parity(&self.ep)
+        permutation_parity(&self.edge_perm)
     }
 
-    /// Is this a reachable cube position?
+    /// Is this a reachable cube position? (Valid permutations, total twist
+    /// and flip 0, equal corner and edge parities.)
     #[must_use]
     pub fn is_solvable(&self) -> bool {
-        let mut cs = [false; 8];
-        let mut es = [false; 12];
-        for &p in &self.cp {
-            if p >= 8 || cs[p as usize] {
+        let mut seen_corners = [false; 8];
+        let mut seen_edges = [false; 12];
+        for &piece in &self.corner_perm {
+            if piece >= 8 || seen_corners[usize::from(piece)] {
                 return false;
             }
-            cs[p as usize] = true;
+            seen_corners[usize::from(piece)] = true;
         }
-        for &p in &self.ep {
-            if p >= 12 || es[p as usize] {
+        for &piece in &self.edge_perm {
+            if piece >= 12 || seen_edges[usize::from(piece)] {
                 return false;
             }
-            es[p as usize] = true;
+            seen_edges[usize::from(piece)] = true;
         }
-        self.co
-            .iter()
-            .map(|&x| u32::from(x))
-            .sum::<u32>()
-            .is_multiple_of(3)
-            && self
-                .eo
-                .iter()
-                .map(|&x| u32::from(x))
-                .sum::<u32>()
-                .is_multiple_of(2)
+        let total = |orients: &[u8]| orients.iter().map(|&x| u32::from(x)).sum::<u32>();
+        total(&self.corner_orient).is_multiple_of(3)
+            && total(&self.edge_orient).is_multiple_of(2)
             && self.corner_parity() == self.edge_parity()
     }
 
     /// Uniformly random reachable position.
     pub fn random(rng: &mut Rng) -> CubieCube {
         loop {
-            let mut c = CubieCube::SOLVED;
+            let mut cube = CubieCube::SOLVED;
+            // (Fisher-Yates shuffles.)
             for i in (1..8).rev() {
                 let j = rng.below_usize(i + 1);
-                c.cp.swap(i, j);
+                cube.corner_perm.swap(i, j);
             }
             for i in (1..12).rev() {
                 let j = rng.below_usize(i + 1);
-                c.ep.swap(i, j);
+                cube.edge_perm.swap(i, j);
             }
-            let mut s = 0;
+            // The last twist and flip make the totals valid.
+            let mut twist = 0;
             for i in 0..7 {
-                c.co[i] = rng.below_u8(3);
-                s += c.co[i];
+                cube.corner_orient[i] = rng.below_u8(3);
+                twist += cube.corner_orient[i];
             }
-            c.co[7] = (3 - s % 3) % 3;
-            let mut s = 0;
+            cube.corner_orient[7] = (3 - twist % 3) % 3;
+            let mut flip = 0;
             for i in 0..11 {
-                c.eo[i] = rng.below_u8(2);
-                s += c.eo[i];
+                cube.edge_orient[i] = rng.below_u8(2);
+                flip += cube.edge_orient[i];
             }
-            c.eo[11] = s % 2;
-            if c.corner_parity() == c.edge_parity() {
-                return c;
+            cube.edge_orient[11] = flip % 2;
+            // Half of all such states have mismatched parities: retry.
+            if cube.corner_parity() == cube.edge_parity() {
+                return cube;
             }
         }
     }
 }
 
-fn perm_parity(p: &[u8]) -> u32 {
-    let mut par = 0;
-    for i in 0..p.len() {
-        for j in i + 1..p.len() {
-            if p[i] > p[j] {
-                par ^= 1;
+/// Parity of a permutation (0 even, 1 odd): that of its number of
+/// inversions.
+fn permutation_parity(perm: &[u8]) -> u32 {
+    let mut parity = 0;
+    for (i, &a) in perm.iter().enumerate() {
+        for &b in &perm[i + 1..] {
+            if a > b {
+                parity ^= 1;
             }
         }
     }
-    par
+    parity
 }
 
 /// Small deterministic PRNG (splitmix64), so benchmarks are reproducible.
@@ -242,104 +266,120 @@ impl Rng {
 }
 
 // ---------------------------------------------------------------------------
-// Sticker model
+// Sticker model: moves and symmetries are rotations and reflections of the
+// 48 stickers; the cubie-level moves and symmetries are read off from them.
 // ---------------------------------------------------------------------------
 
 /// A sticker location: a cubie position vector and the outward normal.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 struct Sticker {
-    p: V3,
-    n: V3,
+    position: Vec3,
+    normal: Vec3,
 }
 
-fn axis_vec(axis: usize, s: i32) -> V3 {
+/// The unit vector `sign` along `axis`.
+fn axis_vector(axis: usize, sign: i32) -> Vec3 {
     let mut v = [0; 3];
-    v[axis] = s;
+    v[axis] = sign;
     v
 }
 
-fn det3(a: V3, b: V3, c: V3) -> i32 {
+/// Determinant of the matrix with rows `a`, `b`, `c`.
+fn determinant(a: Vec3, b: Vec3, c: Vec3) -> i32 {
     a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0])
         + a[2] * (b[0] * c[1] - b[1] * c[0])
 }
 
 /// Stickers of corner position `i` in clockwise order, starting from the U/D one.
 fn corner_stickers(i: usize) -> [Sticker; 3] {
-    let p = CORNER_POS[i];
-    let n0 = axis_vec(1, p[1]);
-    let a = axis_vec(0, p[0]);
-    let b = axis_vec(2, p[2]);
-    let (n1, n2) = if det3(n0, a, b) > 0 { (a, b) } else { (b, a) };
-    [
-        Sticker { p, n: n0 },
-        Sticker { p, n: n1 },
-        Sticker { p, n: n2 },
-    ]
+    let position = CORNER_POSITIONS[i];
+    let up_down = axis_vector(1, position[1]);
+    let a = axis_vector(0, position[0]);
+    let b = axis_vector(2, position[2]);
+    // (Clockwise seen from outside: a positive determinant.)
+    let (second, third) = if determinant(up_down, a, b) > 0 {
+        (a, b)
+    } else {
+        (b, a)
+    };
+    [up_down, second, third].map(|normal| Sticker { position, normal })
 }
 
 /// Stickers of edge position `i`, the reference (U/D, else F/B) one first.
 fn edge_stickers(i: usize) -> [Sticker; 2] {
-    let p = EDGE_POS[i];
-    let (r, o) = if p[1] != 0 {
-        let o = if p[0] != 0 {
-            axis_vec(0, p[0])
+    let position = EDGE_POSITIONS[i];
+    let (reference, other) = if position[1] != 0 {
+        let other = if position[0] != 0 {
+            axis_vector(0, position[0])
         } else {
-            axis_vec(2, p[2])
+            axis_vector(2, position[2])
         };
-        (axis_vec(1, p[1]), o)
+        (axis_vector(1, position[1]), other)
     } else {
-        (axis_vec(2, p[2]), axis_vec(0, p[0]))
+        (axis_vector(2, position[2]), axis_vector(0, position[0]))
     };
-    [Sticker { p, n: r }, Sticker { p, n: o }]
+    [reference, other].map(|normal| Sticker { position, normal })
 }
 
+/// All 48 stickers: 3 per corner position, then 2 per edge position.
 fn all_stickers() -> Vec<Sticker> {
-    let mut v = Vec::with_capacity(48);
+    let mut stickers = Vec::with_capacity(48);
     for i in 0..8 {
-        v.extend_from_slice(&corner_stickers(i));
+        stickers.extend_from_slice(&corner_stickers(i));
     }
     for i in 0..12 {
-        v.extend_from_slice(&edge_stickers(i));
+        stickers.extend_from_slice(&edge_stickers(i));
     }
-    v
+    stickers
 }
 
-fn sticker_index(all: &[Sticker], s: Sticker) -> u8 {
-    let index = all.iter().position(|&x| x == s).expect("bad sticker");
+/// Index of a sticker in `all_stickers()`.
+fn sticker_index(all: &[Sticker], sticker: Sticker) -> u8 {
+    let index = all.iter().position(|&x| x == sticker).expect("bad sticker");
     u8::try_from(index).expect("48 stickers")
 }
 
-type Mat = [[i32; 3]; 3];
+/// A 3x3 integer matrix (rotations and reflections), row major.
+type Matrix = [[i32; 3]; 3];
 
-fn mat_apply(m: &Mat, v: V3) -> V3 {
-    let mut r = [0; 3];
-    for (i, ri) in r.iter_mut().enumerate() {
-        *ri = m[i][0] * v[0] + m[i][1] * v[1] + m[i][2] * v[2];
+/// `m` times the column vector `v`.
+fn matrix_apply(m: &Matrix, v: Vec3) -> Vec3 {
+    let mut result = [0; 3];
+    for (row, x) in m.iter().zip(&mut result) {
+        *x = row[0] * v[0] + row[1] * v[1] + row[2] * v[2];
     }
-    r
+    result
 }
 
-fn mat_det(m: &Mat) -> i32 {
-    det3(m[0], m[1], m[2])
+fn matrix_determinant(m: &Matrix) -> i32 {
+    determinant(m[0], m[1], m[2])
 }
 
-fn mat_mul(a: &Mat, b: &Mat) -> Mat {
-    let mut p = [[0; 3]; 3];
+fn matrix_product(a: &Matrix, b: &Matrix) -> Matrix {
+    let mut product = [[0; 3]; 3];
     for i in 0..3 {
         for j in 0..3 {
-            p[i][j] = (0..3).map(|k| a[i][k] * b[k][j]).sum();
+            product[i][j] = (0..3).map(|k| a[i][k] * b[k][j]).sum();
         }
     }
-    p
+    product
+}
+
+/// The image of a sticker under `m`.
+fn matrix_apply_sticker(m: &Matrix, sticker: Sticker) -> Sticker {
+    Sticker {
+        position: matrix_apply(m, sticker.position),
+        normal: matrix_apply(m, sticker.normal),
+    }
 }
 
 /// Rotation by -90 degrees about unit axis `u` (clockwise seen from outside).
 #[expect(clippy::needless_range_loop, reason = "matrix indices")]
-fn quarter_turn_matrix(u: V3) -> Mat {
-    // R v = -(u x v) + u (u.v)
+fn quarter_turn_matrix(u: Vec3) -> Matrix {
+    // Column j is the image of the unit vector e_j: R v = -(u x v) + u (u.v).
     let mut m = [[0; 3]; 3];
     for j in 0..3 {
-        let v = axis_vec(j, 1);
+        let v = axis_vector(j, 1);
         let cross = [
             u[1] * v[2] - u[2] * v[1],
             u[2] * v[0] - u[0] * v[2],
@@ -353,125 +393,109 @@ fn quarter_turn_matrix(u: V3) -> Mat {
     m
 }
 
-/// A sticker state: `s[loc] = identity` (home location index) of the sticker at `loc`.
+/// A sticker state: `self.0[location]` is the identity (home location
+/// index) of the sticker at `location`.
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct StickerCube(pub [u8; 48]);
 
 impl StickerCube {
     #[must_use]
     pub fn solved() -> StickerCube {
-        let mut s = [0u8; 48];
-        for (x, i) in s.iter_mut().zip(0..) {
+        let mut stickers = [0u8; 48];
+        for (x, i) in stickers.iter_mut().zip(0..) {
             *x = i;
         }
-        StickerCube(s)
+        StickerCube(stickers)
     }
 
-    /// Apply a face move (`face` in 0..6, `q` quarter turns clockwise).
+    /// Apply a face move (`face` in 0..6, clockwise quarter turns).
     #[must_use]
-    pub fn apply_face(&self, face: usize, q: usize) -> StickerCube {
+    pub fn apply_face(&self, face: usize, quarter_turns: usize) -> StickerCube {
         let all = all_stickers();
-        let u = FACE_NORMAL[face];
-        let m = quarter_turn_matrix(u);
-        let mut cur = self.clone();
-        for _ in 0..q {
-            let mut next = cur.clone();
-            for (li, l) in all.iter().enumerate() {
-                let dot = l.p[0] * u[0] + l.p[1] * u[1] + l.p[2] * u[2];
-                if dot > 0 {
-                    let to = Sticker {
-                        p: mat_apply(&m, l.p),
-                        n: mat_apply(&m, l.n),
-                    };
-                    next.0[usize::from(sticker_index(&all, to))] = cur.0[li];
+        let axis = FACE_NORMALS[face];
+        let turn = quarter_turn_matrix(axis);
+        let mut current = self.clone();
+        for _ in 0..quarter_turns {
+            let mut next = current.clone();
+            for (from, &sticker) in all.iter().enumerate() {
+                // (The face's layer: the stickers on its side of the center.)
+                let p = sticker.position;
+                if p[0] * axis[0] + p[1] * axis[1] + p[2] * axis[2] > 0 {
+                    let to = sticker_index(&all, matrix_apply_sticker(&turn, sticker));
+                    next.0[usize::from(to)] = current.0[from];
                 }
             }
-            cur = next;
+            current = next;
         }
-        cur
+        current
     }
 
-    /// Conjugate by a spatial symmetry: `out[M(L)] = M(s[L])`.
+    /// Conjugate by a spatial symmetry `m`: `out[m(L)] = m(self[L])`.
     #[must_use]
-    pub fn conjugate(&self, m: &Mat) -> StickerCube {
+    pub fn conjugate(&self, m: &Matrix) -> StickerCube {
         let all = all_stickers();
-        let map = |idx: u8| -> u8 {
-            let l = all[usize::from(idx)];
-            sticker_index(
-                &all,
-                Sticker {
-                    p: mat_apply(m, l.p),
-                    n: mat_apply(m, l.n),
-                },
-            )
+        let map = |index: u8| -> u8 {
+            sticker_index(&all, matrix_apply_sticker(m, all[usize::from(index)]))
         };
         let mut out = [0u8; 48];
-        for (li, &id) in (0..).zip(&self.0) {
-            out[usize::from(map(li))] = map(id);
+        for (location, &identity) in (0..).zip(&self.0) {
+            out[usize::from(map(location))] = map(identity);
         }
         StickerCube(out)
     }
 
-    /// State with `s[L] = M(L)`: the cubie-level "cube" of a symmetry.
-    fn symmetry_state(m: &Mat) -> StickerCube {
-        StickerCube::solved().conjugate_identity_only(m)
-    }
-
-    fn conjugate_identity_only(&self, m: &Mat) -> StickerCube {
+    /// State with `self[L] = m(L)`: the cubie-level "cube" of a symmetry.
+    fn symmetry_state(m: &Matrix) -> StickerCube {
         let all = all_stickers();
         let mut out = [0u8; 48];
-        for (li, o) in out.iter_mut().enumerate() {
-            let l = all[usize::from(self.0[li])];
-            *o = sticker_index(
-                &all,
-                Sticker {
-                    p: mat_apply(m, l.p),
-                    n: mat_apply(m, l.n),
-                },
-            );
+        for (x, &sticker) in out.iter_mut().zip(&all) {
+            *x = sticker_index(&all, matrix_apply_sticker(m, sticker));
         }
         StickerCube(out)
     }
 
+    /// The cubie state of this sticker state (which must be one).
     #[must_use]
     pub fn to_cubie(&self) -> CubieCube {
-        let mut c = CubieCube::SOLVED;
+        let mut cube = CubieCube::SOLVED;
         for i in 0..8 {
+            // The piece's reference sticker is 3 * piece; where it is gives
+            // the twist.
             let piece = self.0[3 * i] / 3;
-            c.cp[i] = piece;
-            for (k, &id) in (0..).zip(&self.0[3 * i..3 * i + 3]) {
-                if id == 3 * piece {
-                    c.co[i] = k;
+            cube.corner_perm[i] = piece;
+            for (k, &identity) in (0..).zip(&self.0[3 * i..3 * i + 3]) {
+                if identity == 3 * piece {
+                    cube.corner_orient[i] = k;
                 }
             }
         }
         for i in 0..12 {
-            let id = self.0[24 + 2 * i] - 24;
-            c.ep[i] = id / 2;
-            c.eo[i] = id % 2;
+            let identity = self.0[24 + 2 * i] - 24;
+            cube.edge_perm[i] = identity / 2;
+            cube.edge_orient[i] = identity % 2;
         }
-        c
+        cube
     }
 
     #[must_use]
-    pub fn from_cubie(c: &CubieCube) -> StickerCube {
-        let mut s = [0u8; 48];
+    pub fn from_cubie(cube: &CubieCube) -> StickerCube {
+        let mut stickers = [0u8; 48];
         for i in 0..8 {
-            let p = c.cp[i];
+            let piece = cube.corner_perm[i];
             for k in 0..3 {
-                // piece sticker j sits at position sticker (co + j) % 3
-                let j = (k + 3 - c.co[i]) % 3;
-                s[3 * i + usize::from(k)] = 3 * p + j;
+                // piece sticker j sits at position sticker (twist + j) % 3
+                let j = (k + 3 - cube.corner_orient[i]) % 3;
+                stickers[3 * i + usize::from(k)] = 3 * piece + j;
             }
         }
         for i in 0..12 {
-            let p = c.ep[i];
+            let piece = cube.edge_perm[i];
             for k in 0..2 {
-                let j = (k + c.eo[i]) % 2;
-                s[24 + 2 * i + usize::from(k)] = 24 + 2 * p + j;
+                let j = (k + cube.edge_orient[i]) % 2;
+                stickers[24 + 2 * i + usize::from(k)] = 24 + 2 * piece + j;
             }
         }
-        StickerCube(s)
+        StickerCube(stickers)
     }
 }
 
@@ -479,104 +503,99 @@ impl StickerCube {
 // Moves and symmetries
 // ---------------------------------------------------------------------------
 
-pub const NMOVES: usize = 18;
+/// Number of moves (turns of 90, 180 and 270 degrees of the 6 faces).
+pub const N_MOVES: usize = 18;
 
-pub fn move_cubes() -> &'static [CubieCube; 18] {
+/// The cube state of each move.
+pub fn move_cubes() -> &'static [CubieCube; N_MOVES] {
     use std::sync::OnceLock;
-    static M: OnceLock<[CubieCube; 18]> = OnceLock::new();
-    M.get_or_init(|| {
-        let mut r = [CubieCube::SOLVED; 18];
-        for f in 0..6 {
-            for q in 1..=3 {
-                r[3 * f + q - 1] = StickerCube::solved().apply_face(f, q).to_cubie();
+    static MOVES: OnceLock<[CubieCube; N_MOVES]> = OnceLock::new();
+    MOVES.get_or_init(|| {
+        let mut moves = [CubieCube::SOLVED; N_MOVES];
+        for face in 0..6 {
+            for turns in 1..=3 {
+                moves[3 * face + turns - 1] =
+                    StickerCube::solved().apply_face(face, turns).to_cubie();
             }
         }
-        r
+        moves
     })
 }
 
+/// Singmaster name of a move: `U`, `U2`, `U'`, ...
 #[must_use]
-pub fn move_name(m: u8) -> String {
-    let f = FACE_CHARS[(m / 3) as usize];
-    match m % 3 {
-        0 => format!("{f}"),
-        1 => format!("{f}2"),
-        _ => format!("{f}'"),
+pub fn move_name(mv: u8) -> String {
+    let face = FACE_NAMES[usize::from(mv / 3)];
+    match mv % 3 {
+        0 => format!("{face}"),
+        1 => format!("{face}2"),
+        _ => format!("{face}'"),
     }
 }
 
+/// The move that undoes `mv` (same face, opposite direction).
 #[must_use]
-pub fn inverse_move(m: u8) -> u8 {
-    3 * (m / 3) + 2 - m % 3
+pub fn inverse_move(mv: u8) -> u8 {
+    3 * (mv / 3) + 2 - mv % 3
 }
 
 /// Parse "R U2 F' D3 B1" style sequences (both Singmaster and 1/2/3 suffixes).
 #[must_use]
-pub fn parse_moves(s: &str) -> Option<Vec<u8>> {
-    let mut out = Vec::new();
-    let chars: Vec<char> = s.chars().collect();
-    let mut i = 0;
-    while i < chars.len() {
-        let ch = chars[i];
-        if ch.is_whitespace() {
-            i += 1;
+pub fn parse_moves(text: &str) -> Option<Vec<u8>> {
+    let mut moves = Vec::new();
+    let mut chars = text.chars().peekable();
+    while let Some(letter) = chars.next() {
+        if letter.is_whitespace() {
             continue;
         }
-        let f = FACE_CHARS.iter().zip(0..).find(|&(&c, _)| c == ch)?.1;
-        i += 1;
-        let mut q = 1;
-        if i < chars.len() {
-            match chars[i] {
-                '1' => {
-                    i += 1;
-                }
-                '2' => {
-                    q = 2;
-                    i += 1;
-                }
-                '3' | '\'' => {
-                    q = 3;
-                    i += 1;
-                }
-                _ => {}
-            }
-        }
-        out.push(3 * f + q - 1);
+        let face = FACE_NAMES.iter().zip(0..).find(|&(&c, _)| c == letter)?.1;
+        // An optional suffix right after the letter.
+        let quarter_turns = match chars.next_if(|c| matches!(c, '1' | '2' | '3' | '\'')) {
+            Some('2') => 2,
+            Some('3' | '\'') => 3,
+            _ => 1,
+        };
+        moves.push(3 * face + quarter_turns - 1);
     }
-    Some(out)
+    Some(moves)
 }
 
+/// A move sequence in Singmaster notation, separated by spaces.
 #[must_use]
-pub fn format_moves(ms: &[u8]) -> String {
-    ms.iter()
-        .map(|&m| move_name(m))
+pub fn format_moves(moves: &[u8]) -> String {
+    moves
+        .iter()
+        .map(|&mv| move_name(mv))
         .collect::<Vec<_>>()
         .join(" ")
 }
 
-/// A symmetry of the cube.
+/// A symmetry of the cube: one of the 48 rotations and reflections that map
+/// the cube onto itself.
 #[derive(Clone, Debug)]
-pub struct Sym {
-    pub mat: Mat,
+pub struct Symmetry {
+    pub matrix: Matrix,
+    /// Whether it is a reflection (it reverses the turning direction).
     pub mirror: bool,
     /// Cubie "cube" `T` such that conjugation is `T * c * T^-1`
-    /// (followed by corner-orientation inversion for mirrors).
-    pub t: CubieCube,
-    pub tinv: CubieCube,
+    /// (followed by negating the corner twists for mirrors).
+    pub cube: CubieCube,
+    pub cube_inverse: CubieCube,
     /// Image of each move under conjugation.
-    pub move_map: [u8; 18],
+    pub move_map: [u8; N_MOVES],
 }
 
 /// All 48 symmetries; index 0 is the identity.
 ///
 /// # Panics
 /// Never: every symmetry maps faces to faces.
-pub fn symmetries() -> &'static Vec<Sym> {
+pub fn symmetries() -> &'static Vec<Symmetry> {
     use std::sync::OnceLock;
-    static S: OnceLock<Vec<Sym>> = OnceLock::new();
-    S.get_or_init(|| {
-        let mut mats: Vec<Mat> = Vec::new();
-        let perms = [
+    static SYMMETRIES: OnceLock<Vec<Symmetry>> = OnceLock::new();
+    SYMMETRIES.get_or_init(|| {
+        // Signed permutation matrices: each axis maps to some axis, either way.
+        let mut matrices: Vec<Matrix> = Vec::new();
+        let axis_perms = [
             [0, 1, 2],
             [0, 2, 1],
             [1, 0, 2],
@@ -584,43 +603,44 @@ pub fn symmetries() -> &'static Vec<Sym> {
             [2, 0, 1],
             [2, 1, 0],
         ];
-        for p in perms {
+        for perm in axis_perms {
             for signs in 0..8 {
                 let mut m = [[0; 3]; 3];
                 for i in 0..3 {
-                    m[i][p[i]] = if signs >> i & 1 == 1 { -1 } else { 1 };
+                    m[i][perm[i]] = if signs >> i & 1 == 1 { -1 } else { 1 };
                 }
-                mats.push(m);
+                matrices.push(m);
             }
         }
         // identity first
-        let id = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
-        let pos = mats.iter().position(|m| *m == id).unwrap();
-        mats.swap(0, pos);
-        mats.iter()
+        let identity = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+        let pos = matrices.iter().position(|m| *m == identity).unwrap();
+        matrices.swap(0, pos);
+        matrices
+            .iter()
             .map(|m| {
-                let mirror = mat_det(m) < 0;
-                let t = StickerCube::symmetry_state(m).to_cubie();
-                let tinv = t.inverse();
-                let mut move_map = [0u8; 18];
-                for (f, &normal) in (0..).zip(&FACE_NORMAL) {
-                    let n = mat_apply(m, normal);
-                    let f2 = FACE_NORMAL
+                let mirror = matrix_determinant(m) < 0;
+                let cube = StickerCube::symmetry_state(m).to_cubie();
+                let mut move_map = [0u8; N_MOVES];
+                for (face, &normal) in (0..).zip(&FACE_NORMALS) {
+                    let image = matrix_apply(m, normal);
+                    let image_face = FACE_NORMALS
                         .iter()
                         .zip(0..)
-                        .find(|&(&x, _)| x == n)
+                        .find(|&(&x, _)| x == image)
                         .unwrap()
                         .1;
-                    for q in 0..3 {
-                        let q2 = if mirror { 2 - q } else { q };
-                        move_map[usize::from(3 * f + q)] = 3 * f2 + q2;
+                    for turns in 0..3 {
+                        // (A mirror turns clockwise into counterclockwise.)
+                        let image_turns = if mirror { 2 - turns } else { turns };
+                        move_map[usize::from(3 * face + turns)] = 3 * image_face + image_turns;
                     }
                 }
-                Sym {
-                    mat: *m,
+                Symmetry {
+                    matrix: *m,
                     mirror,
-                    t,
-                    tinv,
+                    cube,
+                    cube_inverse: cube.inverse(),
                     move_map,
                 }
             })
@@ -628,39 +648,43 @@ pub fn symmetries() -> &'static Vec<Sym> {
     })
 }
 
-/// Conjugate `c` by symmetry `s` at the cubie level: `T c T^-1` (+ co inversion for mirrors).
+/// Conjugate `cube` by `sym` at the cubie level: `T c T^-1` (corner twists
+/// negated for mirrors). The result is the same position seen through the
+/// symmetry, so it is as far from solved.
 #[must_use]
-pub fn conjugate(c: &CubieCube, s: &Sym) -> CubieCube {
-    let r = s.t.mul(c).mul(&s.tinv);
-    if s.mirror {
-        r.invert_co()
+pub fn conjugate(cube: &CubieCube, sym: &Symmetry) -> CubieCube {
+    let result = sym.cube.compose(cube).compose(&sym.cube_inverse);
+    if sym.mirror {
+        result.negate_corner_orient()
     } else {
-        r
+        result
     }
 }
 
-/// Index of the inverse symmetry.
-pub fn sym_inverse_table() -> &'static [u8; 48] {
+/// Index of the inverse of each symmetry.
+pub fn symmetry_inverses() -> &'static [u8; 48] {
     use std::sync::OnceLock;
-    static T: OnceLock<[u8; 48]> = OnceLock::new();
-    T.get_or_init(|| {
+    static INVERSES: OnceLock<[u8; 48]> = OnceLock::new();
+    INVERSES.get_or_init(|| {
         let syms = symmetries();
-        let mut r = [0u8; 48];
-        for i in 0..48 {
-            for (j, sym_j) in (0..).zip(syms) {
-                if mat_mul(&syms[i].mat, &sym_j.mat) == syms[0].mat {
-                    r[i] = j;
+        let mut inverses = [0u8; 48];
+        for (inverse, sym) in inverses.iter_mut().zip(syms) {
+            for (j, other) in (0..).zip(syms) {
+                if matrix_product(&sym.matrix, &other.matrix) == syms[0].matrix {
+                    *inverse = j;
                 }
             }
         }
-        r
+        inverses
     })
 }
 
 /// Reference conjugation through the sticker model (slow; for tests).
 #[must_use]
-pub fn conjugate_sticker(c: &CubieCube, s: &Sym) -> CubieCube {
-    StickerCube::from_cubie(c).conjugate(&s.mat).to_cubie()
+pub fn conjugate_by_stickers(cube: &CubieCube, sym: &Symmetry) -> CubieCube {
+    StickerCube::from_cubie(cube)
+        .conjugate(&sym.matrix)
+        .to_cubie()
 }
 
 #[cfg(test)]
@@ -671,8 +695,8 @@ mod tests {
     fn sticker_roundtrip() {
         let mut rng = Rng(1);
         for _ in 0..100 {
-            let c = CubieCube::random(&mut rng);
-            assert_eq!(StickerCube::from_cubie(&c).to_cubie(), c);
+            let cube = CubieCube::random(&mut rng);
+            assert_eq!(StickerCube::from_cubie(&cube).to_cubie(), cube);
         }
     }
 
@@ -680,43 +704,52 @@ mod tests {
     fn moves_match_sticker_model() {
         let mut rng = Rng(2);
         for _ in 0..50 {
-            let mut s = StickerCube::solved();
-            let mut c = CubieCube::SOLVED;
+            let mut stickers = StickerCube::solved();
+            let mut cube = CubieCube::SOLVED;
             for _ in 0..30 {
-                let m = rng.below_usize(18);
-                s = s.apply_face(m / 3, m % 3 + 1);
-                c = c.apply_move(m);
-                assert_eq!(s.to_cubie(), c);
-                assert!(c.is_solvable());
+                let mv = rng.below_usize(N_MOVES);
+                stickers = stickers.apply_face(mv / 3, mv % 3 + 1);
+                cube = cube.apply_move(mv);
+                assert_eq!(stickers.to_cubie(), cube);
+                assert!(cube.is_solvable());
             }
         }
     }
 
     #[test]
     fn move_orders() {
-        for m in 0..18 {
-            let mc = move_cubes()[m];
-            let mut c = CubieCube::SOLVED;
+        for mv in 0..N_MOVES {
+            let move_cube = move_cubes()[mv];
+            let mut cube = CubieCube::SOLVED;
             for _ in 0..4 {
-                c = c.mul(&mc);
+                cube = cube.compose(&move_cube);
             }
-            assert_eq!(c, CubieCube::SOLVED);
-            let inverse = inverse_move(u8::try_from(m).unwrap());
-            assert_eq!(mc.inverse(), move_cubes()[usize::from(inverse)]);
+            assert_eq!(cube, CubieCube::SOLVED);
+            let inverse = inverse_move(u8::try_from(mv).unwrap());
+            assert_eq!(move_cube.inverse(), move_cubes()[usize::from(inverse)]);
         }
         // R moves FR edge to UR (front to top).
         let r = move_cubes()[6];
-        assert_eq!(r.ep[4], 8);
+        assert_eq!(r.edge_perm[4], 8);
     }
 
     #[test]
     fn sexy_move_order_6() {
         let seq = parse_moves("R U R' U'").unwrap();
-        let mut c = CubieCube::SOLVED;
+        let mut cube = CubieCube::SOLVED;
         for _ in 0..6 {
-            c = c.apply_moves(&seq);
+            cube = cube.apply_moves(&seq);
         }
-        assert_eq!(c, CubieCube::SOLVED);
+        assert_eq!(cube, CubieCube::SOLVED);
+    }
+
+    #[test]
+    fn parse_and_format() {
+        let moves = parse_moves("R U2 F' D3 B1 L").unwrap();
+        assert_eq!(format_moves(&moves), "R U2 F' D' B L");
+        assert_eq!(parse_moves("R X"), None);
+        // (A suffix must follow its letter.)
+        assert_eq!(parse_moves("R 2"), None);
     }
 
     #[test]
@@ -724,23 +757,23 @@ mod tests {
         let mut rng = Rng(3);
         let syms = symmetries();
         assert_eq!(syms.len(), 48);
-        for s in syms {
+        for sym in syms {
             for _ in 0..20 {
-                let c = CubieCube::random(&mut rng);
-                assert_eq!(conjugate(&c, s), conjugate_sticker(&c, s));
+                let cube = CubieCube::random(&mut rng);
+                assert_eq!(conjugate(&cube, sym), conjugate_by_stickers(&cube, sym));
             }
-            for m in 0..18 {
+            for mv in 0..N_MOVES {
                 assert_eq!(
-                    conjugate(&move_cubes()[m], s),
-                    move_cubes()[s.move_map[m] as usize]
+                    conjugate(&move_cubes()[mv], sym),
+                    move_cubes()[usize::from(sym.move_map[mv])]
                 );
             }
         }
-        let inv = sym_inverse_table();
-        for i in 0..48 {
-            let c = CubieCube::random(&mut rng);
-            let d = conjugate(&conjugate(&c, &syms[i]), &syms[inv[i] as usize]);
-            assert_eq!(c, d);
+        let inverses = symmetry_inverses();
+        for (sym, &inverse) in syms.iter().zip(inverses) {
+            let cube = CubieCube::random(&mut rng);
+            let back = conjugate(&conjugate(&cube, sym), &syms[usize::from(inverse)]);
+            assert_eq!(cube, back);
         }
     }
 }

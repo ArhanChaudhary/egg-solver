@@ -35,7 +35,7 @@ pub struct Tabs {
     pub co_lo: [u32; 256],
     pub co_hi: [u32; 64],
     /// `co_lo`, `co_hi` and `rank8` (of tetrad masks) times 3: the byte
-    /// offset of a packed cocsep entry (`coord::cocsep3`).
+    /// offset of a packed cocsep entry (`coord::cocsep_x3`).
     pub co_lo3: [u32; 256],
     pub co_hi3: [u32; 64],
     pub sep3: [u8; 256],
@@ -59,13 +59,13 @@ pub static TABS: Tabs = Tabs {
     mv_ori: MOVES_ORI,
     inv_mv: INV_MOVES,
     sym_edge: SYM_EDGE,
-    co_lo: crate::coord::CO_LO_T,
-    co_hi: crate::coord::CO_HI_T,
+    co_lo: crate::coord::CO_LOW,
+    co_hi: crate::coord::CO_HIGH,
     co_lo3: {
         let mut r = [0u32; 256];
         let mut i = 0;
         while i < 256 {
-            r[i] = 3 * crate::coord::CO_LO_T[i];
+            r[i] = 3 * crate::coord::CO_LOW[i];
             i += 1;
         }
         r
@@ -74,7 +74,7 @@ pub static TABS: Tabs = Tabs {
         let mut r = [0u32; 64];
         let mut i = 0;
         while i < 64 {
-            r[i] = 3 * crate::coord::CO_HI_T[i];
+            r[i] = 3 * crate::coord::CO_HIGH[i];
             i += 1;
         }
         r
@@ -84,8 +84,8 @@ pub static TABS: Tabs = Tabs {
         let mut r = [0xFFu8; 256];
         let mut i = 0;
         while i < 256 {
-            if crate::coord::RANK8_T[i] != 0xFF {
-                r[i] = 3 * crate::coord::RANK8_T[i];
+            if crate::coord::RANK8_CONST[i] != 0xFF {
+                r[i] = 3 * crate::coord::RANK8_CONST[i];
             }
             i += 1;
         }
@@ -95,12 +95,12 @@ pub static TABS: Tabs = Tabs {
         let mut r = [0u16; 4096];
         let mut x = 0;
         while x < 4096 {
-            r[x] = crate::coord::ESLOT_T[x ^ 0xFFF];
+            r[x] = crate::coord::ESLOT_CONST[x ^ 0xFFF];
             x += 1;
         }
         r
     },
-    rank8: crate::coord::RANK8_T,
+    rank8: crate::coord::RANK8_CONST,
     pext_co: 0x0060_6060_6060_6060,
     pext_sep: 0x0404_0404_0404_0404,
     heur_pair: crate::lanes::HEUR_PAIR,
@@ -155,12 +155,18 @@ impl Cube {
     pub fn from_cubie(c: &CubieCube) -> Cube {
         let mut b = A32([0; 32]);
         for i in 0..8 {
-            b.0[i] = c.cp[i] | (c.co[i] << 5);
+            b.0[i] = c.corner_perm[i] | (c.corner_orient[i] << 5);
         }
         for i in 0..12 {
-            b.0[16 + i] = c.ep[i] | (c.eo[i] << 4);
+            b.0[16 + i] = c.edge_perm[i] | (c.edge_orient[i] << 4);
         }
         Cube(ld(&b))
+    }
+
+    /// The cube with these 32 bytes (in the layout above).
+    #[must_use]
+    pub fn from_bytes(bytes: [u8; 32]) -> Cube {
+        Cube(ld(&A32(bytes)))
     }
 
     #[must_use]
@@ -178,12 +184,12 @@ impl Cube {
         let b = self.to_bytes();
         let mut c = CubieCube::SOLVED;
         for (i, &byte) in b[..8].iter().enumerate() {
-            c.cp[i] = byte & 7;
-            c.co[i] = byte >> 5;
+            c.corner_perm[i] = byte & 7;
+            c.corner_orient[i] = byte >> 5;
         }
         for (i, &byte) in b[16..28].iter().enumerate() {
-            c.ep[i] = byte & 15;
-            c.eo[i] = (byte >> 4) & 1;
+            c.edge_perm[i] = byte & 15;
+            c.edge_orient[i] = (byte >> 4) & 1;
         }
         c
     }
@@ -224,7 +230,7 @@ impl Cube {
 
     #[inline(always)]
     #[must_use]
-    pub fn invert_co(self) -> Cube {
+    pub fn negate_corner_orient(self) -> Cube {
         unsafe {
             let co = _mm256_and_si256(self.0, ld(&CO2));
             let shl = _mm256_slli_epi32(co, 1);
@@ -265,7 +271,7 @@ impl Cube {
             let vo = sh(vo, vi);
             let vp = _mm256_andnot_si256(orient, vi);
             let r = _mm256_and_si256(_mm256_or_si256(vp, vo), ld(&USED));
-            Cube(r).invert_co()
+            Cube(r).negate_corner_orient()
         }
     }
 
@@ -292,7 +298,7 @@ impl Cube {
             .compose(self)
             .compose(Cube(ld(&SYM_TINV[t])));
         if SYM_MIRROR[t] {
-            r.invert_co()
+            r.negate_corner_orient()
         } else {
             r
         }
@@ -349,7 +355,7 @@ mod tests {
             let b = CubieCube::random(&mut rng);
             let (sa, sb) = (Cube::from_cubie(&a), Cube::from_cubie(&b));
             assert_eq!(sa.to_cubie(), a);
-            assert_eq!(sa.compose(sb).to_cubie(), a.mul(&b));
+            assert_eq!(sa.compose(sb).to_cubie(), a.compose(&b));
             assert_eq!(sa.inverse().to_cubie(), a.inverse());
             for m in 0..18 {
                 assert_eq!(sa.apply_move(m).to_cubie(), a.apply_move(m));

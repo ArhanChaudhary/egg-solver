@@ -1,6 +1,6 @@
 //! IDA* optimal solver using the H48 table.
 
-use crate::coord::{cocsep3, index_sym};
+use crate::coord::{cocsep_x3, index_sym};
 use crate::cubie::{inverse_move, CubieCube};
 use crate::simd::Cube;
 use crate::tables::{cp_class, cp_depth, cp_ttrep, Cocsep, H48Table};
@@ -117,7 +117,7 @@ impl<'a> Solver<'a> {
     #[inline(always)]
     pub(crate) fn index(&self, c: Cube) -> (u64, u8) {
         // `self.cs.packed(cocsep(c))`
-        let d = unsafe { self.cptr.add(cocsep3(c)).cast::<u32>().read_unaligned() };
+        let d = unsafe { self.cptr.add(cocsep_x3(c)).cast::<u32>().read_unaligned() };
         let idx = index_sym(c, cp_ttrep(d), cp_class(d), self.row_mul, self.eo_mask);
         (idx, cp_depth(d))
     }
@@ -496,7 +496,7 @@ mod tests {
     use crate::cubie::{conjugate, parse_moves, symmetries, Rng};
     use crate::tables::cd_depth;
 
-    /// The hot-path index (`Solver::index`: `cocsep3`, packed entries,
+    /// The hot-path index (`Solver::index`: `cocsep_x3`, packed entries,
     /// `index_sym`) equals `Cocsep::index` for every `k`, symmetric cubes too.
     #[test]
     #[cfg_attr(miri, ignore = "Cocsep::generate is too slow under Miri")]

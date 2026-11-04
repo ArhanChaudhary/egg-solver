@@ -10,10 +10,10 @@ use std::fmt::Write as _;
 fn simd_bytes(c: &cubie::CubieCube) -> [u8; 32] {
     let mut b = [0u8; 32];
     for (i, byte) in b[..8].iter_mut().enumerate() {
-        *byte = c.cp[i] | (c.co[i] << 5);
+        *byte = c.corner_perm[i] | (c.corner_orient[i] << 5);
     }
     for (i, byte) in b[16..28].iter_mut().enumerate() {
-        *byte = c.ep[i] | (c.eo[i] << 4);
+        *byte = c.edge_perm[i] | (c.edge_orient[i] << 4);
     }
     b
 }
@@ -53,12 +53,12 @@ fn main() {
     let syms = cubie::symmetries();
     writeln!(s, "pub static SYM_T: [A32; 48] = [").unwrap();
     for y in syms {
-        writeln!(s, "  {},", arr(&simd_bytes(&y.t))).unwrap();
+        writeln!(s, "  {},", arr(&simd_bytes(&y.cube))).unwrap();
     }
     writeln!(s, "];").unwrap();
     writeln!(s, "pub static SYM_TINV: [A32; 48] = [").unwrap();
     for y in syms {
-        writeln!(s, "  {},", arr(&simd_bytes(&y.tinv))).unwrap();
+        writeln!(s, "  {},", arr(&simd_bytes(&y.cube_inverse))).unwrap();
     }
     writeln!(s, "];").unwrap();
     // Edge-only conjugation tables (see `coord::edge_key_sym`), one 64-byte
@@ -67,8 +67,8 @@ fn main() {
     // are the position permutation Tinv (edge lane; 0x80 = zero elsewhere).
     writeln!(s, "pub const SYM_EDGE: [A64; 48] = [").unwrap();
     for y in syms {
-        let t = simd_bytes(&y.t);
-        let ti = simd_bytes(&y.tinv);
+        let t = simd_bytes(&y.cube);
+        let ti = simd_bytes(&y.cube_inverse);
         let mut b = [0u8; 64];
         for j in 0..12 {
             let x = t[16 + j];
@@ -88,7 +88,7 @@ fn main() {
         mirrors.join(",")
     )
     .unwrap();
-    let inv: Vec<String> = cubie::sym_inverse_table()
+    let inv: Vec<String> = cubie::symmetry_inverses()
         .iter()
         .map(|x| format!("{x}"))
         .collect();
