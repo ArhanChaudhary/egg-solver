@@ -500,6 +500,143 @@ impl StickerCube {
 }
 
 // ---------------------------------------------------------------------------
+// Facelet strings
+// ---------------------------------------------------------------------------
+
+/// The faces of a facelet string in its order (U R F D L B, as in Kociemba's
+/// solvers), each as its outward normal and the directions of "right" and
+/// "down" as the face is seen from outside: U with B at the top, D with F at
+/// the top, the side faces with U at the top.
+const FACELET_FACES: [(Vec3, Vec3, Vec3); 6] = [
+    ([0, 1, 0], [1, 0, 0], [0, 0, 1]),
+    ([1, 0, 0], [0, 0, -1], [0, -1, 0]),
+    ([0, 0, 1], [1, 0, 0], [0, -1, 0]),
+    ([0, -1, 0], [1, 0, 0], [0, 0, -1]),
+    ([-1, 0, 0], [0, 0, 1], [0, -1, 0]),
+    ([0, 0, -1], [-1, 0, 0], [0, -1, 0]),
+];
+
+/// The sticker of facelet `i` (0..54: 9 per face, row by row).
+fn facelet_sticker(i: usize) -> Sticker {
+    let (normal, right, down) = FACELET_FACES[i / 9];
+    let offset = |x: usize| i32::try_from(x).expect("below 3") - 1;
+    let (row, column) = (offset(i % 9 / 3), offset(i % 3));
+    Sticker {
+        position: std::array::from_fn(|a| normal[a] + column * right[a] + row * down[a]),
+        normal,
+    }
+}
+
+/// The face letter of an outward normal.
+fn face_letter(normal: Vec3) -> char {
+    let face = FACE_NORMALS.iter().position(|&n| n == normal);
+    FACE_NAMES[face.expect("a face normal")]
+}
+
+impl CubieCube {
+    /// The cube of a facelet string: 54 stickers, face by face in the order
+    /// U R F D L B, each face row by row as seen from outside (U with B at
+    /// the top, D with F at the top, the others with U at the top), as in
+    /// Kociemba's solvers. Any six symbols can stand for the colors: a face's
+    /// color is the one of its center. Whitespace is ignored.
+    ///
+    /// # Errors
+    /// If the string is not 54 stickers of six colors, one per center, or
+    /// does not describe pieces of a cube, or a position that can be reached
+    /// by turning faces (e.g. a single twisted corner).
+    ///
+    /// # Panics
+    /// Never (every sticker is a facelet).
+    pub fn from_facelets(text: &str) -> Result<CubieCube, String> {
+        let colors: Vec<char> = text.chars().filter(|c| !c.is_whitespace()).collect();
+        if colors.len() != 54 {
+            return Err(format!("{} stickers, a cube has 54", colors.len()));
+        }
+        // The face of each color, from the centers.
+        let centers: [char; 6] = std::array::from_fn(|face| colors[9 * face + 4]);
+        for (face, center) in centers.iter().enumerate() {
+            if centers[..face].contains(center) {
+                return Err(format!("two centers are {center:?}"));
+            }
+        }
+        let normal_at = |sticker: Sticker| -> Result<Vec3, String> {
+            let i = (0..54)
+                .find(|&i| facelet_sticker(i) == sticker)
+                .expect("every sticker has a facelet");
+            let face = centers.iter().position(|&c| c == colors[i]);
+            face.map(|face| FACELET_FACES[face].0)
+                .ok_or_else(|| format!("sticker {} is {:?}, no center's color", i + 1, colors[i]))
+        };
+        let mut cube = CubieCube::SOLVED;
+        for position in 0..8 {
+            let seen: Vec<Vec3> = corner_stickers(position)
+                .into_iter()
+                .map(&normal_at)
+                .collect::<Result<_, _>>()?;
+            // The piece whose stickers' colors are these, turned by `twist`.
+            let found = (0..8).flat_map(|piece| (0..3).map(move |twist| (piece, twist)));
+            let found = found.into_iter().find(|&(piece, twist)| {
+                let home = corner_stickers(piece);
+                (0..3).all(|j| seen[(twist + j) % 3] == home[j].normal)
+            });
+            let (piece, twist) =
+                found.ok_or_else(|| format!("corner {position}: no such piece"))?;
+            cube.corner_perm[position] = u8::try_from(piece).expect("below 8");
+            cube.corner_orient[position] = u8::try_from(twist).expect("below 3");
+        }
+        for position in 0..12 {
+            let seen: Vec<Vec3> = edge_stickers(position)
+                .into_iter()
+                .map(&normal_at)
+                .collect::<Result<_, _>>()?;
+            let found = (0..12).flat_map(|piece| (0..2).map(move |flip| (piece, flip)));
+            let found = found.into_iter().find(|&(piece, flip)| {
+                let home = edge_stickers(piece);
+                (0..2).all(|j| seen[(flip + j) % 2] == home[j].normal)
+            });
+            let (piece, flip) = found.ok_or_else(|| format!("edge {position}: no such piece"))?;
+            cube.edge_perm[position] = u8::try_from(piece).expect("below 12");
+            cube.edge_orient[position] = u8::try_from(flip).expect("below 2");
+        }
+        if cube.is_solvable() {
+            Ok(cube)
+        } else {
+            Err("not a reachable position (a piece twice, a twisted corner, a flipped edge or two pieces swapped)".to_string())
+        }
+    }
+
+    /// The facelet string of the cube (see `from_facelets`), with the face
+    /// letters U R F D L B as colors.
+    #[must_use]
+    pub fn to_facelets(self) -> String {
+        (0..54)
+            .map(|i| {
+                let sticker = facelet_sticker(i);
+                if i % 9 == 4 {
+                    return face_letter(sticker.normal);
+                }
+                for position in 0..8 {
+                    if let Some(k) = corner_stickers(position).iter().position(|&s| s == sticker) {
+                        let (piece, twist) =
+                            (self.corner_perm[position], self.corner_orient[position]);
+                        let j = (k + 3 - usize::from(twist)) % 3;
+                        return face_letter(corner_stickers(usize::from(piece))[j].normal);
+                    }
+                }
+                for position in 0..12 {
+                    if let Some(k) = edge_stickers(position).iter().position(|&s| s == sticker) {
+                        let (piece, flip) = (self.edge_perm[position], self.edge_orient[position]);
+                        let j = (k + usize::from(flip)) % 2;
+                        return face_letter(edge_stickers(usize::from(piece))[j].normal);
+                    }
+                }
+                unreachable!("every facelet is a center, corner or edge sticker")
+            })
+            .collect()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Moves and symmetries
 // ---------------------------------------------------------------------------
 
@@ -690,6 +827,72 @@ pub fn conjugate_by_stickers(cube: &CubieCube, sym: &Symmetry) -> CubieCube {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Facelet strings: known ones (solved, U, R, the superflip as in
+    /// Kociemba's examples), round trips with any color symbols, and
+    /// rejected non-positions.
+    #[test]
+    fn facelets() {
+        let cube_of = |moves: &str| CubieCube::SOLVED.apply_moves(&parse_moves(moves).unwrap());
+        let known = [
+            ("", "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB"),
+            (
+                "U",
+                "UUUUUUUUUBBBRRRRRRRRRFFFFFFDDDDDDDDDFFFLLLLLLLLLBBBBBB",
+            ),
+            (
+                "R",
+                "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB",
+            ),
+            (
+                "U R2 F B R B2 R U2 L B2 R U' D' R2 F R' L B2 U2 F2",
+                "UBULURUFURURFRBRDRFUFLFRFDFDFDLDRDBDLULBLFLDLBUBRBLBDB",
+            ),
+        ];
+        for (moves, facelets) in known {
+            assert_eq!(cube_of(moves).to_facelets(), facelets, "{moves}");
+            assert_eq!(CubieCube::from_facelets(facelets), Ok(cube_of(moves)));
+        }
+        let mut rng = Rng(4);
+        for _ in 0..100 {
+            let cube = CubieCube::random(&mut rng);
+            let facelets = cube.to_facelets();
+            assert_eq!(CubieCube::from_facelets(&facelets), Ok(cube));
+            let recolored: String = facelets
+                .chars()
+                .map(|c| match c {
+                    'U' => 'W',
+                    'D' => 'Y',
+                    'F' => 'G',
+                    'B' => 'B',
+                    'R' => 'R',
+                    _ => 'O',
+                })
+                .collect();
+            assert_eq!(CubieCube::from_facelets(&recolored), Ok(cube));
+        }
+        let solved = CubieCube::SOLVED.to_facelets();
+        let with = |changes: &[(usize, char)]| {
+            let mut stickers: Vec<char> = solved.chars().collect();
+            for &(i, c) in changes {
+                stickers[i] = c;
+            }
+            stickers.into_iter().collect::<String>()
+        };
+        // No such corner (U9 = F), two R centers, a lone twisted corner (URF:
+        // U9 R1 F3), a lone flipped edge (UF: U8 F2), two edges swapped (UF
+        // and UR, by their F2 and R2), too few stickers.
+        for bad in [
+            with(&[(8, 'F')]),
+            with(&[(4, 'R')]),
+            with(&[(8, 'F'), (9, 'U'), (20, 'R')]),
+            with(&[(7, 'F'), (19, 'U')]),
+            with(&[(19, 'R'), (10, 'F')]),
+            solved[1..].to_string(),
+        ] {
+            assert!(CubieCube::from_facelets(&bad).is_err(), "{bad}");
+        }
+    }
 
     #[test]
     fn sticker_roundtrip() {

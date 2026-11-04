@@ -1,4 +1,4 @@
-//! Portable cube backend (aarch64 NEON, scalar fallback, later wasm): the
+//! Portable cube backend (aarch64 NEON, wasm SIMD128, scalar fallback): the
 //! cube as two 16-byte vectors, with the same byte layout, operations and
 //! results as the x86 backend (`simd.rs`), so that tables and searches are
 //! identical on every backend.
@@ -20,10 +20,17 @@ pub mod coord;
 mod v16_neon;
 #[cfg(backend = "neon")]
 pub use v16_neon::V16;
-#[cfg(not(backend = "neon"))]
+#[cfg(backend = "wasm")]
+mod v16_wasm;
+#[cfg(backend = "wasm")]
+pub use v16_wasm::V16;
+#[cfg(not(any(backend = "neon", backend = "wasm")))]
 mod v16_scalar;
-#[cfg(not(backend = "neon"))]
+#[cfg(not(any(backend = "neon", backend = "wasm")))]
 pub use v16_scalar::V16;
+/// The scalar `V16`, the reference of the SIMD ones in their tests.
+#[cfg(all(test, any(backend = "neon", backend = "wasm")))]
+mod v16_scalar;
 
 /// 32 bytes (a cube constant of build.rs).
 #[repr(C, align(32))]
@@ -638,6 +645,71 @@ impl PartialEq for Cube {
 mod tests {
     use super::*;
     use crate::cubie::{conjugate, symmetries, Rng};
+
+    /// Each operation of the SIMD `V16` gives the scalar reference's bytes,
+    /// on random vectors and on lookup indices over the whole byte range.
+    #[cfg(any(backend = "neon", backend = "wasm"))]
+    #[test]
+    fn v16_matches_scalar() {
+        use v16_scalar::V16 as Scalar;
+        let mut rng = Rng(9);
+        let mut random = || -> [u8; 16] {
+            let mut bytes = [0u8; 16];
+            for chunk in bytes.chunks_mut(8) {
+                chunk.copy_from_slice(&rng.next_u64().to_le_bytes()[..chunk.len()]);
+            }
+            bytes
+        };
+        for round in 0..if cfg!(miri) { 50 } else { 20_000 } {
+            let (a, b) = (random(), random());
+            // Lookup indices: random bytes, or below 16 (the usual case).
+            let mut indices = random();
+            if round % 2 == 0 {
+                indices = indices.map(|x| x & 15);
+            }
+            let (va, vb, vi) = (V16::load(&a), V16::load(&b), V16::load(&indices));
+            let (sa, sb, si) = (Scalar::load(&a), Scalar::load(&b), Scalar::load(&indices));
+            let pairs = [
+                (va.lookup(vi), sa.lookup(si)),
+                (va.wrapping_add(vb), sa.wrapping_add(sb)),
+                (va.wrapping_sub(vb), sa.wrapping_sub(sb)),
+                (va.min(vb), sa.min(sb)),
+                (va.and(vb), sa.and(sb)),
+                (va.or(vb), sa.or(sb)),
+                (va.xor(vb), sa.xor(sb)),
+                (va.and_not(vb), sa.and_not(sb)),
+                (va.shl1(), sa.shl1()),
+                (va.shr1(), sa.shr1()),
+                (
+                    V16::select(round % 3 == 0, va, vb),
+                    Scalar::select(round % 3 == 0, sa, sb),
+                ),
+                (
+                    V16::select_bytes(0xFF, va, vb),
+                    Scalar::select_bytes(0xFF, sa, sb),
+                ),
+                (
+                    V16::select_bytes(0, va, vb),
+                    Scalar::select_bytes(0, sa, sb),
+                ),
+                (V16::splat(a[0]), Scalar::splat(a[0])),
+            ];
+            for (simd, scalar) in pairs {
+                assert_eq!(simd.to_array(), scalar.to_array());
+            }
+            assert_eq!(va.low_u64(), sa.low_u64());
+            assert_eq!(va.bit_mask::<2>(), sa.bit_mask::<2>());
+            assert_eq!(va.bit_mask::<3>(), sa.bit_mask::<3>());
+            assert_eq!(va.bit_mask::<4>(), sa.bit_mask::<4>());
+            assert_eq!(va.bit_masks_764(vb), sa.bit_masks_764(sb));
+            let sparse = a.map(|x| if x < 32 { x } else { 0 });
+            assert_eq!(
+                V16::load(&sparse).is_zero(),
+                Scalar::load(&sparse).is_zero()
+            );
+            assert!(V16::splat(0).is_zero());
+        }
+    }
 
     #[test]
     fn portable_cube_matches_cubie() {

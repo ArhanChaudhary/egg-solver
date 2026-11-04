@@ -4,3 +4,13 @@
 # portable binaries see README.md ("Portable builds").
 [target.'cfg(target_arch = "x86_64")']
 rustflags = ["-C", "target-cpu=native"]
+
+# WebAssembly: SIMD128 (the `wasm` backend; every current browser, Node and
+# wasmtime have it), and for the threads target a 4 GiB maximum for its
+# shared memory (the linker's default for it is 1 GiB, too small for h5+).
+# See README.md ("WebAssembly").
+[target.'cfg(target_arch = "wasm32")']
+rustflags = ["-C", "target-feature=+simd128"]
+
+[target.wasm32-wasip1-threads]
+rustflags = ["-C", "link-arg=--max-memory=4294967296"]

@@ -146,16 +146,12 @@ fn par_rows(rows: usize, threads: usize, f: impl Fn(usize) + Sync) {
 fn par_rows_chunked(rows: usize, threads: usize, f: impl Fn(usize, usize) + Sync) {
     let chunk = 1 << 12;
     let next = std::sync::atomic::AtomicUsize::new(0);
-    std::thread::scope(|s| {
-        for _ in 0..threads {
-            s.spawn(|| loop {
-                let a = next.fetch_add(chunk, Relaxed);
-                if a >= rows {
-                    break;
-                }
-                f(a, (a + chunk).min(rows));
-            });
+    crate::parallel::on_threads(threads, |_| loop {
+        let a = next.fetch_add(chunk, Relaxed);
+        if a >= rows {
+            break;
         }
+        f(a, (a + chunk).min(rows));
     });
 }
 

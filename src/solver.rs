@@ -217,7 +217,8 @@ impl<'a> Solver<'a> {
     pub(crate) fn prefetch(&self, index: u64) {
         // NTA: each line is read once; less L2 pollution (cocsep data).
         // (+2.6% at 48T when added, prefetch-nta.)
-        crate::prefetch::read_once(self.table_ptr.wrapping_add((index >> 2) as usize));
+        // SAFETY: an entry of the table (indices are below its size).
+        unsafe { crate::prefetch::read_once(self.table_ptr.wrapping_add((index >> 2) as usize)) };
     }
 
     /// Lower bound for a single cube (no pipelining).
@@ -671,7 +672,7 @@ mod tests {
     use super::*;
     use crate::coord::cocsep;
     use crate::cubie::{conjugate, parse_moves, symmetries, Rng};
-    use crate::tables::entry_depth;
+    use crate::tables::{entry_depth, H48Meta, Memory};
 
     /// The hot-path index (`Solver::index`: `cocsep_x3`, packed entries,
     /// `index_sym`) equals `Cocsep::index` for every `k`, symmetric cubes too.
@@ -698,7 +699,12 @@ mod tests {
             .flat_map(|c| symmetries().iter().map(move |s| conjugate(&c, s)))
             .collect();
         for k in [0, 7, 8, 11] {
-            let table = H48Table::zeroed(k, 10);
+            // (`index` does not read the table: a page stands in for it, so
+            // that this also runs where h11 cannot be allocated, e.g. wasm32.)
+            let table = H48Table {
+                memory: Memory::anonymous(4096),
+                meta: H48Meta { k, base: 10 },
+            };
             let solver = Solver::new(&corners, &table);
             for c in &variants {
                 let cube = Cube::from_cubie(c);

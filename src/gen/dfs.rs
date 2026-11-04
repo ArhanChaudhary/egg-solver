@@ -152,30 +152,23 @@ impl Prefix {
             let last = &levels[usize::from(d - 1)];
             let next_index = AtomicUsize::new(0);
             let chunk = 4096;
-            let parts: Vec<Vec<u64>> = std::thread::scope(|s| {
-                let handles: Vec<_> = (0..threads)
-                    .map(|_| {
-                        s.spawn(|| {
-                            let mut out = Vec::new();
-                            loop {
-                                let i = next_index.fetch_add(chunk, Relaxed);
-                                if i >= last.len() {
-                                    break;
-                                }
-                                for &e in &last[i..(i + chunk).min(last.len())] {
-                                    let c = decode_index(corners, 11, e);
-                                    for m in 0..18 {
-                                        for_each_entry(corners, c.apply_move(m), |x| out.push(x));
-                                    }
-                                }
-                            }
-                            out.sort_unstable();
-                            out.dedup();
-                            out
-                        })
-                    })
-                    .collect();
-                handles.into_iter().map(|h| h.join().unwrap()).collect()
+            let parts: Vec<Vec<u64>> = crate::parallel::on_threads(threads, |_| {
+                let mut out = Vec::new();
+                loop {
+                    let i = next_index.fetch_add(chunk, Relaxed);
+                    if i >= last.len() {
+                        break;
+                    }
+                    for &e in &last[i..(i + chunk).min(last.len())] {
+                        let c = decode_index(corners, 11, e);
+                        for m in 0..18 {
+                            for_each_entry(corners, c.apply_move(m), |x| out.push(x));
+                        }
+                    }
+                }
+                out.sort_unstable();
+                out.dedup();
+                out
             });
             let mut next: Vec<u64> = parts.concat();
             next.sort_unstable();
@@ -350,38 +343,8 @@ impl Run<'_, '_> {
         let t0 = Instant::now();
         let finished = std::sync::atomic::AtomicBool::new(false);
         std::thread::scope(|s| {
-            let workers: Vec<_> = (0..self.settings.threads)
-                .map(|_| {
-                    s.spawn(|| {
-                        let mut marker = Marker {
-                            part: self.part,
-                            ring: [EMPTY; RING],
-                            head: 0,
-                            clear: 3 ^ code,
-                            group_min: (depth <= base).then_some(u64::from(depth)),
-                        };
-                        loop {
-                            let i = next.fetch_add(chunk, Relaxed);
-                            if i >= roots.len() {
-                                break;
-                            }
-                            for &root in &roots[i..(i + chunk).min(roots.len())] {
-                                let c = decode_index(self.corners, 11, root);
-                                // One root per orbit of entries of the same coset.
-                                let mut smallest = root;
-                                for_each_entry(self.corners, c, |e| smallest = smallest.min(e));
-                                if smallest != root {
-                                    continue;
-                                }
-                                let remaining = depth - self.settings.prefix_depth;
-                                self.walk(c, ALL_MOVES, remaining, true, &mut marker);
-                            }
-                            done.fetch_add(chunk, Relaxed);
-                        }
-                        marker.flush();
-                    })
-                })
-                .collect();
+            // (The progress thread, if any, is spawned before the workers
+            // run: one of them is this thread.)
             if self.settings.verbose {
                 s.spawn(|| {
                     let mut last = Instant::now();
@@ -402,9 +365,34 @@ impl Run<'_, '_> {
                     }
                 });
             }
-            for w in workers {
-                w.join().unwrap();
-            }
+            crate::parallel::on_threads(self.settings.threads, |_| {
+                let mut marker = Marker {
+                    part: self.part,
+                    ring: [EMPTY; RING],
+                    head: 0,
+                    clear: 3 ^ code,
+                    group_min: (depth <= base).then_some(u64::from(depth)),
+                };
+                loop {
+                    let i = next.fetch_add(chunk, Relaxed);
+                    if i >= roots.len() {
+                        break;
+                    }
+                    for &root in &roots[i..(i + chunk).min(roots.len())] {
+                        let c = decode_index(self.corners, 11, root);
+                        // One root per orbit of entries of the same coset.
+                        let mut smallest = root;
+                        for_each_entry(self.corners, c, |e| smallest = smallest.min(e));
+                        if smallest != root {
+                            continue;
+                        }
+                        let remaining = depth - self.settings.prefix_depth;
+                        self.walk(c, ALL_MOVES, remaining, true, &mut marker);
+                    }
+                    done.fetch_add(chunk, Relaxed);
+                }
+                marker.flush();
+            });
             finished.store(true, Relaxed);
         });
     }
@@ -559,15 +547,11 @@ fn finish_group_minima(words: &[AtomicU64], base: u8, threads: usize) {
 fn par_chunks(n: usize, threads: usize, f: impl Fn(usize, usize) + Sync) {
     let chunk = 1 << 16;
     let next = AtomicUsize::new(0);
-    std::thread::scope(|s| {
-        for _ in 0..threads {
-            s.spawn(|| loop {
-                let a = next.fetch_add(chunk, Relaxed);
-                if a >= n {
-                    break;
-                }
-                f(a, (a + chunk).min(n));
-            });
+    crate::parallel::on_threads(threads, |_| loop {
+        let a = next.fetch_add(chunk, Relaxed);
+        if a >= n {
+            break;
         }
+        f(a, (a + chunk).min(n));
     });
 }
