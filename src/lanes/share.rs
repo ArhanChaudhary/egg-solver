@@ -27,7 +27,8 @@
 //! * A lane whose job ends takes, in order: a piece donated to its thread,
 //!   another job of the same cube, a job its thread already claimed, a fresh
 //!   cube (at most `max_active` cubes are in progress), jobs of the oldest
-//!   cube with unclaimed jobs, or part of the remaining moves of a busy lane
+//!   cube with unclaimed jobs, or (while its thread has at most
+//!   `TAIL_LANES` active lanes) part of the remaining moves of a busy lane
 //!   of its thread: the upper half of the faces left at its shallowest node
 //!   with two faces left (cube48opt's `split_ida_node`). Otherwise it goes
 //!   idle.
@@ -74,6 +75,9 @@ const CHUNK_MAX: u32 = 64;
 /// thread, and for another thread.
 const SPLIT_R_LOCAL: u8 = 4;
 const SPLIT_R_REMOTE: u8 = 5;
+/// Most active lanes of a thread for it to split one of them for an idle
+/// one (`Worker::split`).
+const TAIL_LANES: usize = 8;
 /// `SharedLane::slot` of an idle lane.
 const NO_SLOT: usize = usize::MAX;
 
@@ -2558,6 +2562,15 @@ impl Worker<'_, '_> {
     /// donations: part of l5's share mode, which took one cube at a time
     /// from 306 ms to 3.6 ms at 48T; not measured alone.)
     fn split(&mut self, li: usize) -> bool {
+        // In an iteration's tail (nothing left to claim), splitting the
+        // thread's own lanes into all its idle ones kept every lane slow (a
+        // round visits them all; idle threads take pieces instead) and lost
+        // the bounds that the split nodes learn from their children: -3.6% -c 1
+        // at 48T on top of the first pass (8 paired holds; -c 0 and bench share
+        // neutral).
+        if self.active_lanes > TAIL_LANES {
+            return false;
+        }
         let Some((busy, depth, give)) = self.find_split(SPLIT_R_LOCAL, li) else {
             return false;
         };
