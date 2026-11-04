@@ -19,7 +19,7 @@ use cubeopt::cubie::{
 };
 use cubeopt::simd::Cube;
 use cubeopt::solver::{Solver, Stats};
-use cubeopt::tables::{cd_depth, h48_slots, Cocsep, H48Table};
+use cubeopt::tables::{entry_depth, h48_slots, Cocsep, H48Table};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering::Relaxed};
 use std::sync::Mutex;
 
@@ -36,7 +36,7 @@ struct Reference<'a> {
 impl Reference<'_> {
     /// Table lower bound of one cube.
     fn table_bound(&self, cube: Cube) -> u8 {
-        let corner_bound = cd_depth(self.corners.data[cocsep(cube)]);
+        let corner_bound = entry_depth(self.corners.entries[cocsep(cube)]);
         let index = self.corners.index(cube, self.table.meta.k);
         assert!(index < h48_slots(self.table.meta.k));
         let (code, group_min) = self.table.get(index);

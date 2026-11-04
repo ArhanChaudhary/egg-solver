@@ -1,316 +1,387 @@
-//! H48 coordinates.
+//! Coordinates: the numbers that index the pruning tables.
 //!
-//! * cocsep: corner orientation (3^7) x corner tetrad separation (C(8,4)=70),
-//!   reduced by the 48 symmetries to 3393 classes.
-//! * msplit: which of the 8 non-E-slice positions hold S-slice edges (70).
-//! * eo: orientation of 11 edges (2^11).
-//! * eslot: E-slice edge placement (495 values) packed into 512 slots, so
-//!   that slots 64k and 64k+1 are free for a 4-bit group minimum.
+//! A pruning table stores, for each value of a coordinate (a function of
+//! the cube state), a lower bound on the number of moves to solve any cube
+//! with that value. The H48 coordinates (from nissy and cube48opt):
+//!
+//! * cocsep: corner orientation (3^7) x corner tetrad separation: which 4
+//!   of the 8 positions hold the corners `UFL UBR DFR DBL` (C(8,4) = 70;
+//!   half turns keep these 4 among themselves). Reduced by the 48
+//!   symmetries to 3393 classes.
+//! * msplit: which 4 of the 8 non-E-slice positions hold S-slice edges (70).
+//! * eo: edge orientation (2^11; the 12th flip follows from the others).
+//! * eslot: which 4 positions hold E-slice edges (C(12,4) = 495 values),
+//!   packed into 512 slots so that slots 64k and 64k+1 are free for a 4-bit
+//!   group minimum.
 //!
 //! The full h11 key (computed after conjugating the cube by the symmetry
 //! that maps its corners to the class representative) is
-//! `X = ((class * 70 + msplit) << 20) | (eo11 << 9) | eslot` and the hk index
-//! is `((X >> (11 - k)) & !0x1FF) | (X & 0x1FF)` (cube48opt's layout).
+//! `X = ((class * 70 + msplit) << 20) | (eo11 << 9) | eslot`. The table
+//! `hk` (k = 0..=11) keeps only the top `k` eo bits: its index is
+//! `((X >> (11 - k)) & !0x1FF) | (X & 0x1FF)` (cube48opt's layout).
+//!
+//! The hot path (`cocsep_x3`, `index_sym`) reads the cube's bytes with
+//! `pext` (gather the bits under a mask) and `movemask` (gather the top bit
+//! of each byte), then looks the parts up in small tables.
 
-use crate::simd::Cube;
-use std::arch::x86_64::*;
+use crate::simd::{Aligned64, Cube};
+#[cfg(miri)]
+use std::arch::x86_64::_pext_u64;
+use std::arch::x86_64::{
+    __m256i, _mm256_add_epi8, _mm256_load_si256, _mm256_movemask_epi8, _mm256_shuffle_epi8,
+    _mm256_slli_epi16, _mm256_xor_si256, _pdep_u32, _pext_u32,
+};
 
+/// Corner orientations (the 8th follows from the others).
 pub const N_CO: usize = 2187;
+/// Corner tetrad separations.
 pub const N_CSEP: usize = 70;
-pub const N_COCSEP: usize = N_CO * N_CSEP; // 153090
+/// cocsep coordinates: 153090.
+pub const N_COCSEP: usize = N_CO * N_CSEP;
+/// Symmetry classes of cocsep coordinates.
 pub const N_CLASSES: usize = 3393;
+/// msplit values.
 pub const N_MSPLIT: usize = 70;
+/// Edge orientations (11 bits).
 pub const N_EO: usize = 2048;
+/// eslot slots (495 used).
 pub const N_SLOTS: usize = 512;
 
-const fn binom(n: u32, k: u32) -> u32 {
+/// Binomial coefficient `n` choose `k` (for small `n`: no overflow checks).
+const fn binomial(n: u32, k: u32) -> u32 {
     if k > n {
         return 0;
     }
-    let mut r: u64 = 1;
+    let mut result = 1;
     let mut i = 0;
     while i < k {
-        r = r * (n - i) as u64 / (i + 1) as u64;
+        // (Exact: a product of i + 1 consecutive numbers is divisible by (i + 1)!.)
+        result = result * (n - i) / (i + 1);
         i += 1;
     }
-    r as u32
+    result
 }
 
-/// Colex rank of a bit mask with `k` set bits.
-const fn comb_rank(mask: u32) -> u32 {
-    let mut r = 0;
-    let mut j = 0;
-    let mut p = 0;
-    while p < 32 {
-        if mask >> p & 1 == 1 {
-            j += 1;
-            r += binom(p, j);
+/// Colexicographic rank of a bit mask among the masks with as many set
+/// bits: the sum of `binomial(p, j)` over its `j`-th set bit `p`.
+const fn colex_rank(mask: u32) -> u32 {
+    let mut rank = 0;
+    let mut ones = 0;
+    let mut bit = 0;
+    while bit < 32 {
+        if mask >> bit & 1 == 1 {
+            ones += 1;
+            rank += binomial(bit, ones);
         }
-        p += 1;
+        bit += 1;
     }
-    r
+    rank
 }
 
-const fn popcnt(x: u32) -> u32 {
-    x.count_ones()
-}
-
-/// E-slice mask -> slot: masks in descending order fill slots 2..510,
-/// skipping slots 64k and 64k+1 (reserved for the group minimum).
-const fn mk_eslot() -> ([u16; 4096], [u16; 512]) {
-    let mut slot = [0xFFFFu16; 4096];
-    let mut mask = [0u16; 512];
-    let mut v = 2usize;
-    let mut m = 4096;
-    while m > 0 {
-        m -= 1;
-        if popcnt(m as u32) == 4 {
-            slot[m] = v as u16;
-            mask[v] = m as u16;
-            if (v + 1).is_multiple_of(64) {
-                v += 3;
+/// E-slice mask -> slot, and slot -> mask: masks in descending order fill
+/// slots 2..510, skipping slots 64k and 64k+1 (reserved for the group
+/// minimum).
+const fn eslot_tables() -> ([u16; 4096], [u16; 512]) {
+    let mut slot_of = [0xFFFFu16; 4096];
+    let mut mask_of = [0u16; 512];
+    let mut slot: u16 = 2;
+    let mut mask: u16 = 4096;
+    while mask > 0 {
+        mask -= 1;
+        if mask.count_ones() == 4 {
+            slot_of[mask as usize] = slot;
+            mask_of[slot as usize] = mask;
+            if (slot + 1).is_multiple_of(64) {
+                slot += 3;
             } else {
-                v += 1;
+                slot += 1;
             }
         }
     }
-    (slot, mask)
+    (slot_of, mask_of)
 }
-const ESLOT_TABLES: ([u16; 4096], [u16; 512]) = mk_eslot();
+const ESLOT_TABLES: ([u16; 4096], [u16; 512]) = eslot_tables();
 
-const fn mk_8_rank() -> [u8; 256] {
-    let mut t = [0u8; 256];
-    let mut m = 0;
-    while m < 256 {
-        t[m] = if popcnt(m as u32) == 4 {
-            comb_rank(m as u32) as u8
+/// Rank (0..70) of each 8-bit mask with 4 set bits; 0xFF for other masks.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "ranks of 8-bit masks are below 70 (no `try_from` in const fns)"
+)]
+const fn rank8_table() -> [u8; 256] {
+    let mut table = [0u8; 256];
+    let mut mask: u8 = 0;
+    loop {
+        table[mask as usize] = if mask.count_ones() == 4 {
+            colex_rank(mask as u32) as u8
         } else {
             0xFF
         };
-        m += 1;
-    }
-    t
-}
-
-const fn mk_8_unrank() -> [u8; 70] {
-    let mut t = [0u8; 70];
-    let mut m = 0;
-    while m < 256 {
-        if popcnt(m as u32) == 4 {
-            t[comb_rank(m as u32) as usize] = m as u8;
+        if mask == u8::MAX {
+            return table;
         }
-        m += 1;
+        mask += 1;
     }
-    t
 }
 
-/// co rank of 4 corners given 2-bit fields (8 bits), times `mul`.
-const fn mk_co_part(mul: u16, n: usize) -> [u16; 256] {
-    let mut t = [0u16; 256];
-    let mut x = 0;
-    while x < (1 << (2 * n)) {
-        let mut r = 0u16;
-        let mut p = 1u16;
+/// The mask of each rank of `rank8_table`.
+const fn unrank8_table() -> [u8; 70] {
+    let mut table = [0u8; 70];
+    let mut mask: u8 = 0;
+    loop {
+        if mask.count_ones() == 4 {
+            table[colex_rank(mask as u32) as usize] = mask;
+        }
+        if mask == u8::MAX {
+            return table;
+        }
+        mask += 1;
+    }
+}
+
+/// Base-3 value of `n` corner orientations given as 2-bit fields (as
+/// gathered by `pext`), times `scale`.
+const fn co_rank_table(scale: u16, n: usize) -> [u16; 256] {
+    let mut table = [0u16; 256];
+    let mut fields: u16 = 0;
+    while fields < (1 << (2 * n)) {
+        let mut rank = 0;
+        let mut power = 1;
         let mut i = 0;
         while i < n {
-            r += ((x >> (2 * i)) & 3) as u16 * p;
-            p *= 3;
+            rank += ((fields >> (2 * i)) & 3) * power;
+            power *= 3;
             i += 1;
         }
-        t[x] = r * mul;
-        x += 1;
+        table[fields as usize] = rank * scale;
+        fields += 1;
     }
-    t
+    table
 }
 
-pub(crate) const ESLOT_T: [u16; 4096] = ESLOT_TABLES.0;
-pub(crate) const RANK8_T: [u8; 256] = mk_8_rank();
-pub static ESLOT: [u16; 4096] = ESLOT_T;
+/// Compile-time copy of `ESLOT` (consts cannot read statics).
+pub(crate) const ESLOT_CONST: [u16; 4096] = ESLOT_TABLES.0;
+/// Compile-time copy of `RANK8`.
+pub(crate) const RANK8_CONST: [u8; 256] = rank8_table();
+/// eslot of each E-slice position mask (12 bits).
+pub static ESLOT: [u16; 4096] = ESLOT_CONST;
+/// E-slice position mask of each eslot.
 pub static SLOT_EMASK: [u16; 512] = ESLOT_TABLES.1;
-pub static RANK8: [u8; 256] = RANK8_T;
-pub static UNRANK8: [u8; 70] = mk_8_unrank();
-/// co rank parts pre-multiplied by `N_CSEP` (saves a multiply on the
-/// cube -> cocsep data dependency chain).
-const fn mk_co_part70(mul: u32, n: usize) -> [u32; 256] {
-    let t = mk_co_part(1, n);
-    let mut r = [0u32; 256];
+/// Rank of each 8-bit mask with 4 set bits (tetrads, msplit).
+pub static RANK8: [u8; 256] = RANK8_CONST;
+/// Inverse of `RANK8`.
+pub static UNRANK8: [u8; 70] = unrank8_table();
+
+/// `co_rank_table` pre-multiplied by `N_CSEP` (saves a multiply on the
+/// cube -> cocsep data dependency chain; part of m1-micro's +2.2% at 48T).
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "`N_CSEP` is 70 (no `try_from` in const fns)"
+)]
+const fn co_rank_table_x70(scale: u32, n: usize) -> [u32; 256] {
+    let ranks = co_rank_table(1, n);
+    let mut table = [0u32; 256];
     let mut i = 0;
     while i < 256 {
-        r[i] = t[i] as u32 * mul * N_CSEP as u32;
+        table[i] = ranks[i] as u32 * scale * N_CSEP as u32;
         i += 1;
     }
-    r
+    table
 }
-pub(crate) const CO_LO_T: [u32; 256] = mk_co_part70(1, 4);
-pub(crate) const CO_HI_T: [u32; 64] = {
-    let t = mk_co_part70(81, 3);
-    let mut r = [0u32; 64];
+/// cocsep part of the orientations of corners 0..4.
+pub(crate) const CO_LOW: [u32; 256] = co_rank_table_x70(1, 4);
+/// cocsep part of the orientations of corners 4..7 (3^4 times higher).
+pub(crate) const CO_HIGH: [u32; 64] = {
+    let full = co_rank_table_x70(81, 3);
+    let mut table = [0u32; 64];
     let mut i = 0;
     while i < 64 {
-        r[i] = t[i];
+        table[i] = full[i];
         i += 1;
     }
-    r
+    table
 };
 
-/// cocsep coordinate in 0..153090.
+/// The corner bits of a cube: the orientations of corners 0..7 (2 bits
+/// each, 14 bits) and the tetrad mask (8 bits), by two `pext`s.
 #[inline(always)]
-pub fn cocsep(c: Cube) -> usize {
-    let x = c.corners_u64();
+fn corner_fields(cube: Cube) -> (u64, u64) {
+    let corners = cube.corners_u64();
+    let (co_fields, tetrads): (u64, u64);
     unsafe {
-        let t = &crate::simd::TABS;
-        let (co2, sep): (u64, u64);
-        // co2: orientations of corners 0..6 (14 bits); sep: tetrad mask.
+        let tabs = &crate::simd::HOT_TABLES;
         // (Miri cannot run inline asm: the same pexts as intrinsics.)
         #[cfg(miri)]
         {
-            co2 = _pext_u64(x, t.pext_co);
-            sep = _pext_u64(x, t.pext_sep);
+            co_fields = _pext_u64(corners, tabs.co_pext_mask);
+            tetrads = _pext_u64(corners, tabs.tetrad_pext_mask);
         }
+        // (The masks are memory operands: no 64-bit immediates to load;
+        // +1.7% when added, part of m4-micro's +7.7% at 48T.)
         #[cfg(not(miri))]
         std::arch::asm!(
             "pext {co2}, {x}, qword ptr [{t} + {oc}]",
             "pext {sep}, {x}, qword ptr [{t} + {os}]",
-            co2 = out(reg) co2,
-            sep = lateout(reg) sep,
-            x = in(reg) x,
-            t = in(reg) t,
-            oc = const std::mem::offset_of!(crate::simd::Tabs, pext_co),
-            os = const std::mem::offset_of!(crate::simd::Tabs, pext_sep),
+            co2 = out(reg) co_fields,
+            sep = lateout(reg) tetrads,
+            x = in(reg) corners,
+            t = in(reg) tabs,
+            oc = const std::mem::offset_of!(crate::simd::HotTables, co_pext_mask),
+            os = const std::mem::offset_of!(crate::simd::HotTables, tetrad_pext_mask),
             options(pure, readonly, nostack, preserves_flags)
         );
-        std::hint::assert_unchecked(co2 < 1 << 14 && sep < 1 << 8);
-        (*t.co_lo.get_unchecked((co2 & 0xFF) as usize)
-            + *t.co_hi.get_unchecked((co2 >> 8) as usize)
-            + *t.rank8.get_unchecked(sep as usize) as u32) as usize
+        // (A range hint, not an index here: the lookups of `cocsep` and
+        // `cocsep_x3` are unchecked already.)
+        std::hint::assert_unchecked(co_fields < 1 << 14 && tetrads < 1 << 8);
+    }
+    (co_fields, tetrads)
+}
+
+/// cocsep coordinate in 0..153090.
+#[must_use]
+#[inline(always)]
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "hot path: `usize` is 64 bits and the pext results are below 2^14"
+)]
+pub fn cocsep(cube: Cube) -> usize {
+    let (co_fields, tetrads) = corner_fields(cube);
+    unsafe {
+        let tabs = &crate::simd::HOT_TABLES;
+        (*tabs.co_low.get_unchecked((co_fields & 0xFF) as usize)
+            + *tabs.co_high.get_unchecked((co_fields >> 8) as usize)
+            + u32::from(*tabs.rank8.get_unchecked(tetrads as usize))) as usize
     }
 }
 
-/// `3 * cocsep(c)` (the byte offset of its packed entry), from tables
-/// scaled by 3 (no multiply on the index path).
+/// `3 * cocsep(cube)` (the byte offset of its packed entry), from tables
+/// scaled by 3 (no multiply on the index path; part of m6-micro's index
+/// patch: +0.7% at 1T, -0.4% at 48T).
+#[must_use]
 #[inline(always)]
-pub fn cocsep3(c: Cube) -> usize {
-    let x = c.corners_u64();
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "hot path: `usize` is 64 bits and the pext results are below 2^14"
+)]
+pub fn cocsep_x3(cube: Cube) -> usize {
+    let (co_fields, tetrads) = corner_fields(cube);
     unsafe {
-        let t = &crate::simd::TABS;
-        let (co2, sep): (u64, u64);
-        #[cfg(miri)]
-        {
-            co2 = _pext_u64(x, t.pext_co);
-            sep = _pext_u64(x, t.pext_sep);
-        }
-        #[cfg(not(miri))]
-        std::arch::asm!(
-            "pext {co2}, {x}, qword ptr [{t} + {oc}]",
-            "pext {sep}, {x}, qword ptr [{t} + {os}]",
-            co2 = out(reg) co2,
-            sep = lateout(reg) sep,
-            x = in(reg) x,
-            t = in(reg) t,
-            oc = const std::mem::offset_of!(crate::simd::Tabs, pext_co),
-            os = const std::mem::offset_of!(crate::simd::Tabs, pext_sep),
-            options(pure, readonly, nostack, preserves_flags)
-        );
-        std::hint::assert_unchecked(co2 < 1 << 14 && sep < 1 << 8);
-        (*t.co_lo3.get_unchecked((co2 & 0xFF) as usize)
-            + *t.co_hi3.get_unchecked((co2 >> 8) as usize)
-            + *t.sep3.get_unchecked(sep as usize) as u32) as usize
+        let tabs = &crate::simd::HOT_TABLES;
+        (*tabs.co_low_x3.get_unchecked((co_fields & 0xFF) as usize)
+            + *tabs.co_high_x3.get_unchecked((co_fields >> 8) as usize)
+            + u32::from(*tabs.tetrads_x3.get_unchecked(tetrads as usize))) as usize
     }
 }
 
-/// Edge masks: (E-slice positions, S-slice positions, eo), 12 bits each.
+/// Edge masks: (E-slice positions, S-slice positions, flipped edges), 12
+/// bits each.
+#[must_use]
 #[inline(always)]
-pub fn edge_masks(c: Cube) -> (u32, u32, u32) {
+pub fn edge_masks(cube: Cube) -> (u32, u32, u32) {
+    // (Shifting a bit of each byte into the top bit lets `movemask` gather
+    // it; edges are bytes 16..28.)
+    let mask = |bits: i32| (bits.cast_unsigned() >> 16) & 0xFFF;
     unsafe {
-        let e = _mm256_movemask_epi8(_mm256_slli_epi16(c.0, 4)) as u32 >> 16;
-        let s = _mm256_movemask_epi8(_mm256_slli_epi16(c.0, 5)) as u32 >> 16;
-        let o = _mm256_movemask_epi8(_mm256_slli_epi16(c.0, 3)) as u32 >> 16;
-        (e & 0xFFF, s & 0xFFF, o & 0xFFF)
+        (
+            mask(_mm256_movemask_epi8(_mm256_slli_epi16(cube.0, 4))),
+            mask(_mm256_movemask_epi8(_mm256_slli_epi16(cube.0, 5))),
+            mask(_mm256_movemask_epi8(_mm256_slli_epi16(cube.0, 3))),
+        )
     }
 }
 
 /// Edge part of the h11 key of an (already transformed) cube:
 /// `(msplit << 20) | (eo11 << 9) | eslot`.
+#[must_use]
 #[inline(always)]
-pub fn edge_key(c: Cube) -> u64 {
-    let (e, s, o) = edge_masks(c);
+pub fn edge_key(cube: Cube) -> u64 {
+    let (e_slice, s_slice, flips) = edge_masks(cube);
     unsafe {
-        let srel = _pext_u32(s, !e & 0xFFF);
-        let msplit = RANK8[srel as usize] as u64;
-        let eslot = ESLOT[e as usize] as u64;
-        (msplit << 20) | (((o >> 1) as u64) << 9) | eslot
+        // (msplit ranks the S-slice positions among the non-E positions.)
+        let s_among_non_e = _pext_u32(s_slice, !e_slice & 0xFFF);
+        let msplit = u64::from(RANK8[s_among_non_e as usize]);
+        let eslot = u64::from(ESLOT[e_slice as usize]);
+        (msplit << 20) | (u64::from(flips >> 1) << 9) | eslot
     }
 }
 
-/// Edge part of the h11 key of `c` conjugated by symmetry `t`; equals
-/// `edge_key(c.transform_edges(t))`. Only the edge classes and orientations
-/// of the conjugate are built: one shuffle classifies each piece `p` as
-/// `T[p]` (E/S flags, eo of T), xor adds c's eo, and a second shuffle
-/// applies the position permutation `Tinv`, whose eo is added on the eo
-/// path only.
+/// Edge part of the h11 key of `cube` conjugated by symmetry `sym`; equals
+/// `edge_key(cube.transform_edges(sym))`. Only the edge classes and
+/// orientations of the conjugate are built: one shuffle classifies each
+/// piece `p` as `T[p]` (E/S flags, eo of T), xor adds the cube's eo, and a
+/// second shuffle applies the position permutation `Tinv`, whose eo is
+/// added on the eo path only. (Instead of a full conjugation: +5.5% at 48T
+/// when added, edge-conj.)
+#[must_use]
 #[inline(always)]
-pub fn edge_key_sym(c: Cube, t: usize) -> u64 {
-    let (msplit, eo11, eslot) = edge_parts_sym(c, t);
+pub fn edge_key_sym(cube: Cube, sym: usize) -> u64 {
+    let (msplit, eo11, eslot) = edge_parts_sym(cube, sym);
     (msplit << 20) | (eo11 << 9) | eslot
 }
 
-/// (msplit, eo11, eslot) of `c` conjugated by symmetry `t` (see `edge_key_sym`).
+/// (msplit, eo11, eslot) of `cube` conjugated by `sym` (see `edge_key_sym`).
+#[must_use]
 #[inline(always)]
-pub fn edge_parts_sym(c: Cube, t: usize) -> (u64, u64, u64) {
-    let (msplit, o, eslot) = edge_parts_sym_raw(c, t);
-    (msplit, o >> 17, eslot)
+pub fn edge_parts_sym(cube: Cube, sym: usize) -> (u64, u64, u64) {
+    let (msplit, eo_bits, eslot) = edge_parts_sym_raw(cube, sym);
+    (msplit, u64::from(eo_bits >> 17), eslot)
 }
 
 /// `edge_parts_sym` with the eo part unshifted: the eo of edges 0..11 in
 /// bits 16..28 (all else zero).
 #[inline(always)]
-fn edge_parts_sym_raw(c: Cube, t: usize) -> (u64, u64, u64) {
+fn edge_parts_sym_raw(cube: Cube, sym: usize) -> (u64, u32, u64) {
     unsafe {
-        let tabs = &crate::simd::TABS;
-        let tab = tabs.sym_edge.get_unchecked(t).0.as_ptr();
-        let q = _mm256_load_si256(tab as *const __m256i);
-        let p = _mm256_load_si256(tab.add(32) as *const __m256i);
-        let y = _mm256_xor_si256(_mm256_shuffle_epi8(q, c.0), c.0);
-        let z = _mm256_shuffle_epi8(y, p);
+        let tabs = &crate::simd::HOT_TABLES;
+        let line: *const Aligned64 = tabs.sym_edges.get_unchecked(sym);
+        let classify = _mm256_load_si256(line.cast());
+        let positions = _mm256_load_si256(line.cast::<__m256i>().add(1));
+        let classes = _mm256_xor_si256(_mm256_shuffle_epi8(classify, cube.0), cube.0);
+        let conj = _mm256_shuffle_epi8(classes, positions);
         // Masks of edge positions 0..12, in bits 16..28 (all else zero).
-        let e = _mm256_movemask_epi8(z) as u32;
-        // asm: LLVM would turn movemask(z + z) into vptestmb + kmovd, which
-        // is ~1.5 cycles longer on Zen 5 (this mask feeds the pext).
-        let zz = _mm256_add_epi8(z, z);
-        let s: u32;
+        let e_mask = _mm256_movemask_epi8(conj).cast_unsigned();
+        // asm: LLVM would turn movemask(conj + conj) into vptestmb + kmovd,
+        // which is ~1.5 cycles longer on Zen 5 (this mask feeds the pext;
+        // part of m1-micro's +2.2% at 48T).
+        let doubled = _mm256_add_epi8(conj, conj);
+        let s_mask: u32;
         #[cfg(miri)]
         {
-            s = _mm256_movemask_epi8(zz) as u32;
+            s_mask = _mm256_movemask_epi8(doubled).cast_unsigned();
         }
         #[cfg(not(miri))]
-        std::arch::asm!("vpmovmskb {s:e}, {zz}", s = out(reg) s, zz = in(ymm_reg) zz,
+        std::arch::asm!("vpmovmskb {s:e}, {zz}", s = out(reg) s_mask, zz = in(ymm_reg) doubled,
             options(pure, nomem, nostack, preserves_flags));
-        let o = _mm256_movemask_epi8(_mm256_slli_epi16(_mm256_xor_si256(z, p), 3)) as u32;
-        // The non-E positions (`e` is within bits 16..28): the mask of the
-        // pext, and (shifted) the index of the complemented eslot table,
-        // which saves a copy of `e`.
-        let ne = e ^ 0x0FFF_0000;
-        let msplit = *tabs.rank8.get_unchecked(_pext_u32(s, ne) as usize) as u64;
-        let eslot = *tabs.eslot_c.get_unchecked((ne >> 16) as usize) as u64;
-        (msplit, o as u64, eslot)
+        let eo_flips = _mm256_xor_si256(conj, positions);
+        let eo_bits = _mm256_movemask_epi8(_mm256_slli_epi16(eo_flips, 3)).cast_unsigned();
+        // The non-E positions (`e_mask` is within bits 16..28): the mask of
+        // the pext, and (shifted) the index of the complemented eslot
+        // table, which saves a copy of `e_mask`.
+        let non_e = e_mask ^ 0x0FFF_0000;
+        let msplit = u64::from(*tabs.rank8.get_unchecked(_pext_u32(s_mask, non_e) as usize));
+        let eslot = u64::from(*tabs.eslot_complement.get_unchecked((non_e >> 16) as usize));
+        (msplit, eo_bits, eslot)
     }
 }
 
-/// `index_from_parts(class, edge_parts_sym(c, t), k)`, with the shifts by
-/// `k` done as a multiply by `row_mul` = `1 << (k + 9)` and a pext by
+/// `index_from_parts(class, edge_parts_sym(cube, sym), k)`, with the shifts
+/// by `k` done as a multiply by `row_mul` = `1 << (k + 9)` and a pext by
 /// `eo_mask` = the top `k` eo bits, `((1 << k) - 1) << (28 - k)` (memory
-/// operands: no variable shift counts to keep in registers).
+/// operands: no variable shift counts to keep in registers). (The index
+/// straight from the parts: part of packed-cocsep's +2.8% at 48T; the
+/// multiply and pext: part of m6-micro's index patch.)
+#[must_use]
 #[inline(always)]
-pub fn index_sym(c: Cube, t: usize, class: usize, row_mul: u64, eo_mask: u32) -> u64 {
-    let (msplit, o, eslot) = edge_parts_sym_raw(c, t);
+pub fn index_sym(cube: Cube, sym: usize, class: usize, row_mul: u64, eo_mask: u32) -> u64 {
+    let (msplit, eo_bits, eslot) = edge_parts_sym_raw(cube, sym);
     let row = class as u64 * N_MSPLIT as u64 + msplit;
-    let eo = unsafe { _pext_u32(o as u32, eo_mask) } as u64;
+    let eo = u64::from(unsafe { _pext_u32(eo_bits, eo_mask) });
     (row * row_mul) | (eo << 9) | eslot
 }
 
 /// hk index of class `class` and edge parts `(msplit, eo11, eslot)`; equals
 /// `reduce_key((class * 70 + msplit) << 20 | eo11 << 9 | eslot, k)` but with
 /// a shorter dependency chain from msplit.
+#[must_use]
 #[inline(always)]
 pub fn index_from_parts(class: usize, parts: (u64, u64, u64), k: u32) -> u64 {
     let (msplit, eo11, eslot) = parts;
@@ -319,56 +390,62 @@ pub fn index_from_parts(class: usize, parts: (u64, u64, u64), k: u32) -> u64 {
 }
 
 /// Full h11 key from a corner class and transformed edges.
+#[must_use]
 #[inline(always)]
-pub fn h11_key(class: usize, e: Cube) -> u64 {
-    ((class as u64 * N_MSPLIT as u64) << 20) + edge_key(e)
+pub fn h11_key(class: usize, edges: Cube) -> u64 {
+    ((class as u64 * N_MSPLIT as u64) << 20) + edge_key(edges)
 }
 
-/// Reduce an h11 key to an hk index.
+/// Reduce an h11 key to an hk index (drop the low `11 - k` eo bits).
+#[must_use]
 #[inline(always)]
-pub fn reduce_key(x: u64, k: u32) -> u64 {
-    ((x >> (11 - k)) & !0x1FF) | (x & 0x1FF)
+pub fn reduce_key(key: u64, k: u32) -> u64 {
+    ((key >> (11 - k)) & !0x1FF) | (key & 0x1FF)
 }
 
 /// Inverse of `reduce_key` for k in {0, 11}: (class, h11 edge key).
+#[must_use]
 #[inline(always)]
-pub fn split_index(idx: u64, k: u32) -> (usize, u64) {
-    let eslot = idx & 0x1FF;
-    let rest = idx >> 9;
-    let eo = (rest & ((1 << k) - 1)) << (11 - k);
-    let cm = rest >> k;
-    let class = (cm / N_MSPLIT as u64) as usize;
-    let msplit = cm % N_MSPLIT as u64;
+pub fn split_index(index: u64, k: u32) -> (usize, u64) {
+    let eslot = index & 0x1FF;
+    let rest = index >> 9;
+    let eo = (rest & u64::MAX.unbounded_shr(64 - k)) << (11 - k);
+    let row = rest >> k;
+    let class = (row / N_MSPLIT as u64) as usize;
+    let msplit = row % N_MSPLIT as u64;
     (class, (msplit << 20) | (eo << 9) | eslot)
 }
 
-/// Build a cube from the corners of `corner_src` and an h11 edge key.
-pub fn cube_from_edge_key(corner_src: Cube, ek: u64) -> Cube {
-    let eslot = (ek & 0x1FF) as usize;
-    let eo11 = ((ek >> 9) & 0x7FF) as u32;
-    let msplit = (ek >> 20) as usize;
-    let e = SLOT_EMASK[eslot] as u32;
-    let s = unsafe { _pdep_u32(UNRANK8[msplit] as u32, !e & 0xFFF) };
+/// A cube with the corners of `corners` and the edges of an h11 edge key:
+/// some cube of that coordinate.
+#[must_use]
+pub fn cube_from_edge_key(corners: Cube, edge_key: u64) -> Cube {
+    let eslot = (edge_key & 0x1FF) as usize;
+    let eo11 = ((edge_key >> 9) & 0x7FF) as u32;
+    let msplit = (edge_key >> 20) as usize;
+    let e_slice = u32::from(SLOT_EMASK[eslot]);
+    let s_slice = unsafe { _pdep_u32(u32::from(UNRANK8[msplit]), !e_slice & 0xFFF) };
+    // (The 12th flip makes the number of flips even.)
     let eo12 = (eo11 << 1) | (eo11.count_ones() & 1);
-    let mut b = corner_src.to_bytes();
-    let (mut ne, mut ns, mut nm) = (8u8, 4u8, 0u8);
-    for p in 0..12 {
-        let piece = if e >> p & 1 == 1 {
-            ne += 1;
-            ne - 1
-        } else if s >> p & 1 == 1 {
-            ns += 1;
-            ns - 1
+    let mut bytes = corners.to_bytes();
+    // Next piece of each slice: E 8..12, S 4..8, M 0..4.
+    let (mut next_e, mut next_s, mut next_m) = (8u8, 4u8, 0u8);
+    for position in 0..12 {
+        let next = if e_slice >> position & 1 == 1 {
+            &mut next_e
+        } else if s_slice >> position & 1 == 1 {
+            &mut next_s
         } else {
-            nm += 1;
-            nm - 1
+            &mut next_m
         };
-        b[16 + p] = piece | (((eo12 >> p) & 1) << 4) as u8;
+        let piece = *next;
+        *next += 1;
+        let flipped = u8::from(eo12 >> position & 1 == 1);
+        bytes[16 + position] = piece | (flipped << 4);
     }
-    b[8..16].fill(0);
-    b[28..32].fill(0);
-    let a = crate::simd::A32(b);
-    Cube(unsafe { _mm256_load_si256(a.0.as_ptr() as *const __m256i) })
+    bytes[8..16].fill(0);
+    bytes[28..32].fill(0);
+    Cube::from_bytes(bytes)
 }
 
 #[cfg(test)]
@@ -378,20 +455,20 @@ mod tests {
 
     #[test]
     fn rank_tables() {
-        assert_eq!(binom(12, 4), 495);
+        assert_eq!(binomial(12, 4), 495);
         let mut seen = vec![false; 512];
         for m in 0..4096u32 {
             if m.count_ones() == 4 {
-                let r = ESLOT[m as usize] as usize;
+                let r = usize::from(ESLOT[m as usize]);
                 assert!(r < 511 && r % 64 >= 2 && !seen[r]);
                 seen[r] = true;
-                assert_eq!(SLOT_EMASK[r] as u32, m);
+                assert_eq!(u32::from(SLOT_EMASK[r]), m);
             }
         }
         assert_eq!(seen.iter().filter(|&&x| x).count(), 495);
         for m in 0..256u32 {
             if m.count_ones() == 4 {
-                assert_eq!(UNRANK8[RANK8[m as usize] as usize] as u32, m);
+                assert_eq!(u32::from(UNRANK8[usize::from(RANK8[m as usize])]), m);
             }
         }
     }
@@ -417,11 +494,11 @@ mod tests {
     }
 
     #[test]
-    fn cocsep3_is_3_cocsep() {
+    fn cocsep_x3_is_3_cocsep() {
         let mut rng = Rng(17);
         for _ in 0..2000 {
             let c = Cube::from_cubie(&CubieCube::random(&mut rng));
-            assert_eq!(cocsep3(c), 3 * cocsep(c));
+            assert_eq!(cocsep_x3(c), 3 * cocsep(c));
         }
     }
 

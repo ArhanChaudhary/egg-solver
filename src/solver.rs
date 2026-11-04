@@ -1,50 +1,82 @@
-//! IDA* optimal solver using the H48 table.
+//! IDA* optimal solver using the H48 table: the plain recursive search,
+//! one cube at a time. `lanes` runs the same search interleaved over many
+//! cubes, which is much faster; this one is the reference.
+//!
+//! IDA* (iterative deepening A*): for target lengths `T` = 1, 2, ..., a
+//! depth-first search for a solution of exactly `T` moves that skips any
+//! node whose lower bound exceeds its remaining moves. The first target
+//! with a solution gives an optimal one.
+//!
+//! The search runs on both the cube and its inverse (a solution of the
+//! inverse is the reversed, inverted solution of the cube): a node either
+//! applies a move to the normal cube (appended to the solution) or to the
+//! inverse cube (a "premove", prepended in inverted form). Each node moves
+//! the side with fewer allowed moves, and both sides' table bounds prune.
+//!
+//! The first moves of each iteration are split into "jobs" (prefixes of up
+//! to 4 moves), sorted by how promising they were in the last iteration,
+//! so that the last iteration tends to find its solution early (-36% nodes,
+//! +46% at 48T on a batch when added, job-order).
 
-use crate::coord::*;
+use crate::coord::{cocsep_x3, index_sym};
 use crate::cubie::{inverse_move, CubieCube};
 use crate::simd::Cube;
-use crate::tables::*;
+use crate::tables::{packed_class, packed_depth, packed_sym_to_rep, Cocsep, H48Table};
 
-pub const ALL_MOVES: u32 = (1 << 18) - 1;
+/// All 18 moves (the low 18 bits).
+pub const ALL_MOVES: u32 = u32::MAX.unbounded_shr(32 - 18);
 /// Quarter turns only (moves with m % 3 != 1).
-pub const NO_HALF: u32 = 0b101_101_101_101_101_101;
+pub const QUARTER_TURNS: u32 = 0b101_101_101_101_101_101;
 
-/// Moves allowed after a move on `face` (on the same side of the search).
-const fn mk_allowed() -> [u32; 6] {
-    let mut r = [0u32; 6];
-    let mut f = 0;
-    while f < 6 {
-        let mut m = ALL_MOVES & !(7 << (3 * f));
-        if f % 2 == 1 {
-            m &= !(7 << (3 * (f - 1)));
+/// Moves allowed after a move on `face` (on the same side of the search):
+/// not the same face again (two turns of a face are one turn or none), and
+/// after the second face of an opposite pair (D, L, B) not the first one
+/// (U D = D U: only one order is searched).
+const fn allowed_after_table() -> [u32; 6] {
+    let mut table = [0u32; 6];
+    let mut face = 0;
+    while face < 6 {
+        let mut moves = ALL_MOVES & !(7 << (3 * face));
+        if face % 2 == 1 {
+            moves &= !(7 << (3 * (face - 1)));
         }
-        r[f] = m;
-        f += 1;
+        table[face] = moves;
+        face += 1;
     }
-    r
+    table
 }
-pub(crate) const ALLOWED_AFTER_T: [u32; 6] = mk_allowed();
-pub static ALLOWED_AFTER: [u32; 6] = ALLOWED_AFTER_T;
+/// Compile-time copy of `ALLOWED_AFTER` (for `simd::HOT_TABLES`).
+pub(crate) const ALLOWED_AFTER_CONST: [u32; 6] = allowed_after_table();
+/// Moves allowed after a move on each face (see `allowed_after_table`).
+pub static ALLOWED_AFTER: [u32; 6] = ALLOWED_AFTER_CONST;
 
+/// The tables of a search, and the hot path's lookups.
 pub struct Solver<'a> {
-    pub cs: &'a Cocsep,
+    pub corners: &'a Cocsep,
     pub table: &'a H48Table,
-    /// `table.ptr()`, cached (saves a dependent load per prefetch/lookup).
-    tptr: *const u8,
-    /// `cs.packed_ptr()`, cached (saves a dependent load per index).
-    cptr: *const u8,
-    /// `coord::index_sym` constants of the table's `k`.
+    /// `table.ptr()`, cached (saves a dependent load per prefetch/lookup;
+    /// with `value` and `prefetch`, part of m1-micro's +2.2% at 48T).
+    table_ptr: *const u8,
+    /// `corners.packed_ptr()`, cached (saves a dependent load per index).
+    packed_ptr: *const u8,
+    /// `coord::index_sym` constants of the table's `k` (with `packed_ptr`,
+    /// part of m6-micro's index patch: +0.7% at 1T, -0.4% at 48T).
     row_mul: u64,
     eo_mask: u32,
+    /// The table's base: codes 1..=3 mean `base + code`.
     pub(crate) base: u8,
 }
-// `tptr` and `cptr` point into `table` and `cs`, which are shared read-only.
+// `table_ptr` and `packed_ptr` point into `table` and `corners`, which are
+// shared read-only.
 unsafe impl Send for Solver<'_> {}
 unsafe impl Sync for Solver<'_> {}
 
+/// Search statistics.
 #[derive(Default, Clone, Copy, Debug)]
 pub struct Stats {
+    /// Nodes generated (cubes reached by a move).
     pub nodes: u64,
+    /// Table lookups (each costs a likely cache miss).
     pub lookups: u64,
 }
 
@@ -56,436 +88,569 @@ pub struct Stats {
 struct Job {
     moves: [u8; 4],
     len: u8,
-    c: Cube,
-    ci: Cube,
+    /// The cube after the prefix, and its inverse.
+    cube: Cube,
+    inverse: Cube,
     stat: u64,
     /// Lower bounds of the job root (normal, inverse); computed once.
-    ln: u8,
-    li: u8,
+    normal_bound: u8,
+    inverse_bound: u8,
 }
 
 /// Face weight compensating for D/L/B prefixes having fewer continuations.
 #[inline(always)]
 fn job_weight(j: &Job) -> u64 {
-    if (j.moves[j.len as usize - 1] / 3) % 2 == 0 {
+    if (j.moves[j.len as usize - 1] / 3).is_multiple_of(2) {
         47525
     } else {
         58206
     }
 }
 
-struct Ctx {
+/// The path of the current search and its counters.
+struct SearchState {
+    /// Moves applied to the normal cube, from the root.
     moves: [u8; 32],
-    nmoves: usize,
+    n_moves: usize,
+    /// Moves applied to the inverse cube.
     premoves: [u8; 32],
-    npremoves: usize,
+    n_premoves: usize,
     stats: Stats,
-    heur: u64,
+    /// The current job's statistic.
+    stat: u64,
 }
 
+/// A child of a search node, while its bounds are looked up.
 #[derive(Clone, Copy)]
-struct Kid {
-    c: Cube,
-    i: Cube,
-    idx: u64,
-    m: u8,
-    pn: u8,
-    pi: u8,
+struct Child {
+    /// The moved cube (of the node's chosen side) and the other side's cube.
+    moved: Cube,
+    other: Cube,
+    /// Pending table index.
+    index: u64,
+    mv: u8,
+    /// Lower bounds of the moved and the other side.
+    moved_bound: u8,
+    other_bound: u8,
+    /// Not pruned (yet).
     live: bool,
 }
 
+/// A bound not known yet.
 const UNKNOWN: u8 = 0xFF;
+/// `search`'s result when it found a solution.
 const FOUND: u8 = 0xFE;
 
 impl<'a> Solver<'a> {
-    pub fn new(cs: &'a Cocsep, table: &'a H48Table) -> Solver<'a> {
+    #[must_use]
+    pub fn new(corners: &'a Cocsep, table: &'a H48Table) -> Solver<'a> {
+        let k = table.meta.k;
         Solver {
-            cs,
+            corners,
             table,
-            tptr: table.ptr(),
-            cptr: cs.packed_ptr(),
-            row_mul: 1 << (table.meta.k + 9),
-            eo_mask: ((1 << table.meta.k) - 1) << (28 - table.meta.k),
+            table_ptr: table.ptr(),
+            packed_ptr: corners.packed_ptr(),
+            row_mul: 1 << (k + 9),
+            eo_mask: u32::MAX.unbounded_shr(32 - k) << (28 - k),
             base: table.meta.base,
         }
     }
 
-    /// (table index, corner lower bound)
+    /// (table index, corner lower bound) of a cube.
     #[inline(always)]
-    pub(crate) fn index(&self, c: Cube) -> (u64, u8) {
-        // `self.cs.packed(cocsep(c))`
-        let d = unsafe { (self.cptr.add(cocsep3(c)) as *const u32).read_unaligned() };
-        let idx = index_sym(c, cp_ttrep(d), cp_class(d), self.row_mul, self.eo_mask);
-        (idx, cp_depth(d))
+    pub(crate) fn index(&self, cube: Cube) -> (u64, u8) {
+        // `self.corners.packed(cocsep(cube))`
+        let packed = unsafe {
+            self.packed_ptr
+                .add(cocsep_x3(cube))
+                .cast::<u32>()
+                .read_unaligned()
+        };
+        let index = index_sym(
+            cube,
+            packed_sym_to_rep(packed),
+            packed_class(packed),
+            self.row_mul,
+            self.eo_mask,
+        );
+        (index, packed_depth(packed))
     }
 
+    /// The lower bound of table entry `index`: `base + code`, or for code 0
+    /// (at most `base`) the larger of the group minimum and the corner bound.
     #[inline(always)]
-    pub(crate) fn value(&self, idx: u64, cdepth: u8) -> u8 {
+    #[expect(clippy::cast_ptr_alignment, reason = "tables are page aligned")]
+    pub(crate) fn value(&self, index: u64, corner_bound: u8) -> u8 {
         // `H48Table::get` through the cached pointer.
-        let (code, min) = unsafe {
-            let p = self.tptr as *const u64;
-            let w = (idx >> 5) as usize;
-            let x = *p.add(w);
-            let m = *p.add(w & !1) & 15;
-            (((x >> ((idx & 31) * 2)) & 3) as u8, m as u8)
+        let (code, group_min) = unsafe {
+            let words = self.table_ptr.cast::<u64>();
+            let w = (index >> 5) as usize;
+            let word = *words.add(w);
+            let group_min = *words.add(w & !1) & 15;
+            (((word >> ((index & 31) * 2)) & 3) as u8, group_min as u8)
         };
         if code == 0 {
-            min.max(cdepth)
+            group_min.max(corner_bound)
         } else {
             self.base + code
         }
     }
 
-    /// Prefetch table entry `idx` (`H48Table::prefetch`).
+    /// Prefetch table entry `index` (`H48Table::prefetch`).
     #[inline(always)]
-    pub(crate) fn prefetch(&self, idx: u64) {
+    pub(crate) fn prefetch(&self, index: u64) {
         unsafe {
-            let a = self.tptr.add((idx >> 2) as usize);
+            let line = self.table_ptr.add((index >> 2) as usize);
             // NTA: each line is read once; less L2 pollution (cocsep data).
-            std::arch::x86_64::_mm_prefetch(a as *const i8, std::arch::x86_64::_MM_HINT_NTA);
+            // (+2.6% at 48T when added, prefetch-nta.)
+            std::arch::x86_64::_mm_prefetch(line.cast::<i8>(), std::arch::x86_64::_MM_HINT_NTA);
         }
     }
 
     /// Lower bound for a single cube (no pipelining).
-    pub fn lower_bound(&self, c: Cube) -> u8 {
-        let (idx, cd) = self.index(c);
-        self.value(idx, cd)
+    #[must_use]
+    pub fn lower_bound(&self, cube: Cube) -> u8 {
+        let (index, corner_bound) = self.index(cube);
+        self.value(index, corner_bound)
     }
 
-    /// Length of the job prefixes for an iteration with target `d`.
-    pub(crate) fn job_len(&self, d: u8) -> usize {
+    /// Length of the job prefixes for an iteration with target `target`:
+    /// longer jobs for deeper targets (more of them to sort), up to 4.
+    pub(crate) fn job_len(&self, target: u8) -> usize {
         let top = self.base + 3;
-        if d > top {
-            ((d - top) as usize).min(4)
+        if target > top {
+            ((target - top) as usize).min(4)
         } else {
             0
         }
     }
 
     /// Extend jobs by one move; children inherit the parent's stat.
+    #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
     fn extend_jobs(jobs: &[Job]) -> Vec<Job> {
         let mut out = Vec::with_capacity(jobs.len() * 15);
         for j in jobs {
-            let mm = if j.len == 0 {
+            let allowed = if j.len == 0 {
                 ALL_MOVES
             } else {
                 ALLOWED_AFTER[(j.moves[j.len as usize - 1] / 3) as usize]
             };
-            let mut mmv = mm;
-            while mmv != 0 {
-                let m = mmv.trailing_zeros() as usize;
-                mmv &= mmv - 1;
-                let mut n = *j;
-                n.moves[n.len as usize] = m as u8;
-                n.len += 1;
-                n.c = j.c.apply_move(m);
-                n.ci = j.ci.premove_inv(m);
-                out.push(n);
+            let mut todo = allowed;
+            while todo != 0 {
+                let mv = todo.trailing_zeros() as usize;
+                todo ^= todo.isolate_lowest_one();
+                let mut child = *j;
+                child.moves[child.len as usize] = mv as u8;
+                child.len += 1;
+                child.cube = j.cube.apply_move(mv);
+                child.inverse = j.inverse.premove_inverse(mv);
+                out.push(child);
             }
         }
         out
     }
 
-    /// Compute the root bounds of jobs, prefetching in batches.
+    /// Compute the root bounds of jobs, prefetching in batches (+2.4%
+    /// throughput, +1.8% on a 48T batch when added, job-bounds).
     fn job_bounds(&self, jobs: &mut [Job]) {
         for chunk in jobs.chunks_mut(32) {
-            let mut idx = [(0u64, 0u8); 64];
+            let mut lookups = [(0u64, 0u8); 64];
             for (n, j) in chunk.iter().enumerate() {
-                idx[2 * n] = self.index(j.c);
-                idx[2 * n + 1] = self.index(j.ci);
-                self.prefetch(idx[2 * n].0);
-                self.prefetch(idx[2 * n + 1].0);
+                lookups[2 * n] = self.index(j.cube);
+                lookups[2 * n + 1] = self.index(j.inverse);
+                self.prefetch(lookups[2 * n].0);
+                self.prefetch(lookups[2 * n + 1].0);
             }
             for (n, j) in chunk.iter_mut().enumerate() {
-                j.ln = self.value(idx[2 * n].0, idx[2 * n].1);
-                j.li = self.value(idx[2 * n + 1].0, idx[2 * n + 1].1);
+                j.normal_bound = self.value(lookups[2 * n].0, lookups[2 * n].1);
+                j.inverse_bound = self.value(lookups[2 * n + 1].0, lookups[2 * n + 1].1);
             }
         }
     }
 
     /// Find one optimal solution.
+    #[must_use]
     pub fn solve(&self, cube: &CubieCube) -> (Vec<u8>, Stats) {
-        let c = Cube::from_cubie(cube);
-        if c.is_solved() {
+        let cube = Cube::from_cubie(cube);
+        if cube.is_solved() {
             return (vec![], Stats::default());
         }
-        let ci = c.inverse();
-        let ln = self.lower_bound(c);
-        let li = self.lower_bound(ci);
-        let mut ctx = Ctx {
+        let inverse = cube.inverse();
+        let normal_bound = self.lower_bound(cube);
+        let inverse_bound = self.lower_bound(inverse);
+        let mut state = SearchState {
             moves: [0; 32],
-            nmoves: 0,
+            n_moves: 0,
             premoves: [0; 32],
-            npremoves: 0,
+            n_premoves: 0,
             stats: Stats::default(),
-            heur: 0,
+            stat: 0,
         };
         let mut jobs = vec![Job {
             moves: [0; 4],
             len: 0,
-            c,
-            ci,
+            cube,
+            inverse,
             stat: 0,
-            ln,
-            li,
+            normal_bound,
+            inverse_bound,
         }];
-        let mut target = ln.max(li).max(1);
+        let mut target = normal_bound.max(inverse_bound).max(1);
         loop {
-            let jl = self.job_len(target);
-            while (jobs[0].len as usize) < jl {
+            let job_len = self.job_len(target);
+            while (jobs[0].len as usize) < job_len {
                 jobs = Self::extend_jobs(&jobs);
                 self.job_bounds(&mut jobs);
             }
-            if jl > 0 {
+            if job_len > 0 {
                 // stable sort keeps the canonical order among equal keys
                 jobs.sort_by_key(|j| std::cmp::Reverse(j.stat * job_weight(j)));
             }
-            for j in jobs.iter_mut() {
-                let r = target - j.len;
-                let (jn, ji) = (j.ln, j.li);
-                ctx.heur = 0;
-                if jn > r || ji > r || (j.len > 0 && j.c.is_solved()) {
+            for j in &mut jobs {
+                let remaining_depth = target - j.len;
+                let (normal_bound, inverse_bound) = (j.normal_bound, j.inverse_bound);
+                state.stat = 0;
+                if normal_bound > remaining_depth
+                    || inverse_bound > remaining_depth
+                    || (j.len > 0 && j.cube.is_solved())
+                {
                     j.stat = 0;
                     continue;
                 }
-                let mut mm_n = if j.len == 0 {
+                let mut normal_moves = if j.len == 0 {
                     ALL_MOVES
                 } else {
                     ALLOWED_AFTER[(j.moves[j.len as usize - 1] / 3) as usize]
                 };
-                let mut mm_i = ALL_MOVES;
-                if ji == r {
-                    mm_n &= NO_HALF;
+                let mut inverse_moves = ALL_MOVES;
+                // A tight bound on one side: a half turn on the other side
+                // keeps it (see `search`), so only quarter turns can help.
+                if inverse_bound == remaining_depth {
+                    normal_moves &= QUARTER_TURNS;
                 }
-                if jn == r {
-                    mm_i &= NO_HALF;
+                if normal_bound == remaining_depth {
+                    inverse_moves &= QUARTER_TURNS;
                 }
-                ctx.moves[..j.len as usize].copy_from_slice(&j.moves[..j.len as usize]);
-                ctx.nmoves = j.len as usize;
-                ctx.npremoves = 0;
-                let found = self.dfs(&mut ctx, j.c, j.ci, jn, ji, mm_n, mm_i, r) == FOUND;
-                j.stat = ctx.heur;
+                state.moves[..j.len as usize].copy_from_slice(&j.moves[..j.len as usize]);
+                state.n_moves = j.len as usize;
+                state.n_premoves = 0;
+                let found = self.search(
+                    &mut state,
+                    j.cube,
+                    j.inverse,
+                    normal_bound,
+                    inverse_bound,
+                    normal_moves,
+                    inverse_moves,
+                    remaining_depth,
+                ) == FOUND;
+                j.stat = state.stat;
                 if found {
-                    let mut sol: Vec<u8> = ctx.moves[..ctx.nmoves].to_vec();
-                    for k in (0..ctx.npremoves).rev() {
-                        sol.push(inverse_move(ctx.premoves[k]));
+                    let mut solution: Vec<u8> = state.moves[..state.n_moves].to_vec();
+                    for k in (0..state.n_premoves).rev() {
+                        solution.push(inverse_move(state.premoves[k]));
                     }
-                    return (sol, ctx.stats);
+                    return (solution, state.stats);
                 }
             }
             target += 1;
         }
     }
 
-    /// `r` = number of moves remaining (> 0). Bounds `ln`, `li` are <= r.
+    /// Search for a solution of exactly `remaining_depth` (> 0) more moves.
+    /// The bounds `normal_bound`, `inverse_bound` are at most
+    /// `remaining_depth`; `normal_moves`, `inverse_moves` are the moves
+    /// allowed on each side.
     ///
     /// Returns `FOUND`, or a lower bound on the distance of this node learned
     /// from its children (0 if nothing was learned). Every child value is a
     /// lower bound on the child's true distance, and the true distance
     /// changes by at most one per move, so (a) a child value `v` bounds this
     /// node by `v - 1` and (b) bounds same-face siblings (one move apart) by
-    /// `v - 1` as well.
+    /// `v - 1` as well. (Both: -17.7% nodes, +7.5% throughput when added,
+    /// sibling-prune.)
     #[allow(clippy::too_many_arguments)]
-    fn dfs(
+    fn search(
         &self,
-        ctx: &mut Ctx,
-        c: Cube,
-        ci: Cube,
-        ln: u8,
-        li: u8,
-        mm_n: u32,
-        mm_i: u32,
-        r: u8,
+        state: &mut SearchState,
+        cube: Cube,
+        inverse: Cube,
+        normal_bound: u8,
+        inverse_bound: u8,
+        normal_moves: u32,
+        inverse_moves: u32,
+        remaining_depth: u8,
     ) -> u8 {
-        if r == 1 {
-            let mut mm = mm_n & mm_i;
-            while mm != 0 {
-                let m = mm.trailing_zeros() as usize;
-                mm &= mm - 1;
-                ctx.stats.nodes += 1;
-                if c.apply_move(m).is_solved() {
-                    ctx.moves[ctx.nmoves] = m as u8;
-                    ctx.nmoves += 1;
-                    return FOUND;
-                }
-            }
-            return 0;
+        if remaining_depth == 1 {
+            return Self::last_move(state, cube, normal_moves & inverse_moves);
         }
-        let r1 = r - 1;
-        let normal = mm_n.count_ones() <= mm_i.count_ones();
-        // On the chosen side, (a, b) = (cube moved, cube premoved).
-        let (a, b, mm, la_same) = if normal {
-            (c, ci, mm_n, li)
+        let child_remaining = remaining_depth - 1;
+        // Move the side with fewer moves to try (ties: the normal cube; as
+        // the other search techniques of the first version, not measured
+        // separately).
+        let normal = normal_moves.count_ones() <= inverse_moves.count_ones();
+        let (moved, other, allowed, other_side_bound) = if normal {
+            (cube, inverse, normal_moves, inverse_bound)
         } else {
-            (ci, c, mm_i, ln)
+            (inverse, cube, inverse_moves, normal_bound)
         };
         // Best known lower bound per face over that face's children.
-        let mut fmax = [0u8; 6];
-        let mut kids = [Kid {
-            c: a,
-            i: b,
-            idx: 0,
-            m: 0,
-            pn: 0,
-            pi: 0,
-            live: false,
-        }; 18];
-        let mut nk = 0;
-        let mut mmv = mm;
-        while mmv != 0 {
-            let m = mmv.trailing_zeros() as usize;
-            mmv &= mmv - 1;
-            // A half turn on this side does not change the other side's coset.
-            let pi = if m % 3 == 1 { la_same } else { UNKNOWN };
-            if pi != UNKNOWN && pi > r1 {
-                fmax[m / 3] = fmax[m / 3].max(pi);
-                continue;
-            }
-            ctx.stats.nodes += 1;
-            kids[nk] = Kid {
-                c: a.apply_move(m),
-                i: b.premove_inv(m),
-                idx: 0,
-                m: m as u8,
-                pn: 0,
-                pi,
-                live: true,
-            };
-            nk += 1;
-        }
-        let maxval = self.base + 3;
-        if r1 <= maxval {
-            // Stage 1: inverse-side index + prefetch.
-            for k in kids[..nk].iter_mut() {
-                if k.pi == UNKNOWN {
-                    let (idx, cd) = self.index(k.i);
-                    if cd > r1 {
-                        k.live = false;
-                        let f = (k.m / 3) as usize;
-                        fmax[f] = fmax[f].max(cd);
-                        continue;
-                    }
-                    k.idx = idx;
-                    k.pi = cd; // temporarily the corner bound
-                    self.prefetch(idx);
-                    k.pn = UNKNOWN; // marks "pi pending"
-                }
-            }
-            // Stage 2: inverse-side value, normal-side index + prefetch.
-            for k in kids[..nk].iter_mut() {
-                if !k.live {
-                    continue;
-                }
-                let f = (k.m / 3) as usize;
-                if k.pn == UNKNOWN {
-                    ctx.stats.lookups += 1;
-                    k.pi = self.value(k.idx, k.pi);
-                    if k.pi > r1 {
-                        k.live = false;
-                        fmax[f] = fmax[f].max(k.pi);
-                        continue;
-                    }
-                }
-                let (idx, cd) = self.index(k.c);
-                if cd > r1 {
-                    k.live = false;
-                    fmax[f] = fmax[f].max(cd);
-                    continue;
-                }
-                k.idx = idx;
-                k.pn = cd;
-                self.prefetch(idx);
-            }
-            // Stage 3: normal-side value.
-            for k in kids[..nk].iter_mut() {
-                if !k.live {
-                    continue;
-                }
-                ctx.stats.lookups += 1;
-                k.pn = self.value(k.idx, k.pn);
-                ctx.heur += (4096u64 >> k.pi.min(63)) + (4096u64 >> k.pn.min(63));
-                let f = (k.m / 3) as usize;
-                fmax[f] = fmax[f].max(k.pn).max(k.pi);
-                if k.pn > r1 {
-                    k.live = false;
-                }
-            }
-        } else {
-            for k in kids[..nk].iter_mut() {
-                k.pn = 0;
-                if k.pi == UNKNOWN {
-                    k.pi = 0;
-                }
-            }
-        }
+        let mut face_bound = [0u8; 6];
+        let (mut children, n_children) = Self::generate_children(
+            state,
+            (moved, other),
+            allowed,
+            other_side_bound,
+            child_remaining,
+            &mut face_bound,
+        );
+        let children = &mut children[..n_children];
+        self.bound_children(state, children, &mut face_bound, child_remaining);
         // Lower bound for this node from all children.
-        let mut node_lb = fmax.iter().copied().max().unwrap_or(0).saturating_sub(1);
-        if node_lb > r {
-            return node_lb;
+        let mut lower_bound = face_bound
+            .iter()
+            .copied()
+            .max()
+            .unwrap_or(0)
+            .saturating_sub(1);
+        if lower_bound > remaining_depth {
+            return lower_bound;
         }
-        for k in kids[..nk].iter() {
-            let face = (k.m / 3) as usize;
+        for child in &*children {
+            let face = (child.mv / 3) as usize;
             // Pruned directly, or by a same-face sibling that is >= 2 over.
-            if !k.live || fmax[face] > r1 + 1 {
+            if !child.live || face_bound[face] > child_remaining + 1 {
                 continue;
             }
             // Solved before the target depth: a shorter solution exists.
-            if k.c.is_solved() {
+            if child.moved.is_solved() {
                 continue;
             }
-            let (mut nmm_n, mut nmm_i, nc, nci, nln, nli);
+            // The child's two sides, back in normal/inverse terms.
+            let (mut child_normal_moves, mut child_inverse_moves, child_cube, child_inverse);
+            let (child_normal_bound, child_inverse_bound);
             if normal {
-                nmm_n = ALLOWED_AFTER[face];
-                nmm_i = mm_i;
-                nc = k.c;
-                nci = k.i;
-                nln = k.pn;
-                nli = k.pi;
-                ctx.moves[ctx.nmoves] = k.m;
-                ctx.nmoves += 1;
+                child_normal_moves = ALLOWED_AFTER[face];
+                child_inverse_moves = inverse_moves;
+                child_cube = child.moved;
+                child_inverse = child.other;
+                child_normal_bound = child.moved_bound;
+                child_inverse_bound = child.other_bound;
+                state.moves[state.n_moves] = child.mv;
+                state.n_moves += 1;
             } else {
-                nmm_n = mm_n;
-                nmm_i = ALLOWED_AFTER[face];
-                nc = k.i;
-                nci = k.c;
-                nln = k.pi;
-                nli = k.pn;
-                ctx.premoves[ctx.npremoves] = k.m;
-                ctx.npremoves += 1;
+                child_normal_moves = normal_moves;
+                child_inverse_moves = ALLOWED_AFTER[face];
+                child_cube = child.other;
+                child_inverse = child.moved;
+                child_normal_bound = child.other_bound;
+                child_inverse_bound = child.moved_bound;
+                state.premoves[state.n_premoves] = child.mv;
+                state.n_premoves += 1;
             }
-            if nli == r1 {
-                nmm_n &= NO_HALF;
+            // A tight bound on one side: a half turn on the other side keeps
+            // that side's coset, hence its bound, so it cannot finish in time.
+            if child_inverse_bound == child_remaining {
+                child_normal_moves &= QUARTER_TURNS;
             }
-            if nln == r1 {
-                nmm_i &= NO_HALF;
+            if child_normal_bound == child_remaining {
+                child_inverse_moves &= QUARTER_TURNS;
             }
-            let res = self.dfs(ctx, nc, nci, nln, nli, nmm_n, nmm_i, r1);
-            if res == FOUND {
+            let result = self.search(
+                state,
+                child_cube,
+                child_inverse,
+                child_normal_bound,
+                child_inverse_bound,
+                child_normal_moves,
+                child_inverse_moves,
+                child_remaining,
+            );
+            if result == FOUND {
                 return FOUND;
             }
             if normal {
-                ctx.nmoves -= 1;
+                state.n_moves -= 1;
             } else {
-                ctx.npremoves -= 1;
+                state.n_premoves -= 1;
             }
             // Bound learned for the child: prunes its same-face siblings and
             // possibly this whole node.
-            fmax[face] = fmax[face].max(res);
-            node_lb = node_lb.max(res.saturating_sub(1));
-            if node_lb > r {
-                return node_lb;
+            face_bound[face] = face_bound[face].max(result);
+            lower_bound = lower_bound.max(result.saturating_sub(1));
+            if lower_bound > remaining_depth {
+                return lower_bound;
             }
         }
-        node_lb
+        lower_bound
+    }
+
+    /// The last move of a search: is one of `moves` (allowed on both sides)
+    /// a solution? (Nodes with one move left always move the normal cube.)
+    #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
+    fn last_move(state: &mut SearchState, cube: Cube, moves: u32) -> u8 {
+        let mut todo = moves;
+        while todo != 0 {
+            let mv = todo.trailing_zeros() as usize;
+            todo ^= todo.isolate_lowest_one();
+            state.stats.nodes += 1;
+            if cube.apply_move(mv).is_solved() {
+                state.moves[state.n_moves] = mv as u8;
+                state.n_moves += 1;
+                return FOUND;
+            }
+        }
+        0
+    }
+
+    /// Generate the children of a node: the `allowed` moves applied to
+    /// `moved` (the node's cube of the chosen side), premoved on `other`.
+    /// Returns them and their number.
+    ///
+    /// A half turn on this side does not change the other side's coset
+    /// (every half turn lies in the subgroup whose cosets the table
+    /// indexes), so its child keeps the node's other-side bound: children
+    /// whose bound is already too high are not generated.
+    #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
+    #[inline(always)]
+    fn generate_children(
+        state: &mut SearchState,
+        (moved, other): (Cube, Cube),
+        allowed: u32,
+        other_side_bound: u8,
+        child_remaining: u8,
+        face_bound: &mut [u8; 6],
+    ) -> ([Child; 18], usize) {
+        let mut children = [Child {
+            moved,
+            other,
+            index: 0,
+            mv: 0,
+            moved_bound: 0,
+            other_bound: 0,
+            live: false,
+        }; 18];
+        let mut n_children = 0;
+        let mut todo = allowed;
+        while todo != 0 {
+            let mv = todo.trailing_zeros() as usize;
+            todo ^= todo.isolate_lowest_one();
+            let other_bound = if mv % 3 == 1 {
+                other_side_bound
+            } else {
+                UNKNOWN
+            };
+            if other_bound != UNKNOWN && other_bound > child_remaining {
+                face_bound[mv / 3] = face_bound[mv / 3].max(other_bound);
+                continue;
+            }
+            state.stats.nodes += 1;
+            children[n_children] = Child {
+                moved: moved.apply_move(mv),
+                other: other.premove_inverse(mv),
+                index: 0,
+                mv: mv as u8,
+                moved_bound: 0,
+                other_bound,
+                live: true,
+            };
+            n_children += 1;
+        }
+        (children, n_children)
+    }
+
+    /// Look up the bounds of the children, pruning the ones that exceed
+    /// `child_remaining` and noting each face's best bound. The lookups
+    /// are pipelined: all indices are computed and prefetched before the
+    /// first value is read (other side first, then the moved side).
+    #[inline(always)]
+    fn bound_children(
+        &self,
+        state: &mut SearchState,
+        children: &mut [Child],
+        face_bound: &mut [u8; 6],
+        child_remaining: u8,
+    ) {
+        let max_value = self.base + 3;
+        if child_remaining > max_value {
+            // No table value can prune: skip the lookups.
+            for child in children {
+                child.moved_bound = 0;
+                if child.other_bound == UNKNOWN {
+                    child.other_bound = 0;
+                }
+            }
+            return;
+        }
+        // Stage 1: other-side index + prefetch.
+        for child in &mut *children {
+            if child.other_bound == UNKNOWN {
+                let (index, corner_bound) = self.index(child.other);
+                if corner_bound > child_remaining {
+                    child.live = false;
+                    let face = (child.mv / 3) as usize;
+                    face_bound[face] = face_bound[face].max(corner_bound);
+                    continue;
+                }
+                child.index = index;
+                child.other_bound = corner_bound; // temporarily the corner bound
+                self.prefetch(index);
+                child.moved_bound = UNKNOWN; // marks "other_bound pending"
+            }
+        }
+        // Stage 2: other-side value, moved-side index + prefetch.
+        for child in &mut *children {
+            if !child.live {
+                continue;
+            }
+            let face = (child.mv / 3) as usize;
+            if child.moved_bound == UNKNOWN {
+                state.stats.lookups += 1;
+                child.other_bound = self.value(child.index, child.other_bound);
+                if child.other_bound > child_remaining {
+                    child.live = false;
+                    face_bound[face] = face_bound[face].max(child.other_bound);
+                    continue;
+                }
+            }
+            let (index, corner_bound) = self.index(child.moved);
+            if corner_bound > child_remaining {
+                child.live = false;
+                face_bound[face] = face_bound[face].max(corner_bound);
+                continue;
+            }
+            child.index = index;
+            child.moved_bound = corner_bound;
+            self.prefetch(index);
+        }
+        // Stage 3: moved-side value.
+        for child in &mut *children {
+            if !child.live {
+                continue;
+            }
+            state.stats.lookups += 1;
+            child.moved_bound = self.value(child.index, child.moved_bound);
+            state.stat +=
+                (4096u64 >> child.other_bound.min(63)) + (4096u64 >> child.moved_bound.min(63));
+            let face = (child.mv / 3) as usize;
+            face_bound[face] = face_bound[face]
+                .max(child.moved_bound)
+                .max(child.other_bound);
+            if child.moved_bound > child_remaining {
+                child.live = false;
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::coord::cocsep;
     use crate::cubie::{conjugate, parse_moves, symmetries, Rng};
+    use crate::tables::entry_depth;
 
-    /// The hot-path index (`Solver::index`: `cocsep3`, packed entries,
+    /// The hot-path index (`Solver::index`: `cocsep_x3`, packed entries,
     /// `index_sym`) equals `Cocsep::index` for every `k`, symmetric cubes too.
     #[test]
     #[cfg_attr(miri, ignore = "Cocsep::generate is too slow under Miri")]
@@ -516,7 +681,7 @@ mod tests {
                 let cube = Cube::from_cubie(c);
                 let (index, corner_bound) = solver.index(cube);
                 assert_eq!(index, corners.index(cube, k), "k {k}: {c:?}");
-                assert_eq!(corner_bound, cd_depth(corners.data[cocsep(cube)]));
+                assert_eq!(corner_bound, entry_depth(corners.entries[cocsep(cube)]));
             }
         }
     }

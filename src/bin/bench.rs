@@ -1,4 +1,3 @@
-#![allow(clippy::needless_range_loop, clippy::manual_is_multiple_of)]
 //! Optimal-solve throughput benchmark.
 //!
 //! Usage:
@@ -12,70 +11,84 @@
 //! A last argument `share[:C]` uses the work-sharing mode (`lanes::share`)
 //! with at most C cubes in progress at once (default: threads * lanes; 1
 //! solves one cube at a time with all threads).
-use cubeopt::cubie::*;
+use cubeopt::cubie::{parse_moves, CubieCube, Rng};
 use cubeopt::lanes::share::Pool;
 use cubeopt::solver::{Solver, Stats};
-use cubeopt::tables::*;
+use cubeopt::tables::{Cocsep, H48Table};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
 
-struct Rec {
-    t: f64,
-    dt: f64,
-    len: usize,
-    st: Stats,
+/// One solved cube.
+struct Record {
+    /// When it was solved (seconds since the start).
+    finished: f64,
+    /// Its solve time (seconds from its start).
+    seconds: f64,
+    length: usize,
+    stats: Stats,
 }
 
+/// Solve `cubes(i)` for i = 0, 1, ... with `threads` threads (in `lanes`
+/// lanes each; 0: the recursive solver; with `share`: the work-sharing mode
+/// with that many cubes at once) until `cubes` returns `None` or `duration`
+/// seconds have passed. Every solution is checked. Returns the records and
+/// the elapsed seconds.
 fn run(
     solver: &Solver,
     cubes: &(dyn Fn(usize) -> Option<CubieCube> + Sync),
     threads: usize,
-    nlanes: usize,
+    lanes: usize,
     duration: Option<f64>,
     share: Option<usize>,
-) -> (Vec<Rec>, f64) {
+) -> (Vec<Record>, f64) {
     let next = AtomicUsize::new(0);
     let stop = AtomicBool::new(false);
-    let pool = share.map(|c| {
-        let c = if c == 0 { threads * nlanes } else { c };
-        cubeopt::lanes::share::Pool::new(cubes, c, threads)
+    let pool = share.map(|max_active| {
+        let max_active = if max_active == 0 {
+            threads * lanes
+        } else {
+            max_active
+        };
+        cubeopt::lanes::share::Pool::new(cubes, max_active, threads)
     });
-    let recs = Mutex::new(Vec::new());
+    let records = Mutex::new(Vec::new());
     let bad = AtomicU64::new(0);
     let t0 = Instant::now();
+    // (The stream mode's hot loop is the spawned closure, with `run_lanes`
+    // and `Pool::run` inlined: see the commits' asm checks.)
     std::thread::scope(|s| {
         for _ in 0..threads {
             s.spawn(|| {
-                let record = |i: usize, sol: Vec<u8>, st: Stats, dt: f64| {
-                    let c = cubes(i).unwrap();
-                    if c.apply_moves(&sol) != CubieCube::SOLVED {
+                let record = |i: usize, solution: Vec<u8>, stats: Stats, seconds: f64| {
+                    let cube = cubes(i).unwrap();
+                    if cube.apply_moves(&solution) != CubieCube::SOLVED {
                         bad.fetch_add(1, Ordering::Relaxed);
                     }
-                    recs.lock().unwrap().push(Rec {
-                        t: t0.elapsed().as_secs_f64(),
-                        dt,
-                        len: sol.len(),
-                        st,
+                    records.lock().unwrap().push(Record {
+                        finished: t0.elapsed().as_secs_f64(),
+                        seconds,
+                        length: solution.len(),
+                        stats,
                     });
                 };
                 if let Some(pool) = &pool {
-                    share_thread(pool, solver, nlanes, &stop, record);
-                } else if nlanes > 0 {
-                    stream_thread(solver, cubes, &next, &stop, nlanes, record);
+                    share_thread(pool, solver, lanes, &stop, record);
+                } else if lanes > 0 {
+                    stream_thread(solver, cubes, &next, &stop, lanes, record);
                 } else {
                     while !stop.load(Ordering::Relaxed) {
                         let i = next.fetch_add(1, Ordering::Relaxed);
-                        let Some(c) = cubes(i) else { break };
-                        let ts = Instant::now();
-                        let (sol, st) = solver.solve(&c);
-                        record(i, sol, st, ts.elapsed().as_secs_f64());
+                        let Some(cube) = cubes(i) else { break };
+                        let start = Instant::now();
+                        let (solution, stats) = solver.solve(&cube);
+                        record(i, solution, stats, start.elapsed().as_secs_f64());
                     }
                 }
             });
         }
-        if let Some(d) = duration {
-            std::thread::sleep(std::time::Duration::from_secs_f64(d));
+        if let Some(duration) = duration {
+            std::thread::sleep(std::time::Duration::from_secs_f64(duration));
             stop.store(true, Ordering::Relaxed);
         }
     });
@@ -83,7 +96,7 @@ fn run(
     if let Some(pool) = &pool {
         eprintln!("share: {}", pool.counters());
     }
-    (recs.into_inner().unwrap(), t0.elapsed().as_secs_f64())
+    (records.into_inner().unwrap(), t0.elapsed().as_secs_f64())
 }
 
 /// A thread of a share-mode run. (This and `stream_thread` are not inlined
@@ -93,11 +106,11 @@ fn run(
 fn share_thread(
     pool: &Pool,
     solver: &Solver,
-    nlanes: usize,
+    lanes: usize,
     stop: &AtomicBool,
     record: impl FnMut(usize, Vec<u8>, Stats, f64),
 ) {
-    pool.run(solver, nlanes, stop, record);
+    pool.run(solver, lanes, stop, record);
 }
 
 /// A thread of a stream-mode run (`run_lanes`).
@@ -107,117 +120,132 @@ fn stream_thread(
     cubes: &(dyn Fn(usize) -> Option<CubieCube> + Sync),
     next: &AtomicUsize,
     stop: &AtomicBool,
-    nlanes: usize,
+    lanes: usize,
     record: impl FnMut(usize, Vec<u8>, Stats, f64),
 ) {
-    cubeopt::lanes::run_lanes(solver, cubes, next, stop, nlanes, record);
+    cubeopt::lanes::run_lanes(solver, cubes, next, stop, lanes, record);
 }
 
-fn summary(recs: &[Rec]) {
-    let n = recs.len().max(1) as f64;
-    let nodes: u64 = recs.iter().map(|r| r.st.nodes).sum();
-    let lookups: u64 = recs.iter().map(|r| r.st.lookups).sum();
-    let mut lens = [0usize; 32];
-    for r in recs {
-        lens[r.len] += 1;
+/// Print nodes and lookups per cube and the distribution of lengths.
+#[expect(clippy::cast_precision_loss, reason = "statistics")]
+fn summary(records: &[Record]) {
+    let n = records.len().max(1) as f64;
+    let nodes: u64 = records.iter().map(|r| r.stats.nodes).sum();
+    let lookups: u64 = records.iter().map(|r| r.stats.lookups).sum();
+    let mut by_length = [0usize; 32];
+    for r in records {
+        by_length[r.length] += 1;
     }
-    let dist: Vec<String> = lens
+    let histogram: Vec<String> = by_length
         .iter()
         .enumerate()
-        .filter(|(_, &c)| c > 0)
-        .map(|(l, c)| format!("{l}:{c}"))
+        .filter(|(_, &count)| count > 0)
+        .map(|(length, count)| format!("{length}:{count}"))
         .collect();
     println!(
         "nodes/cube {:.0} lookups/cube {:.0}",
         nodes as f64 / n,
         lookups as f64 / n
     );
-    println!("lengths {}", dist.join(" "));
+    println!("lengths {}", histogram.join(" "));
 }
 
+/// Argument `i`, or `default` if it is not given.
+fn arg<T: std::str::FromStr>(args: &[String], i: usize, default: T) -> T
+where
+    T::Err: std::fmt::Debug,
+{
+    args.get(i).map_or(default, |x| x.parse().unwrap())
+}
+
+#[expect(clippy::cast_precision_loss, reason = "statistics")]
 fn main() {
-    let a: Vec<String> = std::env::args().collect();
-    let cs = Cocsep::generate();
-    let tl = Instant::now();
-    let table = H48Table::open(&a[1]).expect("open table");
+    let mut args: Vec<String> = std::env::args().collect();
+    let corners = Cocsep::generate();
+    let load_start = Instant::now();
+    let table = H48Table::open(&args[1]).expect("open table");
     eprintln!(
         "table h{} base {} loaded in {:.1}s",
         table.meta.k,
         table.meta.base,
-        tl.elapsed().as_secs_f64()
+        load_start.elapsed().as_secs_f64()
     );
-    let solver = Solver::new(&cs, &table);
+    let solver = Solver::new(&corners, &table);
     // trailing `share[:C]`
-    let mut a = a;
-    let share = match a.last() {
+    let share = match args.last() {
         Some(x) if x.starts_with("share") => {
-            let c = x.strip_prefix("share:").map_or(0, |c| c.parse().unwrap());
-            a.pop();
-            Some(c)
+            let max_active = x.strip_prefix("share:").map_or(0, |c| c.parse().unwrap());
+            args.pop();
+            Some(max_active)
         }
         _ => None,
     };
-    let arg = |i: usize, d: f64| a.get(i).map(|x| x.parse().unwrap()).unwrap_or(d);
-    if a[2] == "stream" {
-        let warm = arg(3, 3.0);
-        let window = arg(4, 15.0);
-        let threads = arg(5, cubeopt::nthreads() as f64) as usize;
-        let nlanes: usize = a
-            .get(6)
-            .map_or(cubeopt::lanes::DEFAULT_LANES, |x| x.parse().unwrap());
-        let seed = arg(7, 2026.0) as u64;
+    let mode = share.map_or(String::new(), |c| format!(" share {c}"));
+    if args[2] == "stream" {
+        let warmup = arg(&args, 3, 3.0);
+        let window = arg(&args, 4, 15.0);
+        let threads = arg(&args, 5, cubeopt::thread_count());
+        let lanes = arg(&args, 6, cubeopt::lanes::DEFAULT_LANES);
+        let seed: u64 = arg(&args, 7, 2026);
+        // Cube i of the stream: from its own seed, so that it does not
+        // depend on the order in which the threads take the cubes.
         let cubes = move |i: usize| {
             let mut rng = Rng(seed.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ (i as u64));
             rng.next_u64();
             Some(CubieCube::random(&mut rng))
         };
-        let (recs, _) = run(&solver, &cubes, threads, nlanes, Some(warm + window), share);
-        let w: Vec<Rec> = recs
+        let (records, _) = run(
+            &solver,
+            &cubes,
+            threads,
+            lanes,
+            Some(warmup + window),
+            share,
+        );
+        let in_window: Vec<Record> = records
             .into_iter()
-            .filter(|r| r.t >= warm && r.t < warm + window)
+            .filter(|r| r.finished >= warmup && r.finished < warmup + window)
             .collect();
-        let mode = share.map_or(String::new(), |c| format!(" share {c}"));
-        println!("threads {threads} lanes {nlanes} window {window}s{mode}");
-        summary(&w);
-        println!("throughput {:.3}", w.len() as f64 / window);
+        println!("threads {threads} lanes {lanes} window {window}s{mode}");
+        summary(&in_window);
+        println!("throughput {:.3}", in_window.len() as f64 / window);
         return;
     }
-    let file = &a[2];
-    let mut cubes: Vec<CubieCube> = if let Some(spec) = file.strip_prefix("random:") {
-        let v: Vec<u64> = spec.split(':').map(|x| x.parse().unwrap()).collect();
-        let mut rng = Rng(v[1]);
-        (0..v[0]).map(|_| CubieCube::random(&mut rng)).collect()
+    let set = &args[2];
+    let mut cubes: Vec<CubieCube> = if let Some(spec) = set.strip_prefix("random:") {
+        let numbers: Vec<u64> = spec.split(':').map(|x| x.parse().unwrap()).collect();
+        let mut rng = Rng(numbers[1]);
+        (0..numbers[0])
+            .map(|_| CubieCube::random(&mut rng))
+            .collect()
     } else {
-        std::fs::read_to_string(file)
+        std::fs::read_to_string(set)
             .unwrap()
             .lines()
             .filter(|l| !l.trim().is_empty())
             .map(|l| CubieCube::SOLVED.apply_moves(&parse_moves(l).unwrap()))
             .collect()
     };
-    if let Some(n) = a.get(3) {
-        cubes.truncate(n.parse().unwrap());
+    if let Some(count) = args.get(3) {
+        cubes.truncate(count.parse().unwrap());
     }
-    let threads = arg(4, cubeopt::nthreads() as f64) as usize;
-    let nlanes: usize = a
-        .get(5)
-        .map_or(cubeopt::lanes::DEFAULT_LANES, |x| x.parse().unwrap());
+    let threads = arg(&args, 4, cubeopt::thread_count());
+    let lanes = arg(&args, 5, cubeopt::lanes::DEFAULT_LANES);
     let get = |i: usize| cubes.get(i).copied();
-    let (recs, el) = run(&solver, &get, threads, nlanes, None, share);
-    assert_eq!(recs.len(), cubes.len(), "cubes not reported");
+    let (records, elapsed) = run(&solver, &get, threads, lanes, None, share);
+    assert_eq!(records.len(), cubes.len(), "cubes not reported");
     let n = cubes.len() as f64;
-    let mode = share.map_or(String::new(), |c| format!(" share {c}"));
     println!(
-        "cubes {} threads {threads} lanes {nlanes} time {el:.3}s{mode}",
+        "cubes {} threads {threads} lanes {lanes} time {elapsed:.3}s{mode}",
         cubes.len()
     );
-    println!("solves/sec {:.3}", n / el);
-    summary(&recs);
-    let mut t: Vec<f64> = recs.iter().map(|r| r.dt).collect();
-    t.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    println!("solves/sec {:.3}", n / elapsed);
+    summary(&records);
+    let mut times: Vec<f64> = records.iter().map(|r| r.seconds).collect();
+    times.sort_by(f64::total_cmp);
     println!(
         "solve time max {:.3}s p50 {:.4}s",
-        t[t.len() - 1],
-        t[t.len() / 2]
+        times[times.len() - 1],
+        times[times.len() / 2]
     );
 }

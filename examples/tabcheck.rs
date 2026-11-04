@@ -17,7 +17,7 @@
 //! ```
 use cubeopt::coord::{cube_from_edge_key, split_index, N_SLOTS};
 use cubeopt::cubie::Rng;
-use cubeopt::tables::{cd_class, cd_ttrep, h48_rows, Cocsep, H48Table};
+use cubeopt::tables::{entry_class, entry_sym_to_rep, h48_rows, Cocsep, H48Table};
 use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
 
 /// Violations found, by kind.
@@ -38,7 +38,7 @@ fn main() {
     let samples: u64 = args[2].parse().unwrap();
     let seed: u64 = args[3].parse().unwrap();
     let threads: u64 = args.get(4).map_or(8, |x| x.parse().unwrap());
-    let cs = Cocsep::generate();
+    let corners = Cocsep::generate();
     let table = H48Table::open(&args[1]).expect("open table");
     let k = table.meta.k;
     assert!(
@@ -47,12 +47,12 @@ fn main() {
     );
     let rows = h48_rows(k);
     let counts = Counts::default();
-    let report = |what: &str, idx: u64, detail: String| {
-        eprintln!("VIOLATION {what}: index {idx} {detail}");
+    let report = |what: &str, index: u64, detail: String| {
+        eprintln!("VIOLATION {what}: index {index} {detail}");
     };
     std::thread::scope(|s| {
         for t in 0..threads {
-            let (cs, table, counts, report) = (&cs, &table, &counts, &report);
+            let (corners, table, counts, report) = (&corners, &table, &counts, &report);
             s.spawn(move || {
                 let mut rng = Rng(seed ^ (t << 40));
                 for _ in 0..samples / threads {
@@ -64,55 +64,59 @@ fn main() {
                             break x;
                         }
                     };
-                    let idx = rng.below(rows) * N_SLOTS as u64 + slot;
-                    let (class, edge_key) = split_index(idx, k);
-                    let cube = cube_from_edge_key(cs.reps[class], edge_key);
-                    let code = table.get(idx).0;
+                    let index = rng.below(rows) * N_SLOTS as u64 + slot;
+                    let (class, edge_key) = split_index(index, k);
+                    let cube = cube_from_edge_key(corners.representatives[class], edge_key);
+                    let code = table.get(index).0;
                     counts.samples.fetch_add(1, Relaxed);
                     counts.codes[usize::from(code)].fetch_add(1, Relaxed);
-                    if cs.index(cube, k) != idx {
+                    if corners.index(cube, k) != index {
                         counts.index_mismatch.fetch_add(1, Relaxed);
-                        report("index", idx, format!("{cube:?}"));
+                        report("index", index, format!("{cube:?}"));
                     }
                     // Self-symmetric variants of the entry (the same coset seen
                     // through a symmetry fixing the class representative).
-                    let mut sym = cs.selfsim[class] & !1;
+                    let mut sym = corners.self_symmetries[class] & !1;
                     while sym != 0 {
                         let s = sym.trailing_zeros() as usize;
                         sym ^= sym.isolate_lowest_one();
                         let variant = cube.transform(s);
-                        let data = cs.data[cubeopt::coord::cocsep(variant)];
-                        debug_assert_eq!(cd_class(data), class);
-                        let vidx = cs.index(variant, k);
-                        if table.get(vidx).0 != code {
+                        let entry = corners.entries[cubeopt::coord::cocsep(variant)];
+                        debug_assert_eq!(entry_class(entry), class);
+                        let variant_index = corners.index(variant, k);
+                        if table.get(variant_index).0 != code {
                             counts.variant_mismatch.fetch_add(1, Relaxed);
-                            report("variant", idx, format!("sym {s} ttrep {}", cd_ttrep(data)));
+                            report(
+                                "variant",
+                                index,
+                                format!("sym {s} ttrep {}", entry_sym_to_rep(entry)),
+                            );
                         }
                     }
                     let mut has_lower = false;
                     for m in 0..18 {
-                        let ncode = table.get(cs.index(cube.apply_move(m), k)).0;
-                        if ncode + 1 < code {
+                        let neighbor_code = table.get(corners.index(cube.apply_move(m), k)).0;
+                        if neighbor_code + 1 < code {
                             counts.too_low_neighbor.fetch_add(1, Relaxed);
                             report(
                                 "too low neighbor",
-                                idx,
-                                format!("code {code} move {m} code {ncode}"),
+                                index,
+                                format!("code {code} move {m} code {neighbor_code}"),
                             );
                         }
-                        if ncode > code + 1 && code < 3 {
+                        if neighbor_code > code + 1 && code < 3 {
                             counts.too_high_neighbor.fetch_add(1, Relaxed);
                             report(
                                 "too high neighbor",
-                                idx,
-                                format!("code {code} move {m} code {ncode}"),
+                                index,
+                                format!("code {code} move {m} code {neighbor_code}"),
                             );
                         }
-                        has_lower |= ncode + 1 == code;
+                        has_lower |= neighbor_code + 1 == code;
                     }
                     if (code == 1 || code == 2) && !has_lower {
                         counts.no_lower_neighbor.fetch_add(1, Relaxed);
-                        report("no lower neighbor", idx, format!("code {code}"));
+                        report("no lower neighbor", index, format!("code {code}"));
                     }
                 }
             });
