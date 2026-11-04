@@ -1048,6 +1048,11 @@ fn build(
         }
     }
     inner.extended = Instant::now();
+    if inner.phases > 1 {
+        first_pass_order(inner);
+        finish_build(pool, ctx);
+        return false;
+    }
     if job_len > 0 && inner.jobs.len() >= SORT_MIN && parallel {
         if inner.sort_by_bounds {
             stats_from_bounds(&mut inner.jobs);
@@ -1161,10 +1166,19 @@ const FIRST_PASS_SPAN: u8 = 4;
 const MAX_PHASES: usize = 8;
 const _: () = assert!((FIRST_PASS_SPAN as usize) < MAX_PHASES);
 
-/// Statistics of new jobs (no iteration ran them yet) for the sort, from
-/// their bounds: the largest bound lowest first (the largest trees), then
-/// the smallest. Only the order of the tails matters: the first pass is
-/// rarely the last iteration.
+/// A first pass claims its jobs as the extension left them, all of them:
+/// the ones infeasible in a phase are skipped when taken (`Worker::take`).
+/// Sorting them by their bounds was a serial pass over 3240 jobs that other
+/// threads had just written, on every cube's first build. Without it:
+/// -1.9% -c 1 at 48T (7 paired holds), 15/16-move scrambles -16/-11%,
+/// depth-15/16 states -20/-28%; -c 0 and bench share neutral.
+fn first_pass_order(inner: &mut Inner) {
+    inner.feasible = inner.jobs.len();
+}
+
+/// Statistics of new jobs (no iteration ran them yet) for the sort of a
+/// first build that is not a first pass, from their bounds: the largest
+/// bound lowest first (the largest trees), then the smallest.
 fn stats_from_bounds(jobs: &mut [Job]) {
     for job in jobs {
         // (Bounds are below 16.)
@@ -1535,6 +1549,11 @@ fn build_task(
                 unsafe { bufs.out.set_len(children) };
                 std::mem::swap(&mut inner.jobs, &mut bufs.out);
                 inner.extended = Instant::now();
+                if inner.phases > 1 {
+                    first_pass_order(inner);
+                    finish_build(pool, ctx);
+                    return true;
+                }
                 if inner.sort_by_bounds {
                     stats_from_bounds(&mut inner.jobs);
                 }
