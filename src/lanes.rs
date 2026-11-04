@@ -171,6 +171,13 @@ const JOBX0: JobX = JobX {
     _pad: 0,
 };
 
+/// `JobX::ck` of a run's root child whose statistic is 0, i.e. without a
+/// lookup in its subtree: X pruned by its other side (and its X' with it),
+/// or a half turn left out by a tight root. Per node, such children lead to
+/// a solution about as often as those with codes near this one (bounds 12
+/// and 12, or 13 and 12, and no lookup below); with code 0 they ran last.
+const UNSEEN_CODE: u8 = 48;
+
 /// A run entry (`Lane::runs`): key (bits 24..32), job (bits 5..24) and a
 /// child move (bits 0..5), or `RUN_ALL` for the job's children not run yet.
 const RUN_ALL: u32 = 31;
@@ -183,11 +190,13 @@ fn quant(x: f32) -> u8 {
 }
 
 /// The `JobX::ck` codes of the statistics `x` of a root's children:
-/// `quant`, plus one step (saturating) for nonzero codes of moves on faces
-/// 1, 3 and 5. Those children have 12 children instead of 15 (as the face
-/// weight of `job_weight`); measured 0.6% fewer nodes.
+/// `quant`, or `UNSEEN_CODE` for the children in `children` with code 0,
+/// plus one step (saturating) for moves on faces 1, 3 and 5. Those children
+/// have 12 children instead of 15 (as the face weight of `job_weight`);
+/// measured 0.6% fewer nodes. (Code 0 means statistic 0: every lookup adds
+/// at least 2 * 8.)
 #[inline(always)]
-fn quant18(x: &[f32; 18]) -> [u8; 18] {
+fn quant18(x: &[f32; 18], children: u32) -> [u8; 18] {
     let mut r = [0u8; 18];
     unsafe {
         use std::arch::x86_64::*;
@@ -198,13 +207,23 @@ fn quant18(x: &[f32; 18]) -> [u8; 18] {
         );
         let q = _mm512_cvtusepi32_epi8(_mm512_max_epi32(q, _mm512_setzero_si512()));
         let odd = _mm_setr_epi8(0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1);
-        let q = _mm_mask_adds_epu8(q, _mm_test_epi8_mask(q, q), q, odd);
+        let seen = _mm_test_epi8_mask(q, q);
+        let q = _mm_mask_adds_epu8(q, seen, q, odd);
+        let unseen = _mm_add_epi8(_mm_set1_epi8(UNSEEN_CODE.cast_signed()), odd);
+        #[expect(clippy::cast_possible_truncation, reason = "moves 0..16")]
+        let children_lo = children as u16;
+        let q = _mm_mask_mov_epi8(q, !seen & children_lo, unseen);
         _mm_storeu_si128(r.as_mut_ptr() as *mut __m128i, q);
     }
     // (moves 16 and 17 are on face 5)
     for m in 16..18 {
         let q = quant(x[m]);
-        r[m] = q.saturating_add((q != 0) as u8);
+        let q = if q == 0 && children >> m & 1 != 0 {
+            UNSEEN_CODE
+        } else {
+            q
+        };
+        r[m] = q.saturating_add(u8::from(q != 0));
     }
     r
 }
@@ -645,7 +664,10 @@ impl Lane {
     }
 
     /// The rest of a split iteration: one entry per job with children not
-    /// run yet, by decreasing best `ck` of those.
+    /// run yet, by decreasing best `ck` of all its children (those run in
+    /// this iteration's first part included: a job whose best child ran
+    /// without a solution is still more promising than one whose best child
+    /// is weaker; measured 0.5% fewer nodes than the best of those left).
     fn build_rest(&mut self) {
         let n = self.rs.jx.len();
         let tag = (self.target as u32) << 24;
@@ -656,7 +678,9 @@ impl Lane {
             let x = &self.rs.jx[ji];
             let rest = self.side_moves(ji) & !done_now(x, tag);
             if rest != 0 {
-                let key = max18(&x.ck, rest);
+                // The job's best code of all its children, not only of those
+                // left (-0.5% nodes on 20K random and 33K depth-18 cubes).
+                let key = max18(&x.ck, ALL_MOVES);
                 cnt[key as usize] += 1;
                 self.rs
                     .runs_tmp
@@ -694,7 +718,11 @@ impl Lane {
             let root = &self.stack[0];
             let mask = self.rs.cur_mask;
             let tag = (self.target as u32) << 24;
-            let q = quant18(&self.cheur);
+            // Children without statistics get `UNSEEN_CODE`: they run with
+            // the mid-ranked children instead of last (with the rest key of
+            // `build_rest`: -1.0% nodes on 20K random and 33K depth-18
+            // cubes, +0.6% 48T).
+            let q = quant18(&self.cheur, moves_after(&self.jobs[ji]) & mask);
             debug_assert!(root.normal);
             let x = if self.rs.part == 0 {
                 // A whole run: the entry is all new (not read: it is not
@@ -1565,6 +1593,33 @@ mod tests {
                 l.target += 1;
             }
         }
+    }
+
+    /// `quant18`: the children in the mask without a statistic get
+    /// `UNSEEN_CODE`, the others keep `quant` (0 stays 0), and every nonzero
+    /// code of a move on faces 1, 3 and 5 gets one step more.
+    #[test]
+    fn quant18_codes_unseen_children() {
+        let mut x = [0f32; 18];
+        x[0] = HEUR_TERMS[12] * 2.0;
+        x[4] = HEUR_TERMS[13] + HEUR_TERMS[11];
+        x[9] = HEUR_TERMS[10];
+        x[17] = HEUR_TERMS[12];
+        // (all faces but face 2: moves 16 and 17 included)
+        let children = ALLOWED_AFTER[2];
+        let q = quant18(&x, children);
+        for m in 0..18 {
+            let face_step = u8::from((m / 3) % 2 == 1);
+            let want = if x[m] > 0.0 {
+                quant(x[m]) + face_step
+            } else if children >> m & 1 != 0 {
+                UNSEEN_CODE + face_step
+            } else {
+                0
+            };
+            assert_eq!(q[m], want, "move {m}");
+        }
+        assert!(q[0] > 0 && q[16] == UNSEEN_CODE + 1 && q[7] == 0);
     }
 
     #[test]
