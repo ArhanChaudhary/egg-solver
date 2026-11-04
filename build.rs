@@ -31,9 +31,35 @@ fn aligned32(bytes: &[u8; 32]) -> String {
     format!("Aligned32([{}])", list(bytes))
 }
 
+/// The cube backend for the target: `x86` (AVX2 + BMI2, `simd.rs`), `neon`
+/// (aarch64) or `scalar` (anything else, or the `scalar` feature); the last
+/// two are `portable/`. Set as `cfg(backend = "...")`.
+fn backend(has: impl Fn(&str) -> bool) -> &'static str {
+    let arch = std::env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
+    if std::env::var_os("CARGO_FEATURE_SCALAR").is_some() {
+        "scalar"
+    } else if arch == "x86_64" && has("avx2") && has("bmi2") {
+        "x86"
+    } else if arch == "aarch64" && has("neon") {
+        "neon"
+    } else {
+        "scalar"
+    }
+}
+
 fn main() {
     println!("cargo:rerun-if-changed=src/cubie.rs");
     println!("cargo:rerun-if-changed=build.rs");
+    let features = std::env::var("CARGO_CFG_TARGET_FEATURE").unwrap_or_default();
+    let has = |f: &str| features.split(',').any(|x| x == f);
+    println!("cargo::rustc-check-cfg=cfg(backend, values(\"x86\", \"neon\", \"scalar\"))");
+    println!("cargo::rustc-check-cfg=cfg(avx512)");
+    let backend = backend(has);
+    println!("cargo::rustc-cfg=backend=\"{backend}\"");
+    // AVX-512 helpers of the lanes kernel (`lanes.rs`) on the x86 backend.
+    if backend == "x86" && has("avx512f") && has("avx512bw") && has("avx512vl") {
+        println!("cargo::rustc-cfg=avx512");
+    }
     let mut s = String::new();
     let moves = cubie::move_cubes();
     writeln!(s, "pub const MOVES: [Aligned32; 18] = [").unwrap();

@@ -8,7 +8,8 @@
 //!
 //! Modules, from the bottom up:
 //! * `cubie`: the reference cube model (pieces and their orientations).
-//! * `simd`: the fast cube (one AVX2 register) and its moves and symmetries.
+//! * `simd`: the fast cube (one AVX2 register, or two 16-byte vectors on
+//!   other targets: `portable`) and its moves and symmetries.
 //! * `coord`: coordinates, the table indices of a cube.
 //! * `tables`: the corner table and the big H48 table (and its files,
 //!   `tables::file`); `gen` builds the latter, for any k.
@@ -23,9 +24,22 @@ pub mod gen;
 pub mod hot;
 pub mod lanes;
 pub mod prefetch;
+/// The cube type and the hot path's small tables: AVX2 on x86 (`simd.rs`),
+/// else the portable backend (NEON on aarch64, scalar elsewhere).
+#[cfg(backend = "x86")]
+pub mod simd;
+#[cfg(not(backend = "x86"))]
+#[path = "portable/mod.rs"]
 pub mod simd;
 pub mod solver;
 pub mod tables;
+
+/// The portable backend, compiled with the x86 one only for its tests (which
+/// cross-check the two).
+#[cfg(all(test, backend = "x86"))]
+#[path = "portable/mod.rs"]
+#[allow(dead_code)]
+mod portable_check;
 
 use tables::{h48_bytes, h48_rows, Cocsep, H48Meta, H48Table, Memory};
 

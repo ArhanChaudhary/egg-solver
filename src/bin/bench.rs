@@ -122,7 +122,10 @@ cubeopt::hot_section!(".text.hot_stream", cubeopt::hot::STREAM_PAD);
 
 /// A thread of a stream-mode run (`run_lanes`).
 #[inline(never)]
-#[unsafe(link_section = ".text.hot_stream")]
+#[cfg_attr(
+    all(target_arch = "x86_64", target_os = "linux"),
+    unsafe(link_section = ".text.hot_stream")
+)]
 fn stream_thread(
     solver: &Solver,
     cubes: &(dyn Fn(usize) -> Option<CubieCube> + Sync),

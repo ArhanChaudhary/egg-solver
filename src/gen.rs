@@ -242,12 +242,7 @@ impl Generator<'_> {
                     let i = self.index(cube.apply_move(mv));
                     *slot = i;
                     let (w, _) = entry_position(i);
-                    unsafe {
-                        std::arch::x86_64::_mm_prefetch(
-                            words.as_ptr().add(w).cast::<i8>(),
-                            std::arch::x86_64::_MM_HINT_T0,
-                        );
-                    }
+                    crate::prefetch::read(words.as_ptr().wrapping_add(w));
                 }
             }
             for (p, &index) in pending.iter().enumerate() {

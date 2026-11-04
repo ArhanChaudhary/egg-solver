@@ -565,12 +565,9 @@ impl H48Table {
 
     #[inline(always)]
     pub fn prefetch(&self, index: u64) {
-        unsafe {
-            let line = self.memory.ptr().add((index >> 2) as usize);
-            // NTA: each line is read once; less L2 pollution (cocsep data).
-            // (+2.6% at 48T when added, prefetch-nta.)
-            std::arch::x86_64::_mm_prefetch(line.cast::<i8>(), std::arch::x86_64::_MM_HINT_NTA);
-        }
+        // NTA: each line is read once; less L2 pollution (cocsep data).
+        // (+2.6% at 48T when added, prefetch-nta.)
+        crate::prefetch::read_once(self.memory.ptr().wrapping_add((index >> 2) as usize));
     }
 
     /// Distribution of the 2-bit codes over real entries.

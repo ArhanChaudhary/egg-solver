@@ -1722,15 +1722,11 @@ fn phase_target(inner: &Inner, phase: u8) -> u8 {
 
 #[inline(always)]
 fn prefetch<T>(x: &T, write: bool) {
-    // SAFETY: prefetches have no effect on the program state.
-    unsafe {
-        use std::arch::x86_64::{_mm_prefetch, _MM_HINT_ET0, _MM_HINT_T0};
-        let p = std::ptr::from_ref(x).cast::<i8>();
-        if write {
-            _mm_prefetch(p, _MM_HINT_ET0);
-        } else {
-            _mm_prefetch(p, _MM_HINT_T0);
-        }
+    let p = std::ptr::from_ref(x);
+    if write {
+        crate::prefetch::write(p);
+    } else {
+        crate::prefetch::read(p);
     }
 }
 
@@ -1795,7 +1791,10 @@ impl Worker<'_, '_> {
     // register): -3.0% -c 0, -2.6% -c 1, +3.8% bench share at 48T, -2.0% -c 0
     // at 1T (l6-share-2).
     #[inline(never)]
-    #[unsafe(link_section = ".text.hot_share")]
+    #[cfg_attr(
+        all(target_arch = "x86_64", target_os = "linux"),
+        unsafe(link_section = ".text.hot_share")
+    )]
     fn rounds(&mut self, solver: &Solver, stop: &AtomicBool, round: &mut u32) -> bool {
         while self.active_lanes > 0 {
             let mut i = 0;

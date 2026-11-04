@@ -1,2 +1,6 @@
-[build]
+# Build for the CPU of the build machine (AVX2/AVX-512, BMI2 on x86). Only
+# for x86_64 targets: "native" would name the host CPU when cross-compiling,
+# and aarch64 targets already default to a NEON CPU (apple-m1 on macOS). For
+# portable binaries see README.md ("Portable builds").
+[target.'cfg(target_arch = "x86_64")']
 rustflags = ["-C", "target-cpu=native"]

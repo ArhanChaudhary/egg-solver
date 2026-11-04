@@ -25,10 +25,17 @@
 //! of each byte), then looks the parts up in small tables.
 
 use crate::simd::Cube;
+#[cfg(backend = "x86")]
 use std::arch::x86_64::{
     _mm256_add_epi8, _mm256_movemask_epi8, _mm256_shuffle_epi8, _mm256_slli_epi16,
     _mm256_xor_si256, _pdep_u32, _pext_u32, _pext_u64,
 };
+// The portable backend's versions of the parts that use BMI2 and movemasks
+// here (same results; see `portable/coord.rs`).
+#[cfg(not(backend = "x86"))]
+pub use crate::simd::coord::edge_masks;
+#[cfg(not(backend = "x86"))]
+use crate::simd::coord::{corner_fields, edge_parts_sym_raw, pdep12, pext12, pext_contiguous};
 
 /// Corner orientations (the 8th follows from the others).
 pub const N_CO: usize = 2187;
@@ -201,6 +208,7 @@ pub(crate) const CO_HIGH: [u32; 64] = {
 
 /// The corner bits of a cube: the orientations of corners 0..7 (2 bits
 /// each, 14 bits) and the tetrad mask (8 bits), by two `pext`s.
+#[cfg(backend = "x86")]
 #[inline(always)]
 fn corner_fields(cube: Cube) -> (u64, u64) {
     let corners = cube.corners_u64();
@@ -272,6 +280,7 @@ pub fn cocsep_x3(cube: Cube) -> usize {
 
 /// Edge masks: (E-slice positions, S-slice positions, flipped edges), 12
 /// bits each.
+#[cfg(backend = "x86")]
 #[must_use]
 #[inline(always)]
 pub fn edge_masks(cube: Cube) -> (u32, u32, u32) {
@@ -291,11 +300,15 @@ pub fn edge_masks(cube: Cube) -> (u32, u32, u32) {
 /// `(msplit << 20) | (eo11 << 9) | eslot`.
 #[must_use]
 #[inline(always)]
+#[cfg_attr(not(backend = "x86"), allow(unused_unsafe))]
 pub fn edge_key(cube: Cube) -> u64 {
     let (e_slice, s_slice, flips) = edge_masks(cube);
     unsafe {
         // (msplit ranks the S-slice positions among the non-E positions.)
+        #[cfg(backend = "x86")]
         let s_among_non_e = _pext_u32(s_slice, !e_slice & 0xFFF);
+        #[cfg(not(backend = "x86"))]
+        let s_among_non_e = pext12(s_slice, !e_slice & 0xFFF);
         let msplit = u64::from(RANK8[s_among_non_e as usize]);
         let eslot = u64::from(ESLOT[e_slice as usize]);
         (msplit << 20) | (u64::from(flips >> 1) << 9) | eslot
@@ -326,6 +339,7 @@ pub fn edge_parts_sym(cube: Cube, sym: usize) -> (u64, u64, u64) {
 
 /// `edge_parts_sym` with the eo part unshifted: the eo of edges 0..11 in
 /// bits 16..28 (all else zero).
+#[cfg(backend = "x86")]
 #[expect(
     clippy::cast_possible_truncation,
     reason = "x86-64: the u64 pext result indexes a 256-entry table"
@@ -390,7 +404,10 @@ fn edge_parts_sym_raw(cube: Cube, sym: usize) -> (u64, u32, u64) {
 pub fn index_sym(cube: Cube, sym: usize, class: usize, row_mul: u64, eo_mask: u32) -> u64 {
     let (msplit, eo_bits, eslot) = edge_parts_sym_raw(cube, sym);
     let row = class as u64 * N_MSPLIT as u64 + msplit;
+    #[cfg(backend = "x86")]
     let eo = u64::from(unsafe { _pext_u32(eo_bits, eo_mask) });
+    #[cfg(not(backend = "x86"))]
+    let eo = u64::from(pext_contiguous(eo_bits, eo_mask));
     (row * row_mul) | (eo << 9) | eslot
 }
 
@@ -440,7 +457,10 @@ pub fn cube_from_edge_key(corners: Cube, edge_key: u64) -> Cube {
     let eo11 = ((edge_key >> 9) & 0x7FF) as u32;
     let msplit = (edge_key >> 20) as usize;
     let e_slice = u32::from(SLOT_EMASK[eslot]);
+    #[cfg(backend = "x86")]
     let s_slice = unsafe { _pdep_u32(u32::from(UNRANK8[msplit]), !e_slice & 0xFFF) };
+    #[cfg(not(backend = "x86"))]
+    let s_slice = pdep12(u32::from(UNRANK8[msplit]), !e_slice & 0xFFF);
     // (The 12th flip makes the number of flips even.)
     let eo12 = (eo11 << 1) | (eo11.count_ones() & 1);
     let mut bytes = corners.to_bytes();

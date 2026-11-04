@@ -6,6 +6,10 @@ edition = "2021"
 [dependencies]
 libc = "0.2"
 
+[features]
+# Force the portable scalar backend (to test it on any machine).
+scalar = []
+
 [profile.release]
 opt-level = 3
 lto = "fat"

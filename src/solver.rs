@@ -199,12 +199,9 @@ impl<'a> Solver<'a> {
     /// Prefetch table entry `index` (`H48Table::prefetch`).
     #[inline(always)]
     pub(crate) fn prefetch(&self, index: u64) {
-        unsafe {
-            let line = self.table_ptr.add((index >> 2) as usize);
-            // NTA: each line is read once; less L2 pollution (cocsep data).
-            // (+2.6% at 48T when added, prefetch-nta.)
-            std::arch::x86_64::_mm_prefetch(line.cast::<i8>(), std::arch::x86_64::_MM_HINT_NTA);
-        }
+        // NTA: each line is read once; less L2 pollution (cocsep data).
+        // (+2.6% at 48T when added, prefetch-nta.)
+        crate::prefetch::read_once(self.table_ptr.wrapping_add((index >> 2) as usize));
     }
 
     /// Lower bound for a single cube (no pipelining).

@@ -222,6 +222,7 @@ fn quantize(stat: f32) -> u8 {
 /// have 12 children instead of 15 (as the face weight of `job_weight`;
 /// -0.6% nodes when added, part of c7). (Code 0 means statistic 0: every
 /// lookup adds at least 2 * 8.)
+#[cfg(avx512)]
 #[inline(always)]
 #[expect(clippy::cast_ptr_alignment, reason = "unaligned store")]
 fn quantize18(stats: &[f32; 18], children: u32) -> [u8; 18] {
@@ -261,8 +262,29 @@ fn quantize18(stats: &[f32; 18], children: u32) -> [u8; 18] {
     codes
 }
 
+/// `quantize18` without AVX-512 (the same codes).
+#[cfg(not(avx512))]
+#[inline(always)]
+fn quantize18(stats: &[f32; 18], children: u32) -> [u8; 18] {
+    std::array::from_fn(|mv| {
+        let code = quantize(stats[mv]);
+        let code = if code == 0 && children >> mv & 1 != 0 {
+            UNSEEN_CODE
+        } else {
+            code
+        };
+        // One step more for moves on faces 1, 3 and 5.
+        if (mv / 3) % 2 == 1 {
+            code.saturating_add(u8::from(code != 0))
+        } else {
+            code
+        }
+    })
+}
+
 /// The sum of 18 statistics (a tree of additions: off the latency of a
 /// sequential sum).
+#[cfg(avx512)]
 #[inline(always)]
 fn sum18(stats: &[f32; 18]) -> f32 {
     unsafe {
@@ -271,8 +293,20 @@ fn sum18(stats: &[f32; 18]) -> f32 {
     }
 }
 
+/// `sum18` without AVX-512: the additions of `_mm512_reduce_add_ps`
+/// (halves, then quarters, ...) in its order, so the same sum to the bit
+/// (job statistics order the search: node counts stay identical).
+#[cfg(not(avx512))]
+#[inline(always)]
+fn sum18(stats: &[f32; 18]) -> f32 {
+    let eighths: [f32; 8] = std::array::from_fn(|i| stats[i] + stats[i + 8]);
+    let quarters: [f32; 4] = std::array::from_fn(|i| eighths[i] + eighths[i + 4]);
+    (quarters[0] + quarters[2]) + (quarters[1] + quarters[3]) + (stats[16] + stats[17])
+}
+
 /// Bit mask of the moves m with `codes[m] > threshold` (moves 0..16 in one
 /// SSE compare, 16 and 17 apart).
+#[cfg(avx512)]
 #[inline(always)]
 #[expect(clippy::cast_ptr_alignment, reason = "unaligned load")]
 fn codes_above(codes: &[u8; 18], threshold: u8) -> u32 {
@@ -287,7 +321,15 @@ fn codes_above(codes: &[u8; 18], threshold: u8) -> u32 {
     }
 }
 
+/// `codes_above` without AVX-512.
+#[cfg(not(avx512))]
+#[inline(always)]
+fn codes_above(codes: &[u8; 18], threshold: u8) -> u32 {
+    (0..18).fold(0, |mask, mv| mask | u32::from(codes[mv] > threshold) << mv)
+}
+
 /// The largest `codes[m]` over the moves m in `moves` (0 if none).
+#[cfg(avx512)]
 #[inline(always)]
 #[expect(
     clippy::cast_possible_truncation,
@@ -314,6 +356,17 @@ fn max_code(codes: &[u8; 18], moves: u32) -> u8 {
     let code16 = if moves >> 16 & 1 != 0 { codes[16] } else { 0 };
     let code17 = if moves >> 17 & 1 != 0 { codes[17] } else { 0 };
     low_max.max(code16).max(code17)
+}
+
+/// `max_code` without AVX-512.
+#[cfg(not(avx512))]
+#[inline(always)]
+fn max_code(codes: &[u8; 18], moves: u32) -> u8 {
+    (0..18)
+        .filter(|mv| moves >> mv & 1 != 0)
+        .map(|mv| codes[mv])
+        .max()
+        .unwrap_or(0)
 }
 
 /// Job statistic contribution of each lookup value h: 8^(16-h). Steeper
@@ -701,12 +754,22 @@ impl Lane {
     /// whose code is above `theta`, by decreasing code (ties in job and move
     /// order). The entries of a job's moves 0..16 are written by one AVX-512
     /// compress-store of the candidates.
-    #[expect(
-        clippy::cast_possible_truncation,
-        clippy::cast_possible_wrap,
-        clippy::cast_ptr_alignment,
-        reason = "job indices are below 2^19 (19 bits of a run entry); the low 16 \
-                  moves; unaligned load"
+    #[cfg_attr(
+        avx512,
+        expect(
+            clippy::cast_possible_truncation,
+            clippy::cast_possible_wrap,
+            clippy::cast_ptr_alignment,
+            reason = "job indices are below 2^19 (19 bits of a run entry); the low 16 \
+                      moves; unaligned load"
+        )
+    )]
+    #[cfg_attr(
+        not(avx512),
+        expect(
+            clippy::cast_possible_truncation,
+            reason = "job indices are below 2^19 (19 bits of a run entry)"
+        )
     )]
     fn build_first(&mut self) {
         self.run_state.theta = self.choose_theta();
@@ -727,6 +790,7 @@ impl Lane {
             }
             // SAFETY: n_runs + 18 <= capacity; entries are written before
             // `set_len` covers them.
+            #[cfg(avx512)]
             unsafe {
                 use std::arch::x86_64::{
                     __m128i, _mm512_add_epi32, _mm512_cvtepu8_epi32,
@@ -751,6 +815,25 @@ impl Lane {
                     end += (candidates >> mv & 1) as usize;
                 }
                 n_runs = end;
+            }
+            // (The same entries, in the same order, without AVX-512.)
+            #[cfg(not(avx512))]
+            {
+                let mut moves = candidates;
+                while moves != 0 {
+                    let mv = moves.trailing_zeros();
+                    moves ^= moves.isolate_lowest_one();
+                    let entry = u32::from(order.codes[mv as usize]) << 24 | (job as u32) << 5 | mv;
+                    // SAFETY: as above.
+                    unsafe {
+                        self.run_state
+                            .runs_tmp
+                            .as_mut_ptr()
+                            .add(n_runs)
+                            .write(entry);
+                    }
+                    n_runs += 1;
+                }
             }
         }
         // SAFETY: the first `n_runs` entries were written.
@@ -903,21 +986,13 @@ impl Lane {
             // The job vectors are too big for L2 and the lanes interleave
             // their streams: fetch the next entry's job early (part of c7).
             unsafe {
-                use std::arch::x86_64::{_mm_prefetch, _MM_HINT_T0};
                 let next = *self
                     .run_state
                     .runs
                     .get_unchecked(self.run_state.run_pos.min(self.run_state.runs.len() - 1));
                 let next_job = (next >> 5 & 0x7_FFFF) as usize;
-                _mm_prefetch(
-                    self.run_state
-                        .child_orders
-                        .as_ptr()
-                        .add(next_job)
-                        .cast::<i8>(),
-                    _MM_HINT_T0,
-                );
-                _mm_prefetch(self.jobs.as_ptr().add(next_job).cast::<i8>(), _MM_HINT_T0);
+                crate::prefetch::read(self.run_state.child_orders.as_ptr().add(next_job));
+                crate::prefetch::read(self.jobs.as_ptr().add(next_job));
             }
             let job_index = (entry >> 5 & 0x7_FFFF) as usize;
             let mv = entry & 31;
@@ -987,14 +1062,10 @@ impl Lane {
             // m2-jobs' +4.3% at 48T when added).
             let ahead = (self.job_pos + 8).min(self.jobs.len() - 1);
             unsafe {
-                use std::arch::x86_64::{_mm_prefetch, _MM_HINT_ET0, _MM_HINT_T0};
-                _mm_prefetch(self.jobs.as_ptr().add(ahead).cast::<i8>(), _MM_HINT_T0);
+                crate::prefetch::read(self.jobs.as_ptr().add(ahead));
                 if self.run_state.full {
                     // (written at the end of the run)
-                    _mm_prefetch(
-                        self.run_state.child_orders.as_ptr().add(ahead).cast::<i8>(),
-                        _MM_HINT_ET0,
-                    );
+                    crate::prefetch::write(self.run_state.child_orders.as_ptr().add(ahead));
                 }
             }
             let remaining_depth = self.target - job.len;

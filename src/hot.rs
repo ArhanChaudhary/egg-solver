@@ -57,9 +57,13 @@ pub const fn pad(var: Option<&str>, default: usize) -> usize {
 /// `#[unsafe(link_section = $name)]`, the section's only one, then starts
 /// at offset `$pad` of a 64-byte line. (Module-level asm is emitted before
 /// any function, and the function's own alignment, 16, divides the pad.)
+/// Only on x86-64 Linux (ELF section syntax, tuned on Zen 5): elsewhere the
+/// hot functions stay where the linker puts them (their `link_section` is
+/// set under the same condition).
 #[macro_export]
 macro_rules! hot_section {
     ($name:literal, $pad:expr) => {
+        #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
         ::core::arch::global_asm!(
             concat!(".pushsection ", $name, ",\"ax\",@progbits"),
             ".p2align 6",
