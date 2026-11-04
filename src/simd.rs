@@ -62,8 +62,8 @@ pub struct HotTables {
     /// immediates per call): orientations of corners 0..6, tetrads.
     pub co_pext_mask: u64,
     pub tetrad_pext_mask: u64,
-    /// `lanes::HEUR_PAIR`.
-    pub heur_pair: [f32; 256],
+    /// `lanes::STAT_PAIRS`.
+    pub stat_pairs: [f32; 256],
     /// `solver::ALLOWED_AFTER`.
     pub allowed_after: [u32; 6],
     /// `!(7 << (3 * f))`: all moves but those of face `f`.
@@ -114,7 +114,7 @@ pub static HOT_TABLES: HotTables = HotTables {
     rank8: crate::coord::RANK8_CONST,
     co_pext_mask: 0x0060_6060_6060_6060,
     tetrad_pext_mask: 0x0404_0404_0404_0404,
-    heur_pair: crate::lanes::HEUR_PAIR,
+    stat_pairs: crate::lanes::STAT_PAIRS,
     allowed_after: crate::solver::ALLOWED_AFTER_CONST,
     face_keep: {
         let mut result = [0u32; 6];

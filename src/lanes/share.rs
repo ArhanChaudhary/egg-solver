@@ -780,8 +780,8 @@ impl SharedLane {
         lane.jobs.push(Job {
             moves: [0; 4],
             len: 0,
-            ln: 0,
-            li: 0,
+            normal_bound: 0,
+            inverse_bound: 0,
             stat: 0.0,
         });
         SharedLane {
@@ -868,8 +868,8 @@ fn build(
     }
     if len < job_len {
         // (`scratch` gets the cube's buffer and ours, and returns them.)
-        scratch.root_c = ctx.root;
-        scratch.root_ci = ctx.root_inverse;
+        scratch.root = ctx.root;
+        scratch.root_inverse = ctx.root_inverse;
         std::mem::swap(&mut scratch.jobs, &mut inner.jobs);
         std::mem::swap(&mut scratch.jobs_tmp, &mut own_bufs.out);
         // Moves left to add, in parallel.
@@ -1092,7 +1092,8 @@ fn sort_key(jobs: &[Job], stats: &[AtomicU32], from_atomics: bool, target: u8, i
     } else {
         job.stat
     };
-    let infeasible = u32::from(job.ln.max(job.li)) + u32::from(job.len) > u32::from(target);
+    let infeasible =
+        u32::from(job.normal_bound.max(job.inverse_bound)) + u32::from(job.len) > u32::from(target);
     u64::from(infeasible) << 63
         | u64::from(!(stat * job_weight(job)).to_bits()) << KEY_SHIFT
         | i as u64
@@ -1291,8 +1292,8 @@ fn build_task(
                 };
                 let lo = task * chunk;
                 let hi = (lo + chunk).min(inner.jobs.len());
-                scratch.root_c = ctx.root;
-                scratch.root_ci = ctx.root_inverse;
+                scratch.root = ctx.root;
+                scratch.root_inverse = ctx.root_inverse;
                 scratch.jobs.clear();
                 scratch.jobs.extend_from_slice(&inner.jobs[lo..hi]);
                 for _ in 0..inner.b.extension_moves {
@@ -1644,10 +1645,10 @@ impl Worker<'_, '_> {
         if stat {
             let job_stat = &loc.ctx.inner().stats[sl.job as usize];
             if sl.split {
-                add_f32(job_stat, sl.lane.heur);
+                add_f32(job_stat, sl.lane.job_stat);
             } else {
                 // (Nobody else writes it; it was 0.)
-                job_stat.store(sl.lane.heur.to_bits(), Relaxed);
+                job_stat.store(sl.lane.job_stat.to_bits(), Relaxed);
             }
         }
         loc.pending -= 1;
@@ -1767,8 +1768,8 @@ impl Worker<'_, '_> {
             let inner = ctx.inner();
             let sl = &mut self.lanes[li];
             let lane = &mut sl.lane;
-            lane.root_c = ctx.root;
-            lane.root_ci = ctx.root_inverse;
+            lane.root = ctx.root;
+            lane.root_inverse = ctx.root_inverse;
             lane.target = inner.target;
             lane.jobs[0] = inner.jobs[job as usize];
             lane.job_pos = 0;
@@ -1985,8 +1986,8 @@ impl Worker<'_, '_> {
                 inner.jobs.push(Job {
                     moves: [0; 4],
                     len: 0,
-                    ln: bound,
-                    li: bound_inverse,
+                    normal_bound: bound,
+                    inverse_bound: bound_inverse,
                     stat: 0.0,
                 });
                 inner.stats.clear();
@@ -2043,7 +2044,7 @@ impl Worker<'_, '_> {
             // (The lane is idle: its stack is free.)
             let lane = &mut self.lanes[li].lane;
             lane.stack[..=piece.depth].copy_from_slice(&piece.nodes[..=piece.depth]);
-            lane.sp = piece.depth;
+            lane.depth = piece.depth;
             (piece.ctx.take().unwrap(), piece.job)
         };
         mailbox.state.store(IDLE, Release);
@@ -2063,9 +2064,9 @@ impl Worker<'_, '_> {
         lane.jobs[0] = inner.jobs[job as usize];
         lane.job_pos = 0;
         lane.target = inner.target;
-        lane.root_c = ctx.root;
-        lane.root_ci = ctx.root_inverse;
-        lane.cheur = [0.0; 18];
+        lane.root = ctx.root;
+        lane.root_inverse = ctx.root_inverse;
+        lane.child_stats = [0.0; 18];
         sl.slot = slot;
         sl.job = job;
         sl.split = true;
@@ -2087,23 +2088,23 @@ impl Worker<'_, '_> {
                 continue;
             }
             let lane = &sl.lane;
-            for depth in 0..=lane.sp {
+            for depth in 0..=lane.depth {
                 let node = &lane.stack[depth];
-                if node.r <= best_r {
+                if node.remaining_depth <= best_r {
                     break;
                 }
-                if node.lb > node.r || node.todo == 0 {
+                if node.lower_bound > node.remaining_depth || node.todo == 0 {
                     continue;
                 }
-                // (An active lane's pending child is `k_m`.)
-                let face = if depth < lane.sp {
-                    lane.stack[depth + 1].m / 3
+                // (An active lane's pending child is `pending_move`.)
+                let face = if depth < lane.depth {
+                    lane.stack[depth + 1].mv / 3
                 } else {
-                    lane.k_m / 3
+                    lane.pending_move / 3
                 };
                 if let Some(give) = split_moves(node.todo, face) {
                     best = Some((index, depth, give));
-                    best_r = node.r;
+                    best_r = node.remaining_depth;
                     break;
                 }
             }
@@ -2127,13 +2128,13 @@ impl Worker<'_, '_> {
         }
         to.lane.stack[depth].todo = give;
         from.lane.stack[depth].todo &= !give;
-        to.lane.sp = depth;
-        to.lane.cheur = [0.0; 18];
+        to.lane.depth = depth;
+        to.lane.child_stats = [0.0; 18];
         to.lane.jobs[0] = from.lane.jobs[0];
         to.lane.job_pos = 0;
         to.lane.target = from.lane.target;
-        to.lane.root_c = from.lane.root_c;
-        to.lane.root_ci = from.lane.root_ci;
+        to.lane.root = from.lane.root;
+        to.lane.root_inverse = from.lane.root_inverse;
         to.slot = from.slot;
         to.job = from.job;
         to.split = true;
@@ -2434,8 +2435,8 @@ mod tests {
                     Job {
                         moves: [(r >> 40) as u8 % 18, 0, 0, (i % 251) as u8],
                         len: 1,
-                        ln: (i / 251) as u8,
-                        li: 0,
+                        normal_bound: (i / 251) as u8,
+                        inverse_bound: 0,
                         stat,
                     }
                 })
@@ -2445,11 +2446,11 @@ mod tests {
             // all feasible
             let mut serial = jobs.clone();
             assert_eq!(sort_serial(&mut serial, &mut Bufs::sized(), 255), n);
-            let id = |j: &Job| (j.moves, j.ln, j.stat.to_bits());
+            let id = |j: &Job| (j.moves, j.normal_bound, j.stat.to_bits());
             assert!(serial.iter().map(id).eq(want.iter().map(id)), "n = {n}");
             // the feasible ones in that order, then the others
             let target = 100;
-            let feasible = |j: &&Job| j.ln < target;
+            let feasible = |j: &&Job| j.normal_bound < target;
             let want_t: Vec<Job> = want
                 .iter()
                 .filter(feasible)
