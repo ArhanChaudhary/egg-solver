@@ -24,12 +24,10 @@
 //! `pext` (gather the bits under a mask) and `movemask` (gather the top bit
 //! of each byte), then looks the parts up in small tables.
 
-use crate::simd::{Aligned64, Cube};
-#[cfg(miri)]
-use std::arch::x86_64::_pext_u64;
+use crate::simd::Cube;
 use std::arch::x86_64::{
-    __m256i, _mm256_add_epi8, _mm256_load_si256, _mm256_movemask_epi8, _mm256_shuffle_epi8,
-    _mm256_slli_epi16, _mm256_xor_si256, _pdep_u32, _pext_u32,
+    _mm256_add_epi8, _mm256_movemask_epi8, _mm256_shuffle_epi8, _mm256_slli_epi16,
+    _mm256_xor_si256, _pdep_u32, _pext_u32, _pext_u64,
 };
 
 /// Corner orientations (the 8th follows from the others).
@@ -307,10 +305,10 @@ pub fn edge_key(cube: Cube) -> u64 {
 /// Edge part of the h11 key of `cube` conjugated by symmetry `sym`; equals
 /// `edge_key(cube.transform_edges(sym))`. Only the edge classes and
 /// orientations of the conjugate are built: one shuffle classifies each
-/// piece `p` as `T[p]` (E/S flags, eo of T), xor adds the cube's eo, and a
-/// second shuffle applies the position permutation `Tinv`, whose eo is
-/// added on the eo path only. (Instead of a full conjugation: +5.5% at 48T
-/// when added, edge-conj.)
+/// piece `p` as `T[p]` (E/S flags, eo of T), xor adds the cube's eo and
+/// Tinv's (by source position: one three-way xor), and a second shuffle
+/// applies the position permutation `Tinv`. (Instead of a full
+/// conjugation: +5.5% at 48T when added, edge-conj.)
 #[must_use]
 #[inline(always)]
 pub fn edge_key_sym(cube: Cube, sym: usize) -> u64 {
@@ -328,14 +326,26 @@ pub fn edge_parts_sym(cube: Cube, sym: usize) -> (u64, u64, u64) {
 
 /// `edge_parts_sym` with the eo part unshifted: the eo of edges 0..11 in
 /// bits 16..28 (all else zero).
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "x86-64: the u64 pext result indexes a 256-entry table"
+)]
 #[inline(always)]
 fn edge_parts_sym_raw(cube: Cube, sym: usize) -> (u64, u32, u64) {
     unsafe {
         let tabs = &crate::simd::HOT_TABLES;
-        let line: *const Aligned64 = tabs.sym_edges.get_unchecked(sym);
-        let classify = _mm256_load_si256(line.cast());
-        let positions = _mm256_load_si256(line.cast::<__m256i>().add(1));
-        let classes = _mm256_xor_si256(_mm256_shuffle_epi8(classify, cube.0), cube.0);
+        let entry = tabs.sym_edges.get_unchecked(sym);
+        let classify = crate::simd::load(&entry.classes);
+        let positions = crate::simd::load(&entry.perm);
+        // Tinv's eo (by source position) is folded into the xor that adds
+        // the cube's eo: one vpternlog, and no xor after the position
+        // shuffle (part of m7's µop stack: +1.5% at 1T averaged over code
+        // offsets, even at 48T).
+        let position_eo = crate::simd::load(&entry.perm_eo);
+        let classes = _mm256_xor_si256(
+            _mm256_xor_si256(_mm256_shuffle_epi8(classify, cube.0), cube.0),
+            position_eo,
+        );
         let conj = _mm256_shuffle_epi8(classes, positions);
         // Masks of edge positions 0..12, in bits 16..28 (all else zero).
         let e_mask = _mm256_movemask_epi8(conj).cast_unsigned();
@@ -343,21 +353,27 @@ fn edge_parts_sym_raw(cube: Cube, sym: usize) -> (u64, u32, u64) {
         // which is ~1.5 cycles longer on Zen 5 (this mask feeds the pext;
         // part of m1-micro's +2.2% at 48T).
         let doubled = _mm256_add_epi8(conj, conj);
-        let s_mask: u32;
+        // (A 64-bit output: the 32-bit write zero-extends, and the 64-bit
+        // pext below then needs no zero extension of `s_mask`.)
+        let s_mask: u64;
         #[cfg(miri)]
         {
-            s_mask = _mm256_movemask_epi8(doubled).cast_unsigned();
+            s_mask = u64::from(_mm256_movemask_epi8(doubled).cast_unsigned());
         }
         #[cfg(not(miri))]
         std::arch::asm!("vpmovmskb {s:e}, {zz}", s = out(reg) s_mask, zz = in(ymm_reg) doubled,
             options(pure, nomem, nostack, preserves_flags));
-        let eo_flips = _mm256_xor_si256(conj, positions);
-        let eo_bits = _mm256_movemask_epi8(_mm256_slli_epi16(eo_flips, 3)).cast_unsigned();
+        let eo_bits = _mm256_movemask_epi8(_mm256_slli_epi16(conj, 3)).cast_unsigned();
         // The non-E positions (`e_mask` is within bits 16..28): the mask of
         // the pext, and (shifted) the index of the complemented eslot
         // table, which saves a copy of `e_mask`.
         let non_e = e_mask ^ 0x0FFF_0000;
-        let msplit = u64::from(*tabs.rank8.get_unchecked(_pext_u32(s_mask, non_e) as usize));
+        // (64-bit pext: no zero extension of the index.)
+        let msplit = u64::from(
+            *tabs
+                .rank8
+                .get_unchecked(_pext_u64(s_mask, u64::from(non_e)) as usize),
+        );
         let eslot = u64::from(*tabs.eslot_complement.get_unchecked((non_e >> 16) as usize));
         (msplit, eo_bits, eslot)
     }

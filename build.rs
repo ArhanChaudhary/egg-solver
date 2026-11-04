@@ -74,27 +74,40 @@ fn main() {
         writeln!(s, "  {},", aligned32(&simd_bytes(&sym.cube_inverse))).unwrap();
     }
     writeln!(s, "];").unwrap();
-    // Edge-only conjugation tables (see `coord::edge_key_sym`), one 64-byte
-    // line per symmetry: bytes 0..32 classify a piece j of T (edge lane:
-    // bit 7 = E-slice, bit 6 = S-slice, bit 4 = eo of T at j), bytes 32..64
-    // are the position permutation Tinv (edge lane; 0x80 = zero elsewhere).
-    writeln!(s, "pub const SYM_EDGES: [Aligned64; 48] = [").unwrap();
+    // Edge-only conjugation tables (see `coord::edge_key_sym`), per
+    // symmetry: `classes` classifies a piece j of T (edge lane: bit 7 =
+    // E-slice, bit 6 = S-slice, bit 4 = eo of T at j), `perm` is the
+    // position permutation Tinv (edge lane; 0x80 = zero elsewhere), and
+    // `perm_eo` the eo of Tinv by source position: byte j (edge lane) is bit
+    // 4 of Tinv at the position i that Tinv maps from j (`Tinv[i] & 15 ==
+    // j`), so that xoring it before the position permutation adds Tinv's eo.
+    writeln!(s, "pub const SYM_EDGES: [SymEdge; 48] = [").unwrap();
     for sym in syms {
         let t = simd_bytes(&sym.cube);
         let t_inverse = simd_bytes(&sym.cube_inverse);
-        let mut line = [0u8; 64];
+        let (mut classes, mut perm, mut perm_eo) = ([0u8; 32], [0u8; 32], [0u8; 32]);
         for j in 0..12 {
             let x = t[16 + j];
-            line[16 + j] = ((x & 0x0C) << 4) | (x & 0x10);
+            classes[16 + j] = ((x & 0x0C) << 4) | (x & 0x10);
         }
         for i in 0..32 {
-            line[32 + i] = if (16..28).contains(&i) {
+            perm[i] = if (16..28).contains(&i) {
                 t_inverse[i]
             } else {
                 0x80
             };
         }
-        writeln!(s, "  Aligned64([{}]),", list(line)).unwrap();
+        for &x in &t_inverse[16..28] {
+            perm_eo[16 + usize::from(x & 15)] = x & 0x10;
+        }
+        writeln!(
+            s,
+            "  SymEdge {{ classes: {}, perm: {}, perm_eo: {}, pad: Aligned32([0; 32]) }},",
+            aligned32(&classes),
+            aligned32(&perm),
+            aligned32(&perm_eo)
+        )
+        .unwrap();
     }
     writeln!(s, "];").unwrap();
     let mirrors = list(syms.iter().map(|sym| sym.mirror));
