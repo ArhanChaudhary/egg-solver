@@ -2205,6 +2205,9 @@ fn entry_job(inner: &Inner, entry: u32) -> (u32, u8, u8) {
     if inner.phases == 1 {
         return (entry, inner.target, 0);
     }
+    // SAFETY: a first pass has at least one entry per phase
+    // (`finish_build`). (A value-range hint: no division-by-zero check.)
+    unsafe { std::hint::assert_unchecked(inner.phase_entries != 0) };
     let phase = entry / inner.phase_entries;
     let job = entry - phase * inner.phase_entries;
     (job, phase_target(inner, phase as u8), phase as u8)
@@ -2225,6 +2228,31 @@ fn prefetch<T>(x: &T, write: bool) {
     } else {
         crate::prefetch::read(p);
     }
+}
+
+/// The `Local` of slot `slot`, unchecked (the claim and refill paths run
+/// once per job: no bounds check or `unwrap` there).
+///
+/// # Safety
+/// `slot` is joined: `locals[slot]` is `Some` (a slot of a job this worker
+/// claimed, started or ended, until it is released; slots are never
+/// removed, only emptied by `release`).
+#[inline(always)]
+unsafe fn joined(locals: &mut [Option<Local>], slot: usize) -> &mut Local {
+    debug_assert!(matches!(locals.get(slot), Some(Some(_))));
+    // SAFETY: the caller's contract.
+    unsafe { locals.get_unchecked_mut(slot).as_mut().unwrap_unchecked() }
+}
+
+/// `joined`, shared.
+///
+/// # Safety
+/// As for `joined`.
+#[inline(always)]
+unsafe fn joined_ref(locals: &[Option<Local>], slot: usize) -> &Local {
+    debug_assert!(matches!(locals.get(slot), Some(Some(_))));
+    // SAFETY: the caller's contract.
+    unsafe { locals.get_unchecked(slot).as_ref().unwrap_unchecked() }
 }
 
 /// Round `round` is at or after round `other` (wrapping).
@@ -2294,16 +2322,27 @@ impl Worker<'_, '_> {
     )]
     fn rounds(&mut self, solver: &Solver, stop: &AtomicBool, round: &mut u32) -> bool {
         while self.active_lanes > 0 {
-            let mut i = 0;
             let mut active = self.active_lanes;
-            while i < active {
-                // SAFETY: i < active_lanes <= lanes.len().
-                let lane = unsafe { &mut self.lanes.get_unchecked_mut(i).lane };
+            // The lanes by pointer (`next` to `end`), as in `run_lanes`: an
+            // index cost a multiply (by the lane's size) at the start of
+            // every visit's value chain. (With m8's unsafe pass, whose loop
+            // alone was -1.3% in share mode at 1T, and share pad 16, on
+            // def2cd0: share +2.5% at 1T; -c 1 -2.1%, -c 0 -2.5%, bench share
+            // +2.5% at 48T.) The pointers are made again after `on_end`,
+            // which may swap lanes.
+            let mut lanes = self.lanes.as_mut_ptr();
+            // SAFETY: `active <= lanes.len()`.
+            let (mut next, mut end) = (lanes, unsafe { lanes.add(active) });
+            while next < end {
+                // SAFETY: `next` is one of the active lanes, and nothing
+                // else accesses it during the visit.
+                let lane = unsafe { &mut (*next).lane };
                 let value = lane.pending_value(solver);
                 let outcome = match lane.phase {
                     Phase::WaitOther => {
                         if lane.resolve_other(value, solver) {
-                            i += 1;
+                            // SAFETY: at most one past the active lanes.
+                            next = unsafe { next.add(1) };
                             continue;
                         }
                         lane.advance(solver)
@@ -2311,12 +2350,18 @@ impl Worker<'_, '_> {
                     Phase::WaitMoved => lane.resolve_moved(value, solver),
                 };
                 match outcome {
-                    Step::Pending => i += 1,
+                    // SAFETY: as above.
+                    Step::Pending => next = unsafe { next.add(1) },
                     outcome => {
+                        // SAFETY: `next` points into `lanes`.
+                        let mut i = unsafe { next.offset_from(lanes) }.cast_unsigned();
                         if self.on_end(i, matches!(outcome, Step::Found)) {
                             i += 1;
                         }
                         active = self.active_lanes;
+                        lanes = self.lanes.as_mut_ptr();
+                        // SAFETY: `i <= active <= lanes.len()`.
+                        (next, end) = unsafe { (lanes.add(i), lanes.add(active)) };
                     }
                 }
             }
@@ -2388,7 +2433,10 @@ impl Worker<'_, '_> {
             if !self.refill(i, prefer) {
                 return false;
             }
-            let found = match self.lanes[i].lane.advance_cold(self.solver) {
+            // SAFETY: `i < lanes.len()` (an active lane, or the first idle
+            // one in `fill_idle`).
+            let lane = unsafe { &mut self.lanes.get_unchecked_mut(i).lane };
+            let found = match lane.advance_cold(self.solver) {
                 Step::Pending => return true,
                 step => matches!(step, Step::Found),
             };
@@ -2511,10 +2559,12 @@ impl Worker<'_, '_> {
 
     /// Account for the end of lane `i`'s job; returns its slot.
     fn end_job(&mut self, i: usize, stat: bool) -> usize {
-        let sl = &mut self.lanes[i];
+        // SAFETY: `i < lanes.len()` (see `restart`); a lane with a job has
+        // its cube's slot, which is joined.
+        let sl = unsafe { self.lanes.get_unchecked_mut(i) };
         let slot = sl.slot;
         sl.slot = NO_SLOT;
-        let loc = self.locals[slot].as_mut().unwrap();
+        let loc = unsafe { joined(&mut self.locals, slot) };
         loc.nodes += sl.lane.stats.nodes - sl.nodes_at_start;
         loc.lookups += sl.lane.stats.lookups - sl.lookups_at_start;
         loc.iteration_nodes += sl.lane.stats.nodes - sl.nodes_at_start;
@@ -2525,14 +2575,27 @@ impl Worker<'_, '_> {
         let inner = loc.ctx.inner();
         let phases = inner.phases;
         if stat && inner.record_leads && sl.lead_children != 0 && sl.lane.stack[0].normal {
-            let children = moves_after(&inner.jobs[sl.job as usize]) & sl.lead_children;
+            // SAFETY: the job is one of the iteration's, and with
+            // `record_leads` there is a lead per possible job (`MAX_JOBS`).
+            debug_assert!((sl.job as usize) < inner.jobs.len().min(inner.leads.len()));
+            let (job, lead_slot) = unsafe {
+                (
+                    inner.jobs.get_unchecked(sl.job as usize),
+                    inner.leads.get_unchecked(sl.job as usize),
+                )
+            };
+            let children = moves_after(job) & sl.lead_children;
             let lead = lead_of(&sl.lane.child_stats, children, inner.write_tag);
-            inner.leads[sl.job as usize].store(lead, Relaxed);
+            lead_slot.store(lead, Relaxed);
         }
         // (In a first pass, only the last phase's entries give statistics:
         // its target is the next iteration's.)
         if stat && u32::from(sl.phase) + 1 == phases {
-            let job_stat = &inner.stats[sl.job as usize];
+            // SAFETY: the job is one of the iteration's, which has a
+            // statistic per job (`finish_build`); it cannot be rebuilt while
+            // the job is outstanding.
+            debug_assert!((sl.job as usize) < inner.stats.len());
+            let job_stat = unsafe { inner.stats.get_unchecked(sl.job as usize) };
             if sl.split {
                 add_f32(job_stat, sl.lane.job_stat);
             } else {
@@ -2543,7 +2606,8 @@ impl Worker<'_, '_> {
         loc.pending -= 1;
         if phases > 1 {
             let phase = usize::from(sl.phase);
-            loc.phase_pending[phase] -= 1;
+            // SAFETY: phases are below `phases <= MAX_PHASES`.
+            unsafe { *loc.phase_pending.get_unchecked_mut(phase) -= 1 };
             self.phase_ended(slot, phase);
         }
         slot
@@ -2551,7 +2615,13 @@ impl Worker<'_, '_> {
 
     fn deactivate(&mut self, i: usize) {
         self.active_lanes -= 1;
-        self.lanes.swap(i, self.active_lanes);
+        debug_assert!(i <= self.active_lanes);
+        // SAFETY: `i` and the last active lane are below `lanes.len()`
+        // (`ptr::swap` allows them to be the same lane).
+        unsafe {
+            let base = self.lanes.as_mut_ptr();
+            std::ptr::swap(base.add(i), base.add(self.active_lanes));
+        }
     }
 
     /// Give lane `li` (not running a job) new work; `prefer`: the slot of
@@ -2571,8 +2641,10 @@ impl Worker<'_, '_> {
                 return true;
             }
         }
+        // (Slots are never removed: `slot` stays below `locals.len()`.)
         for slot in 0..self.locals.len() {
-            if matches!(&self.locals[slot], Some(l) if l.next < l.end)
+            // SAFETY: see above.
+            if matches!(unsafe { self.locals.get_unchecked(slot) }, Some(l) if l.next < l.end)
                 && self.continue_local(li, slot)
             {
                 return true;
@@ -2581,7 +2653,8 @@ impl Worker<'_, '_> {
         // (Kept cubes: no need to look for them.)
         if self.pool.few() {
             for slot in 0..self.locals.len() {
-                if matches!(&self.locals[slot], Some(l) if l.ctx.unclaimed() > 0)
+                // SAFETY: as above.
+                if matches!(unsafe { self.locals.get_unchecked(slot) }, Some(l) if l.ctx.unclaimed() > 0)
                     && self.continue_local(li, slot)
                 {
                     return true;
@@ -2607,7 +2680,8 @@ impl Worker<'_, '_> {
                 break;
             }
         }
-        let loc = self.locals[slot].as_ref().unwrap();
+        // SAFETY: `slot` is joined (the caller's; only `release` empties it).
+        let loc = unsafe { joined_ref(&self.locals, slot) };
         if loc.pending == 0 && !self.keep(&loc.ctx) {
             self.release(slot);
         }
@@ -2618,7 +2692,8 @@ impl Worker<'_, '_> {
     /// then (unless it is kept).
     fn tidy(&mut self, slot: usize) {
         self.settle(slot);
-        let loc = self.locals[slot].as_ref().unwrap();
+        // SAFETY: `slot` is joined (the lane's last job's).
+        let loc = unsafe { joined_ref(&self.locals, slot) };
         if loc.pending == 0 && !self.keep(&loc.ctx) {
             self.release(slot);
         }
@@ -2638,8 +2713,11 @@ impl Worker<'_, '_> {
 
     /// Leave the kept cubes that were solved (nothing pending).
     fn release_done(&mut self) {
+        // (Slots are never removed: `slot` stays below `locals.len()`.)
         for slot in 0..self.locals.len() {
-            if matches!(&self.locals[slot], Some(l) if l.pending == 0 && l.ctx.done.load(Relaxed)) {
+            // SAFETY: see above.
+            let local = unsafe { self.locals.get_unchecked(slot) };
+            if matches!(local, Some(l) if l.pending == 0 && l.ctx.done.load(Relaxed)) {
                 // (Clears the claimed count.)
                 self.settle(slot);
                 self.release(slot);
@@ -2649,14 +2727,16 @@ impl Worker<'_, '_> {
 
     /// Start the next claimed job of `slot` in lane `li`.
     fn take(&mut self, li: usize, slot: usize) -> bool {
-        let loc = self.locals[slot].as_mut().unwrap();
+        // SAFETY (`joined` here and below): `slot` is joined (callers pass
+        // the slot of a claimed or ended job, or one that is `Some`).
+        let loc = unsafe { joined(&mut self.locals, slot) };
         if loc.next < loc.end && loc.ctx.done.load(Relaxed) {
             // (dropped)
             loc.pending -= loc.end - loc.next;
             loc.next = loc.end;
         }
         loop {
-            let loc = self.locals[slot].as_mut().unwrap();
+            let loc = unsafe { joined(&mut self.locals, slot) };
             if loc.next >= loc.end {
                 return false;
             }
@@ -2667,26 +2747,34 @@ impl Worker<'_, '_> {
             let (job, target, phase) = entry_job(inner, entry);
             // (A split iteration's run: a job and its root children.)
             let (job, children) = if inner.split {
-                let run = inner.runs[job as usize];
+                // SAFETY: a split iteration's claim entries are its runs.
+                debug_assert!((job as usize) < inner.runs.len());
+                let run = *unsafe { inner.runs.get_unchecked(job as usize) };
                 (run_job(run), run_children(run))
             } else {
                 (job, ALL_MOVES)
             };
             let phases = inner.phases;
-            let job_entry = inner.jobs[job as usize];
+            // SAFETY: claimed entries (and runs) are of jobs of the iteration
+            // (at most `feasible.max(1)` per phase, and there is at least one
+            // job).
+            debug_assert!((job as usize) < inner.jobs.len());
+            let job_entry = *unsafe { inner.jobs.get_unchecked(job as usize) };
             // (A first pass's entries that are infeasible in their phase are
             // skipped before the job's cubes are made, and those as long as
             // a solution found are of no use.)
             let skip = phases > 1
                 && (job_entry.normal_bound.max(job_entry.inverse_bound) + job_entry.len > target
                     || target >= ctx.rarely_written.pass_limit.load(Relaxed));
-            let sl = &mut self.lanes[li];
+            // SAFETY: `li < lanes.len()` (see `restart`).
+            let sl = unsafe { self.lanes.get_unchecked_mut(li) };
             let lane = &mut sl.lane;
             if !skip {
                 lane.root = ctx.root;
                 lane.root_inverse = ctx.root_inverse;
                 lane.target = target;
-                lane.jobs[0] = job_entry;
+                // SAFETY: a shared lane has its one job slot (`SharedLane::new`).
+                *unsafe { lane.jobs.get_unchecked_mut(0) } = job_entry;
                 lane.job_pos = 0;
                 if lane.setup_job() {
                     // (The jobs and statistics were fetched when claimed.)
@@ -2710,7 +2798,8 @@ impl Worker<'_, '_> {
             // infeasible (statistic 0, as in stream mode)
             loc.pending -= 1;
             if phases > 1 {
-                loc.phase_pending[usize::from(phase)] -= 1;
+                // SAFETY: phases are below `phases <= MAX_PHASES`.
+                unsafe { *loc.phase_pending.get_unchecked_mut(usize::from(phase)) -= 1 };
                 self.phase_ended(slot, usize::from(phase));
             }
         }
@@ -2720,12 +2809,22 @@ impl Worker<'_, '_> {
     /// none of this thread's is left, count them down from the cube's, and
     /// if they were the last, the phase ended (`phase_done`).
     fn phase_ended(&mut self, slot: usize, phase: usize) {
-        let loc = self.locals[slot].as_mut().unwrap();
-        if loc.phase_pending[phase] != 0 || loc.phase_claimed[phase] == 0 {
+        // SAFETY: `slot` is joined (that of the entry that ended) and
+        // phases are below `phases <= MAX_PHASES`.
+        debug_assert!(phase < MAX_PHASES);
+        let loc = unsafe { joined(&mut self.locals, slot) };
+        let (pending, claimed, left) = unsafe {
+            (
+                *loc.phase_pending.get_unchecked(phase),
+                loc.phase_claimed.get_unchecked_mut(phase),
+                loc.ctx.phase_left.get_unchecked(phase),
+            )
+        };
+        if pending != 0 || *claimed == 0 {
             return;
         }
-        let ended = std::mem::take(&mut loc.phase_claimed[phase]);
-        if loc.ctx.phase_left[phase].fetch_sub(ended, AcqRel) == ended {
+        let ended = std::mem::take(claimed);
+        if left.fetch_sub(ended, AcqRel) == ended {
             let ctx = loc.ctx.clone();
             self.phase_done(&ctx);
         }
@@ -2733,10 +2832,16 @@ impl Worker<'_, '_> {
 
     /// Claim more jobs of the cube in `slot` (none must be unstarted).
     fn claim(&mut self, slot: usize) -> bool {
-        let loc = self.locals[slot].as_mut().unwrap();
+        // SAFETY: `slot` is joined (see `take`).
+        let loc = unsafe { joined(&mut self.locals, slot) };
         debug_assert!(loc.next >= loc.end);
+        let divisor = 2 * self.pool.nthreads;
+        // SAFETY: `Pool::new` makes `nthreads` at least 1, and below 2^31
+        // (it allocates a mailbox of over 3 KB per thread). (A value-range
+        // hint: no division-by-zero check.)
+        unsafe { std::hint::assert_unchecked(divisor != 0) };
         // (Chunks shrink as the iteration runs out: l5, not measured alone.)
-        let chunk = (loc.ctx.unclaimed() / (2 * self.pool.nthreads)).clamp(1, CHUNK_MAX);
+        let chunk = (loc.ctx.unclaimed() / divisor).clamp(1, CHUNK_MAX);
         let Some((first, count)) = loc.ctx.claim(chunk) else {
             return false;
         };
@@ -2749,12 +2854,21 @@ impl Worker<'_, '_> {
         if inner.phases > 1 {
             // (A first pass's entries: per phase, all the jobs again.)
             let per_phase = inner.phase_entries;
+            // SAFETY: a first pass has at least one entry per phase
+            // (`finish_build`; a value-range hint).
+            unsafe { std::hint::assert_unchecked(per_phase != 0) };
             let mut entry = first;
             while entry < loc.end {
                 let phase = entry / per_phase;
                 let phase_end = ((phase + 1) * per_phase).min(loc.end);
-                loc.phase_pending[phase as usize] += phase_end - entry;
-                loc.phase_claimed[phase as usize] += u64::from(phase_end - entry);
+                // SAFETY: claimed entries are below `phases * per_phase`,
+                // and `phases <= MAX_PHASES`.
+                debug_assert!((phase as usize) < MAX_PHASES);
+                unsafe {
+                    *loc.phase_pending.get_unchecked_mut(phase as usize) += phase_end - entry;
+                    *loc.phase_claimed.get_unchecked_mut(phase as usize) +=
+                        u64::from(phase_end - entry);
+                }
                 entry = phase_end;
             }
             let base = first / per_phase * per_phase;
@@ -2765,26 +2879,34 @@ impl Worker<'_, '_> {
         // the statistics by the publication), and lanes take the jobs one
         // after another. (l6-share-2; screening run without it: -c 1 3.06 vs
         // 2.36-2.42 ms, bench share 799 vs 845/s at 48T.)
+        // (By address, which a prefetch needs not be valid at: no bounds
+        // checks. The claimed jobs are in range anyway.)
         let (first, end) = (jobs.0 as usize, jobs.1 as usize);
+        let (job_lines, stat_lines) = (inner.jobs.as_ptr(), inner.stats.as_ptr());
         if inner.split {
             // (The runs' jobs are scattered.)
-            for &run in &inner.runs[first..end] {
-                prefetch(&inner.jobs[run_job(run) as usize], false);
-                prefetch(&inner.stats[run_job(run) as usize], true);
+            // SAFETY: claimed entries are below the run count (`first..end`
+            // is within `runs`).
+            debug_assert!(end <= inner.runs.len());
+            for &run in unsafe { inner.runs.get_unchecked(first..end) } {
+                let job = run_job(run) as usize;
+                crate::prefetch::read(job_lines.wrapping_add(job));
+                crate::prefetch::write(stat_lines.wrapping_add(job));
             }
             return true;
         }
         for i in (first..end).step_by(4) {
-            prefetch(&inner.jobs[i], false);
+            crate::prefetch::read(job_lines.wrapping_add(i));
         }
-        prefetch(&inner.jobs[end - 1], false);
+        crate::prefetch::read(job_lines.wrapping_add(end - 1));
         for i in (first..end).step_by(16) {
-            prefetch(&inner.stats[i], true);
+            crate::prefetch::write(stat_lines.wrapping_add(i));
         }
-        prefetch(&inner.stats[end - 1], true);
+        crate::prefetch::write(stat_lines.wrapping_add(end - 1));
         if inner.record_leads {
+            let lead_lines = inner.leads.as_ptr();
             for i in (first..end).step_by(16) {
-                prefetch(&inner.leads[i], true);
+                crate::prefetch::write(lead_lines.wrapping_add(i));
             }
         }
         true
@@ -2794,7 +2916,8 @@ impl Worker<'_, '_> {
     /// the cube's outstanding jobs, and build the next iteration if they
     /// were the last.
     fn settle(&mut self, slot: usize) {
-        let loc = self.locals[slot].as_mut().unwrap();
+        // SAFETY: `slot` is joined (see `take`).
+        let loc = unsafe { joined(&mut self.locals, slot) };
         if loc.ctx.done.load(Relaxed) {
             // drop the unstarted jobs
             loc.pending -= loc.end - loc.next;
@@ -3033,10 +3156,17 @@ impl Worker<'_, '_> {
             // SAFETY: `FULL`: the slot is ours until we store `IDLE`.
             let piece = unsafe { &mut *mailbox.piece.get() };
             // (The lane is idle: its stack is free.)
-            let lane = &mut self.lanes[li].lane;
-            lane.stack[..=piece.depth].copy_from_slice(&piece.nodes[..=piece.depth]);
-            lane.depth = piece.depth;
-            (piece.ctx.take().unwrap(), piece.job, piece.phase)
+            // SAFETY: `li < lanes.len()` (see `restart`); a piece's depth is
+            // a lane depth (below MAXD), and a full piece has its cube.
+            debug_assert!(piece.depth < MAXD && piece.ctx.is_some());
+            unsafe {
+                let lane = &mut self.lanes.get_unchecked_mut(li).lane;
+                lane.stack
+                    .get_unchecked_mut(..piece.depth + 1)
+                    .copy_from_slice(piece.nodes.get_unchecked(..piece.depth + 1));
+                lane.depth = piece.depth;
+                (piece.ctx.take().unwrap_unchecked(), piece.job, piece.phase)
+            }
         };
         mailbox.state.store(IDLE, Release);
         // (A solved cube's outstanding count no longer matters.)
@@ -3046,17 +3176,25 @@ impl Worker<'_, '_> {
         let Some(slot) = self.local(&ctx) else {
             return false;
         };
-        let loc = self.locals[slot].as_mut().unwrap();
+        // SAFETY: `local` returns a joined slot.
+        let loc = unsafe { joined(&mut self.locals, slot) };
         loc.pending += 1;
         loc.claimed += 1;
         let inner = ctx.inner();
         if inner.phases > 1 {
-            loc.phase_pending[usize::from(phase)] += 1;
-            loc.phase_claimed[usize::from(phase)] += 1;
+            // SAFETY: the donor's phase is below `phases <= MAX_PHASES`.
+            unsafe {
+                *loc.phase_pending.get_unchecked_mut(usize::from(phase)) += 1;
+                *loc.phase_claimed.get_unchecked_mut(usize::from(phase)) += 1;
+            }
         }
-        let sl = &mut self.lanes[li];
+        // SAFETY: `li < lanes.len()`; the donor's job is one of the
+        // iteration's (it cannot end while the piece is outstanding).
+        debug_assert!((job as usize) < inner.jobs.len());
+        let sl = unsafe { self.lanes.get_unchecked_mut(li) };
         let lane = &mut sl.lane;
-        lane.jobs[0] = inner.jobs[job as usize];
+        // (A shared lane has its one job slot: `SharedLane::new`.)
+        unsafe { *lane.jobs.get_unchecked_mut(0) = *inner.jobs.get_unchecked(job as usize) };
         lane.job_pos = 0;
         lane.target = phase_target(inner, phase);
         lane.root = ctx.root;
@@ -3082,13 +3220,19 @@ impl Worker<'_, '_> {
     fn find_split(&self, min_r: u8, exclude: usize) -> Option<(usize, usize, u32)> {
         let mut best = None;
         let mut best_r = min_r - 1;
-        for (index, sl) in self.lanes[..self.active_lanes].iter().enumerate() {
+        // (Run once per round while threads wait for work: no bounds checks.)
+        // SAFETY: `active_lanes <= lanes.len()`; a lane's depth is below
+        // MAXD (see `Lane::advance`).
+        let active = unsafe { self.lanes.get_unchecked(..self.active_lanes) };
+        for (index, sl) in active.iter().enumerate() {
             if index == exclude || sl.slot == NO_SLOT {
                 continue;
             }
             let lane = &sl.lane;
+            debug_assert!(lane.depth < MAXD);
             for depth in 0..=lane.depth {
-                let node = &lane.stack[depth];
+                // SAFETY: see above.
+                let node = unsafe { lane.stack.get_unchecked(depth) };
                 if node.remaining_depth <= best_r {
                     break;
                 }
@@ -3097,7 +3241,8 @@ impl Worker<'_, '_> {
                 }
                 // (An active lane's pending child is `pending_move`.)
                 let face = if depth < lane.depth {
-                    lane.stack[depth + 1].mv / 3
+                    // SAFETY: `depth + 1 <= lane.depth < MAXD`.
+                    unsafe { lane.stack.get_unchecked(depth + 1) }.mv / 3
                 } else {
                     lane.pending_move / 3
                 };
@@ -3130,15 +3275,25 @@ impl Worker<'_, '_> {
         let Ok([from, to]) = self.lanes.get_disjoint_mut([busy, li]) else {
             unreachable!("`find_split` excludes lane `li`");
         };
-        to.lane.stack[..=depth].copy_from_slice(&from.lane.stack[..=depth]);
-        for node in &mut to.lane.stack[..depth] {
+        // SAFETY: `find_split` returns a depth of the lane's stack (below
+        // MAXD).
+        debug_assert!(depth < MAXD);
+        let (to_stack, from_stack) = unsafe {
+            (
+                to.lane.stack.get_unchecked_mut(..depth + 1),
+                from.lane.stack.get_unchecked_mut(..depth + 1),
+            )
+        };
+        to_stack.copy_from_slice(from_stack);
+        for node in &mut to_stack[..depth] {
             node.todo = 0;
         }
-        to.lane.stack[depth].todo = give;
-        from.lane.stack[depth].todo &= !give;
+        to_stack[depth].todo = give;
+        from_stack[depth].todo &= !give;
         to.lane.depth = depth;
         to.lane.child_stats = [0.0; 18];
-        to.lane.jobs[0] = from.lane.jobs[0];
+        // SAFETY: a shared lane has its one job slot (`SharedLane::new`).
+        unsafe { *to.lane.jobs.get_unchecked_mut(0) = *from.lane.jobs.get_unchecked(0) };
         to.lane.job_pos = 0;
         to.lane.target = from.lane.target;
         to.lane.root = from.lane.root;
@@ -3154,10 +3309,12 @@ impl Worker<'_, '_> {
         to.nodes_at_start = to.lane.stats.nodes;
         to.lookups_at_start = to.lane.stats.lookups;
         to.started = Instant::now();
-        let loc = self.locals[from.slot].as_mut().unwrap();
+        // SAFETY: the busy lane's slot is joined; phases are below
+        // `phases <= MAX_PHASES`.
+        let loc = unsafe { joined(&mut self.locals, from.slot) };
         loc.pending += 1;
         if loc.ctx.inner().phases > 1 {
-            loc.phase_pending[usize::from(from.phase)] += 1;
+            unsafe { *loc.phase_pending.get_unchecked_mut(usize::from(from.phase)) += 1 };
         }
         if self.pool.trace_bits & TRACE_COUNTERS != 0 {
             loc.ctx
@@ -3194,14 +3351,16 @@ impl Worker<'_, '_> {
             return;
         };
         pool.hungry.fetch_sub(1, Relaxed);
-        let sl = &mut self.lanes[busy];
+        // SAFETY: `find_split` returns an active lane, whose slot is joined.
+        let sl = unsafe { self.lanes.get_unchecked_mut(busy) };
         sl.split = true;
-        let ctx = self.locals[sl.slot].as_ref().unwrap().ctx.clone();
+        let ctx = unsafe { joined_ref(&self.locals, sl.slot) }.ctx.clone();
         // (The job is outstanding, so the iteration cannot end before the
         // piece is counted.)
         ctx.outstanding.fetch_add(1, Relaxed);
         if ctx.inner().phases > 1 {
-            ctx.phase_left[usize::from(sl.phase)].fetch_add(1, Relaxed);
+            // SAFETY: phases are below `phases <= MAX_PHASES`.
+            unsafe { ctx.phase_left.get_unchecked(usize::from(sl.phase)) }.fetch_add(1, Relaxed);
         }
         if pool.trace_bits & TRACE_COUNTERS != 0 {
             ctx.rarely_written.iteration_donations.fetch_add(1, Relaxed);
@@ -3209,17 +3368,26 @@ impl Worker<'_, '_> {
         {
             // SAFETY: `FILL` (ours): the owner reads the slot once `FULL`.
             let piece = unsafe { &mut *mailbox.piece.get() };
-            piece.nodes[..=depth].copy_from_slice(&sl.lane.stack[..=depth]);
-            for node in &mut piece.nodes[..depth] {
+            // SAFETY: `find_split` returns a depth of the lane's stack.
+            debug_assert!(depth < MAXD);
+            let (nodes, path) = unsafe {
+                (
+                    piece.nodes.get_unchecked_mut(..depth + 1),
+                    sl.lane.stack.get_unchecked(..depth + 1),
+                )
+            };
+            nodes.copy_from_slice(path);
+            for node in &mut nodes[..depth] {
                 node.todo = 0;
             }
-            piece.nodes[depth].todo = give;
+            nodes[depth].todo = give;
             piece.ctx = Some(ctx);
             piece.job = sl.job;
             piece.phase = sl.phase;
             piece.depth = depth;
         }
-        sl.lane.stack[depth].todo &= !give;
+        // SAFETY: as above.
+        unsafe { sl.lane.stack.get_unchecked_mut(depth) }.todo &= !give;
         mailbox.state.store(FULL, Release);
         self.counts[C_DONATED] += 1;
     }
@@ -3268,8 +3436,10 @@ impl Worker<'_, '_> {
         let mut dropped = false;
         while i > 0 {
             i -= 1;
-            let sl = &self.lanes[i];
-            let ctx = &self.locals[sl.slot].as_ref().unwrap().ctx;
+            // SAFETY: `i < active_lanes <= lanes.len()`, and an active lane's
+            // slot is joined.
+            let sl = unsafe { self.lanes.get_unchecked(i) };
+            let ctx = &unsafe { joined_ref(&self.locals, sl.slot) }.ctx;
             // (A first pass's entries as long as its shortest solution so
             // far are of no use.)
             if !ctx.done.load(Relaxed)

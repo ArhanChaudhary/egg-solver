@@ -477,10 +477,32 @@ impl Cube {
 
     /// The cube after move `mv`: `compose` with the move's lookup indices
     /// and orientation part precomputed.
+    ///
+    /// # Panics
+    /// If `mv` is not a move (below 18).
     #[inline(always)]
     #[must_use]
     pub fn apply_move(self, mv: usize) -> Cube {
-        let (perm, orient) = (&HOT_TABLES.moves[mv], &HOT_TABLES.move_orients[mv]);
+        assert!(mv < 18, "not a move");
+        // SAFETY: checked above.
+        unsafe { self.apply_move_unchecked(mv) }
+    }
+
+    /// `apply_move` without the bounds check of the move tables (as in
+    /// `simd.rs`).
+    ///
+    /// # Safety
+    /// `mv < 18`.
+    #[inline(always)]
+    #[must_use]
+    pub unsafe fn apply_move_unchecked(self, mv: usize) -> Cube {
+        // SAFETY: `mv < 18` (the caller's contract).
+        let (perm, orient) = unsafe {
+            (
+                HOT_TABLES.moves.get_unchecked(mv),
+                HOT_TABLES.move_orients.get_unchecked(mv),
+            )
+        };
         let corners = self.corners.lookup(V16::load(&perm.corners.0));
         let edges = self.edges.lookup(V16::load(&perm.edges.0));
         Cube::wrap(
@@ -490,10 +512,28 @@ impl Cube {
     }
 
     /// Given the inverse of a cube `c`, the inverse of `c` then `mv`.
+    ///
+    /// # Panics
+    /// If `mv` is not a move (below 18).
     #[inline(always)]
     #[must_use]
     pub fn premove_inverse(self, mv: usize) -> Cube {
-        HOT_TABLES.inverse_moves[mv].load().compose(self)
+        assert!(mv < 18, "not a move");
+        // SAFETY: checked above.
+        unsafe { self.premove_inverse_unchecked(mv) }
+    }
+
+    /// `premove_inverse` without the bounds check of the move table.
+    ///
+    /// # Safety
+    /// `mv < 18`.
+    #[inline(always)]
+    #[must_use]
+    pub unsafe fn premove_inverse_unchecked(self, mv: usize) -> Cube {
+        // SAFETY: `mv < 18` (the caller's contract).
+        unsafe { HOT_TABLES.inverse_moves.get_unchecked(mv) }
+            .load()
+            .compose(self)
     }
 
     /// Corner twists negated (mod 3): 1 <-> 2 (mirror symmetries).
@@ -612,12 +652,21 @@ impl Cube {
     /// `moved` and `other`: `other.premove_inverse(mv)` for an X move
     /// (`x_move_mask` all ones), else `moved.apply_move(mv)` (`x_move_mask`
     /// 0). One composition of selected operands, as in `simd.rs`.
+    ///
+    /// # Safety
+    /// `mv < 18`.
     #[inline(always)]
     #[must_use]
-    pub fn child_lookup(moved: Cube, other: Cube, mv: usize, x_move_mask: u32) -> Cube {
-        let inverse_move = HOT_TABLES.inverse_moves[mv].load();
+    pub unsafe fn child_lookup(moved: Cube, other: Cube, mv: usize, x_move_mask: u32) -> Cube {
+        // SAFETY: `mv < 18` (the caller's contract).
+        let (inverse_move, move_cube) = unsafe {
+            (
+                HOT_TABLES.inverse_moves.get_unchecked(mv).load(),
+                HOT_TABLES.move_cubes.get_unchecked(mv).load(),
+            )
+        };
         let left = Cube::select_mask(x_move_mask, inverse_move, moved);
-        let right = Cube::select_mask(x_move_mask, other, HOT_TABLES.move_cubes[mv].load());
+        let right = Cube::select_mask(x_move_mask, other, move_cube);
         left.compose(right)
     }
 
@@ -735,11 +784,16 @@ mod tests {
             assert!(Cube::select(true, fa, fb) == fa && Cube::select(false, fa, fb) == fb);
             let (inverse_a, inverse_b) = (fa.inverse(), fb.inverse());
             for mv in 0..18 {
-                assert_eq!(Cube::child_lookup(fa, inverse_b, mv, 0), fa.apply_move(mv));
-                assert_eq!(
-                    Cube::child_lookup(inverse_a, fb, mv, !0),
-                    fb.premove_inverse(mv)
-                );
+                // SAFETY: `mv < 18`.
+                unsafe {
+                    assert_eq!(Cube::child_lookup(fa, inverse_b, mv, 0), fa.apply_move(mv));
+                    assert_eq!(
+                        Cube::child_lookup(inverse_a, fb, mv, !0),
+                        fb.premove_inverse(mv)
+                    );
+                    assert_eq!(fa.apply_move_unchecked(mv), fa.apply_move(mv));
+                    assert_eq!(fa.premove_inverse_unchecked(mv), fa.premove_inverse(mv));
+                }
             }
         }
         assert!(Cube::from_cubie(&CubieCube::SOLVED).is_solved());
