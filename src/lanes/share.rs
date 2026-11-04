@@ -39,6 +39,12 @@
 //! by another lane. The search kernel is the one of stream mode: `advance`
 //! of a `Lane::shared` lane only differs in returning at the end of a job,
 //! and everything here runs at job boundaries or once per round.
+//!
+//! Gains, 48 threads, h11, `random_state`: the mode itself (l5) took a batch
+//! from 7.86 ms to 1.26 ms per cube (bench random:1000 from 187 to 795
+//! solves/s), and one cube at a time from 306 ms (one lane) to 3.6 ms.
+//! l6-share-a and l6-share-2 brought one cube at a time to ~2.2 ms. The
+//! comments at each optimization give its own measured gain.
 
 use super::{job_weight, Job, Lane, Node, Phase, Step, MAXD};
 use crate::cubie::CubieCube;
@@ -97,6 +103,8 @@ struct Inner {
 /// swapped around, and the other buffers of a build are reused through
 /// `Pool::bufs`: builds never touch fresh pages (whose faults, ~1 us per
 /// 4 KiB, took most of the time of a parallel build).
+// No fresh pages in builds: part of l6-share-a (-38.8% -c 1 latency at 48T,
+// with the staged builds on all threads).
 const MAX_JOBS: usize = 43254;
 const JOBS_CAP: usize = 3240 * 15;
 
@@ -164,6 +172,7 @@ impl Bufs {
 /// A reader-writer spin lock. The threads of a pool have cores of their
 /// own and hold it briefly: waiting must not sleep (with `std`'s lock,
 /// readers queued behind a writer sleep in the kernel, for tens of us).
+// Instead of std's RwLock: part of l6-share-a (-38.8% -c 1 latency at 48T).
 struct SpinRw<T> {
     /// Readers, plus `SPIN_W` while a writer holds or waits for the lock.
     state: AtomicU32,
@@ -219,6 +228,8 @@ impl<T> SpinRw<T> {
 
 /// One wait of a spin lock: spins, then yields (if threads outnumber the
 /// cores, the holder may be waiting for one).
+// Yields after 256 spins: with pure spinning and more threads than cores,
+// the pool stalled (l6-share-a; a fix, not measured as a gain).
 #[inline(always)]
 fn spin_wait(i: &mut u32) {
     *i += 1;
@@ -265,6 +276,8 @@ impl<T> Drop for SpinWrite<'_, T> {
 }
 
 /// A value on cache lines of its own (atomics written by many threads).
+// Padding of the shared atomics, rarely written fields and free lists
+// (l6-share-2; screening run without it: bench share 787 vs 845/s at 48T).
 #[repr(align(128))]
 struct Pad<T>(T);
 
@@ -290,6 +303,8 @@ struct CubeCtx {
     /// Jobs of the current iteration: `count << 32 | next unclaimed`. One
     /// `fetch_add` claims a chunk; the count in the same word tells a late
     /// claimer that it got nothing (no separate, racing check).
+    // Jobs claimed in chunks by one atomic: part of l5's share mode (batch
+    // 7.86 -> 1.26 ms/cube at 48T; not measured alone).
     claim: Pad<AtomicU64>,
     /// Tasks of a parallel build: `stage << 56 | count << 32 | next
     /// unclaimed`, and the number of tasks of the stage not yet done.
@@ -439,6 +454,9 @@ const FULL: u8 = 3;
 
 /// A thread's mailbox: a thread without work asks for a piece (`WANT`); a
 /// busy thread takes the request (`FILL`) and delivers (`FULL`).
+// A fixed piece slot instead of a Mutex<Option<Piece>> with a Vec per
+// donation (l6-share-2; screening run with the Mutex: bench share 827 vs
+// 845/s at 48T).
 struct Mailbox {
     state: AtomicU8,
     /// Written only by the donor that moved `state` from `WANT` to `FILL`,
@@ -657,7 +675,8 @@ impl<'a> Pool<'a> {
         if dead > 0 {
             // (Not a try: under the read locks of the threads looking for
             // work it would rarely succeed, and the dead cubes would keep
-            // them all taking the lock.)
+            // them all taking the lock. Part of l6-share-a: -38.8% -c 1
+            // latency at 48T.)
             let mut open = self.open.write();
             open.retain(keep_open);
             self.open_count.store(open.len(), Relaxed);
@@ -832,11 +851,16 @@ fn build(
     let target = inner.target;
     // (As in `start_iteration`: the stack depth stays below the target.)
     assert!((target as usize) < MAXD);
+    // Stream mode's prefixes: 4-move prefixes from iteration 15 on cost +8%
+    // -c 1 latency at 48T (l6-share-2).
     let job_len = solver.job_len(target);
-    // (With few cubes, threads are about to wait for this one.)
+    // (With few cubes, threads are about to wait for this one.) Staging the
+    // builds of few cubes before anyone waits: part of l6-share-2 (-5.6% -c 1
+    // latency at 48T for the series; not measured alone).
     let parallel = pool.few() || pool.hungry.load(Relaxed) != 0;
     let len = inner.jobs[0].len as usize;
     // Sorted by the statistics as they are (not copied to the jobs first)?
+    // (The serial copy took ~90 us per build; part of l6-share-a.)
     let from_atomics =
         !first && len >= job_len && job_len > 0 && parallel && inner.jobs.len() >= SORT_MIN;
     if !first && !from_atomics {
@@ -936,7 +960,8 @@ const KEEP: usize = 2;
 fn copy_stats(inner: &mut Inner) {
     let n = inner.jobs.len();
     for i in 0..n {
-        // (Written by other threads: fetched well ahead.)
+        // (Written by other threads: fetched well ahead. Part of
+        // l6-share-a.)
         if i % 16 == 0 {
             prefetch(&inner.stats[(i + 512).min(n - 1)], false);
         }
@@ -1034,6 +1059,8 @@ const SAMPLE: usize = 16;
 
 /// Open build stage `stage` with `tasks` tasks (and list the cube: it may have
 /// been dropped from the open list while the last stage's tasks ran).
+// Listing the cube at every stage lets all threads run its stages: part of
+// l6-share-a (-38.8% -c 1 latency at 48T).
 #[expect(clippy::cast_possible_truncation, reason = "fewer than 2^24 tasks")]
 fn open_stage(pool: &Pool, ctx: &Arc<CubeCtx>, stage: usize, tasks: usize) {
     ctx.task_left.store(tasks as u32, Relaxed);
@@ -1227,6 +1254,8 @@ fn sort_stage_done(inner: &mut Inner, stage: usize) -> Option<(usize, usize)> {
 
 /// Do a task of `ctx`'s parallel build, if one is left (false otherwise);
 /// the last task of a stage opens the next one or publishes the iteration.
+// Builds in stages by all waiting threads: l5 (not measured alone); on all
+// threads and without page faults since l6-share-a (-38.8% -c 1 at 48T).
 fn build_task(
     scratch: &mut Lane,
     solver: &Solver,
@@ -1325,7 +1354,8 @@ fn finish_build(pool: &Pool, ctx: &Arc<CubeCtx>) {
     inner.stats.resize_with(n, || AtomicU32::new(0));
     // (The infeasible jobs, at the end, keep the statistic 0.)
     // At least one job is claimed (an infeasible one is skipped): the
-    // iteration ends when the claimed jobs end.
+    // iteration ends when the claimed jobs end. (Only the feasible jobs are
+    // claimed: part of l6-share-a, not measured alone.)
     let claimed = inner.feasible.max(1) as u64;
     ctx.outstanding.store(claimed, Relaxed);
     ctx.rarely_written.claims_ran_out_ns.store(0, Relaxed);
@@ -1462,6 +1492,9 @@ impl Worker<'_, '_> {
     /// is left (true) or `stop` is set (false). Job ends are handled by
     /// `on_end` (which may swap another lane into position i), the rest
     /// once per round by `maintain`. (Kept apart from the cold code.)
+    // The solver is a parameter (noalias: the table pointer stays in a
+    // register): -3.0% -c 0, -2.6% -c 1, +3.8% bench share at 48T, -2.0% -c 0
+    // at 1T (l6-share-2).
     #[inline(never)]
     fn rounds(&mut self, solver: &Solver, stop: &AtomicBool, round: &mut u32) -> bool {
         while self.active_lanes > 0 {
@@ -1700,6 +1733,8 @@ impl Worker<'_, '_> {
     /// unsolved cubes it has nothing to do on: its next jobs there need no
     /// search of the open list, nor joining again (atomics on lines shared
     /// by all threads, at every iteration).
+    // Part of l6-share-2 (-5.6% -c 1 latency at 48T for the series; screening
+    // run without it: -c 1 2.46 vs 2.36-2.42 ms).
     fn keep(&self, ctx: &CubeCtx) -> bool {
         !ctx.done.load(Relaxed)
             && self.pool.few()
@@ -1757,6 +1792,7 @@ impl Worker<'_, '_> {
     fn claim(&mut self, slot: usize) -> bool {
         let loc = self.locals[slot].as_mut().unwrap();
         debug_assert!(loc.next >= loc.end);
+        // (Chunks shrink as the iteration runs out: l5, not measured alone.)
         let chunk = (loc.ctx.unclaimed() / (2 * self.pool.nthreads)).clamp(1, CHUNK_MAX);
         let Some((first, count)) = loc.ctx.claim(chunk) else {
             return false;
@@ -1768,7 +1804,8 @@ impl Worker<'_, '_> {
         // The claimed jobs and their statistics (written at their ends):
         // the lines were written by other threads (the jobs by the build,
         // the statistics by the publication), and lanes take the jobs one
-        // after another.
+        // after another. (l6-share-2; screening run without it: -c 1 3.06 vs
+        // 2.36-2.42 ms, bench share 799 vs 845/s at 48T.)
         let inner = loc.ctx.inner();
         let (first, end) = (first as usize, loc.end as usize);
         for i in (first..end).step_by(4) {
@@ -2074,7 +2111,9 @@ impl Worker<'_, '_> {
         best
     }
 
-    /// Give lane `li` part of a busy lane's remaining moves.
+    /// Give lane `li` part of a busy lane's remaining moves. (Splits and
+    /// donations: part of l5's share mode, which took one cube at a time
+    /// from 306 ms to 3.6 ms at 48T; not measured alone.)
     fn split(&mut self, li: usize) -> bool {
         let Some((busy, depth, give)) = self.find_split(SPLIT_R_LOCAL, li) else {
             return false;
@@ -2246,7 +2285,10 @@ impl Worker<'_, '_> {
             self.counts[C_IDLE] += 1;
             let full = || matches!(self.mailbox(), Some(m) if m.state.load(Relaxed) == FULL);
             // Spin a little, then yield: a thread of ours with work may
-            // share the core (until the scheduler moves one of us).
+            // share the core (until the scheduler moves one of us). Long
+            // spinning slows the busy cores (screening, -c 1 at 48T: 2.54 ms
+            // with these 1K spins, 3.19 ms with 16K, 4.21 ms with 256K);
+            // yielding at once was not better in 5 runs (l6).
             for i in 0..1 << 12 {
                 if pool.epoch.load(Relaxed) != epoch || full() {
                     break;
