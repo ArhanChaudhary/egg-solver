@@ -29,6 +29,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
 
+/// Print the usage and exit with status 2.
 fn usage() -> ! {
     eprintln!(
         "usage: solve <table> [-t threads] [-l lanes] [-c concurrency] [-n count] < scrambles"
@@ -44,20 +45,19 @@ fn main() {
     }
     let mut threads = cubeopt::thread_count();
     let mut lanes = cubeopt::lanes::DEFAULT_LANES;
-    let mut conc = 0;
+    let mut concurrency = 0;
     let mut count = usize::MAX;
-    let mut i = 2;
-    while i < args.len() {
-        let v = args.get(i + 1).and_then(|x| x.parse::<usize>().ok());
-        let Some(v) = v else { usage() };
-        match args[i].as_str() {
-            "-t" => threads = v.max(1),
-            "-l" => lanes = v.max(1),
-            "-c" => conc = v,
-            "-n" => count = v,
+    // Options are pairs: `-x value`.
+    for option in args[2..].chunks(2) {
+        let value = option.get(1).and_then(|x| x.parse::<usize>().ok());
+        let Some(value) = value else { usage() };
+        match option[0].as_str() {
+            "-t" => threads = value.max(1),
+            "-l" => lanes = value.max(1),
+            "-c" => concurrency = value,
+            "-n" => count = value,
             _ => usage(),
         }
-        i += 2;
     }
     let mut cubes = Vec::new();
     for (n, line) in std::io::stdin().lock().lines().enumerate() {
@@ -68,46 +68,50 @@ fn main() {
         if cubes.len() >= count {
             break;
         }
-        let Some(ms) = parse_moves(&line) else {
+        let Some(moves) = parse_moves(&line) else {
             eprintln!("line {}: cannot parse {line:?}", n + 1);
             std::process::exit(2);
         };
-        cubes.push(CubieCube::SOLVED.apply_moves(&ms));
+        cubes.push(CubieCube::SOLVED.apply_moves(&moves));
     }
-    let cs = Cocsep::generate();
+    let corners = Cocsep::generate();
     let table = H48Table::open(&args[1]).expect("open table");
-    let solver = Solver::new(&cs, &table);
+    let solver = Solver::new(&corners, &table);
     let get = |i: usize| cubes.get(i).copied();
-    let max_active = if conc == 0 { usize::MAX } else { conc };
-    let out = Mutex::new(std::io::stdout());
+    let max_active = if concurrency == 0 {
+        usize::MAX
+    } else {
+        concurrency
+    };
+    let stdout = Mutex::new(std::io::stdout());
     let nodes = AtomicU64::new(0);
     let bad = AtomicBool::new(false);
-    let ndone = AtomicUsize::new(0);
-    let done = |i: usize, sol: Vec<u8>, st: Stats, dt: f64| {
-        let ok = cubes[i].apply_moves(&sol) == CubieCube::SOLVED;
-        nodes.fetch_add(st.nodes, Ordering::Relaxed);
-        ndone.fetch_add(1, Ordering::Relaxed);
-        let mut o = out.lock().unwrap();
+    let n_done = AtomicUsize::new(0);
+    let done = |i: usize, solution: Vec<u8>, stats: Stats, seconds: f64| {
+        let ok = cubes[i].apply_moves(&solution) == CubieCube::SOLVED;
+        nodes.fetch_add(stats.nodes, Ordering::Relaxed);
+        n_done.fetch_add(1, Ordering::Relaxed);
+        let mut out = stdout.lock().unwrap();
         if !ok {
             bad.store(true, Ordering::Relaxed);
-            let _ = writeln!(o, "BAD {i}");
+            let _ = writeln!(out, "BAD {i}");
         }
         let _ = writeln!(
-            o,
-            "solved {i} {} {} {dt:.6} {}",
-            sol.len(),
-            st.nodes,
-            format_moves(&sol)
+            out,
+            "solved {i} {} {} {seconds:.6} {}",
+            solution.len(),
+            stats.nodes,
+            format_moves(&solution)
         );
-        let _ = o.flush();
+        let _ = out.flush();
     };
-    let t0 = Instant::now();
+    let start = Instant::now();
     cubeopt::lanes::share::solve_all(&solver, &get, threads, lanes, max_active, &done);
-    let wall = t0.elapsed().as_secs_f64();
+    let wall = start.elapsed().as_secs_f64();
     let n = cubes.len();
-    assert_eq!(ndone.load(Ordering::Relaxed), n, "cubes not reported");
+    assert_eq!(n_done.load(Ordering::Relaxed), n, "cubes not reported");
     println!(
-        "total {n} cubes wall {wall:.6} wall/cube {:.6} nodes/cube {:.0} threads {threads} lanes {lanes} concurrency {conc}",
+        "total {n} cubes wall {wall:.6} wall/cube {:.6} nodes/cube {:.0} threads {threads} lanes {lanes} concurrency {concurrency}",
         wall / n.max(1) as f64,
         nodes.load(Ordering::Relaxed) as f64 / n.max(1) as f64
     );
