@@ -2675,7 +2675,7 @@ impl Worker<'_, '_> {
         let solved = self.pool.solved.load(Acquire);
         if solved != self.solved {
             self.solved = solved;
-            self.cancel_done();
+            self.cancel_done(round);
             self.release_done();
         }
         if self.active_lanes < self.lanes.len() {
@@ -2706,9 +2706,10 @@ impl Worker<'_, '_> {
     }
 
     /// Drop the jobs of solved cubes (and a first pass's entries as long as
-    /// its shortest solution so far).
-    fn cancel_done(&mut self) {
+    /// its shortest solution so far), then give the lanes new work.
+    fn cancel_done(&mut self, round: u32) {
         let mut i = self.active_lanes;
+        let mut dropped = false;
         while i > 0 {
             i -= 1;
             let sl = &self.lanes[i];
@@ -2720,10 +2721,20 @@ impl Worker<'_, '_> {
             {
                 continue;
             }
-            let slot = self.end_job(i, false);
-            if !self.restart(i, Some(slot)) {
-                self.deactivate(i);
-            }
+            self.end_job(i, false);
+            self.deactivate(i);
+            dropped = true;
+        }
+        // Refilled together, up to the first lane without work: when each
+        // dropped lane looked for work on its own, all threads took the open
+        // list's lock once per lane at once, after each solved cube, and the
+        // next cube's first build waited for them (at 48 threads, one thread
+        // often ran all 18 tasks of its extension): -5.1% -c 1 at 48T (6 paired
+        // holds; 15/16-move scrambles -10/-9%, depth-15 states -12%; -c 0 and
+        // bench share neutral).
+        if dropped {
+            self.release_done();
+            self.fill_idle(round);
         }
     }
 
