@@ -9,6 +9,17 @@ hashbrown = "0.16"
 libc = "0.2"
 # The library's error types (`tables::TableError`, `cubie::FaceletError`).
 thiserror = "2"
+# Command-line crates, for the binaries only (the `cli` feature): argument
+# parsing and shell completions, errors with context, logging (`-v`,
+# `RUST_LOG`), `--json` output and `gen`'s progress bars.
+clap = { version = "4.6", features = ["derive", "env"], optional = true }
+clap_complete = { version = "4.6", optional = true }
+anyhow = { version = "1", optional = true }
+log = { version = "0.4", optional = true }
+env_logger = { version = "0.11", default-features = false, features = ["auto-color"], optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
+indicatif = { version = "0.18", optional = true }
 
 [build-dependencies]
 # (build.rs includes src/cubie.rs.)
@@ -20,9 +31,42 @@ thiserror = "2"
 parking_lot = "0.12"
 
 [features]
+default = ["cli"]
+# The binaries and `cubeopt::cli` (the library alone needs none of it: the
+# wasm module builds without it).
+cli = [
+    "dep:clap",
+    "dep:clap_complete",
+    "dep:anyhow",
+    "dep:log",
+    "dep:env_logger",
+    "dep:serde",
+    "dep:serde_json",
+    "dep:indicatif",
+]
 # Force the portable scalar backend (to test it on any machine).
 scalar = []
 
+[[bin]]
+name = "cubeopt"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[[bin]]
+name = "solve"
+required-features = ["cli"]
+
+[[bin]]
+name = "bench"
+required-features = ["cli"]
+
+[[bin]]
+name = "gen"
+required-features = ["cli"]
+
+[[test]]
+name = "cli"
+required-features = ["cli"]
 [profile.release]
 opt-level = 3
 lto = "fat"

@@ -134,7 +134,10 @@ impl Prefix {
             };
             next.retain(|e| !older(e));
             if verbose {
-                eprintln!("[gen] prefix depth {d}: {} h11 entries", next.len());
+                super::progress::line(format_args!(
+                    "[gen] prefix depth {d}: {} h11 entries",
+                    next.len()
+                ));
             }
             levels.push(next);
         }
@@ -303,8 +306,13 @@ impl Run<'_, '_> {
         let finished = std::sync::atomic::AtomicBool::new(false);
         std::thread::scope(|s| {
             // (The progress thread, if any, is spawned before the workers
-            // run: one of them is this thread.)
-            if self.settings.verbose {
+            // run: one of them is this thread. A reporter's progress bar
+            // replaces it.)
+            super::progress::start(
+                format_args!("h{} depth {depth}", self.settings.k),
+                roots.len() as u64,
+            );
+            if self.settings.verbose && !super::progress::installed() {
                 s.spawn(|| {
                     let mut last = Instant::now();
                     while !finished.load(Relaxed) {
@@ -349,6 +357,7 @@ impl Run<'_, '_> {
                         self.walk(c, ALL_MOVES, remaining, true, &mut marker);
                     }
                     done.fetch_add(chunk, Relaxed);
+                    super::progress::advance(chunk as u64);
                 }
                 marker.flush();
             });
@@ -384,7 +393,10 @@ impl<'c> Generator<'c> {
         let t0 = Instant::now();
         let prefix = Prefix::build(corners, prefix_depth, threads, verbose);
         if verbose {
-            eprintln!("[gen h{k}] prefix in {:.1}s", t0.elapsed().as_secs_f64());
+            super::progress::line(format_args!(
+                "[gen h{k}] prefix in {:.1}s",
+                t0.elapsed().as_secs_f64()
+            ));
         }
         Generator {
             corners,
@@ -451,13 +463,13 @@ impl<'c> Generator<'c> {
             let tp = Instant::now();
             run.pass(depth);
             if verbose {
-                eprintln!(
+                super::progress::line(format_args!(
                     "[gen h{k}] rows {}..{}: depth {depth} in {:.1}s ({:.1}s for these rows)",
                     rows.start,
                     rows.end,
                     tp.elapsed().as_secs_f64(),
                     t0.elapsed().as_secs_f64()
-                );
+                ));
             }
         }
         finish_group_minima(words, base, threads);

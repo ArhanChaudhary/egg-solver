@@ -68,15 +68,27 @@ The default solves the whole input as a batch on all cores (highest
 throughput); `solve -c 1` solves one cube at a time with all cores (lowest
 latency), `-t` sets the threads.
 
+Every binary has `--help` and `--version`. `--json` prints JSON lines
+(`solve`: one per cube, then the total; `bench`; `gen check`). `-v` logs to
+stderr how the table was loaded (map or copy, page sizes) and the threads
+and lanes (`RUST_LOG=debug` for more). The table can also come from
+`CUBEOPT_TABLE`, the threads from `CUBEOPT_THREADS`. `bench` has
+subcommands (`bench stream|batch|tune <table> ...`, see `bench --help`); its
+positional form (`bench <table> stream 20 30 48`) still works. Shell
+completions: e.g. `solve --completions bash` (or zsh, fish, elvish,
+powershell). The binaries need the default `cli` feature; the library
+builds without it (`default-features = false`).
+
 ### Table files
 
 A table file holds the table data, then a 4 KiB trailer (k, base,
 distribution, checksum): `gen check <table>` verifies a table against it.
 Tables are the same on every machine and backend: you can generate one on a
-big machine and copy it. `CUBEOPT_LOAD=map|copy` sets how a table is
-loaded (map the file, or copy it into memory with transparent huge pages;
-the default is copy on Linux, map elsewhere), and `CUBEOPT_PREFAULT=0`
-(with map) reads pages on first use instead of the whole table at start.
+big machine and copy it. `--load map|copy` (or `CUBEOPT_LOAD`) sets how a
+table is loaded (map the file, or copy it into memory with transparent huge
+pages; the default is copy on Linux, map elsewhere), and `--prefault 0` (or
+`CUBEOPT_PREFAULT=0`; with map) reads pages on first use instead of the
+whole table at start.
 
 ### Portable builds
 

@@ -9,7 +9,7 @@ publish = false
 crate-type = ["cdylib"]
 
 [dependencies]
-cubeopt = { path = ".." }
+cubeopt = { path = "..", default-features = false }
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
