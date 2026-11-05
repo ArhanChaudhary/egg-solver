@@ -20,6 +20,9 @@ env_logger = { version = "0.11", default-features = false, features = ["auto-col
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
 indicatif = { version = "0.18", optional = true }
+# Kernel micro-benchmarks (benches/kernels.rs, `cargo bench --features
+# bench`): a feature, not a dev-dependency, so that tests never build it.
+criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"], optional = true }
 
 [build-dependencies]
 # (build.rs includes src/cubie.rs.)
@@ -46,6 +49,8 @@ cli = [
 ]
 # Force the portable scalar backend (to test it on any machine).
 scalar = []
+# The criterion benchmarks.
+bench = ["dep:criterion"]
 
 [[bin]]
 name = "cubeopt"
@@ -67,6 +72,12 @@ required-features = ["cli"]
 [[test]]
 name = "cli"
 required-features = ["cli"]
+
+[[bench]]
+name = "kernels"
+harness = false
+required-features = ["bench"]
+
 [profile.release]
 opt-level = 3
 lto = "fat"
