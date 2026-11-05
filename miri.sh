@@ -27,6 +27,8 @@ run "$strict" simd:: coord:: solver:: tables:: > "$logs/3" &
 run "$strict" lanes::tests:: > "$logs/4" &
 run "$strict" lanes::share::tests::staged > "$logs/5" &
 run "$strict -Zmiri-many-seeds=$seeds" lanes::share::tests::share_ > "$logs/6" &
+# (Workers driven by hand in one thread: one seed. About 5 minutes.)
+run "$strict" lanes::share::tests::first_pass_ > "$logs/7" &
 wait
 cat "$logs"/*
 rm -r "$logs"
