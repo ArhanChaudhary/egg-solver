@@ -55,8 +55,17 @@ fn run(binary: &str, args: &[&str], stdin: &str) -> Output {
     run_env(binary, args, stdin, &[])
 }
 
+/// Shared memory keys of this test process: every run gets `shm_key(0)`, a
+/// key without a segment (so that no segment a user loaded is used);
+/// `solve_shared_memory` makes its segments at `shm_key(1)` and
+/// `solve_shared_memory_fallbacks` at `shm_key(2)`.
+fn shm_key(n: u32) -> String {
+    format!("{:#010x}", 0x5800_0000 | std::process::id() << 2 | n)
+}
+
 /// Run `binary` with `args`, `stdin` and the environment variables `env`
-/// (the binaries' own variables are unset otherwise).
+/// (the binaries' own variables are unset otherwise, and `CUBEOPT_SHM_KEY`
+/// is `shm_key(0)` but with `--completions`).
 fn run_env(binary: &str, args: &[&str], stdin: &str, env: &[(&str, &str)]) -> Output {
     let mut command = Command::new(binary);
     command
@@ -67,12 +76,20 @@ fn run_env(binary: &str, args: &[&str], stdin: &str, env: &[(&str, &str)]) -> Ou
     for variable in [
         "CUBEOPT_LOAD",
         "CUBEOPT_PREFAULT",
+        "CUBEOPT_SHM_DENY_HUGE",
+        "CUBEOPT_SHM_KEY",
+        "CUBEOPT_SHM_PAGES",
         "CUBEOPT_TABLE",
         "CUBEOPT_THREADS",
         "CUBEOPT_PREFLIGHT_LIMIT",
         "RUST_LOG",
     ] {
         command.env_remove(variable);
+    }
+    // (`--completions` is exclusive, and clap counts a variable's value as
+    // given.)
+    if !args.contains(&"--completions") {
+        command.env("CUBEOPT_SHM_KEY", shm_key(0));
     }
     command.envs(env.iter().copied());
     let mut child = command.spawn().unwrap();
@@ -265,6 +282,145 @@ fn solve_json_env_and_logging() {
     let log = text(&out.stderr);
     assert!(log.contains("h0 base 8"), "{log}");
     assert!(log.contains("2 threads, 40 lanes per thread"), "{log}");
+}
+
+/// Removes a shared memory test's segment on drop.
+#[cfg(target_os = "linux")]
+struct Segment<'a>(&'a [(&'a str, &'a str)]);
+#[cfg(target_os = "linux")]
+impl Drop for Segment<'_> {
+    fn drop(&mut self) {
+        let _ = run_env(
+            env!("CARGO_BIN_EXE_solve"),
+            &["--shm-remove", h0()],
+            "",
+            self.0,
+        );
+    }
+}
+
+/// `solve --shm-load` makes a table's shared memory segment, later runs
+/// attach it (`--shm`, and `auto` loads), explicit copy loads do not, and
+/// `--shm-remove` removes it. (With a key of its own and never 1 GiB pages;
+/// the segment is removed at the end, also when the test fails.)
+#[test]
+#[cfg(target_os = "linux")]
+fn solve_shared_memory() {
+    let table = h0();
+    let solve = env!("CARGO_BIN_EXE_solve");
+    let key = shm_key(1);
+    let env = [
+        ("CUBEOPT_SHM_KEY", key.as_str()),
+        ("CUBEOPT_SHM_PAGES", "2m,4k"),
+    ];
+    let segment = Segment(&env);
+    // (One left by a crashed earlier run of this process id.)
+    drop(run_env(solve, &["--shm-remove", table], "", &env));
+    let made = run_env(solve, &["--shm-load", table], "", &env);
+    let stdout = ok(&made);
+    assert!(
+        stdout.starts_with(&format!("segment {key} shmid "))
+            && stdout.contains(": h0 base 8, 0.03 GiB on ")
+            && stdout.contains(&format!(" pages, made from {table} in ")),
+        "{stdout}"
+    );
+    if stdout.contains("on 4 KiB pages") {
+        // (2 MiB pages were allowed: why they were not had, and a warning.)
+        let log = text(&made.stderr);
+        assert!(
+            log.contains("is on 4 KiB pages") && log.contains("2 MiB pages: "),
+            "{log}"
+        );
+    }
+    let again = ok(&run_env(solve, &["--shm-load", table], "", &env));
+    assert!(
+        again.contains(&format!("already loaded (from {table} by process ")),
+        "{again}"
+    );
+    for load in ["--shm", "--load=auto"] {
+        let args = [table, "-t", "2", "-c", "1", "-v", load];
+        let out = run_env(solve, &args, SCRAMBLES, &env);
+        check_solve_output(&ok(&out), 4, "2", "40", "1");
+        let log = text(&out.stderr);
+        assert!(
+            log.contains(&format!("shared memory segment {key} (shmid "))
+                && log.contains("attached (made by process "),
+            "{log}"
+        );
+    }
+    // With the segment there, no memory is needed (no copy).
+    let low = [
+        ("CUBEOPT_SHM_KEY", key.as_str()),
+        ("CUBEOPT_PREFLIGHT_LIMIT", "1000000"),
+    ];
+    let out = run_env(solve, &[table, "-t", "2", "-c", "1"], SCRAMBLES, &low);
+    check_solve_output(&ok(&out), 4, "2", "40", "1");
+    let args = [table, "-t", "2", "-c", "1", "-v", "--load", "copy"];
+    let out = run_env(solve, &args, SCRAMBLES, &env);
+    check_solve_output(&ok(&out), 4, "2", "40", "1");
+    assert!(!text(&out.stderr).contains("shared memory segment"));
+    let removed = ok(&run_env(solve, &["--shm-remove", table], "", &env));
+    assert!(
+        removed.starts_with(&format!("removed segment {key} shmid "))
+            && removed.contains(": h0 base 8, checksum "),
+        "{removed}"
+    );
+    let none = ok(&run_env(solve, &["--shm-remove", table], "", &env));
+    assert_eq!(none.trim(), format!("no segment {key} for {table}"));
+    drop(segment);
+}
+
+/// A new segment's fallbacks: without the permission for huge pages
+/// (simulated), 4 KiB pages with a warning; without the memory for 4 KiB
+/// pages, refused before anything is made. (Its own key; removed at the
+/// end, also when the test fails.)
+#[test]
+#[cfg(target_os = "linux")]
+fn solve_shared_memory_fallbacks() {
+    let table = h0();
+    let solve = env!("CARGO_BIN_EXE_solve");
+    let key = shm_key(2);
+    let env = [("CUBEOPT_SHM_KEY", key.as_str())];
+    let segment = Segment(&env);
+    // A new segment on 4 KiB pages without the memory for it: refused
+    // before anything is made (exit 2), as a copy would be.
+    let low = [
+        ("CUBEOPT_SHM_KEY", key.as_str()),
+        ("CUBEOPT_SHM_PAGES", "4k"),
+        ("CUBEOPT_PREFLIGHT_LIMIT", "1000000"),
+    ];
+    let refused = run_env(solve, &["--shm-load", table], "", &low);
+    let log = text(&refused.stderr);
+    assert_eq!(refused.status.code(), Some(2), "{log}");
+    assert!(
+        log.contains("a shared memory segment of table") && log.contains("on 4 KiB pages"),
+        "{log}"
+    );
+    let none = ok(&run_env(solve, &["--shm-remove", table], "", &env));
+    assert_eq!(none.trim(), format!("no segment {key} for {table}"));
+    // Without the permission for huge pages (simulated: the kernel is not
+    // asked), 1 GiB and then 2 MiB pages are skipped with how to get it,
+    // and the segment gets 4 KiB pages, with a warning.
+    let denied = [
+        ("CUBEOPT_SHM_KEY", key.as_str()),
+        ("CUBEOPT_SHM_DENY_HUGE", "1"),
+        ("CUBEOPT_SHM_PAGES", "1g,2m,4k"),
+    ];
+    let made = run_env(solve, &["--shm-load", table], "", &denied);
+    assert!(ok(&made).contains(" 0.03 GiB on 4 KiB pages, made from "));
+    let log = text(&made.stderr);
+    let gib = log.find("1 GiB pages: no permission: huge-page segments need a group of yours in vm.hugetlb_shm_group");
+    let mib = log.find("2 MiB pages: no permission: ");
+    assert!(gib.is_some() && mib > gib, "{log}");
+    assert!(
+        log.contains("or CAP_IPC_LOCK; to allow your group: `sudo sysctl vm.hugetlb_shm_group="),
+        "{log}"
+    );
+    assert!(
+        log.contains(&format!("shared memory segment {key} is on 4 KiB pages")),
+        "{log}"
+    );
+    drop(segment);
 }
 
 #[test]

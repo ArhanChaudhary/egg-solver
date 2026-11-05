@@ -11,8 +11,11 @@
 //! slack after the data, so tables made before trailers existed can be
 //! stamped in place (`gen stamp`). Tables without a trailer are described by
 //! a `<path>.meta` sidecar (`k base`), or, for the legacy tables on
-//! `/mnt/huge`, by `tables/<name>.hugemeta` in the build folder.
+//! `/mnt/huge`, by `tables/<name>.hugemeta` in the build folder. A table can
+//! also be loaded into a shared memory segment that outlives the process
+//! (`LoadMode::Shm`, see `tables::shm`).
 
+pub use super::shm::ShmPages;
 use std::io::{Read, Seek, SeekFrom, Write};
 
 /// Size of the trailer at the end of a table file.
@@ -95,6 +98,43 @@ pub enum TableError {
     /// The data's checksum is not the trailer's.
     #[error("checksum {got:016x}, the trailer says {want:016x}: the data is damaged")]
     Checksum { got: u64, want: u64 },
+    /// `LoadMode::Shm` off Linux.
+    #[error("shared memory segments (--load shm) are only supported on Linux")]
+    ShmUnsupported,
+    /// `LoadMode::Shm` of a table without a checksum, which could not be told
+    /// from another table in a segment.
+    #[error(
+        "{path}: its trailer has no checksum, which a shared memory segment needs to tell \
+         this table from another (`gen stamp` adds one)"
+    )]
+    ShmNoChecksum { path: String },
+    /// The segment under the table's key holds another table (say an older
+    /// one of the same k and base): never used.
+    #[error(
+        "shared memory segment {key:#010x} holds {held}, not the table of {path} ({wanted}); \
+         remove it ({hint}) and load again"
+    )]
+    ShmOtherTable {
+        key: u32,
+        path: String,
+        held: String,
+        wanted: String,
+        hint: String,
+    },
+    /// Another process is loading the segment (try again later).
+    #[error("shared memory segment {key:#010x} is being loaded by process {pid}")]
+    ShmLoading { key: u32, pid: i32 },
+    /// The segment cannot be made or used; the message says why and how to
+    /// fix it (memory, kernel limits, an interrupted load).
+    #[error("shared memory segment {key:#010x}: {message}")]
+    Shm { key: u32, message: String },
+    /// A shared memory call failed.
+    #[error("shared memory segment {key:#010x}: {call}")]
+    ShmCall {
+        key: u32,
+        call: &'static str,
+        source: std::io::Error,
+    },
 }
 
 /// `TableError::Io` of the file at `path`.
@@ -408,16 +448,22 @@ pub fn checksum(data: &[u8], threads: usize) -> u64 {
 /// How `H48Table::open` brings a table file into memory.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LoadMode {
-    /// `Map` for files on hugetlbfs or `/dev/shm` (already in memory) and on
-    /// other unix systems; `Copy` for other files on Linux (anonymous memory
-    /// gets transparent huge pages reliably, the page cache may not) and
-    /// where there are no file mappings (WASI, Windows).
+    /// The table's shared memory segment if there is one that holds it
+    /// (`Shm`, Linux); else `Map` for files on hugetlbfs or `/dev/shm`
+    /// (already in memory) and on other unix systems; `Copy` for other files
+    /// on Linux (anonymous memory gets transparent huge pages reliably, the
+    /// page cache may not) and where there are no file mappings (WASI,
+    /// Windows).
     Auto,
     /// Map the file read-only (shared with other processes using it).
     Map,
     /// Copy the file into anonymous memory (transparent huge pages where
     /// available), then drop it from the page cache.
     Copy,
+    /// Attach the table's shared memory segment, made from the file first if
+    /// there is none (Linux; see `tables::shm`). `Auto` also uses a segment
+    /// that is there, if it holds this file's table.
+    Shm,
 }
 
 /// Options of `H48Table::open_with`.
@@ -425,8 +471,13 @@ pub enum LoadMode {
 pub struct LoadOptions {
     pub mode: LoadMode,
     /// With `Map`: fault the whole table in at open (a sequential read), not
-    /// on first use (random reads, slow until the table is cached).
+    /// on first use (random reads, slow until the table is cached). With
+    /// `Shm`: map all of the segment's pages at attach.
     pub prefault: bool,
+    /// With `Shm`: the page sizes a new segment may get.
+    pub shm_pages: ShmPages,
+    /// The segment's key [default: `shm::key` of the table's k and base].
+    pub shm_key: Option<u32>,
 }
 
 impl Default for LoadOptions {
@@ -434,13 +485,16 @@ impl Default for LoadOptions {
         LoadOptions {
             mode: LoadMode::Auto,
             prefault: true,
+            shm_pages: ShmPages::ALL,
+            shm_key: None,
         }
     }
 }
 
 impl LoadOptions {
     /// Options from the environment: `CUBEOPT_LOAD` = `auto` | `map` |
-    /// `copy`, and `CUBEOPT_PREFAULT` = `1` | `0`.
+    /// `copy` | `shm`, `CUBEOPT_PREFAULT` = `1` | `0`, `CUBEOPT_SHM_PAGES`
+    /// (`ShmPages::parse`) and `CUBEOPT_SHM_KEY` (`shm::parse_key`).
     ///
     /// # Panics
     /// If a variable is set to another value.
@@ -452,8 +506,19 @@ impl LoadOptions {
                 "auto" | "" => LoadMode::Auto,
                 "map" => LoadMode::Map,
                 "copy" => LoadMode::Copy,
-                _ => panic!("CUBEOPT_LOAD={v:?}: expected auto, map or copy"),
+                "shm" => LoadMode::Shm,
+                _ => panic!("CUBEOPT_LOAD={v:?}: expected auto, map, copy or shm"),
             };
+        }
+        if let Ok(v) = std::env::var("CUBEOPT_SHM_PAGES") {
+            o.shm_pages = ShmPages::parse(&v)
+                .unwrap_or_else(|| panic!("CUBEOPT_SHM_PAGES={v:?}: expected e.g. 1g,2m,4k"));
+        }
+        if let Ok(v) = std::env::var("CUBEOPT_SHM_KEY") {
+            o.shm_key = Some(
+                super::shm::parse_key(&v)
+                    .unwrap_or_else(|| panic!("CUBEOPT_SHM_KEY={v:?}: expected e.g. 0x636f0709")),
+            );
         }
         if let Ok(v) = std::env::var("CUBEOPT_PREFAULT") {
             o.prefault = match v.as_str() {
@@ -465,7 +530,8 @@ impl LoadOptions {
         o
     }
 
-    /// The mode used for the file at `path` (resolves `Auto`).
+    /// The mode used for the file at `path` (resolves `Auto`, unless a
+    /// segment of the table is there: see `H48Table::open_reporting`).
     #[must_use]
     pub fn mode_for(&self, path: &str) -> LoadMode {
         match self.mode {
