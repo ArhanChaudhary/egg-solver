@@ -1,5 +1,5 @@
 //! cubeopt as a WebAssembly module: a plain C ABI of a few functions, which
-//! `cubeopt.mjs` wraps for JavaScript (Node and browsers).
+//! `cubeopt.mjs` wraps for JavaScript (Bun and browsers).
 //!
 //! Strings go in as (pointer, length) of UTF-8 in buffers from
 //! `cubeopt_alloc`. Results come out as text in an output buffer

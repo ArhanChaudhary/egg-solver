@@ -1,8 +1,8 @@
-#!/usr/bin/env node
-// Solve cubes with the WebAssembly build in Node.
+#!/usr/bin/env bun
+// Solve cubes with the WebAssembly build in Bun.
 //
-//   node wasm/demo.mjs [options] < scrambles       one scramble or facelet string per line
-//   node wasm/demo.mjs --random 20:2026 [options]  random states (as `bench random:20:2026`)
+//   bun wasm/demo.mjs [options] < scrambles       one scramble or facelet string per line
+//   bun wasm/demo.mjs --random 20:2026 [options]  random states (as `bench random:20:2026`)
 //
 // Options:
 //   --table <file>    a table file (`gen <k> auto <file>`); or
@@ -21,7 +21,6 @@
 // Prints one line per cube (length, time, nodes, solution), then totals.
 
 import { Cubeopt } from './cubeopt.mjs';
-import { readFileSync } from 'node:fs';
 
 const args = process.argv.slice(2);
 const option = (name) => {
@@ -66,7 +65,7 @@ if (option('--random')) {
   const [count, seed] = option('--random').split(':').map(Number);
   cubes = solver.randomCubes(seed, count);
 } else {
-  cubes = readFileSync(0, 'utf8').split('\n').filter((l) => l.trim() !== '');
+  cubes = (await Bun.stdin.text()).split('\n').filter((l) => l.trim() !== '');
 }
 
 start = performance.now();

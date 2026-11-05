@@ -1,5 +1,5 @@
-#!/usr/bin/env node
-// Smoke test of the built modules (wasm/build.sh) in Node, run by check.sh:
+#!/usr/bin/env bun
+// Smoke test of the built modules (wasm/build.sh) in Bun, run by check.sh:
 // both builds generate h0 and solve short scrambles one at a time and as a
 // batch; every solution must undo its scramble (solving "scramble +
 // solution" gives the empty solution), be no longer than the scramble, and

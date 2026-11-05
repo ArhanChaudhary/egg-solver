@@ -1,4 +1,4 @@
-// cubeopt in WebAssembly: a JavaScript wrapper for Node and browsers.
+// cubeopt in WebAssembly: a JavaScript wrapper for Bun and browsers.
 //
 //   import { Cubeopt } from './cubeopt.mjs';
 //   const solver = await Cubeopt.create({ wasm: 'dist/cubeopt.wasm' });
@@ -12,8 +12,9 @@
 // on a shared memory. In browsers the threads build needs a cross-origin
 // isolated page (COOP/COEP headers, see `serve.mjs`) and must run in a worker
 // (the main thread may not block). See README.md, "WebAssembly".
-
-const isNode = typeof process !== 'undefined' && process.versions?.node !== undefined;
+//
+// Web APIs only (Worker, fetch, Blob, Atomics), except `localFile` (Bun's file
+// API, for local paths).
 
 const ERRNO_SUCCESS = 0;
 const ERRNO_AGAIN = 6;
@@ -241,14 +242,23 @@ function importedMemoryLimits(bytes) {
   return undefined;
 }
 
-/** The bytes of `source`: a path (Node), a URL, or bytes already. */
+/**
+ * A local file as a `Blob` (Bun: a path, or a `file:` URL), else undefined
+ * (browsers, and http(s), data and blob URLs, which are fetched).
+ */
+function localFile(source) {
+  if (typeof Bun === 'undefined' || !(typeof source === 'string' || source instanceof URL)) {
+    return undefined;
+  }
+  return /^(https?|data|blob):/.test(String(source)) ? undefined : Bun.file(source);
+}
+
+/** The bytes of `source`: a path (Bun), a URL, or bytes already. */
 async function readSource(source) {
   if (source instanceof Uint8Array) return source;
   if (source instanceof ArrayBuffer) return new Uint8Array(source);
-  if (isNode && !/^(https?|data|blob):/.test(String(source))) {
-    const { readFile } = await import('node:fs/promises');
-    return new Uint8Array(await readFile(source instanceof URL ? source : String(source)));
-  }
+  const file = localFile(source);
+  if (file) return new Uint8Array(await file.arrayBuffer());
   const response = await fetch(source);
   if (!response.ok) throw new Error(`${source}: ${response.status} ${response.statusText}`);
   return new Uint8Array(await response.arrayBuffer());
@@ -257,34 +267,21 @@ async function readSource(source) {
 /** Start a pool worker (`cubeopt-thread.mjs`) and wait until it is idle. */
 async function startWorker(module, memory, control, slot) {
   const url = new URL('./cubeopt-thread.mjs', import.meta.url);
-  let worker;
-  const ready = new Promise((resolve, reject) => {
-    const onMessage = (message) => (message === 'ready' ? resolve() : reject(new Error(message)));
-    if (isNode) {
-      worker = null;
-      import('node:worker_threads').then(({ Worker }) => {
-        worker = new Worker(url);
-        worker.on('message', onMessage);
-        worker.on('error', reject);
-        worker.postMessage({ module, memory, control, slot });
-      }, reject);
-    } else {
-      worker = new Worker(url, { type: 'module' });
-      worker.onmessage = (e) => onMessage(e.data);
-      worker.onerror = (e) => reject(new Error(e.message));
-      worker.postMessage({ module, memory, control, slot });
-    }
+  const worker = new Worker(url, { type: 'module' });
+  await new Promise((resolve, reject) => {
+    worker.onmessage = (e) => (e.data === 'ready' ? resolve() : reject(new Error(e.data)));
+    worker.onerror = (e) => reject(new Error(e.message));
+    worker.postMessage({ module, memory, control, slot });
   });
-  await ready;
-  // (Node: idle pool workers must not keep the process alive.)
-  if (isNode) worker.unref();
+  // (Bun: idle pool workers must not keep the process alive.)
+  worker.unref?.();
   return worker;
 }
 
 /** The solver: one WebAssembly instance with its table. */
 export class Cubeopt {
   /**
-   * Instantiate the module. `wasm`: a path (Node), URL, bytes or a compiled
+   * Instantiate the module. `wasm`: a path (Bun), URL, bytes or a compiled
    * `WebAssembly.Module`; `threads`: threads to use with the threads build
    * (default: all cores; the single-thread build uses 1).
    */
@@ -303,10 +300,7 @@ export class Cubeopt {
       // (The threads build imports all 4 GiB at once, see wasm/build.rs.)
       const limits = bytes ? importedMemoryLimits(bytes) : { initial: 65535, maximum: 65536 };
       memory = new WebAssembly.Memory({ ...limits, shared: true });
-      const cores = isNode
-        ? (await import('node:os')).availableParallelism()
-        : navigator.hardwareConcurrency;
-      threads = Math.max(1, threads ?? cores ?? 1);
+      threads = Math.max(1, threads ?? navigator.hardwareConcurrency ?? 1);
       // One worker per thread a solve can spawn, plus one.
       const slots = threads + 1;
       control = new Int32Array(new SharedArrayBuffer(4 * slotBase(slots)));
@@ -377,7 +371,7 @@ export class Cubeopt {
 
   /**
    * Load a table file (made by the native `gen`, or `gen` in wasmtime): a
-   * path (Node), a URL (fetched), a `Blob`/`File` (browsers), or its bytes.
+   * path (Bun), a URL (fetched), a `Blob`/`File` (browsers), or its bytes.
    * The file is copied straight into the module's memory (no second copy).
    * `verify` checks the data against the checksum in the file's trailer.
    * Returns `{ k, base, bytes }`.
@@ -389,27 +383,10 @@ export class Cubeopt {
       const bytes = source instanceof Uint8Array ? source : new Uint8Array(source);
       size = bytes.length;
       fill = async (at) => at(0).set(bytes);
-    } else if (typeof Blob !== 'undefined' && source instanceof Blob) {
-      size = source.size;
-      fill = (at) => copyStream(source.stream(), at, onProgress, size);
-    } else if (isNode && !/^(https?|data|blob):/.test(String(source))) {
-      const fs = await import('node:fs');
-      const fd = fs.openSync(source instanceof URL ? source : String(source), 'r');
-      try {
-        size = fs.fstatSync(fd).size;
-        fill = async (at) => {
-          const piece = 64 << 20;
-          for (let done = 0; done < size; ) {
-            const n = fs.readSync(fd, at(done, Math.min(piece, size - done)), 0, Math.min(piece, size - done), done);
-            if (n <= 0) throw new Error(`${source}: unexpected end of file`);
-            done += n;
-            onProgress?.(done, size);
-          }
-        };
-        return await this.fillTable(size, fill, verify);
-      } finally {
-        fs.closeSync(fd);
-      }
+    } else if (localFile(source) || (typeof Blob !== 'undefined' && source instanceof Blob)) {
+      const blob = localFile(source) ?? source;
+      size = blob.size;
+      fill = (at) => copyStream(blob.stream(), at, onProgress, size);
     } else {
       const response = await fetch(source);
       if (!response.ok) throw new Error(`${source}: ${response.status} ${response.statusText}`);
@@ -475,15 +452,18 @@ export class Cubeopt {
 
   /**
    * Have the engine compile the search loops with its optimizing compiler
-   * now, so that the first real solves get it: V8 (Chrome, Node) runs new
-   * code with its baseline compiler and switches a function to optimized
-   * code only on its next call, so a long first solve would run its whole
-   * search slowly: 187.7 s instead of 129.5 s for 100 depth-17 cubes on h6
-   * (Node 26, one thread). Solves short scrambles (cheap with any table)
+   * now, so that the first real solves get it: V8 (Chrome) runs new code
+   * with its baseline compiler and switches a function to optimized code
+   * only on its next call, so a long first solve would run its whole search
+   * slowly: 187.7 s instead of 129.5 s for 100 depth-17 cubes on h6 (V8 in
+   * Node 26, one thread). Solves short scrambles (cheap with any table)
    * for about `seconds`, then gives the background compiler time to finish.
-   * `loadTable` and `generateTable` call it.
+   * `loadTable` and `generateTable` call it. Not in Bun: JavaScriptCore
+   * moves a running loop to optimized code (126.5 s without, 127.0 s with
+   * the warm-up, same set).
    */
   async warmUp({ seconds = 0.3 } = {}) {
+    if (typeof Bun !== 'undefined') return;
     const faces = 'UDRLFB';
     let seed = 1;
     const random = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
