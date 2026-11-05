@@ -50,6 +50,11 @@ mkdir -p ~/cube-tables
 target/release/gen 8 auto ~/cube-tables/h8
 ```
 
+Before it starts, `gen` checks that the disk (on hugetlbfs: the free huge
+pages) and the memory are enough, and stops with the numbers if not
+(`--force` skips the checks); `solve` and `bench` check the memory before
+they copy a table into it.
+
 Optionally tune the lanes per thread for your machine (about two minutes;
 saved next to the table as `h8.tune`, used by `solve` and `bench`):
 

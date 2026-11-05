@@ -25,7 +25,7 @@
 //! pipes) stderr has the progress lines only.
 use anyhow::Context as _;
 use clap::{Args, Parser, Subcommand};
-use cubeopt::cli::{self, BadInput, Verbosity};
+use cubeopt::cli::{self, preflight, BadInput, Verbosity};
 use cubeopt::gen::progress;
 use cubeopt::gen::{collapse, dfs};
 use cubeopt::tables::file::{self, LoadMode, LoadOptions, Trailer};
@@ -85,6 +85,9 @@ enum Command {
         k: u32,
         /// The table file to write.
         out: String,
+        /// Skip the checks of disk space and memory before the run.
+        #[arg(long)]
+        force: bool,
     },
     /// Compare table A with table B (of the same base; B's k at least A's,
     /// collapsed to A's k on the fly).
@@ -128,6 +131,10 @@ struct GenerateArgs {
     /// Smaller tables to derive in the same run (BFS only: K 0 or 11).
     #[arg(value_name = "K:BASE:PATH", value_parser = parse_derived)]
     derived: Vec<(u32, u8, String)>,
+    /// Skip the checks before the run: room for the files (free space, or
+    /// free huge pages on hugetlbfs) and memory (`MemAvailable`).
+    #[arg(long)]
+    force: bool,
 }
 
 /// A base: a number or `auto`.
@@ -268,7 +275,15 @@ fn main() -> ExitCode {
         (Some(Command::Generate(args)), _) | (None, Some(args)) => generate(&args),
         (Some(Command::Stamp { path, k, base }), _) => stamp(&path, k, base),
         (Some(Command::Check { path, json }), _) => check(&path, json),
-        (Some(Command::Derive { source, k, out }), _) => derive(&source, k, &out),
+        (
+            Some(Command::Derive {
+                source,
+                k,
+                out,
+                force,
+            }),
+            _,
+        ) => derive(&source, k, &out, force),
         (Some(Command::Compare { a, b }), _) => compare(&a, &b),
         // (clap asks for <K> <BASE> <OUT> before.)
         (None, None) => Err(BadInput("a command or <K> <BASE> <OUT> is needed".to_string()).into()),
@@ -301,6 +316,12 @@ fn generate(args: &GenerateArgs) -> anyhow::Result<ExitCode> {
         )
         .into());
     }
+    let bfs = (k == 0 && !force_dfs) || k == 11;
+    if args.force {
+        log::info!("preflight: skipped (--force)");
+    } else {
+        preflight_generate(k, out, parts, bfs, &args.derived)?;
+    }
     let t = Instant::now();
     let corners = Cocsep::generate();
     // (On a terminal: a progress bar, with the progress lines above it.)
@@ -317,7 +338,7 @@ fn generate(args: &GenerateArgs) -> anyhow::Result<ExitCode> {
             String::new()
         }
     ));
-    let trailer = if (k == 0 && !force_dfs) || k == 11 {
+    let trailer = if bfs {
         // BFS (true coordinates). On hugetlbfs or /dev/shm the table is
         // generated in place; elsewhere in memory, then written.
         let in_place = file::is_hugetlbfs(out) || out.starts_with("/dev/shm");
@@ -632,7 +653,71 @@ fn check(path: &str, json: bool) -> anyhow::Result<ExitCode> {
     })
 }
 
-fn derive(source: &str, k: u32, out: &str) -> anyhow::Result<ExitCode> {
+/// Before generating hK into `out` (and the `derived` tables): room for the
+/// files, and memory for the tables built in memory (BFS: the table unless
+/// it is built in place on hugetlbfs, and each derived table not on
+/// hugetlbfs, which are written through mappings; depth-first: one part)
+/// and the generator's own.
+fn preflight_generate(
+    k: u32,
+    out: &str,
+    parts: u64,
+    bfs: bool,
+    derived: &[(u32, u8, String)],
+) -> anyhow::Result<()> {
+    let names: Vec<String> = std::iter::once(k)
+        .chain(derived.iter().map(|d| d.0))
+        .map(|k| format!("h{k}"))
+        .collect();
+    let mut outputs = vec![(names[0].as_str(), out, h48_bytes(k))];
+    for ((dk, _, path), name) in derived.iter().zip(&names[1..]) {
+        outputs.push((name.as_str(), path.as_str(), h48_bytes(*dk)));
+    }
+    let hint = "free space, or choose another OUT or a smaller k";
+    let rooms = preflight::files(&outputs, hint)?;
+    let in_memory = |i: usize| {
+        rooms[i]
+            .as_ref()
+            .is_none_or(|room| room.huge_page.is_none())
+    };
+    let tables: u64 = if bfs {
+        (0..outputs.len())
+            .filter(|&i| in_memory(i))
+            .map(|i| outputs[i].2)
+            .sum()
+    } else {
+        let rows = h48_rows(k);
+        rows.div_ceil(parts.max(1)).next_multiple_of(8192).min(rows) * ROW_BYTES
+    };
+    let hint = if bfs {
+        "free memory, generate on hugetlbfs, or use a smaller k (--force skips this check)"
+    } else {
+        "use --parts N (1/N of the memory), free memory or use a smaller k (--force skips \
+         this check)"
+    };
+    preflight::memory(
+        &format!("generating {}", names.join(" and ")),
+        tables + preflight::GENERATOR_OVERHEAD,
+        hint,
+    )
+}
+
+fn derive(source: &str, k: u32, out: &str, force: bool) -> anyhow::Result<ExitCode> {
+    if force {
+        log::info!("preflight: skipped (--force)");
+    } else {
+        let name = format!("h{k}");
+        preflight::files(
+            &[(&name, out, h48_bytes(k))],
+            "free space, or choose another OUT",
+        )?;
+        let hint = "free memory or derive a smaller k (--force skips this check)";
+        preflight::memory(
+            &format!("deriving {name}"),
+            h48_bytes(k) + preflight::GENERATOR_OVERHEAD,
+            hint,
+        )?;
+    }
     let src = open_source(source)?;
     if k > src.meta.k {
         let source_k = src.meta.k;
