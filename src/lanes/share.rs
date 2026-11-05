@@ -57,11 +57,45 @@ use crate::cubie::CubieCube;
 use crate::simd::Cube;
 use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES};
 use crate::symstart::SymFilter;
+use crossbeam_utils::CachePadded;
+// parking_lot's Mutex instead of std's for the share mode's mutexes (native
+// targets; wasm: `Mutex` below): no poisoning to check or unwrap per lock,
+// less code around the locks; bench share +0.8% at 48T and +1.3% at 1T, -c 1
+// within noise (d1).
+#[cfg(not(target_family = "wasm"))]
+use parking_lot::Mutex;
 use std::cell::UnsafeCell;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, AtomicUsize};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::Arc;
 use std::time::Instant;
+
+/// On wasm, std's Mutex with `parking_lot`'s `lock` (the guard; a poisoned
+/// lock is used as it is, as `parking_lot` has no poisoning). `parking_lot_core`
+/// parks wasm threads only with its `nightly` feature: on stable Rust its
+/// parker panics as soon as a lock is contended.
+#[cfg(target_family = "wasm")]
+struct Mutex<T>(std::sync::Mutex<T>);
+
+#[cfg(target_family = "wasm")]
+impl<T> Mutex<T> {
+    fn new(value: T) -> Mutex<T> {
+        Mutex(std::sync::Mutex::new(value))
+    }
+
+    fn lock(&self) -> std::sync::MutexGuard<'_, T> {
+        self.0
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    #[cfg(test)]
+    fn into_inner(self) -> T {
+        self.0
+            .into_inner()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+}
 
 /// Parents per task of a parallel job extension, and the smallest job lists
 /// extended or sorted in parallel (when threads are waiting for work).
@@ -382,19 +416,15 @@ impl<T> Drop for SpinWrite<'_, T> {
     }
 }
 
-/// A value on cache lines of its own (atomics written by many threads).
+/// A value on cache lines of its own (atomics written by many threads):
+/// crossbeam's `CachePadded`, 128 bytes on x86-64 (the prefetcher pulls
+/// 64-byte lines in pairs) and aarch64.
 // Padding of the shared atomics, rarely written fields and free lists
 // (l6-share-2; screening run without it: bench share 787 vs 845/s at 48T).
-#[repr(align(128))]
-struct Pad<T>(T);
-
-impl<T> std::ops::Deref for Pad<T> {
-    type Target = T;
-    #[inline(always)]
-    fn deref(&self) -> &T {
-        &self.0
-    }
-}
+// CachePadded instead of our own `repr(align(128))` newtype: the same
+// layout and code on x86-64, neutral (-c 1 and bench share at 48T, 1T
+// share: within noise, d1).
+type Pad<T> = CachePadded<T>;
 
 /// A cube being solved by any number of lanes.
 struct CubeCtx {
@@ -766,14 +796,14 @@ impl<'a> Pool<'a> {
             cubes,
             max_active: max_active.max(1),
             nthreads: u32::try_from(nthreads.max(1)).unwrap_or(u32::MAX),
-            next: Pad(AtomicUsize::new(0)),
+            next: Pad::new(AtomicUsize::new(0)),
             no_fresh: AtomicBool::new(false),
-            active: Pad(AtomicUsize::new(0)),
-            open: Pad(SpinRw::new(Vec::new())),
-            open_count: Pad(AtomicUsize::new(0)),
+            active: Pad::new(AtomicUsize::new(0)),
+            open: Pad::new(SpinRw::new(Vec::new())),
+            open_count: Pad::new(AtomicUsize::new(0)),
             mail: (0..nthreads.max(1))
                 .map(|_| {
-                    Pad(Mailbox {
+                    Pad::new(Mailbox {
                         state: AtomicU8::new(IDLE),
                         piece: UnsafeCell::new(Piece {
                             ctx: None,
@@ -786,11 +816,11 @@ impl<'a> Pool<'a> {
                 })
                 .collect(),
             next_thread_id: AtomicUsize::new(0),
-            hungry: Pad(AtomicUsize::new(0)),
-            epoch: Pad(AtomicU64::new(0)),
-            solved: Pad(AtomicU64::new(0)),
-            spare: Pad(Mutex::new(Vec::new())),
-            bufs: Pad(Mutex::new(Vec::new())),
+            hungry: Pad::new(AtomicUsize::new(0)),
+            epoch: Pad::new(AtomicU64::new(0)),
+            solved: Pad::new(AtomicU64::new(0)),
+            spare: Pad::new(Mutex::new(Vec::new())),
+            bufs: Pad::new(Mutex::new(Vec::new())),
             counters: Mutex::new([0; NCOUNT]),
             trace: std::env::var_os("CUBE_TRACE").is_some(),
             trace_out: Mutex::new(String::new()),
@@ -821,16 +851,8 @@ impl<'a> Pool<'a> {
             let inner = Inner::touched();
             let mut bufs = Bufs::sized();
             bufs.pooled = true;
-            // (Buffers only: a panic of a thread holding them does not
-            // matter.)
-            self.spare
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .push(inner);
-            self.bufs
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner)
-                .push(bufs);
+            self.spare.lock().push(inner);
+            self.bufs.lock().push(bufs);
         }
         // (Built here, not by a `Worker::new`: that shrank this thread's
         // stack frame by 320 bytes, with `rounds` unchanged, and took solve
@@ -855,9 +877,7 @@ impl<'a> Pool<'a> {
             counts: [0; NCOUNT],
         };
         worker.run(stop);
-        // (Counters only: a panic of another thread while it held them
-        // does not matter.)
-        let mut counters = self.counters.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut counters = self.counters.lock();
         for (sum, count) in counters.iter_mut().zip(worker.counts) {
             *sum += count;
         }
@@ -867,7 +887,7 @@ impl<'a> Pool<'a> {
     /// mean number of active lanes per round, jobs started, ...
     #[expect(clippy::cast_precision_loss, reason = "a ratio of counts")]
     pub fn counters(&self) -> String {
-        let counts = *self.counters.lock().unwrap_or_else(PoisonError::into_inner);
+        let counts = *self.counters.lock();
         let mut out = format!(
             "active lanes/round {:.2}",
             counts[C_VISITS] as f64 / counts[C_ROUNDS].max(1) as f64
@@ -937,7 +957,7 @@ impl<'a> Pool<'a> {
 
     /// Buffers for a staged build.
     fn take_bufs(&self) -> Bufs {
-        let mut bufs = self.bufs.lock().unwrap().pop().unwrap_or_else(Bufs::sized);
+        let mut bufs = self.bufs.lock().pop().unwrap_or_else(Bufs::sized);
         bufs.pooled = true;
         bufs.stats_from_atomics = false;
         bufs
@@ -946,7 +966,7 @@ impl<'a> Pool<'a> {
     /// Give back the buffers of a staged build (if any).
     fn put_bufs(&self, bufs: Bufs) {
         if bufs.pooled {
-            self.bufs.lock().unwrap().push(bufs);
+            self.bufs.lock().push(bufs);
         }
     }
 
@@ -963,12 +983,7 @@ impl<'a> Pool<'a> {
 impl Drop for Pool<'_> {
     fn drop(&mut self) {
         if self.trace {
-            let out = std::mem::take(
-                &mut *self
-                    .trace_out
-                    .lock()
-                    .unwrap_or_else(PoisonError::into_inner),
-            );
+            let out = std::mem::take(&mut *self.trace_out.lock());
             eprint!("{out}");
             let wall = self.started.elapsed().as_secs_f64();
             #[expect(clippy::cast_precision_loss, reason = "trace output")]
@@ -984,10 +999,7 @@ impl Drop for Pool<'_> {
 /// (trace) Append a line to the pool's trace.
 fn tlog(pool: &Pool, args: std::fmt::Arguments) {
     use std::fmt::Write;
-    let mut out = pool
-        .trace_out
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner);
+    let mut out = pool.trace_out.lock();
     let _ = out.write_fmt(args);
     out.push('\n');
 }
@@ -2134,7 +2146,7 @@ fn finish_build(pool: &Pool, ctx: &Arc<CubeCtx>) {
         for left in &ctx.phase_left[..inner.phases as usize] {
             left.store(claimed, Relaxed);
         }
-        *ctx.pass.lock().unwrap() = PassState::default();
+        *ctx.pass.lock() = PassState::default();
         ctx.rarely_written.pass_limit.store(u8::MAX, Relaxed);
         claimed *= u64::from(inner.phases);
     }
@@ -2426,7 +2438,7 @@ impl Worker<'_, '_> {
     }
 
     fn mailbox(&self) -> Option<&Mailbox> {
-        self.pool.mail.get(self.id).map(|m| &m.0)
+        self.pool.mail.get(self.id).map(|m| &**m)
     }
 
     /// Ask for a piece.
@@ -2504,7 +2516,7 @@ impl Worker<'_, '_> {
         }
         let ctx = ctx.clone();
         let solution = sl.lane.reconstruct();
-        let mut pass = ctx.pass.lock().unwrap();
+        let mut pass = ctx.pass.lock();
         match pass.offer(u32::from(sl.phase), solution) {
             Offer::Report(solution) => {
                 drop(pass);
@@ -2524,7 +2536,7 @@ impl Worker<'_, '_> {
     fn phase_done(&mut self, ctx: &CubeCtx) {
         let phases = ctx.inner().phases;
         let ended = |phase: u32| ctx.phase_left[phase as usize].load(Acquire) == 0;
-        let solution = ctx.pass.lock().unwrap().ended(phases, ended);
+        let solution = ctx.pass.lock().ended(phases, ended);
         if let Some(solution) = solution {
             self.report_pass(ctx, solution);
         }
@@ -2569,7 +2581,7 @@ impl Worker<'_, '_> {
 
     /// `ctx` is solved (`done` was set by this thread): publish the result.
     fn publish_solution(&self, ctx: &CubeCtx, solution: Vec<u8>, seconds: f64) {
-        *ctx.result.lock().unwrap() = (solution, seconds);
+        *ctx.result.lock() = (solution, seconds);
         self.pool.active.fetch_sub(1, AcqRel);
         self.pool.epoch.fetch_add(1, Release);
         self.pool.solved.fetch_add(1, Release);
@@ -2586,7 +2598,7 @@ impl Worker<'_, '_> {
         if inner.phases == 1 {
             return false;
         }
-        let solution = std::mem::take(&mut ctx.pass.lock().unwrap().candidate);
+        let solution = std::mem::take(&mut ctx.pass.lock().candidate);
         if solution.is_empty() {
             return false;
         }
@@ -3018,12 +3030,12 @@ impl Worker<'_, '_> {
             // its atomics): recycle its buffers.
             // SAFETY: see above.
             let inner = std::mem::replace(unsafe { &mut *ctx.inner.get() }, Inner::new(vec![], 0));
-            let mut spare = self.pool.spare.lock().unwrap();
+            let mut spare = self.pool.spare.lock();
             if spare.len() < self.pool.nthreads as usize {
                 spare.push(inner);
             }
             drop(spare);
-            let (solution, seconds) = std::mem::take(&mut *ctx.result.lock().unwrap());
+            let (solution, seconds) = std::mem::take(&mut *ctx.result.lock());
             let stats = Stats {
                 nodes: ctx.rarely_written.nodes.load(Relaxed),
                 lookups: ctx.rarely_written.lookups.load(Relaxed),
@@ -3104,7 +3116,7 @@ impl Worker<'_, '_> {
             let root_inverse = root.inverse();
             let bound = solver.lower_bound(root);
             let bound_inverse = solver.lower_bound(root_inverse);
-            let spare = pool.spare.lock().unwrap().pop();
+            let spare = pool.spare.lock().pop();
             let mut inner = spare.unwrap_or_else(Inner::touched);
             inner.target = bound.max(bound_inverse).max(1);
             inner.tag_base = u32::try_from(index % 64).unwrap_or(0) * 4;
@@ -3114,15 +3126,15 @@ impl Worker<'_, '_> {
                 root,
                 root_inverse,
                 sym_filter: solver.sym_filter(root, root_inverse),
-                claim: Pad(AtomicU64::new(0)),
-                task: Pad(AtomicU64::new(0)),
-                task_left: Pad(AtomicU32::new(0)),
-                outstanding: Pad(AtomicU64::new(0)),
+                claim: Pad::new(AtomicU64::new(0)),
+                task: Pad::new(AtomicU64::new(0)),
+                task_left: Pad::new(AtomicU32::new(0)),
+                outstanding: Pad::new(AtomicU64::new(0)),
                 done: AtomicBool::new(false),
-                phase_left: Pad(std::array::from_fn(|_| AtomicU64::new(0))),
+                phase_left: Pad::new(std::array::from_fn(|_| AtomicU64::new(0))),
                 trace: pool.trace,
-                parts: Pad(AtomicU32::new(1)),
-                rarely_written: Pad(RarelyWritten {
+                parts: Pad::new(AtomicU32::new(1)),
+                rarely_written: Pad::new(RarelyWritten {
                     pass_limit: AtomicU8::new(u8::MAX),
                     ..RarelyWritten::default()
                 }),
@@ -3379,7 +3391,7 @@ impl Worker<'_, '_> {
         // a thread waiting for a piece
         let pool = self.pool;
         let mailboxes = pool.mail.len();
-        let next = |k: usize| &pool.mail[(self.id + k) % mailboxes].0;
+        let next = |k: usize| &*pool.mail[(self.id + k) % mailboxes];
         let Some(mailbox) = (1..mailboxes).map(next).find(|mailbox| {
             mailbox.state.load(Relaxed) == WANT
                 && mailbox
@@ -3629,7 +3641,7 @@ mod tests {
                     // for its jobs forever and the test would hang).
                     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                         pool.run(solver, nlanes, &stop, |i, solution, _, _| {
-                            let mut all = solutions.lock().unwrap();
+                            let mut all = solutions.lock();
                             assert!(all[i].is_none(), "cube {i} reported twice");
                             all[i] = Some(solution);
                         });
@@ -3641,13 +3653,13 @@ mod tests {
                 });
             }
         });
-        let solutions = solutions.into_inner().unwrap();
+        let solutions = solutions.into_inner();
         let solutions = solutions
             .into_iter()
             .enumerate()
             .map(|(i, s)| s.unwrap_or_else(|| panic!("cube {i} not reported")))
             .collect();
-        let counts = *pool.counters.lock().unwrap();
+        let counts = *pool.counters.lock();
         (solutions, counts)
     }
 
@@ -4010,8 +4022,8 @@ mod tests {
         // (Two threads, one cube: not few, so builds are serial.)
         let pool = Pool::new(&get, 1, 2);
         let reported = Mutex::new(Vec::new());
-        let mut report = |i, solution, _, _| reported.lock().unwrap().push((i, solution));
-        let mut report_too = |i, solution, _, _| reported.lock().unwrap().push((i, solution));
+        let mut report = |i, solution, _, _| reported.lock().push((i, solution));
+        let mut report_too = |i, solution, _, _| reported.lock().push((i, solution));
         let mut first = hand_worker(&pool, &solver, 0, 2, &mut report);
         let mut second = hand_worker(&pool, &solver, 1, 2, &mut report_too);
         // The first worker runs an entry of phase 0, ...
@@ -4032,7 +4044,7 @@ mod tests {
         // entry, its last pending job of the cube.
         let phase = second.lanes[0].phase;
         {
-            let mut pass = ctx.pass.lock().unwrap();
+            let mut pass = ctx.pass.lock();
             pass.candidate = vec![0];
             pass.shortest = u32::from(phase) + 1;
         }
@@ -4054,7 +4066,7 @@ mod tests {
         second.release_done();
         let joined = first.locals.iter().chain(&second.locals);
         assert!(joined.flatten().next().is_none());
-        assert_eq!(*reported.lock().unwrap(), [(0, vec![0])]);
+        assert_eq!(*reported.lock(), [(0, vec![0])]);
     }
 
     /// While a first pass's candidate is being reported (taken when the
@@ -4079,7 +4091,7 @@ mod tests {
         // another thread took a solution of phase 1 to report it.
         assert!(run_up_to_phase(&mut worker, 0, slot, 2));
         {
-            let mut pass = ctx.pass.lock().unwrap();
+            let mut pass = ctx.pass.lock();
             assert_eq!(pass.phases_ended, u32::from(worker.lanes[0].phase));
             assert_eq!(pass.candidate, []);
             pass.shortest = 2;
