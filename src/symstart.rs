@@ -180,7 +180,7 @@ fn move_conjugates() -> &'static [[u8; 18]; 48] {
     static CONJUGATES: OnceLock<[[u8; 18]; 48]> = OnceLock::new();
     CONJUGATES.get_or_init(|| {
         let mut conjugates = [[0u8; 18]; 48];
-        let moves: Vec<Cube> = (0..18).map(|mv| Cube::solved().apply_move(mv)).collect();
+        let moves: [Cube; 18] = std::array::from_fn(|mv| Cube::solved().apply_move(mv));
         for (sym, row) in conjugates.iter_mut().enumerate() {
             for (mv, image_move) in row.iter_mut().enumerate() {
                 let image = moves[mv].transform(sym);
