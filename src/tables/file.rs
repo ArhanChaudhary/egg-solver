@@ -45,7 +45,9 @@ impl Trailer {
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         use std::fmt::Write as _;
-        let mut text = String::from(MAGIC);
+        let trailer_len = usize::try_from(TRAILER_BYTES).unwrap();
+        let mut text = String::with_capacity(trailer_len);
+        text.push_str(MAGIC);
         let _ = writeln!(text, "layout {LAYOUT}");
         let _ = writeln!(text, "k {}", self.k);
         let _ = writeln!(text, "base {}", self.base);
@@ -57,8 +59,8 @@ impl Trailer {
             let _ = writeln!(text, "checksum {c:016x}");
         }
         let mut bytes = text.into_bytes();
-        assert!(bytes.len() < usize::try_from(TRAILER_BYTES).unwrap());
-        bytes.resize(usize::try_from(TRAILER_BYTES).unwrap(), 0);
+        assert!(bytes.len() < trailer_len);
+        bytes.resize(trailer_len, 0);
         bytes
     }
 

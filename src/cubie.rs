@@ -569,10 +569,8 @@ impl CubieCube {
         };
         let mut cube = CubieCube::SOLVED;
         for position in 0..8 {
-            let seen: Vec<Vec3> = corner_stickers(position)
-                .into_iter()
-                .map(&normal_at)
-                .collect::<Result<_, _>>()?;
+            let [first, second, third] = corner_stickers(position).map(&normal_at);
+            let seen = [first?, second?, third?];
             // The piece whose stickers' colors are these, turned by `twist`.
             let found = (0..8).flat_map(|piece| (0..3).map(move |twist| (piece, twist)));
             let found = found.into_iter().find(|&(piece, twist)| {
@@ -585,10 +583,8 @@ impl CubieCube {
             cube.corner_orient[position] = u8::try_from(twist).expect("below 3");
         }
         for position in 0..12 {
-            let seen: Vec<Vec3> = edge_stickers(position)
-                .into_iter()
-                .map(&normal_at)
-                .collect::<Result<_, _>>()?;
+            let [first, second] = edge_stickers(position).map(&normal_at);
+            let seen = [first?, second?];
             let found = (0..12).flat_map(|piece| (0..2).map(move |flip| (piece, flip)));
             let found = found.into_iter().find(|&(piece, flip)| {
                 let home = edge_stickers(piece);
@@ -662,11 +658,18 @@ pub fn move_cubes() -> &'static [CubieCube; N_MOVES] {
 /// Singmaster name of a move: `U`, `U2`, `U'`, ...
 #[must_use]
 pub fn move_name(mv: u8) -> String {
-    let face = FACE_NAMES[usize::from(mv / 3)];
+    let mut name = String::with_capacity(2);
+    push_move_name(&mut name, mv);
+    name
+}
+
+/// Appends the Singmaster name of `mv` to `text`.
+fn push_move_name(text: &mut String, mv: u8) {
+    text.push(FACE_NAMES[usize::from(mv / 3)]);
     match mv % 3 {
-        0 => format!("{face}"),
-        1 => format!("{face}2"),
-        _ => format!("{face}'"),
+        0 => {}
+        1 => text.push('2'),
+        _ => text.push('\''),
     }
 }
 
@@ -700,11 +703,16 @@ pub fn parse_moves(text: &str) -> Option<Vec<u8>> {
 /// A move sequence in Singmaster notation, separated by spaces.
 #[must_use]
 pub fn format_moves(moves: &[u8]) -> String {
-    moves
-        .iter()
-        .map(|&mv| move_name(mv))
-        .collect::<Vec<_>>()
-        .join(" ")
+    // (One String, not a String per move, a Vec and a join: `solve -c 1`
+    // allocates 6.5 instead of 25.2 times per cube.)
+    let mut text = String::with_capacity(3 * moves.len());
+    for (i, &mv) in moves.iter().enumerate() {
+        if i > 0 {
+            text.push(' ');
+        }
+        push_move_name(&mut text, mv);
+    }
+    text
 }
 
 /// A symmetry of the cube: one of the 48 rotations and reflections that map
@@ -726,12 +734,12 @@ pub struct Symmetry {
 ///
 /// # Panics
 /// Never: every symmetry maps faces to faces.
-pub fn symmetries() -> &'static Vec<Symmetry> {
+pub fn symmetries() -> &'static [Symmetry] {
     use std::sync::OnceLock;
-    static SYMMETRIES: OnceLock<Vec<Symmetry>> = OnceLock::new();
+    static SYMMETRIES: OnceLock<Box<[Symmetry]>> = OnceLock::new();
     SYMMETRIES.get_or_init(|| {
         // Signed permutation matrices: each axis maps to some axis, either way.
-        let mut matrices: Vec<Matrix> = Vec::new();
+        let mut matrices: Vec<Matrix> = Vec::with_capacity(48);
         let axis_perms = [
             [0, 1, 2],
             [0, 2, 1],

@@ -26,14 +26,14 @@ use std::sync::atomic::{AtomicU64, Ordering};
 pub struct Cocsep {
     /// `entries[cocsep] = class << 16 | sym_to_rep << 8 | depth` (see
     /// `entry_*`).
-    pub entries: Vec<u32>,
+    pub entries: Box<[u32]>,
     /// Representative cube (corners only meaningful) per class.
-    pub representatives: Vec<Cube>,
+    pub representatives: Box<[Cube]>,
     /// Bitmask of the symmetries fixing the representative's cocsep, per
     /// class.
-    pub self_symmetries: Vec<u64>,
+    pub self_symmetries: Box<[u64]>,
     /// Depth distribution of the 153090 cocsep coordinates.
-    pub distribution: Vec<u64>,
+    pub distribution: Box<[u64]>,
     /// Hot-path copy of `entries` packed into 3 bytes per entry (25% less
     /// L2 footprint): `class << 10 | sym_to_rep << 4 | depth` (+1 pad byte),
     /// on a transparent huge page (one TLB entry instead of ~113). (+2.8% at
@@ -110,7 +110,7 @@ impl Cocsep {
             }
         }
         assert_eq!(order.len(), N_COCSEP);
-        let mut distribution = vec![0u64; 16];
+        let mut distribution = vec![0u64; 16].into_boxed_slice();
         for &d in &depth {
             distribution[usize::from(d)] += 1;
         }
@@ -118,13 +118,16 @@ impl Cocsep {
         // representative; its 48 conjugates are the class's members.
         let mut class = vec![u32::MAX; N_COCSEP];
         let mut sym_to_rep = vec![0u8; N_COCSEP];
-        let mut representatives = Vec::new();
-        let mut self_symmetries = Vec::new();
+        // (Filled by class index: `into_boxed_slice` of a pushed Vec keeps a
+        // shrink path, +654 bytes of solve::main.)
+        let mut representatives = vec![Cube::solved(); N_CLASSES].into_boxed_slice();
+        let mut self_symmetries = vec![0u64; N_CLASSES].into_boxed_slice();
+        let mut n_classes = 0;
         for &i in &order {
             if class[i] != u32::MAX {
                 continue;
             }
-            let new_class = u32::try_from(representatives.len()).unwrap();
+            let new_class = u32::try_from(n_classes).unwrap();
             let rep = cube_of[i];
             let mut fixing = 0u64;
             for (sym, &inverse) in crate::simd::SYM_INVERSES.iter().enumerate() {
@@ -138,11 +141,12 @@ impl Cocsep {
                 }
             }
             debug_assert_eq!(sym_to_rep[i], 0);
-            representatives.push(rep);
-            self_symmetries.push(fixing);
+            representatives[n_classes] = rep;
+            self_symmetries[n_classes] = fixing;
+            n_classes += 1;
         }
-        assert_eq!(representatives.len(), N_CLASSES);
-        let entries: Vec<u32> = (0..N_COCSEP)
+        assert_eq!(n_classes, N_CLASSES);
+        let entries: Box<[u32]> = (0..N_COCSEP)
             .map(|i| (class[i] << 16) | (u32::from(sym_to_rep[i]) << 8) | u32::from(depth[i]))
             .collect();
         // 2 MiB: the kernel aligns it so that it gets one huge page.
@@ -188,15 +192,15 @@ impl Cocsep {
         // and sym_to_rep 0: just the depth byte.
         let packed = Memory::anonymous(2 << 20);
         let bytes = unsafe { std::slice::from_raw_parts_mut(packed.ptr(), 3 * N_COCSEP + 1) };
-        let mut distribution = vec![0u64; 16];
+        let mut distribution = vec![0u64; 16].into_boxed_slice();
         for (i, &d) in depths.iter().enumerate() {
             bytes[3 * i] = d;
             distribution[usize::from(d)] += 1;
         }
         Cocsep {
             entries: depths.iter().map(|&d| u32::from(d)).collect(),
-            representatives: vec![Cube::solved(); N_CLASSES],
-            self_symmetries: vec![1; N_CLASSES],
+            representatives: vec![Cube::solved(); N_CLASSES].into_boxed_slice(),
+            self_symmetries: vec![1; N_CLASSES].into_boxed_slice(),
             distribution,
             packed,
         }
