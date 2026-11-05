@@ -69,8 +69,8 @@ fn run(
     let records = Mutex::new(Vec::new());
     let bad = AtomicU64::new(0);
     let t0 = Instant::now();
-    // (The stream mode's hot loop is the spawned closure, with `run_lanes`
-    // and `Pool::run` inlined: see the commits' asm checks.)
+    // (Each mode's thread code is a function of its own, not inlined here:
+    // `share_thread`, and `stream_thread`, which is the stream's hot loop.)
     std::thread::scope(|s| {
         for _ in 0..threads {
             s.spawn(|| {

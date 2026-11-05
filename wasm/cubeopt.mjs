@@ -456,11 +456,11 @@ export class Cubeopt {
    * with its baseline compiler and switches a function to optimized code
    * only on its next call, so a long first solve would run its whole search
    * slowly: 187.7 s instead of 129.5 s for 100 depth-17 cubes on h6 (V8 in
-   * Node 26, one thread). Solves short scrambles (cheap with any table)
-   * for about `seconds`, then gives the background compiler time to finish.
-   * `loadTable` and `generateTable` call it. Not in Bun: JavaScriptCore
-   * moves a running loop to optimized code (126.5 s without, 127.0 s with
-   * the warm-up, same set).
+   * Node 26, one thread: +45% with the warm-up). Solves short scrambles
+   * (cheap with any table) for about `seconds`, then gives the background
+   * compiler time to finish. `loadTable` and `generateTable` call it. Not
+   * in Bun: JavaScriptCore moves a running loop to optimized code (126.5 s
+   * without, 127.0 s with the warm-up, same set).
    */
   async warmUp({ seconds = 0.3 } = {}) {
     if (typeof Bun !== 'undefined') return;

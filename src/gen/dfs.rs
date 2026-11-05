@@ -159,7 +159,7 @@ pub struct Part<'a> {
 
 /// Leaf marks of one thread, in a ring: each index is prefetched when it is
 /// pushed and applied `RING` pushes later, so that ~`RING` table misses are
-/// in flight (batched prefetched writes).
+/// in flight (batched prefetched writes; not measured separately).
 struct Marker<'p, 'a> {
     part: &'p Part<'a>,
     ring: [u64; RING],
