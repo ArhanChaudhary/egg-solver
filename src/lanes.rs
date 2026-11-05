@@ -201,6 +201,16 @@ struct ChildOrder {
     _pad: u32,
 }
 
+// The sizes that the comments on `Node`, `Job` and `ChildOrder` rely on
+// (two cache lines, 12 bytes, 32 bytes), checked at compile time so that a
+// new field cannot grow them unnoticed (perf-book "Type Sizes"). On x86-64,
+// where they were measured; no code is generated.
+#[cfg(target_arch = "x86_64")]
+const _: () = assert!(
+    size_of::<Node>() == 128 && size_of::<Job>() == 12 && size_of::<ChildOrder>() == 32,
+    "a hot type changed size"
+);
+
 /// Nothing known yet.
 const NO_CHILD_ORDER: ChildOrder = ChildOrder {
     codes: [0; 18],

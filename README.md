@@ -91,6 +91,17 @@ cargo build --release --target aarch64-apple-darwin        # Apple Silicon (NEON
 cargo build --release --features scalar                    # the scalar backend, any target
 ```
 
+### Profile-guided `solve`
+
+`scripts/pgo-solve.sh <table> [threads]` builds a profile-guided `solve`
+(`target/pgo-solve/solve`): an instrumented build, a short training run on
+the table (scrambles the script makes itself, none from a benchmark set),
+then a `-Cprofile-use` build. It needs rustup's `llvm-tools` component and
+takes a few minutes. On the 48-core server with h11 it makes `solve` about
+2% faster at 1 thread (44.4 -> 43.5 ms per random-state cube) and changes
+nothing measurable at 48 threads (`-c 1`). `bench` and the default `cargo
+build` stay as they are: PGO slows the stream loop (neg/pb1-pgo-stream).
+
 ## WebAssembly
 
 The solver also compiles to WebAssembly (SIMD128) and runs in browsers and
