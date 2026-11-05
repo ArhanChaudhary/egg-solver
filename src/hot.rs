@@ -19,7 +19,9 @@
 //! or 48), and use the same pads on both sides of an A/B.
 
 /// Offset of `bench::stream_thread` in its 64-byte line: 16, where 735dd25
-/// had it (its four pads were within the noise of each other at 1T).
+/// had it (its four pads were within the noise of each other at 1T), and
+/// the best pad for m8's loop on def2cd0 (1T against main at 16, 2 pairs
+/// per pad: 0 -0.3 +0.6%, 16 +4.0 +0.5%, 32 -0.1 +1.2%, 48 +2.4 +1.3%).
 pub const STREAM_PAD: usize = pad(option_env!("CUBEOPT_STREAM_PAD"), 16);
 
 /// Offset of the share mode's round loop (`share::Worker::rounds`) in its

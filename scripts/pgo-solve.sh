@@ -1,6 +1,7 @@
 #!/bin/bash
 # Profile-guided (PGO) build of the `solve` binary (share mode only; `bench`
-# and the default `cargo build` are not affected).
+# and the default `cargo build` are not affected). 1T `solve -c 1`: -2.1%
+# ms/cube (8 of 8 pairs); 48T `-c 1` neutral (pb1, 66c4f03).
 #
 #   scripts/pgo-solve.sh <table> [threads]
 #

@@ -435,10 +435,10 @@ fn stream(
 }
 
 /// Lanes per thread: as asked, else 16. Lanes pay off in wasm too (the
-/// table load of one lane overlaps the work of the next ones), but already
-/// fully at 8: V8, h6, 100 depth-17 cubes, 1 thread, 1/8/16/24/40/64 lanes:
-/// 200.6/123.8/125.3/128.2/130.3/127.9 s. 16 lanes, with some margin,
-/// take 23 MB instead of the 56 MB of 40.
+/// table load of one lane overlaps the work of the next ones; 8 lanes: +62%
+/// against 1), but already fully at 8: V8, h6, 100 depth-17 cubes, 1 thread,
+/// 1/8/16/24/40/64 lanes: 200.6/123.8/125.3/128.2/130.3/127.9 s. 16 lanes,
+/// with some margin, take 23 MB instead of the 56 MB of 40.
 fn lanes_for(asked: u32) -> usize {
     match asked {
         0 => 16,

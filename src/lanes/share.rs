@@ -49,7 +49,9 @@
 //! Gains, 48 threads, h11, `random_state`: the mode itself (l5) took a batch
 //! from 7.86 ms to 1.26 ms per cube (bench random:1000 from 187 to 795
 //! solves/s), and one cube at a time from 306 ms (one lane) to 3.6 ms.
-//! l6-share-a and l6-share-2 brought one cube at a time to ~2.2 ms. The
+//! l6-share-a and l6-share-2 brought one cube at a time to ~2.2 ms; c10
+//! (first pass, tail lanes, refills), c11 (touched buffers, split
+//! iterations) and m8 (unsafe pass, lanes by pointer) to ~1.6 ms. The
 //! comments at each optimization give its own measured gain.
 
 use super::{job_weight, moves_after, Job, Lane, Node, Phase, Step, MAXD, MAX_JOB_LEN};
@@ -282,8 +284,8 @@ impl Bufs {
 /// wait for each other (the extension to 4-move jobs took 0.26 ms instead of
 /// 0.02 ms for about half of the first 50 cubes of `solve -c 1` at 48T).
 // With `WARM_BUFFERS` and `Bufs::own` (c11): -c 1 at 48T -8.1% on 17-move
-// scrambles, -9.6% on depth-17 states, -0.7% on 500 random states (7 paired
-// holds); a 48-thread pool starts 0.42 ms later.
+// scrambles and -9.6% on depth-17 states (3 paired holds), -0.7% on 500
+// random states (7); a 48-thread pool starts 0.42 ms later.
 fn touched<T: Clone>(capacity: usize, value: T) -> Vec<T> {
     let mut v = Vec::with_capacity(capacity);
     // (Miri: not needed, and slow.)
@@ -2227,7 +2229,10 @@ fn trace_build(pool: &Pool, ctx: &CubeCtx, inner: &Inner, sorted: Instant) {
 
 /// (trace) Lane `sl` (of a thread with `active_lanes` lanes) found the
 /// solution of `ctx`, `seconds` after its start: where in the iteration, the
-/// job's rank and start, and its nodes before the solution.
+/// job's rank and start, and its nodes before the solution. (Cold and out of
+/// line: inlined in `report`, it changed `Worker::rounds`'s register
+/// allocation, and untraced runs at 48T were slower: -c 1 +3.7%, -c 0
+/// +4.1%, bench share -4.2%; c10.)
 #[cold]
 fn trace_found(pool: &Pool, ctx: &CubeCtx, sl: &SharedLane, active_lanes: usize, seconds: f64) {
     // SAFETY: (trace) the iteration is still on.
@@ -2287,7 +2292,8 @@ fn prefetch<T>(x: &T, write: bool) {
 }
 
 /// The `Local` of slot `slot`, unchecked (the claim and refill paths run
-/// once per job: no bounds check or `unwrap` there).
+/// once per job: no bounds check or `unwrap` there; part of m8's unsafe
+/// pass, measured with its round loop: see `Worker::rounds`).
 ///
 /// # Safety
 /// `slot` is joined: `locals[slot]` is `Some` (a slot of a job this worker
@@ -3639,7 +3645,8 @@ fn deeper<R>(f: impl FnOnce() -> R) -> R {
 impl Pool<'_> {
     /// `run` with the worker's state and stack frames at fixed offsets
     /// within a page (`PinnedWorker`, `WORKER_DEPTH`), as `solve` runs it:
-    /// main's offsets, so -c 1 is unchanged (48T table in s9's commit). (A
+    /// main's offsets, so -c 1 is unchanged (48T table in s9's commit; at its
+    /// merge -0.5..-1.35% -c 1 at 48T, as d1's crates had moved the loop). (A
     /// copy of `run` rather than a change to it: `bench` keeps main's code
     /// layout byte for byte; every pinned layout of its stream loop tried ran
     /// 0.3-1.5% slower at 1T than main's.)

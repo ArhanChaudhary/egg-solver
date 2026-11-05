@@ -118,9 +118,10 @@ struct Job {
 /// Face weight compensating for D/L/B prefixes having fewer continuations.
 #[inline(always)]
 fn job_weight(job: &Job) -> f32 {
-    // (branchless: the face parity is unpredictable; the last move's index
-    // masked to the array, which leaves the 1 to 4 moves of a weighed job
-    // as they are: no bounds check per job of a sort)
+    // (branchless: the face parity is unpredictable, part of m2-jobs' +4.3%
+    // at 48T; the last move's index masked to the array, which leaves the 1
+    // to 4 moves of a weighed job as they are: no bounds check per job of a
+    // sort, part of m8's unsafe pass)
     [47525.0, 58206.0][((job.moves[(job.len as usize).wrapping_sub(1) & 3] / 3) % 2) as usize]
 }
 
@@ -306,7 +307,7 @@ fn quantize18(stats: &[f32; 18], children: u32) -> [u8; 18] {
 }
 
 /// The sum of 18 statistics (a tree of additions: off the latency of a
-/// sequential sum).
+/// sequential sum, which took 2% of the samples when added, c7).
 #[cfg(avx512)]
 #[inline(always)]
 fn sum18(stats: &[f32; 18]) -> f32 {
@@ -484,7 +485,8 @@ pub struct Lane {
     jobs_tmp: Vec<Job>,
     /// The next job to run (whole-job iterations).
     job_pos: usize,
-    /// Stream mode's run state (cold: kept out of the lane's hot lines).
+    /// Stream mode's run state (cold: kept out of the lane's hot lines; part
+    /// of c7, not measured separately).
     run_state: Box<RunState>,
     /// The iteration's solution length.
     target: u8,
@@ -909,7 +911,7 @@ impl Lane {
     /// run yet, by decreasing best code of all its children (those run in
     /// this iteration's first part included: a job whose best child ran
     /// without a solution is still more promising than one whose best child
-    /// is weaker; measured 0.5% fewer nodes than the best of those left).
+    /// is weaker; -0.5% nodes against the best of those left, c8).
     #[expect(
         clippy::cast_possible_truncation,
         reason = "job indices are below 2^19 (19 bits of a run entry)"
@@ -930,7 +932,7 @@ impl Lane {
             let remaining = unsafe { self.side_moves_unchecked(job) } & !done_now(order, tag);
             if remaining != 0 {
                 // The job's best code of all its children, not only of those
-                // left (-0.5% nodes on 20K random and 33K depth-18 cubes).
+                // left (-0.5% nodes on 20K random and 33K depth-18 cubes, c8).
                 let key = max_code(&order.codes, ALL_MOVES);
                 counts[key as usize] += 1;
                 // SAFETY: at most one entry per job: `n_runs < n_jobs <=
@@ -1005,13 +1007,13 @@ impl Lane {
             // Children without statistics get `UNSEEN_CODE`: they run with
             // the mid-ranked children instead of last (with the rest key of
             // `build_rest`: -1.0% nodes on 20K random and 33K depth-18
-            // cubes, +0.6% 48T).
+            // cubes, +0.6% at 48T, 1T within noise when added, c8).
             let allowed = unsafe { self.side_moves_unchecked(job) };
             let codes = quantize18(&self.child_stats, allowed & children);
             debug_assert!(root.normal);
             let order = if self.run_state.part == 0 {
                 // A whole run: the entry is all new (not read: it is not
-                // in the cache).
+                // in the cache; reading it took 2-3% of the samples, c7).
                 ChildOrder {
                     codes,
                     twin_values: root.twin_values,
@@ -1266,8 +1268,9 @@ impl Lane {
         // target is below MAXD. (No bounds checks in the lane loop: +1.1% at
         // 48T when added, m2-nobc. None left on the search loops' paths at
         // all, with the unchecked move tables and the job and run paths:
-        // -3.3% instructions per node, stream +3.2% at 1T and +1.3% at 48T,
-        // m8's unsafe pass on def2cd0.)
+        // m8's unsafe pass, stream +1.5% at 1T and +0.4% at 48T alone on
+        // 857a0c6; with m8's share-loop commit on def2cd0, -3.3% instructions
+        // per node, stream +3.2% at 1T and +1.3% at 48T.)
         let (mut todo, mut lower_bound, mut remaining_depth) = {
             let top = unsafe { self.stack.get_unchecked(depth) };
             (top.todo, top.lower_bound, top.remaining_depth)
@@ -1294,6 +1297,8 @@ impl Lane {
                 let reached = live ^ live.wrapping_sub(1);
                 nodes += u64::from((todo & reached).count_ones());
                 todo &= !reached;
+                // (Done when no move is live: the branch waits on one andn;
+                // +1.0..1.3% at 1T when added in m6's skipcount, since reworked.)
                 live == 0
             };
             if done {
@@ -1484,7 +1489,8 @@ impl Lane {
     /// have been dropped before this child was generated; and nothing is
     /// learned on a face after it is dropped.) (Dropping the per-face
     /// maxima for this: +2.6% at 48T, +1.0% at 1T when added; the face cut as
-    /// a select of `face_keep`: +1.4% at 1T; both m6-micro.)
+    /// a select of `face_keep`: part of m6's small-tables patch, +1.4% at 1T and
+    /// -0.1% at 48T; both m6-micro.)
     #[inline(always)]
     fn note_value(&mut self, face: usize, value: u8) {
         // SAFETY: the depth is below MAXD (see `advance`); `face` is the
@@ -1599,7 +1605,8 @@ impl Lane {
     /// = 0) and
     /// no skipped moves, and its first move is an X move (move masks are
     /// whole faces, less half turns), which looks up the other side first.
-    /// (Within noise when measured: +0.9% at 1T, +0.6% at 48T, p5-sched.)
+    /// (Within noise alone; against the p5-sched stack without it: +0.9% at
+    /// 1T, +0.6% at 48T.)
     #[inline(always)]
     #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
     fn push_advance(&mut self, moved_bound: u8, other_bound: u8, solver: &Solver) -> Step {
