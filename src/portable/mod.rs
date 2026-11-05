@@ -12,7 +12,7 @@
 //! Only the vector operations differ per target (`V16`); this file and
 //! `coord.rs` are shared.
 
-use crate::cubie::CubieCube;
+use crate::cubie::{CubieCube, Move};
 
 pub mod coord;
 
@@ -477,15 +477,11 @@ impl Cube {
 
     /// The cube after move `mv`: `compose` with the move's lookup indices
     /// and orientation part precomputed.
-    ///
-    /// # Panics
-    /// If `mv` is not a move (below 18).
     #[inline(always)]
     #[must_use]
-    pub fn apply_move(self, mv: usize) -> Cube {
-        assert!(mv < 18, "not a move");
-        // SAFETY: checked above.
-        unsafe { self.apply_move_unchecked(mv) }
+    pub fn apply_move(self, mv: Move) -> Cube {
+        // SAFETY: a `Move` is below 18.
+        unsafe { self.apply_move_unchecked(mv.index()) }
     }
 
     /// `apply_move` without the bounds check of the move tables (as in
@@ -512,15 +508,11 @@ impl Cube {
     }
 
     /// Given the inverse of a cube `c`, the inverse of `c` then `mv`.
-    ///
-    /// # Panics
-    /// If `mv` is not a move (below 18).
     #[inline(always)]
     #[must_use]
-    pub fn premove_inverse(self, mv: usize) -> Cube {
-        assert!(mv < 18, "not a move");
-        // SAFETY: checked above.
-        unsafe { self.premove_inverse_unchecked(mv) }
+    pub fn premove_inverse(self, mv: Move) -> Cube {
+        // SAFETY: a `Move` is below 18.
+        unsafe { self.premove_inverse_unchecked(mv.index()) }
     }
 
     /// `premove_inverse` without the bounds check of the move table.
@@ -771,11 +763,11 @@ mod tests {
             assert_eq!(fa.to_cubie(), a);
             assert_eq!(fa.compose(fb).to_cubie(), a.compose(&b));
             assert_eq!(fa.inverse().to_cubie(), a.inverse());
-            for mv in 0..18 {
-                assert_eq!(fa.apply_move(mv).to_cubie(), a.apply_move(mv));
+            for m in Move::ALL {
+                assert_eq!(fa.apply_move(m).to_cubie(), a.apply_move(m));
                 assert_eq!(
-                    fa.inverse().premove_inverse(mv).to_cubie(),
-                    a.apply_move(mv).inverse()
+                    fa.inverse().premove_inverse(m).to_cubie(),
+                    a.apply_move(m).inverse()
                 );
             }
             for (sym, symmetry) in syms.iter().enumerate() {
@@ -783,16 +775,16 @@ mod tests {
             }
             assert!(Cube::select(true, fa, fb) == fa && Cube::select(false, fa, fb) == fb);
             let (inverse_a, inverse_b) = (fa.inverse(), fb.inverse());
-            for mv in 0..18 {
+            for (mv, m) in (0..18).zip(Move::ALL) {
                 // SAFETY: `mv < 18`.
                 unsafe {
-                    assert_eq!(Cube::child_lookup(fa, inverse_b, mv, 0), fa.apply_move(mv));
+                    assert_eq!(Cube::child_lookup(fa, inverse_b, mv, 0), fa.apply_move(m));
                     assert_eq!(
                         Cube::child_lookup(inverse_a, fb, mv, !0),
-                        fb.premove_inverse(mv)
+                        fb.premove_inverse(m)
                     );
-                    assert_eq!(fa.apply_move_unchecked(mv), fa.apply_move(mv));
-                    assert_eq!(fa.premove_inverse_unchecked(mv), fa.premove_inverse(mv));
+                    assert_eq!(fa.apply_move_unchecked(mv), fa.apply_move(m));
+                    assert_eq!(fa.premove_inverse_unchecked(mv), fa.premove_inverse(m));
                 }
             }
         }

@@ -260,9 +260,10 @@ fn read_scrambles(count: usize) -> anyhow::Result<Vec<CubieCube>> {
         if cubes.len() >= count {
             break;
         }
-        let moves = parse_moves(&line)
+        let cube = parse_moves(&line)
+            .and_then(|moves| CubieCube::SOLVED.apply_moves(&moves))
             .ok_or_else(|| BadInput(format!("line {}: cannot parse {line:?}", n + 1)))?;
-        cubes.push(CubieCube::SOLVED.apply_moves(&moves));
+        cubes.push(cube);
     }
     Ok(cubes)
 }
@@ -295,7 +296,7 @@ fn run(args: &Args) -> anyhow::Result<ExitCode> {
     let bad = AtomicBool::new(false);
     let n_done = AtomicUsize::new(0);
     let done = |i: usize, solution: Vec<u8>, stats: Stats, seconds: f64| {
-        let ok = cubes[i].apply_moves(&solution) == CubieCube::SOLVED;
+        let ok = cubes[i].apply_moves(&solution) == Some(CubieCube::SOLVED);
         nodes.fetch_add(stats.nodes, Ordering::Relaxed);
         n_done.fetch_add(1, Ordering::Relaxed);
         let mut out = stdout.lock().unwrap();
@@ -449,7 +450,7 @@ fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
     };
     let parse = |text: &str| {
         parse_moves(text)
-            .map(|moves| CubieCube::SOLVED.apply_moves(&moves))
+            .and_then(|moves| CubieCube::SOLVED.apply_moves(&moves))
             .ok_or_else(|| BadInput(format!("cannot parse {text:?}")))
     };
     let mut cubes = Vec::new();
@@ -479,7 +480,7 @@ fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
     solve_all_pinned(&solver, &get, threads, lanes, 1, &done);
     let (solution, stats, seconds) = (result.into_inner().unwrap()).context("not solved")?;
     anyhow::ensure!(
-        cubes[last].apply_moves(&solution) == CubieCube::SOLVED,
+        cubes[last].apply_moves(&solution) == Some(CubieCube::SOLVED),
         "BAD: {} does not solve the scramble",
         format_moves(&solution)
     );

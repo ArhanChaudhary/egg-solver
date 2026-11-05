@@ -3713,6 +3713,7 @@ impl Pool<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cubie::Move;
     use crate::tables::{Cocsep, H48Table};
 
     /// Solve `cubes` with a pool of `threads` threads of `nlanes` lanes and at
@@ -3781,12 +3782,12 @@ mod tests {
         let table = H48Table::zeroed(0, 2);
         let solver = Solver::new(&corners, &table);
         let cubes: Vec<CubieCube> = (0..6)
-            .map(|m| CubieCube::SOLVED.apply_move(3 * m))
+            .map(|m| CubieCube::SOLVED.apply_move(Move::ALL[3 * m]))
             .collect();
         for (threads, max_active) in [(4, 1), (3, 2)] {
             let solutions = solve_with_pool(&solver, &cubes, threads, 1, max_active, true);
             for (cube, solution) in cubes.iter().zip(&solutions) {
-                assert_eq!(cube.apply_moves(solution), CubieCube::SOLVED);
+                assert_eq!(cube.apply_moves(solution), Some(CubieCube::SOLVED));
                 assert_eq!(solution.len(), 1);
             }
         }
@@ -3808,7 +3809,7 @@ mod tests {
                 let moves: Vec<u8> = (0..i % 7)
                     .map(|_| u8::try_from(rng.below(18)).unwrap())
                     .collect();
-                CubieCube::SOLVED.apply_moves(&moves)
+                CubieCube::SOLVED.apply_moves(&moves).unwrap()
             })
             .collect();
         let optimal: Vec<usize> = cubes.iter().map(|c| solver.solve(c).0.len()).collect();
@@ -3828,7 +3829,11 @@ mod tests {
         for &(threads, nlanes, max_active) in configs {
             let solutions = solve_with_pool(&solver, &cubes, threads, nlanes, max_active, false);
             for (i, (cube, solution)) in cubes.iter().zip(&solutions).enumerate() {
-                assert_eq!(cube.apply_moves(solution), CubieCube::SOLVED, "cube {i}");
+                assert_eq!(
+                    cube.apply_moves(solution),
+                    Some(CubieCube::SOLVED),
+                    "cube {i}"
+                );
                 assert_eq!(
                     solution.len(),
                     optimal[i],
@@ -3854,7 +3859,7 @@ mod tests {
                 let moves: Vec<u8> = (0..4 + i % 4)
                     .map(|_| u8::try_from(rng.below(18)).unwrap())
                     .collect();
-                CubieCube::SOLVED.apply_moves(&moves)
+                CubieCube::SOLVED.apply_moves(&moves).unwrap()
             })
             .collect();
         let optimal: Vec<usize> = cubes.iter().map(|c| solver.solve(c).0.len()).collect();
@@ -3866,7 +3871,11 @@ mod tests {
         for &config in configs {
             let (solutions, counts) = solve_with_pool_counted(&solver, &cubes, config, |_| {});
             for (i, (cube, solution)) in cubes.iter().zip(&solutions).enumerate() {
-                assert_eq!(cube.apply_moves(solution), CubieCube::SOLVED, "cube {i}");
+                assert_eq!(
+                    cube.apply_moves(solution),
+                    Some(CubieCube::SOLVED),
+                    "cube {i}"
+                );
                 assert_eq!(solution.len(), optimal[i], "cube {i}: {config:?}");
             }
             assert!(counts[C_PASS_SOLUTIONS] > 0, "{config:?}: {counts:?}");
@@ -4075,7 +4084,7 @@ mod tests {
             let moves: Vec<u8> = (0..6)
                 .map(|_| u8::try_from(rng.below(18)).unwrap())
                 .collect();
-            let cube = CubieCube::SOLVED.apply_moves(&moves);
+            let cube = CubieCube::SOLVED.apply_moves(&moves).unwrap();
             let root = Cube::from_cubie(&cube);
             let target = solver
                 .lower_bound(root)

@@ -20,6 +20,7 @@ pub mod dfs;
 pub mod progress;
 
 use crate::coord::{cocsep, cube_from_edge_key, h11_key, reduce_key, split_index};
+use crate::cubie::Move;
 use crate::simd::Cube;
 use crate::tables::{
     entry_class, entry_low_bits, entry_position, entry_sym_to_rep, h48_bytes, h48_rows, Cocsep,
@@ -227,7 +228,7 @@ impl Generator<'_> {
                 let bit = u64::from(frontier.trailing_zeros());
                 frontier ^= frontier.isolate_lowest_one();
                 let cube = decode_index(self.corners, self.k, w * 32 + bit / 2);
-                for mv in 0..18 {
+                for mv in Move::ALL {
                     let neighbor = cube.apply_move(mv);
                     self.for_each_index(neighbor, |i| mark_new(words, i));
                 }
@@ -246,7 +247,7 @@ impl Generator<'_> {
         let flush = |pending: &[u64], neighbors: &mut [[u64; 18]; BATCH]| {
             for (p, &index) in pending.iter().enumerate() {
                 let cube = decode_index(self.corners, self.k, index);
-                for (mv, slot) in neighbors[p].iter_mut().enumerate() {
+                for (&mv, slot) in Move::ALL.iter().zip(neighbors[p].iter_mut()) {
                     let i = self.index(cube.apply_move(mv));
                     *slot = i;
                     let (w, _) = entry_position(i);

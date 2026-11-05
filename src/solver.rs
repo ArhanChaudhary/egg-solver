@@ -19,7 +19,7 @@
 //! +46% at 48T on a batch when added, job-order).
 
 use crate::coord::{cocsep_x3, index_sym};
-use crate::cubie::{inverse_move, CubieCube};
+use crate::cubie::{inverse_move, CubieCube, Move};
 use crate::simd::Cube;
 use crate::symstart::SymFilter;
 use crate::tables::{packed_class, packed_depth, packed_sym_to_rep, Cocsep, H48Table};
@@ -245,7 +245,6 @@ impl<'a> Solver<'a> {
 
     /// Extend jobs by one move; children inherit the parent's stat. Jobs
     /// that `filter` drops (symmetric start) are left out.
-    #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
     fn extend_jobs(jobs: &[Job], filter: &SymFilter) -> Vec<Job> {
         let mut out = Vec::with_capacity(jobs.len() * 15);
         for j in jobs {
@@ -255,8 +254,7 @@ impl<'a> Solver<'a> {
                 ALLOWED_AFTER[(j.moves[j.len as usize - 1] / 3) as usize]
             };
             let mut todo = allowed;
-            while todo != 0 {
-                let mv = todo.trailing_zeros() as usize;
+            while let Some(mv) = Move::lowest(todo) {
                 todo ^= todo.isolate_lowest_one();
                 let mut child = *j;
                 child.moves[child.len as usize] = mv as u8;
@@ -515,11 +513,9 @@ impl<'a> Solver<'a> {
 
     /// The last move of a search: is one of `moves` (allowed on both sides)
     /// a solution? (Nodes with one move left always move the normal cube.)
-    #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
     fn last_move(state: &mut SearchState, cube: Cube, moves: u32) -> u8 {
         let mut todo = moves;
-        while todo != 0 {
-            let mv = todo.trailing_zeros() as usize;
+        while let Some(mv) = Move::lowest(todo) {
             todo ^= todo.isolate_lowest_one();
             state.stats.nodes += 1;
             if cube.apply_move(mv).is_solved() {
@@ -539,7 +535,6 @@ impl<'a> Solver<'a> {
     /// (every half turn lies in the subgroup whose cosets the table
     /// indexes), so its child keeps the node's other-side bound: children
     /// whose bound is already too high are not generated.
-    #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
     #[inline(always)]
     fn generate_children(
         state: &mut SearchState,
@@ -560,16 +555,15 @@ impl<'a> Solver<'a> {
         }; 18];
         let mut n_children = 0;
         let mut todo = allowed;
-        while todo != 0 {
-            let mv = todo.trailing_zeros() as usize;
+        while let Some(mv) = Move::lowest(todo) {
             todo ^= todo.isolate_lowest_one();
-            let other_bound = if mv % 3 == 1 {
+            let other_bound = if mv.index() % 3 == 1 {
                 other_side_bound
             } else {
                 UNKNOWN
             };
             if other_bound != UNKNOWN && other_bound > child_remaining {
-                face_bound[mv / 3] = face_bound[mv / 3].max(other_bound);
+                face_bound[mv.index() / 3] = face_bound[mv.index() / 3].max(other_bound);
                 continue;
             }
             state.stats.nodes += 1;
@@ -691,7 +685,11 @@ mod tests {
             "U D' R L' F B' U D'",
             "U R2 F B R B2 R U2 L B2 R U' D' R2 F R' L B2 U2 F2",
         ] {
-            cubes.push(CubieCube::SOLVED.apply_moves(&parse_moves(scramble).unwrap()));
+            cubes.push(
+                CubieCube::SOLVED
+                    .apply_moves(&parse_moves(scramble).unwrap())
+                    .unwrap(),
+            );
         }
         for _ in 0..40 {
             cubes.push(CubieCube::random(&mut rng));

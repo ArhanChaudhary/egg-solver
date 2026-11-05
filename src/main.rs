@@ -46,11 +46,11 @@ fn run(args: &Args) -> anyhow::Result<ExitCode> {
     let solver = Solver::new(&corners, &table);
     for line in std::io::stdin().lock().lines() {
         let line = line.context("cannot read stdin")?;
-        let Some(moves) = parse_moves(&line) else {
+        let Some(cube) = parse_moves(&line).and_then(|moves| CubieCube::SOLVED.apply_moves(&moves))
+        else {
             println!("parse error");
             continue;
         };
-        let cube = CubieCube::SOLVED.apply_moves(&moves);
         let start = std::time::Instant::now();
         let (solution, stats) = solver.solve(&cube);
         println!(

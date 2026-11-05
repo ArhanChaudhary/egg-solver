@@ -36,7 +36,7 @@
 //! (`Lane::start_iteration`), and full-length job roots branch on the
 //! normal side.
 
-use crate::cubie::{inverse_move, CubieCube};
+use crate::cubie::{inverse_move, CubieCube, Move};
 use crate::simd::{Cube, HOT_TABLES};
 use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES, QUARTER_TURNS};
 use crate::symstart::SymFilter;
@@ -630,7 +630,6 @@ impl Lane {
 
     /// Extend every job by one move (children in move order), with their
     /// bounds.
-    #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
     fn extend_jobs(&mut self, solver: &Solver) {
         // Bounds of the new jobs: lookups are prefetched and resolved LAG
         // lookups later (`pending` is a ring of (bound slot, index, corner
@@ -667,8 +666,7 @@ impl Lane {
             } else {
                 ALLOWED_AFTER[(job.moves[job.len as usize - 1] / 3) as usize]
             };
-            while todo != 0 {
-                let mv = todo.trailing_zeros() as usize;
+            while let Some(mv) = Move::lowest(todo) {
                 todo ^= todo.isolate_lowest_one();
                 let mut child = *job;
                 child.moves[child.len as usize] = mv as u8;
@@ -682,7 +680,7 @@ impl Lane {
                 solver.prefetch(index);
                 pending[head % 64] = (2 * position, index, corner_bound);
                 head += 1;
-                if mv.is_multiple_of(3) || filtered {
+                if mv.index().is_multiple_of(3) || filtered {
                     let (index, corner_bound) = solver.index(inverse.premove_inverse(mv));
                     solver.prefetch(index);
                     pending[head % 64] = (2 * position + 1, index, corner_bound);
@@ -706,15 +704,10 @@ impl Lane {
             }
         }
         if filtered {
-            let root = self.root;
             filter.dedup(
                 &mut extended,
                 |job| &job.moves[..usize::from(job.len)],
-                |job| {
-                    job.moves[..usize::from(job.len)]
-                        .iter()
-                        .fold(root, |cube, &mv| cube.apply_move(usize::from(mv)))
-                },
+                |job| self.job_cubes(job).0,
             );
         }
         self.jobs_tmp = std::mem::replace(&mut self.jobs, extended);

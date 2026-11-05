@@ -123,7 +123,7 @@ fn parse_cube(text: &str) -> Result<CubieCube, String> {
         return CubieCube::from_facelets(text).map_err(|e| e.to_string());
     }
     parse_moves(text)
-        .map(|moves| CubieCube::SOLVED.apply_moves(&moves))
+        .and_then(|moves| CubieCube::SOLVED.apply_moves(&moves))
         .ok_or_else(|| format!("neither a scramble nor 54 facelets: {text:?}"))
 }
 

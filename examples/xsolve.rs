@@ -15,7 +15,7 @@
 //! status is 1 if one is wrong, 2 if a cube is not reported (or twice).
 use cubeopt::coord::cocsep;
 use cubeopt::cubie::{
-    conjugate, format_moves, inverse_move, parse_moves, symmetries, CubieCube, Rng,
+    conjugate, format_moves, inverse_move, parse_moves, symmetries, CubieCube, Move, Rng,
 };
 use cubeopt::simd::Cube;
 use cubeopt::solver::{Solver, Stats};
@@ -66,7 +66,7 @@ impl Reference<'_> {
             {
                 continue;
             }
-            let child = cube.apply_move(usize::from(m));
+            let child = cube.apply_move(Move::ALL[usize::from(m)]);
             children[count] = (child, m, self.bound(child));
             count += 1;
         }
@@ -112,7 +112,7 @@ fn load_set(spec: &str) -> Vec<CubieCube> {
         return (0..v[0])
             .map(|_| {
                 let moves: Vec<u8> = (0..v[1]).map(|_| random_move(&mut rng)).collect();
-                CubieCube::SOLVED.apply_moves(&moves)
+                CubieCube::SOLVED.apply_moves(&moves).unwrap()
             })
             .collect();
     }
@@ -132,7 +132,11 @@ fn load_set(spec: &str) -> Vec<CubieCube> {
         .unwrap()
         .lines()
         .filter(|l| !l.trim().is_empty() && !l.starts_with('#'))
-        .map(|l| CubieCube::SOLVED.apply_moves(&parse_moves(l).expect("parse")))
+        .map(|l| {
+            CubieCube::SOLVED
+                .apply_moves(&parse_moves(l).expect("parse"))
+                .unwrap()
+        })
         .collect()
 }
 
@@ -223,7 +227,7 @@ fn main() {
             missing = true;
             continue;
         };
-        let ok = cubes[i].apply_moves(solution) == CubieCube::SOLVED;
+        let ok = cubes[i].apply_moves(solution) == Some(CubieCube::SOLVED);
         bad |= !ok;
         lengths[solution.len()] += 1;
         // (The inverse of the solution is a scramble of the cube: input for

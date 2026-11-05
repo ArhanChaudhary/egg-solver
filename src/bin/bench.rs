@@ -76,7 +76,7 @@ fn run(
             s.spawn(|| {
                 let record = |i: usize, solution: Vec<u8>, stats: Stats, seconds: f64| {
                     let cube = cubes(i).unwrap();
-                    if cube.apply_moves(&solution) != CubieCube::SOLVED {
+                    if cube.apply_moves(&solution) != Some(CubieCube::SOLVED) {
                         bad.fetch_add(1, Ordering::Relaxed);
                     }
                     records.lock().unwrap().push(Record {
@@ -543,9 +543,11 @@ fn cube_set(set: &str) -> anyhow::Result<Vec<CubieCube>> {
         .enumerate()
         .filter(|(_, line)| !line.trim().is_empty())
         .map(|(n, line)| {
-            let moves = parse_moves(line)
-                .ok_or_else(|| BadInput(format!("{set}: line {}: cannot parse {line:?}", n + 1)))?;
-            Ok(CubieCube::SOLVED.apply_moves(&moves))
+            parse_moves(line)
+                .and_then(|moves| CubieCube::SOLVED.apply_moves(&moves))
+                .ok_or_else(|| {
+                    BadInput(format!("{set}: line {}: cannot parse {line:?}", n + 1)).into()
+                })
         })
         .collect()
 }

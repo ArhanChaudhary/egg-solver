@@ -15,6 +15,7 @@ pub mod shm;
 pub use file::TableError;
 
 use crate::coord::{cocsep, h11_key, reduce_key, N_CLASSES, N_COCSEP, N_MSPLIT, N_SLOTS};
+use crate::cubie::Move;
 use crate::simd::Cube;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -101,7 +102,7 @@ impl Cocsep {
         while head < order.len() {
             let i = order[head];
             head += 1;
-            for mv in 0..18 {
+            for mv in Move::ALL {
                 let next = cube_of[i].apply_move(mv);
                 let j = cocsep(next);
                 if depth[j] == 0xFF {
@@ -179,7 +180,7 @@ impl Cocsep {
         for d in 1..=depth {
             let mut next = Vec::new();
             for cube in frontier {
-                for mv in 0..18 {
+                for mv in Move::ALL {
                     let child = cube.apply_move(mv);
                     let coord = cocsep(child);
                     if depths[coord] > d {

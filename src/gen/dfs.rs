@@ -33,6 +33,7 @@
 
 use super::decode_index;
 use crate::coord::{cocsep, h11_key, index_sym, reduce_key, N_MSPLIT, N_SLOTS};
+use crate::cubie::Move;
 use crate::simd::Cube;
 use crate::solver::{ALLOWED_AFTER, ALL_MOVES};
 use crate::tables::{
@@ -115,7 +116,7 @@ impl Prefix {
                     }
                     for &e in &last[i..(i + chunk).min(last.len())] {
                         let c = decode_index(corners, 11, e);
-                        for m in 0..18 {
+                        for m in Move::ALL {
                             for_each_entry(corners, c.apply_move(m), |x| out.push(x));
                         }
                     }
@@ -279,8 +280,7 @@ impl Run<'_, '_> {
     /// from `c` (`allowed`: the moves allowed next); marks the leaves.
     fn walk(&self, c: Cube, allowed: u32, remaining: u8, prune_prefix: bool, marker: &mut Marker) {
         let mut moves = allowed;
-        while moves != 0 {
-            let m = moves.trailing_zeros() as usize;
+        while let Some(m) = Move::lowest(moves) {
             moves ^= moves.isolate_lowest_one();
             let child = c.apply_move(m);
             if prune_prefix && self.prefix.last_two.contains(&entry(self.corners, child)) {
@@ -289,7 +289,13 @@ impl Run<'_, '_> {
             if remaining == 1 {
                 self.mark_leaf(child, marker);
             } else {
-                self.walk(child, ALLOWED_AFTER[m / 3], remaining - 1, false, marker);
+                self.walk(
+                    child,
+                    ALLOWED_AFTER[m.index() / 3],
+                    remaining - 1,
+                    false,
+                    marker,
+                );
             }
         }
     }

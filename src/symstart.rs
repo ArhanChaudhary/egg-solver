@@ -52,7 +52,6 @@
 
 use crate::simd::Cube;
 use std::collections::HashMap;
-use std::sync::OnceLock;
 
 /// Exact classes are computed for levels of at most this many jobs (after
 /// `keep`): ~0.2 µs per job at 1T (3240 jobs in ~0.7 ms).
@@ -175,31 +174,22 @@ impl SymFilter {
 }
 
 /// `conjugates[t][m]`: the move `t m t⁻¹` (`Cube::transform` by `t` of
-/// move `m`).
+/// move `m`): each symmetry's move map, from build.rs.
 fn move_conjugates() -> &'static [[u8; 18]; 48] {
-    static CONJUGATES: OnceLock<[[u8; 18]; 48]> = OnceLock::new();
-    CONJUGATES.get_or_init(|| {
-        let mut conjugates = [[0u8; 18]; 48];
-        let moves: [Cube; 18] = std::array::from_fn(|mv| Cube::solved().apply_move(mv));
-        for (sym, row) in conjugates.iter_mut().enumerate() {
-            for (mv, image_move) in row.iter_mut().enumerate() {
-                let image = moves[mv].transform(sym);
-                let index = moves.iter().position(|&other| other.equals(image));
-                *image_move =
-                    u8::try_from(index.expect("a conjugate of a move is a move")).unwrap();
-            }
-        }
-        conjugates
-    })
+    &crate::simd::SYM_MOVE_MAP
 }
 
 /// The corner and edge bytes of a cube.
 fn position_key(cube: Cube) -> (u64, u128) {
     let bytes = cube.to_bytes();
     let mut corners = [0u8; 8];
-    corners.copy_from_slice(&bytes[..8]);
+    for (x, &byte) in corners.iter_mut().zip(&bytes) {
+        *x = byte;
+    }
     let mut edges = [0u8; 16];
-    edges[..12].copy_from_slice(&bytes[16..28]);
+    for (x, &byte) in edges.iter_mut().zip(bytes.iter().skip(16).take(12)) {
+        *x = byte;
+    }
     (u64::from_le_bytes(corners), u128::from_le_bytes(edges))
 }
 
@@ -214,17 +204,20 @@ fn class_key(cube: Cube) -> (u64, u128) {
                 position_key(inverse.transform(sym)),
             ]
         })
-        .min()
-        .unwrap()
+        .fold((u64::MAX, u128::MAX), std::cmp::min)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cubie::{parse_moves, CubieCube, Rng};
+    use crate::cubie::{parse_moves, CubieCube, Move, Rng};
 
     fn cube(moves: &str) -> Cube {
-        Cube::from_cubie(&CubieCube::SOLVED.apply_moves(&parse_moves(moves).unwrap()))
+        Cube::from_cubie(
+            &CubieCube::SOLVED
+                .apply_moves(&parse_moves(moves).unwrap())
+                .unwrap(),
+        )
     }
 
     /// Conjugation is a homomorphism:
@@ -237,8 +230,10 @@ mod tests {
             let x = Cube::from_cubie(&CubieCube::random(&mut rng));
             for (sym, row) in conjugates.iter().enumerate() {
                 for (mv, &image_move) in row.iter().enumerate() {
-                    let lhs = x.apply_move(mv).transform(sym);
-                    let rhs = x.transform(sym).apply_move(usize::from(image_move));
+                    let lhs = x.apply_move(Move::ALL[mv]).transform(sym);
+                    let rhs = x
+                        .transform(sym)
+                        .apply_move(Move::ALL[usize::from(image_move)]);
                     assert!(lhs.equals(rhs), "sym {sym} move {mv}");
                 }
             }
@@ -283,7 +278,7 @@ mod tests {
                 |prefix| {
                     prefix
                         .iter()
-                        .fold(x, |cube, &mv| cube.apply_move(usize::from(mv)))
+                        .fold(x, |cube, &mv| cube.apply_move(Move::ALL[usize::from(mv)]))
                 },
             );
             *kept_of_length = next.len();
@@ -314,12 +309,12 @@ mod tests {
         let a = cube("R U2 F' L D B2 R'");
         let sym = (0..48)
             .find(|&sym| {
-                let u = Cube::solved().apply_move(0);
+                let u = Cube::solved().apply_move(Move::U);
                 u.transform(sym).equals(u)
                     && Cube::solved()
-                        .apply_move(6)
+                        .apply_move(Move::R)
                         .transform(sym)
-                        .equals(Cube::solved().apply_move(9))
+                        .equals(Cube::solved().apply_move(Move::L))
             })
             .unwrap();
         let x = a.compose(a.transform(sym).inverse());

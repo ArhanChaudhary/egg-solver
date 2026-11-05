@@ -8,14 +8,19 @@ mod cubie;
 
 use std::fmt::Write as _;
 
+/// A build error: the message of a failed step.
+type Error = Box<dyn std::error::Error>;
+
 /// The 32 bytes of a cube in the SIMD layout.
 fn simd_bytes(cube: &cubie::CubieCube) -> [u8; 32] {
     let mut bytes = [0u8; 32];
-    for (i, byte) in bytes[..8].iter_mut().enumerate() {
-        *byte = cube.corner_perm[i] | (cube.corner_orient[i] << 5);
+    let corners = cube.corner_perm.iter().zip(&cube.corner_orient);
+    for (byte, (&piece, &twist)) in bytes.iter_mut().zip(corners) {
+        *byte = piece | (twist << 5);
     }
-    for (i, byte) in bytes[16..28].iter_mut().enumerate() {
-        *byte = cube.edge_perm[i] | (cube.edge_orient[i] << 4);
+    let edges = cube.edge_perm.iter().zip(&cube.edge_orient);
+    for (byte, (&piece, &flip)) in bytes.iter_mut().skip(16).zip(edges) {
+        *byte = piece | (flip << 4);
     }
     bytes
 }
@@ -56,7 +61,49 @@ fn backend(has: impl Fn(&str) -> bool) -> &'static str {
     }
 }
 
-fn main() {
+/// Rust source of a `CubieCube` constant.
+fn cubie_literal(cube: &cubie::CubieCube) -> String {
+    format!(
+        "CubieCube {{ corner_perm: {:?}, corner_orient: {:?}, edge_perm: {:?}, edge_orient: {:?} }}",
+        cube.corner_perm, cube.corner_orient, cube.edge_perm, cube.edge_orient
+    )
+}
+
+/// The source of `cubie_consts.rs` (see `cubie.rs`): the moves, symmetries
+/// and facelet tables of the sticker model.
+fn cubie_consts(
+    moves: &[cubie::CubieCube],
+    syms: &[cubie::Symmetry],
+    inverses: &[u8; 48],
+) -> Result<String, Error> {
+    let mut s = String::new();
+    writeln!(s, "static MOVE_CUBES: [CubieCube; N_MOVES] = [")?;
+    for m in moves {
+        writeln!(s, "  {},", cubie_literal(m))?;
+    }
+    writeln!(s, "];")?;
+    writeln!(s, "static SYMMETRIES: [Symmetry; 48] = [")?;
+    for sym in syms {
+        writeln!(
+            s,
+            "  Symmetry {{ matrix: {:?}, mirror: {}, cube: {}, cube_inverse: {}, move_map: {:?} }},",
+            sym.matrix,
+            sym.mirror,
+            cubie_literal(&sym.cube),
+            cubie_literal(&sym.cube_inverse),
+            sym.move_map
+        )?;
+    }
+    writeln!(s, "];")?;
+    writeln!(s, "static SYMMETRY_INVERSES: [u8; 48] = {inverses:?};")?;
+    let corners = cubie::model::corner_facelets().ok_or("cube model: no corner facelets")?;
+    writeln!(s, "const CORNER_FACELETS: [[u8; 3]; 8] = {corners:?};")?;
+    let edges = cubie::model::edge_facelets().ok_or("cube model: no edge facelets")?;
+    writeln!(s, "const EDGE_FACELETS: [[u8; 2]; 12] = {edges:?};")?;
+    Ok(s)
+}
+
+fn main() -> Result<(), Error> {
     println!("cargo:rerun-if-changed=src/cubie.rs");
     println!("cargo:rerun-if-changed=build.rs");
     let features = std::env::var("CARGO_CFG_TARGET_FEATURE").unwrap_or_default();
@@ -77,46 +124,52 @@ fn main() {
     if backend == "x86" && has("avx512f") && has("avx512bw") && has("avx512vl") {
         println!("cargo::rustc-cfg=avx512");
     }
+    // The library's cubie.rs takes its moves, symmetries and facelet tables
+    // from `cubie_consts.rs` (this script's copy derives them).
+    println!("cargo::rustc-cfg=cubie_generated");
+    let moves = cubie::model::move_cubes().ok_or("cube model: no move cubes")?;
+    let syms = cubie::model::symmetries().ok_or("cube model: no symmetries")?;
+    let inverses = cubie::model::symmetry_inverses(&syms).ok_or("cube model: no inverses")?;
+    let out_dir = std::path::PathBuf::from(std::env::var("OUT_DIR")?);
+    std::fs::write(
+        out_dir.join("cubie_consts.rs"),
+        cubie_consts(&moves, &syms, &inverses)?,
+    )?;
     let mut s = String::new();
-    let moves = cubie::move_cubes();
-    writeln!(s, "pub const MOVES: [Aligned32; 18] = [").unwrap();
-    for m in moves {
-        writeln!(s, "  {},", aligned32(&simd_bytes(m))).unwrap();
+    writeln!(s, "pub const MOVES: [Aligned32; 18] = [")?;
+    for m in &moves {
+        writeln!(s, "  {},", aligned32(&simd_bytes(m)))?;
     }
-    writeln!(s, "];").unwrap();
+    writeln!(s, "];")?;
     // Orientation part of each move (the `ORIENT_BITS` term of `compose`).
-    writeln!(s, "pub const MOVE_ORIENTS: [Aligned32; 18] = [").unwrap();
-    for m in moves {
+    writeln!(s, "pub const MOVE_ORIENTS: [Aligned32; 18] = [")?;
+    for m in &moves {
         let mut bytes = simd_bytes(m);
         for (i, x) in bytes.iter_mut().enumerate() {
             *x &= if i < 8 { 0x60 } else { 0x10 };
         }
-        writeln!(s, "  {},", aligned32(&bytes)).unwrap();
+        writeln!(s, "  {},", aligned32(&bytes))?;
     }
-    writeln!(s, "];").unwrap();
+    writeln!(s, "];")?;
     // Premove cubes: applying move m to the inverse = premove of inverse(m).
-    writeln!(s, "pub const INVERSE_MOVES: [Aligned32; 18] = [").unwrap();
+    writeln!(s, "pub const INVERSE_MOVES: [Aligned32; 18] = [")?;
     for m in 0..18u8 {
-        let inverse = cubie::inverse_move(m);
-        writeln!(
-            s,
-            "  {},",
-            aligned32(&simd_bytes(&moves[usize::from(inverse)]))
-        )
-        .unwrap();
+        let inverse = moves
+            .get(usize::from(cubie::inverse_move(m)))
+            .ok_or("no inverse move")?;
+        writeln!(s, "  {},", aligned32(&simd_bytes(inverse)))?;
     }
-    writeln!(s, "];").unwrap();
-    let syms = cubie::symmetries();
-    writeln!(s, "pub static SYM_CUBES: [Aligned32; 48] = [").unwrap();
-    for sym in syms {
-        writeln!(s, "  {},", aligned32(&simd_bytes(&sym.cube))).unwrap();
+    writeln!(s, "];")?;
+    writeln!(s, "pub static SYM_CUBES: [Aligned32; 48] = [")?;
+    for sym in &syms {
+        writeln!(s, "  {},", aligned32(&simd_bytes(&sym.cube)))?;
     }
-    writeln!(s, "];").unwrap();
-    writeln!(s, "pub static SYM_CUBE_INVERSES: [Aligned32; 48] = [").unwrap();
-    for sym in syms {
-        writeln!(s, "  {},", aligned32(&simd_bytes(&sym.cube_inverse))).unwrap();
+    writeln!(s, "];")?;
+    writeln!(s, "pub static SYM_CUBE_INVERSES: [Aligned32; 48] = [")?;
+    for sym in &syms {
+        writeln!(s, "  {},", aligned32(&simd_bytes(&sym.cube_inverse)))?;
     }
-    writeln!(s, "];").unwrap();
+    writeln!(s, "];")?;
     // Edge-only conjugation tables (see `coord::edge_key_sym`), per
     // symmetry: `classes` classifies a piece j of T (edge lane: bit 7 =
     // E-slice, bit 6 = S-slice, bit 4 = eo of T at j), `perm` is the
@@ -124,24 +177,21 @@ fn main() {
     // `perm_eo` the eo of Tinv by source position: byte j (edge lane) is bit
     // 4 of Tinv at the position i that Tinv maps from j (`Tinv[i] & 15 ==
     // j`), so that xoring it before the position permutation adds Tinv's eo.
-    writeln!(s, "pub const SYM_EDGES: [SymEdge; 48] = [").unwrap();
-    for sym in syms {
+    writeln!(s, "pub const SYM_EDGES: [SymEdge; 48] = [")?;
+    for sym in &syms {
         let t = simd_bytes(&sym.cube);
         let t_inverse = simd_bytes(&sym.cube_inverse);
         let (mut classes, mut perm, mut perm_eo) = ([0u8; 32], [0u8; 32], [0u8; 32]);
-        for j in 0..12 {
-            let x = t[16 + j];
-            classes[16 + j] = ((x & 0x0C) << 4) | (x & 0x10);
+        for (class, &x) in classes.iter_mut().zip(&t).skip(16).take(12) {
+            *class = ((x & 0x0C) << 4) | (x & 0x10);
         }
-        for i in 0..32 {
-            perm[i] = if (16..28).contains(&i) {
-                t_inverse[i]
-            } else {
-                0x80
-            };
+        for (i, (p, &x)) in perm.iter_mut().zip(&t_inverse).enumerate() {
+            *p = if (16..28).contains(&i) { x } else { 0x80 };
         }
-        for &x in &t_inverse[16..28] {
-            perm_eo[16 + usize::from(x & 15)] = x & 0x10;
+        for &x in t_inverse.iter().skip(16).take(12) {
+            *perm_eo
+                .get_mut(16 + usize::from(x & 15))
+                .ok_or("edge out of range")? = x & 0x10;
         }
         writeln!(
             s,
@@ -149,19 +199,18 @@ fn main() {
             aligned32(&classes),
             aligned32(&perm),
             aligned32(&perm_eo)
-        )
-        .unwrap();
+        )?;
     }
-    writeln!(s, "];").unwrap();
+    writeln!(s, "];")?;
     let mirrors = list(syms.iter().map(|sym| sym.mirror));
-    writeln!(s, "pub static SYM_MIRROR: [bool; 48] = [{mirrors}];").unwrap();
-    let inverses = list(cubie::symmetry_inverses());
-    writeln!(s, "pub static SYM_INVERSES: [u8; 48] = [{inverses}];").unwrap();
-    writeln!(s, "pub static SYM_MOVE_MAP: [[u8; 18]; 48] = [").unwrap();
-    for sym in syms {
-        writeln!(s, "  [{}],", list(sym.move_map)).unwrap();
+    writeln!(s, "pub static SYM_MIRROR: [bool; 48] = [{mirrors}];")?;
+    let inverses = list(inverses);
+    writeln!(s, "pub static SYM_INVERSES: [u8; 48] = [{inverses}];")?;
+    writeln!(s, "pub static SYM_MOVE_MAP: [[u8; 18]; 48] = [")?;
+    for sym in &syms {
+        writeln!(s, "  [{}],", list(sym.move_map))?;
     }
-    writeln!(s, "];").unwrap();
-    let out = std::path::Path::new(&std::env::var("OUT_DIR").unwrap()).join("consts.rs");
-    std::fs::write(out, s).unwrap();
+    writeln!(s, "];")?;
+    std::fs::write(out_dir.join("consts.rs"), s)?;
+    Ok(())
 }

@@ -5,7 +5,7 @@
 //! (`bench` measures that).
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use cubeopt::cubie::{CubieCube, Rng};
+use cubeopt::cubie::{CubieCube, Move, Rng};
 use cubeopt::simd::Cube;
 use cubeopt::solver::Solver;
 use cubeopt::tables::Cocsep;
@@ -30,7 +30,7 @@ fn kernels(c: &mut Criterion) {
     c.bench_function("apply_move", |b| {
         b.iter(|| {
             let i = next();
-            black_box(cubes[i]).apply_move(black_box(i % 18))
+            black_box(cubes[i]).apply_move(black_box(Move::ALL[i % 18]))
         });
     });
     c.bench_function("child_lookup", |b| {

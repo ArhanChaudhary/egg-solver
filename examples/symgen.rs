@@ -20,7 +20,7 @@ fn main() {
         let fixed = |cube: &CubieCube| conjugate(cube, sym) == *cube;
         if kind == "anti" || kind == "mix" && written % 3 == 2 {
             // Antisymmetric: A · t(A)⁻¹ with t an involution.
-            let probe = CubieCube::SOLVED.apply_moves(&[0, 7, 14]);
+            let probe = CubieCube::SOLVED.apply_moves(&[0, 7, 14]).unwrap();
             if conjugate(&conjugate(&probe, sym), sym) != probe {
                 continue;
             }
@@ -31,7 +31,7 @@ fn main() {
                 .rev()
                 .map(|&mv| inverse_move(sym.move_map[usize::from(mv)]));
             let moves: Vec<u8> = half.iter().copied().chain(image_inverse).collect();
-            let cube = CubieCube::SOLVED.apply_moves(&moves);
+            let cube = CubieCube::SOLVED.apply_moves(&moves).unwrap();
             assert_eq!(conjugate(&cube, sym), cube.inverse());
             println!("{}", format_moves(&moves));
             written += 1;
@@ -40,13 +40,13 @@ fn main() {
         // Words fixed by `sym`: single moves and pairs of moves on
         // different faces.
         let mut words: Vec<Vec<u8>> = (0..18u8)
-            .filter(|&mv| fixed(&CubieCube::SOLVED.apply_moves(&[mv])))
+            .filter(|&mv| fixed(&CubieCube::SOLVED.apply_moves(&[mv]).unwrap()))
             .map(|mv| vec![mv])
             .collect();
         for first in 0..18u8 {
             for second in 0..18u8 {
                 if first / 3 != second / 3
-                    && fixed(&CubieCube::SOLVED.apply_moves(&[first, second]))
+                    && fixed(&CubieCube::SOLVED.apply_moves(&[first, second]).unwrap())
                 {
                     words.push(vec![first, second]);
                 }
@@ -66,7 +66,7 @@ fn main() {
         while moves.len() < length {
             moves.extend(&words[rng.below_usize(words.len())]);
         }
-        assert!(fixed(&CubieCube::SOLVED.apply_moves(&moves)));
+        assert!(fixed(&CubieCube::SOLVED.apply_moves(&moves).unwrap()));
         println!("{}", format_moves(&moves));
         written += 1;
     }
