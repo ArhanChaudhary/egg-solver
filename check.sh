@@ -7,8 +7,11 @@ cargo clippy --release --all-targets -- -D warnings
 # A private log, so concurrent runs (several worktrees) never read each other's output.
 log=$(mktemp -t cube-test.XXXXXX.log)
 trap 'rm -f "$log"' EXIT
+# The last test run's log shows no failure. (Called as `no_failure || exit 1`:
+# `set -e` ignores a failing `! grep`.)
+no_failure() { ! grep -qE "FAILED|panicked" "$log"; }
 cargo test --release 2>&1 | tee "$log" | grep -E "^test result"
-! grep -qE "FAILED|panicked" "$log"
+no_failure || exit 1
 # The other backends (src/portable/) must keep compiling and passing: aarch64
 # NEON (macOS and Linux), the scalar fallback (any target; forced here by the
 # `scalar` feature) and wasm (SIMD128: WASI with and without threads, and the
@@ -61,13 +64,33 @@ if [ "${CHECK_BACKENDS:-1}" != 0 ]; then
     fi
     cargo clippy --release --all-targets --features scalar -- -D warnings
     cargo test --features scalar --lib 2>&1 | tee "$log" | grep -E "^test result"
-    ! grep -qE "FAILED|panicked" "$log"
+    no_failure || exit 1
     if grep -qx aarch64-unknown-linux-gnu <<< "$installed" &&
         command -v qemu-aarch64 > /dev/null && command -v aarch64-linux-gnu-gcc > /dev/null; then
-        CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
-            CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER="qemu-aarch64 -L /usr/aarch64-linux-gnu" \
-            cargo test --target aarch64-unknown-linux-gnu --lib 2>&1 | tee "$log" | grep -E "^test result"
-        ! grep -qE "FAILED|panicked" "$log"
+        neon_tests() {
+            CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
+                CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER="qemu-aarch64 -L /usr/aarch64-linux-gnu" \
+                cargo test --target aarch64-unknown-linux-gnu --lib -- "$@" 2>&1 | tee "$log" | grep -E "^test result"
+        }
+        # qemu-user (8.2) crashes ("QEMU internal SIGSEGV {code=MAPERR,
+        # addr=0x20}", a fault in its own code) when the guest reads
+        # /proc/self/maps, which qemu emulates, while other guest threads map
+        # or unmap memory (in 8-20% of the runs, from the test below; a
+        # 25-line program does it too): that test runs alone. Should qemu
+        # crash anyway, with no test failed, the step runs once more.
+        maps_test=tables::tests::opened_table_file_is_read_only
+        for filter in --skip --exact; do
+            if ! neon_tests $filter $maps_test; then
+                if ! grep -q "QEMU internal SIGSEGV" "$log" || ! no_failure; then
+                    exit 1
+                fi
+                echo "check: qemu-aarch64 crashed (QEMU internal SIGSEGV): NEON tests run again" >&2
+                neon_tests $filter $maps_test
+            fi
+            no_failure || exit 1
+        done
+        # (The test alone did run.)
+        grep -q "test result: ok. 1 passed" "$log" || exit 1
     else
         echo "check: qemu-aarch64 or aarch64-linux-gnu-gcc missing: NEON tests not run" >&2
     fi
