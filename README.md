@@ -99,11 +99,83 @@ builds without it (`default-features = false`).
 A table file holds the table data, then a 4 KiB trailer (k, base,
 distribution, checksum): `gen check <table>` verifies a table against it.
 Tables are the same on every machine and backend: you can generate one on a
-big machine and copy it. `--load map|copy` (or `CUBEOPT_LOAD`) sets how a
-table is loaded (map the file, or copy it into memory with transparent huge
-pages; the default is copy on Linux, map elsewhere), and `--prefault 0` (or
-`CUBEOPT_PREFAULT=0`; with map) reads pages on first use instead of the
-whole table at start.
+big machine and copy it. `--load map|copy|shm` (or `CUBEOPT_LOAD`) sets how
+a table is loaded (map the file, copy it into memory with transparent huge
+pages, or attach its shared memory segment, below; the default is the
+table's segment if there is one, else copy on Linux, map elsewhere), and
+`--prefault 0` (or `CUBEOPT_PREFAULT=0`; with map and shm) reads pages on
+first use instead of the whole table at start.
+
+### Shared memory
+
+As with vcube's `--shm`, a table can be loaded once into a System V shared
+memory segment, which stays in memory after the process exits (until reboot
+or until it is removed); later runs attach it read-only and start at once
+(Linux only). h7 attaches in 0.00 s on 1 GiB pages, against 28 s to copy it
+from a ~140 MB/s disk, and solves as fast as from a hugetlbfs map of the
+same table:
+
+```sh
+solve --shm-load tables/h8           # make the segment from the file (or check it), and exit
+solve tables/h8 < scrambles          # attaches it (the default --load auto does)
+solve --shm tables/h8 < scrambles    # the same; makes the segment first if there is none
+solve --shm-remove tables/h8         # remove it (as ipcrm -M KEY)
+```
+
+`--shm` (the same as `--load shm`, or `CUBEOPT_LOAD=shm`) also works with
+`bench` and `cubeopt`; `--load map` and `--load copy` never use a segment.
+
+- **Keys:** ASCII "co" (`0x636f`), then the table's k and base, a byte each:
+  `ipcs -m` lists h7 base 9 as `0x636f0709`, h11 base 10 as `0x636f0b0a`.
+  `--shm-key` (or `CUBEOPT_SHM_KEY`) sets another, e.g. for two tables of the
+  same k and base.
+- **Checked on every attach:** a segment holds the file's bytes, and in its
+  last 4 KiB the file's trailer (k, base, size, distribution, checksum),
+  written last, once the copy's checksum is checked. Each run compares it
+  with the table file's trailer: a segment of another table under the key
+  (say an older table of the same k and base) is refused by `--shm`, with how
+  to remove it, and passed over by `auto`, which loads the file. A segment
+  whose load was interrupted has no trailer: `--shm` removes it and loads
+  again (or waits while another process is loading it). The table needs a
+  checksum in its trailer (`gen stamp` adds one). A loaded segment is
+  read-only: `ipcs -m` shows perms `400` (`600` while loading).
+- **Pages:** a new segment gets 1 GiB pages, else 2 MiB, else 4 KiB pages
+  (`--shm-pages 1g,2m,4k`, or `CUBEOPT_SHM_PAGES`); `-v` logs which, and why
+  larger ones could not be had. On 4 KiB pages the search is much slower
+  (h7: 27% fewer solves/s at 1 thread, 32% at 48 threads, than on 1 GiB
+  pages; attaching maps 0.95 million pages, 0.6 s), and every run warns. Huge-page segments need, once (root):
+  1. the permission, which is what enables 1 GiB and 2 MiB segments: a
+     group of yours in `vm.hugetlb_shm_group`, e.g. `sudo sysctl
+     vm.hugetlb_shm_group=$(id -g)` (a file in `/etc/sysctl.d` keeps it after
+     reboot), or CAP_IPC_LOCK. Without it the kernel refuses (EPERM; older
+     kernels also allowed them within the memlock limit, `ulimit -l`: kernel
+     7.0 on the test server refused even 2 MiB with an 11.8 GiB limit);
+  2. free pages in the kernel's hugetlb pool: `echo N | sudo tee
+     /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages` for 1 GiB
+     pages (most reliably reserved at boot: `hugepagesz=1G hugepages=N`), or
+     `hugepages-2048kB` for 2 MiB pages.
+
+  A segment on 4 KiB pages gets transparent huge pages where
+  `/sys/kernel/mm/transparent_hugepage/shmem_enabled` is `advise` (not tried
+  here: it is `never` on the test server).
+- **Preflight:** before it copies anything, `--shm` checks the segment
+  against `kernel.shmmax` (bytes per segment), `kernel.shmall` (pages in all
+  segments) and `kernel.shmmni`, then the permission and the pool's free
+  pages for huge pages, or free memory for 4 KiB pages (as for a copy), and
+  says what to raise. A run that attaches a segment needs no free memory.
+- **Persistence:** a segment stays until reboot or removal, also when no
+  process uses it. `ipcs -m` lists segments; `solve --shm-remove TABLE` or
+  `ipcrm -M 0x636f0709` removes one (its memory is freed when the last
+  process detaches).
+
+```text
+$ solve --shm-load /mnt/huge/h7
+segment 0x636f0709 shmid 42: h7 base 9, 4.00 GiB on 1 GiB pages, made from /mnt/huge/h7 in 0.10s
+$ ipcs -m
+------ Shared Memory Segments --------
+key        shmid      owner      perms      bytes      nattch     status
+0x636f0709 42         super      400        4294967296 0
+```
 
 ### Portable builds
 

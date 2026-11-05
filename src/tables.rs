@@ -11,6 +11,7 @@
 //!   and loaded from a file (58 GiB for h11).
 
 pub mod file;
+pub mod shm;
 pub use file::TableError;
 
 use crate::coord::{cocsep, h11_key, reduce_key, N_CLASSES, N_COCSEP, N_MSPLIT, N_SLOTS};
@@ -807,6 +808,18 @@ pub fn read_meta(path: &str) -> Result<H48Meta, TableError> {
     checked_meta(k, base).ok_or_else(invalid)
 }
 
+/// How `H48Table::open_reporting` loaded a table.
+#[derive(Clone, Debug)]
+pub struct LoadReport {
+    /// The mode used: `Auto` resolved (to `Shm` if a segment was used).
+    pub mode: file::LoadMode,
+    /// The shared memory segment used, with `Shm`.
+    pub segment: Option<shm::Segment>,
+    /// Why no segment was used (`Auto`), or why a new one got smaller pages
+    /// than it might have, and how to get them.
+    pub notes: Vec<String>,
+}
+
 impl H48Table {
     /// Open a table file, loaded as `file::LoadOptions::from_env` says.
     ///
@@ -818,15 +831,35 @@ impl H48Table {
 
     /// Open a table file. Files on hugetlbfs (1 GiB pages) and `/dev/shm`
     /// are mapped directly; other files are mapped or copied into anonymous
-    /// huge-page memory, as `options` say.
+    /// huge-page memory, or loaded through a shared memory segment, as
+    /// `options` say (see `open_reporting`).
     ///
     /// # Errors
     /// If the table's meta cannot be read (`read_meta`), the file size does
     /// not match its `k`, or reading or mapping fails.
     ///
     /// # Panics
-    /// If reading a copied table fails half-way.
+    /// If memory for a copy cannot be mapped.
     pub fn open_with(path: &str, options: &file::LoadOptions) -> Result<H48Table, TableError> {
+        H48Table::open_reporting(path, options).map(|(table, _)| table)
+    }
+
+    /// `open_with`, and how the table was loaded. With `LoadMode::Shm` the
+    /// table's shared memory segment is attached, or made from the file
+    /// first (`shm`); `Auto` attaches it only if it is there and holds this
+    /// file's table (else loads the file as before, with a note).
+    ///
+    /// # Errors
+    /// As `open_with`; with `Shm`, also if the segment cannot be made or
+    /// holds another table, or is being loaded by another process
+    /// (`TableError::ShmLoading`: try again).
+    ///
+    /// # Panics
+    /// As `open_with`.
+    pub fn open_reporting(
+        path: &str,
+        options: &file::LoadOptions,
+    ) -> Result<(H48Table, LoadReport), TableError> {
         let meta = read_meta(path)?;
         let len = usize::try_from(h48_bytes(meta.k)).map_err(|_| TableError::TooLarge(meta.k))?;
         // A file of another `k` (a stale or wrong meta) would give wrong,
@@ -842,22 +875,35 @@ impl H48Table {
                 needed: len as u64,
             });
         }
+        let mut report = LoadReport {
+            mode: options.mode_for(path),
+            segment: None,
+            notes: Vec::new(),
+        };
+        if matches!(options.mode, file::LoadMode::Auto | file::LoadMode::Shm) {
+            let create = options.mode == file::LoadMode::Shm;
+            if let Some((memory, segment)) = shm::open(path, options, create, &mut report.notes)? {
+                report.mode = file::LoadMode::Shm;
+                report.segment = Some(segment);
+                return Ok((H48Table { memory, meta }, report));
+            }
+        }
         let io_error = file::io_error(path);
-        if options.mode_for(path) == file::LoadMode::Map {
+        if report.mode == file::LoadMode::Map {
             let memory = Memory::map_read_only(path, len, options.prefault).map_err(io_error)?;
-            return Ok(H48Table { memory, meta });
+            return Ok((H48Table { memory, meta }, report));
         }
         let memory = Memory::anonymous(len);
         let table_file = std::fs::File::open(path).map_err(io_error)?;
         #[cfg(unix)]
-        read_parallel(&table_file, &memory, len);
+        read_parallel(&table_file, &memory, len).map_err(file::io_error(path))?;
         #[cfg(not(unix))]
         {
             // SAFETY: `len` bytes of our own memory.
             let buf = unsafe { std::slice::from_raw_parts_mut(memory.ptr(), len) };
             std::io::Read::read_exact(&mut &table_file, buf).map_err(file::io_error(path))?;
         }
-        Ok(H48Table { memory, meta })
+        Ok((H48Table { memory, meta }, report))
     }
 
     /// A table from the bytes of a table file already in `memory` (the data,
@@ -971,42 +1017,66 @@ impl H48Table {
 /// Read the first `len` bytes of `table_file` into `memory`, in parallel (16
 /// threads: a disk or page cache copy of up to tens of GiB), each 64 MiB
 /// piece dropped from the page cache once copied (the copy is what is used).
+///
+/// # Errors
+/// A read error of any thread (or a thread's panic).
 #[cfg(unix)]
-fn read_parallel(table_file: &std::fs::File, memory: &Memory, len: usize) {
+fn read_parallel(table_file: &std::fs::File, memory: &Memory, len: usize) -> std::io::Result<()> {
     let threads = 16usize;
     // (Whole 2 MiB pages per thread.)
     let per_thread = len.div_ceil(threads).next_multiple_of(1 << 21);
     std::thread::scope(|s| {
-        for t in 0..threads {
-            s.spawn(move || {
-                use std::os::unix::fs::FileExt;
-                let start = t * per_thread;
-                let end = ((t + 1) * per_thread).min(len);
-                if start >= end {
-                    return;
-                }
-                // SAFETY: `start..end` is within the mapping, and each thread
-                // writes its own range.
-                let buf =
-                    unsafe { std::slice::from_raw_parts_mut(memory.ptr().add(start), end - start) };
-                for (i, piece) in buf.chunks_mut(64 << 20).enumerate() {
-                    let offset = (start + (i << 26)) as u64;
-                    table_file.read_exact_at(piece, offset).expect("read table");
-                    #[cfg(target_os = "linux")]
-                    // SAFETY: advice on an open file.
-                    unsafe {
-                        use std::os::unix::io::AsRawFd;
-                        libc::posix_fadvise(
-                            table_file.as_raw_fd(),
-                            libc::off_t::try_from(offset).expect("file offset"),
-                            libc::off_t::try_from(piece.len()).expect("piece size"),
-                            libc::POSIX_FADV_DONTNEED,
-                        );
-                    }
-                }
-            });
+        let readers: Vec<_> = (0..threads)
+            .map(|t| {
+                s.spawn(move || -> std::io::Result<()> {
+                    read_range(
+                        table_file,
+                        memory,
+                        t * per_thread,
+                        ((t + 1) * per_thread).min(len),
+                    )
+                })
+            })
+            .collect();
+        readers.into_iter().try_for_each(|reader| {
+            reader
+                .join()
+                .unwrap_or_else(|_| Err(std::io::Error::other("a reader thread panicked")))
+        })
+    })
+}
+
+/// `read_parallel`'s work for one thread: bytes `start..end`.
+#[cfg(unix)]
+fn read_range(
+    table_file: &std::fs::File,
+    memory: &Memory,
+    start: usize,
+    end: usize,
+) -> std::io::Result<()> {
+    use std::os::unix::fs::FileExt;
+    if start >= end {
+        return Ok(());
+    }
+    // SAFETY: `start..end` is within the mapping, and each thread writes its
+    // own range.
+    let buf = unsafe { std::slice::from_raw_parts_mut(memory.ptr().add(start), end - start) };
+    for (i, piece) in buf.chunks_mut(64 << 20).enumerate() {
+        let offset = (start + (i << 26)) as u64;
+        table_file.read_exact_at(piece, offset)?;
+        #[cfg(target_os = "linux")]
+        // SAFETY: advice on an open file.
+        unsafe {
+            use std::os::unix::io::AsRawFd;
+            libc::posix_fadvise(
+                table_file.as_raw_fd(),
+                libc::off_t::try_from(offset).map_err(std::io::Error::other)?,
+                libc::off_t::try_from(piece.len()).map_err(std::io::Error::other)?,
+                libc::POSIX_FADV_DONTNEED,
+            );
         }
-    });
+    }
+    Ok(())
 }
 
 /// A fresh path for a test's scratch file: in the temporary folder, named by

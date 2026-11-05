@@ -1,14 +1,15 @@
 //! What the binaries (`solve`, `bench`, `gen`, `cubeopt`) share, with the
 //! `cli` feature: logging (`-v`, `RUST_LOG`), how a table is loaded
-//! (`--load`, `--prefault`) and what it got (page sizes), shell completions
-//! and exit statuses. All of it runs before or after a search, never during
-//! one. (JSON is printed by the binaries: `serde_json`'s `PartialEq` impls
-//! would break type inference in the library's tests.)
+//! (`--load`, `--prefault`, `--shm`) and what it got (page sizes), shell
+//! completions and exit statuses. All of it runs before or after a search,
+//! never during one. (JSON is printed by the binaries: `serde_json`'s
+//! `PartialEq` impls would break type inference in the library's tests.)
 
 pub mod preflight;
 
-use crate::tables::file::{LoadMode, LoadOptions};
-use crate::tables::{h48_bytes, H48Table, TableError};
+use crate::tables::file::{LoadMode, LoadOptions, ShmPages};
+use crate::tables::shm::{self, Segment};
+use crate::tables::{h48_bytes, H48Table, LoadReport, TableError};
 use std::io::Write as _;
 use std::process::ExitCode;
 use std::time::Instant;
@@ -60,19 +61,25 @@ pub fn positive() -> clap::builder::RangedU64ValueParser<usize> {
 #[derive(clap::Args, Clone, Copy, Debug)]
 pub struct LoadArgs {
     /// How to load the table: `map` the file, `copy` it into memory (with
-    /// transparent huge pages), or `auto`: map on hugetlbfs, /dev/shm and
-    /// other systems than Linux, else copy.
+    /// transparent huge pages), `shm`: attach its shared memory segment,
+    /// made from the file first if there is none (Linux; the segment stays
+    /// until reboot or `solve --shm-remove`, see README.md "Shared memory"),
+    /// or `auto`: the table's segment if one is there, else map on
+    /// hugetlbfs, /dev/shm and other systems than Linux, else copy.
     #[arg(
         long,
-        value_name = "auto|map|copy",
+        value_name = "auto|map|copy|shm",
         env = "CUBEOPT_LOAD",
         default_value = "auto",
         value_parser = parse_load_mode,
         display_order = 90
     )]
     pub load: LoadMode,
-    /// With `map`: read the whole table at start (1), or each page on first
-    /// use (0).
+    /// The same as `--load shm` (and overrides it).
+    #[arg(long, display_order = 91)]
+    pub shm: bool,
+    /// With `map` and `shm`: read (map) the whole table at start (1), or each
+    /// page on first use (0).
     #[arg(
         long,
         value_name = "0|1",
@@ -80,9 +87,30 @@ pub struct LoadArgs {
         default_value = "1",
         value_parser = parse_prefault,
         action = clap::ArgAction::Set,
-        display_order = 91
+        display_order = 92
     )]
     pub prefault: bool,
+    /// With `shm`: the page sizes a new segment may get, tried largest first
+    /// (1g and 2m pages come from the kernel's hugetlb pool).
+    #[arg(
+        long,
+        value_name = "LIST",
+        env = "CUBEOPT_SHM_PAGES",
+        default_value = "1g,2m,4k",
+        value_parser = parse_shm_pages,
+        display_order = 93
+    )]
+    pub shm_pages: ShmPages,
+    /// The shared memory segment's key [default: 0x636f (ASCII "co"), then
+    /// the table's k and base, a byte each: 0x636f0709 for h7 base 9].
+    #[arg(
+        long,
+        value_name = "KEY",
+        env = "CUBEOPT_SHM_KEY",
+        value_parser = parse_shm_key,
+        display_order = 94
+    )]
+    pub shm_key: Option<u32>,
 }
 
 /// `--load` (an empty `CUBEOPT_LOAD` is `auto`, as before clap).
@@ -91,8 +119,19 @@ fn parse_load_mode(text: &str) -> Result<LoadMode, String> {
         "auto" | "" => Ok(LoadMode::Auto),
         "map" => Ok(LoadMode::Map),
         "copy" => Ok(LoadMode::Copy),
-        _ => Err("expected auto, map or copy".to_string()),
+        "shm" => Ok(LoadMode::Shm),
+        _ => Err("expected auto, map, copy or shm".to_string()),
     }
+}
+
+/// `--shm-pages`.
+fn parse_shm_pages(text: &str) -> Result<ShmPages, String> {
+    ShmPages::parse(text).ok_or_else(|| "expected a list of 1g, 2m and 4k, e.g. 2m,4k".to_string())
+}
+
+/// `--shm-key`.
+fn parse_shm_key(text: &str) -> Result<u32, String> {
+    shm::parse_key(text).ok_or_else(|| "expected a key other than 0, e.g. 0x636f0709".to_string())
 }
 
 /// `--prefault` (an empty `CUBEOPT_PREFAULT` is 1, as before clap).
@@ -109,8 +148,10 @@ impl LoadArgs {
     #[must_use]
     pub fn options(self) -> LoadOptions {
         LoadOptions {
-            mode: self.load,
+            mode: if self.shm { LoadMode::Shm } else { self.load },
             prefault: self.prefault,
+            shm_pages: self.shm_pages,
+            shm_key: self.shm_key,
         }
     }
 
@@ -121,6 +162,14 @@ impl LoadArgs {
     /// As `H48Table::open_with`, as a `BadInput` (exit status 2, as `solve`
     /// gave before).
     pub fn open(self, path: &str) -> anyhow::Result<H48Table> {
+        self.open_reported(path).map(|(table, _)| table)
+    }
+
+    /// `open`, and how the table was loaded.
+    ///
+    /// # Errors
+    /// As `open`.
+    pub fn open_reported(self, path: &str) -> anyhow::Result<(H48Table, LoadReport)> {
         self.preflight(path)?;
         self.open_logged(path).map_err(|error| {
             // (Most messages name the file already.)
@@ -133,52 +182,205 @@ impl LoadArgs {
         })
     }
 
-    /// Before a copy into memory (`--load copy`, or `auto` off hugetlbfs and
-    /// /dev/shm on Linux): that the memory is there (`preflight`).
+    /// Before the table is loaded: that the memory for it is there
+    /// (`preflight`), for a copy (`--load copy`, or `auto` off hugetlbfs and
+    /// /dev/shm on Linux) and for a new shared memory segment that only 4
+    /// KiB pages are left for. Nothing is needed when `auto` or `--shm`
+    /// attaches the table's segment, or for a segment on huge pages (pool
+    /// pages, which `tables::shm` checks itself).
     fn preflight(self, path: &str) -> anyhow::Result<()> {
-        if self.options().mode_for(path) != LoadMode::Copy {
+        let options = self.options();
+        let mode = options.mode_for(path);
+        if !matches!(mode, LoadMode::Copy | LoadMode::Shm) {
             return Ok(());
         }
         // (A table that does not open fails in `open_logged`.)
         let Ok(meta) = crate::tables::read_meta(path) else {
             return Ok(());
         };
-        preflight::memory(
-            &format!("copying table {path} (h{}) into memory", meta.k),
-            h48_bytes(meta.k),
-            "use a copy on hugetlbfs (mapped, not copied: --load map) or a smaller table",
-        )
+        if matches!(options.mode, LoadMode::Auto | LoadMode::Shm) && shm::loaded(path, &options) {
+            return Ok(());
+        }
+        if mode == LoadMode::Copy {
+            return preflight::memory(
+                &format!("copying table {path} (h{}) into memory", meta.k),
+                h48_bytes(meta.k),
+                "use a copy on hugetlbfs (mapped, not copied: --load map) or a smaller table",
+            );
+        }
+        if shm::new_segment_page(path, &options) == Some(shm::NORMAL_PAGE) {
+            preflight::memory(
+                &format!(
+                    "a shared memory segment of table {path} (h{}) on 4 KiB pages",
+                    meta.k
+                ),
+                shm::segment_bytes(h48_bytes(meta.k), shm::NORMAL_PAGE),
+                "allow huge pages (README.md \"Shared memory\") or use a smaller table",
+            )?;
+        }
+        Ok(())
     }
 
-    /// `open`, with the table's own error.
-    fn open_logged(self, path: &str) -> Result<H48Table, TableError> {
+    /// `open_reported`, with the table's own error.
+    fn open_logged(self, path: &str) -> Result<(H48Table, LoadReport), TableError> {
         let options = self.options();
         let mode = options.mode_for(path);
         log::info!(
-            "table {path}: {mode:?}{}",
-            if mode == LoadMode::Map && !options.prefault {
+            "table {path}: {mode:?}{}{}",
+            if options.mode == LoadMode::Auto && cfg!(target_os = "linux") {
+                " (or the table's shared memory segment, if there)"
+            } else {
+                ""
+            },
+            if matches!(mode, LoadMode::Map | LoadMode::Shm) && !options.prefault {
                 ", pages read on first use"
             } else {
                 ""
             }
         );
         let start = Instant::now();
-        let table = H48Table::open_with(path, &options)?;
+        let mut waiting = false;
+        let (table, report) = loop {
+            match H48Table::open_reporting(path, &options) {
+                // (Another process is filling the segment: wait for it.)
+                Err(TableError::ShmLoading { key, pid }) => {
+                    if !waiting {
+                        log::warn!(
+                            "table {path}: shared memory segment {key:#010x} is being loaded by \
+                             process {pid}: waiting for it"
+                        );
+                        waiting = true;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+                result => break result?,
+            }
+        };
+        for note in &report.notes {
+            log::info!("table {path}: {note}");
+        }
         let len = usize::try_from(h48_bytes(table.meta.k)).unwrap_or(usize::MAX);
         log::info!(
-            "table {path}: h{} base {}, {:.2} GiB, loaded in {:.2}s",
+            "table {path}: h{} base {}, {:.2} GiB, {:?}, loaded in {:.2}s",
             table.meta.k,
             table.meta.base,
             gib(len),
+            report.mode,
             start.elapsed().as_secs_f64()
         );
+        if let Some(segment) = &report.segment {
+            log_segment(path, segment, &report.notes, options.shm_pages);
+        }
         if log::log_enabled!(log::Level::Info) {
             log::info!(
                 "table {path}: {}",
                 page_report(table.memory.ptr().addr(), len)
             );
         }
-        Ok(table)
+        Ok((table, report))
+    }
+
+    /// `solve --shm-load`: make the table's shared memory segment from the
+    /// file (or check the one there) and print it, without solving.
+    ///
+    /// # Errors
+    /// As `open` with `--load shm`.
+    pub fn shm_load(self, path: &str) -> anyhow::Result<ExitCode> {
+        let args = LoadArgs { shm: true, ..self };
+        let start = Instant::now();
+        let (table, report) = args.open_reported(path)?;
+        let seconds = start.elapsed().as_secs_f64();
+        let segment = report
+            .segment
+            .ok_or_else(|| anyhow::anyhow!("no segment"))?;
+        let how = if segment.created {
+            format!("made from {path} in {seconds:.2}s")
+        } else {
+            format!(
+                "already loaded (from {} by process {})",
+                segment.source, segment.creator
+            )
+        };
+        println!(
+            "segment {:#010x} shmid {}: h{} base {}, {:.2} GiB on {} pages, {how}",
+            segment.key,
+            segment.id,
+            table.meta.k,
+            table.meta.base,
+            gib(usize::try_from(segment.bytes).unwrap_or(usize::MAX)),
+            shm::page_name(segment.page_bytes),
+        );
+        Ok(ExitCode::SUCCESS)
+    }
+
+    /// `solve --shm-remove`: remove the table's shared memory segment (as
+    /// `ipcrm -M KEY`; the key from the table's k and base, or `--shm-key`).
+    ///
+    /// # Errors
+    /// If the table's k and base cannot be read, or the segment cannot be
+    /// removed (another user's).
+    pub fn shm_remove(self, path: &str) -> anyhow::Result<ExitCode> {
+        let key = if let Some(key) = self.shm_key {
+            key
+        } else {
+            let meta = crate::tables::read_meta(path).map_err(|error| {
+                anyhow::Error::new(error).context(BadInput(format!("cannot read table {path}")))
+            })?;
+            shm::key(meta.k, meta.base)
+        };
+        match shm::remove(key)? {
+            Some(removed) => {
+                let still = match removed.attached {
+                    0 => String::new(),
+                    n => format!(" (attached by {n} processes: freed when they detach)"),
+                };
+                println!(
+                    "removed segment {key:#010x} shmid {}: {}, {:.2} GiB{still}",
+                    removed.id,
+                    removed.held,
+                    gib(usize::try_from(removed.bytes).unwrap_or(usize::MAX))
+                );
+            }
+            None => println!("no segment {key:#010x} for {path}"),
+        }
+        Ok(ExitCode::SUCCESS)
+    }
+}
+
+/// Log the table's shared memory segment: its page size, and whether it was
+/// made or found; warn if it is on 4 KiB pages although huge pages were
+/// allowed (much slower).
+fn log_segment(path: &str, segment: &Segment, notes: &[String], allowed: ShmPages) {
+    let key = segment.key;
+    let how = if segment.created {
+        "made from the file".to_string()
+    } else {
+        format!(
+            "attached (made by process {} from {})",
+            segment.creator, segment.source
+        )
+    };
+    log::info!(
+        "table {path}: shared memory segment {key:#010x} (shmid {}), {:.2} GiB on {} pages: {how}",
+        segment.id,
+        gib(usize::try_from(segment.bytes).unwrap_or(usize::MAX)),
+        shm::page_name(segment.page_bytes)
+    );
+    if segment.page_bytes == shm::NORMAL_PAGE && allowed.sizes().any(|page| page > shm::NORMAL_PAGE)
+    {
+        let fix = if segment.created {
+            notes.join("; ")
+        } else {
+            format!(
+                "to move it to huge pages, remove it (`solve --shm-remove {path}`) and load it \
+                 again once they can be had"
+            )
+        };
+        log::warn!(
+            "table {path}: shared memory segment {key:#010x} is on 4 KiB pages, much slower \
+             than huge pages (h7: 27% fewer solves/s at 1 thread, 32% at 48, than on 1 GiB \
+             pages; README.md \"Shared memory\"); {fix}"
+        );
     }
 }
 

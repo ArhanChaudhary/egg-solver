@@ -28,6 +28,10 @@
 //! `solve --fast [SCRAMBLE]...` solves one scramble as fast as this machine
 //! can (what fast.sh did): the largest table found, all threads on the one
 //! cube (`-c 1`), a warm-up cube first; see `run_fast`.
+//!
+//! `solve --shm-load TABLE` loads a table into a shared memory segment that
+//! later runs attach at once (`--shm`; README.md "Shared memory"), `solve
+//! --shm-remove TABLE` removes it.
 use anyhow::Context as _;
 use clap::Parser;
 use cubeopt::cli::{self, BadInput, LoadArgs, Verbosity};
@@ -87,7 +91,13 @@ fn solve_all_pinned(
 struct Args {
     /// The table file (made by `gen`, e.g. `gen 8 auto h8`) [with --fast:
     /// the largest found].
-    #[arg(required_unless_present_any = ["completions", "fast", "table_flag"])]
+    #[arg(required_unless_present_any = [
+        "completions",
+        "fast",
+        "table_flag",
+        "shm_load",
+        "shm_remove",
+    ])]
     table: Option<String>,
     /// The table file (as TABLE).
     #[arg(
@@ -140,6 +150,25 @@ struct Args {
     warmup: Option<String>,
     #[command(flatten)]
     load: LoadArgs,
+    /// Load TABLE into its shared memory segment (as `--shm` does, if it is
+    /// not there yet), print the segment and exit: later runs on TABLE
+    /// attach it at once.
+    #[arg(
+        long,
+        value_name = "TABLE",
+        conflicts_with_all = ["fast", "shm_remove"],
+        display_order = 95
+    )]
+    shm_load: Option<String>,
+    /// Remove TABLE's shared memory segment (as `ipcrm -M KEY`) and exit: its
+    /// memory is freed once no process has it attached.
+    #[arg(
+        long,
+        value_name = "TABLE",
+        conflicts_with = "fast",
+        display_order = 96
+    )]
+    shm_remove: Option<String>,
     #[command(flatten)]
     verbosity: Verbosity,
     /// Print a shell completion script.
@@ -207,7 +236,11 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
     args.verbosity.init_logging();
-    let result = if args.fast {
+    let result = if let Some(path) = &args.shm_load {
+        args.load.shm_load(path)
+    } else if let Some(path) = &args.shm_remove {
+        args.load.shm_remove(path)
+    } else if args.fast {
         run_fast(&args)
     } else {
         run(&args)

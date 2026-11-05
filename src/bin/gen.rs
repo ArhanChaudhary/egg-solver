@@ -174,6 +174,7 @@ fn open_source(path: &str) -> anyhow::Result<H48Table> {
     let options = LoadOptions {
         mode: LoadMode::Map,
         prefault: file::is_hugetlbfs(path),
+        ..LoadOptions::default()
     };
     log::info!("{path}: mapped (prefault: {})", options.prefault);
     H48Table::open_with(path, &options).with_context(|| format!("cannot open {path}"))
