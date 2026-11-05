@@ -3007,6 +3007,8 @@ impl Worker<'_, '_> {
     /// Leave the cube in `slot` (nothing pending).
     fn release(&mut self, slot: usize) {
         let loc = self.locals[slot].take().unwrap();
+        // (`counted_down`: every path that ends the last pending job of a
+        // cube settles it, also at the exit of `run`.)
         debug_assert!(loc.pending == 0 && loc.claimed == 0);
         let ctx = loc.ctx;
         ctx.rarely_written.nodes.fetch_add(loc.nodes, Relaxed);
@@ -3449,6 +3451,7 @@ impl Worker<'_, '_> {
         if self.pool.hungry.load(Relaxed) != 0 {
             self.donate(round);
         }
+        debug_assert!(self.counted_down());
     }
 
     /// Give idle lanes work.
@@ -3488,6 +3491,21 @@ impl Worker<'_, '_> {
             self.deactivate(i);
             dropped = true;
         }
+        if !dropped {
+            return;
+        }
+        // Count down the jobs of the cubes left with nothing pending (as each
+        // dropped lane's `restart` did before they were refilled together):
+        // else a first pass's dropped entries stayed outstanding until the
+        // cube was reported, and a thread leaving the pool before then
+        // released its cube with jobs not counted down. (Slots are never
+        // removed: `slot` stays below `locals.len()`.)
+        for slot in 0..self.locals.len() {
+            // SAFETY: see above.
+            if unsafe { self.locals.get_unchecked(slot) }.is_some() {
+                self.settle(slot);
+            }
+        }
         // Refilled together, up to the first lane without work: when each
         // dropped lane looked for work on its own, all threads took the open
         // list's lock once per lane at once, after each solved cube, and the
@@ -3495,16 +3513,25 @@ impl Worker<'_, '_> {
         // often ran all 18 tasks of its extension): -5.1% -c 1 at 48T (6 paired
         // holds; 15/16-move scrambles -10/-9%, depth-15 states -12%; -c 0 and
         // bench share neutral).
-        if dropped {
-            self.release_done();
-            self.fill_idle(round);
-        }
+        self.release_done();
+        self.fill_idle(round);
+    }
+
+    /// (Checked in debug builds) This thread's jobs of every cube where
+    /// none is pending were counted down from its outstanding ones (by
+    /// `settle`): a count left behind would hold up the iteration.
+    fn counted_down(&self) -> bool {
+        self.locals
+            .iter()
+            .flatten()
+            .all(|loc| loc.pending != 0 || loc.claimed == 0)
     }
 
     /// No lane is active: find work or wait for some. Returns false when
     /// the pool is finished (or `stop` is set).
     #[inline(never)]
     fn idle_wait(&mut self, stop: &AtomicBool) -> bool {
+        debug_assert!(self.counted_down());
         let pool = self.pool;
         let entered = (pool.trace_bits & TRACE_IDLE != 0).then(Instant::now);
         let result = self.idle_wait_loop(stop);
@@ -3965,6 +3992,69 @@ mod tests {
                 return false;
             }
         }
+    }
+
+    /// Entries of a first pass dropped as useless (a solution as short was
+    /// found) are counted down at once, also when they were the last
+    /// pending jobs of the thread's share of a cube not solved yet. (They
+    /// were left outstanding until the cube was reported, and a thread
+    /// leaving the pool before released them so: the debug check in
+    /// `Worker::release` failed.) Two workers driven by hand, in one thread.
+    #[test]
+    fn first_pass_dropped_entries_are_counted_down() {
+        let corners = Cocsep::truncated(4);
+        let table = H48Table::zeroed(0, 2);
+        let solver = Solver::new(&corners, &table);
+        let cube = first_pass_cube(&solver);
+        let get = |i: usize| (i == 0).then_some(cube);
+        // (Two threads, one cube: not few, so builds are serial.)
+        let pool = Pool::new(&get, 1, 2);
+        let reported = Mutex::new(Vec::new());
+        let mut report = |i, solution, _, _| reported.lock().unwrap().push((i, solution));
+        let mut report_too = |i, solution, _, _| reported.lock().unwrap().push((i, solution));
+        let mut first = hand_worker(&pool, &solver, 0, 2, &mut report);
+        let mut second = hand_worker(&pool, &solver, 1, 2, &mut report_too);
+        // The first worker runs an entry of phase 0, ...
+        assert!(first.fresh(0));
+        first.active_lanes = 1;
+        let first_slot = first.lanes[0].slot;
+        let ctx = first.locals[first_slot].as_ref().unwrap().ctx.clone();
+        assert!(ctx.inner().phases >= 3 && first.lanes[0].phase == 0);
+        // ... the second one an entry of a later phase, after all the others.
+        let second_slot = second.local(&ctx).unwrap();
+        assert!(run_up_to_phase(&mut second, 0, second_slot, 1));
+        second.active_lanes = 1;
+        while take_next(&mut second, 1, second_slot) {
+            second.end_job(1, false);
+        }
+        assert_eq!(ctx.unclaimed(), 0);
+        // A solution of that phase was found: the second worker drops its
+        // entry, its last pending job of the cube.
+        let phase = second.lanes[0].phase;
+        {
+            let mut pass = ctx.pass.lock().unwrap();
+            pass.candidate = vec![0];
+            pass.shortest = u32::from(phase) + 1;
+        }
+        let pass_limit = second.lanes[0].lane.target;
+        ctx.rarely_written.pass_limit.store(pass_limit, Relaxed);
+        pool.solved.fetch_add(1, Release);
+        second.maintain(1);
+        assert_eq!(second.active_lanes, 0);
+        assert!(!ctx.done.load(Relaxed));
+        assert!(second.counted_down(), "dropped entries left outstanding");
+        // Phase 0 ends: the solution is reported, nothing is outstanding.
+        first.end_job(0, false);
+        while take_next(&mut first, 0, first_slot) {
+            first.end_job(0, false);
+        }
+        first.tidy(first_slot);
+        assert!(ctx.done.load(Relaxed));
+        assert_eq!(ctx.outstanding.load(Relaxed), 0);
+        second.release_done();
+        let joined = first.locals.iter().chain(&second.locals);
+        assert!(joined.flatten().next().is_none());
+        assert_eq!(*reported.lock().unwrap(), [(0, vec![0])]);
     }
 
     /// While a first pass's candidate is being reported (taken when the
