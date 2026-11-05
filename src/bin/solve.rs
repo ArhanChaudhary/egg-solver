@@ -24,14 +24,20 @@
 //! its latency). Every solution is verified; a wrong one is reported as
 //! `BAD <index>` and makes the exit status 1. With `--json`, the same as
 //! JSON lines (`Line`).
+//!
+//! `solve --fast [SCRAMBLE]...` solves one scramble as fast as this machine
+//! can (what fast.sh did): the largest table found, all threads on the one
+//! cube (`-c 1`), a warm-up cube first; see `run_fast`.
 use anyhow::Context as _;
 use clap::Parser;
 use cubeopt::cli::{self, BadInput, LoadArgs, Verbosity};
-use cubeopt::cubie::{format_moves, parse_moves, CubieCube};
+use cubeopt::cubie::{format_moves, parse_moves, CubieCube, Rng};
 use cubeopt::lanes::share::Pool;
 use cubeopt::solver::{Solver, Stats};
 use cubeopt::tables::Cocsep;
+use std::hash::{Hash as _, Hasher as _};
 use std::io::{BufRead, Write};
+use std::path::Path;
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Mutex;
@@ -79,9 +85,18 @@ fn solve_all_pinned(
 #[derive(Parser, Debug)]
 #[command(name = "solve", version, after_long_help = OUTPUT_HELP)]
 struct Args {
-    /// The table file (made by `gen`, e.g. `gen 8 auto h8`).
-    #[arg(env = "CUBEOPT_TABLE", required_unless_present = "completions")]
+    /// The table file (made by `gen`, e.g. `gen 8 auto h8`) [with --fast:
+    /// the largest found].
+    #[arg(required_unless_present_any = ["completions", "fast", "table_flag"])]
     table: Option<String>,
+    /// The table file (as TABLE).
+    #[arg(
+        long = "table",
+        id = "table_flag",
+        value_name = "TABLE",
+        env = "CUBEOPT_TABLE"
+    )]
+    table_flag: Option<String>,
     /// Threads.
     #[arg(
         short,
@@ -103,9 +118,26 @@ struct Args {
     /// Solve only the first COUNT scrambles.
     #[arg(short = 'n', long)]
     count: Option<usize>,
-    /// Print JSON lines: one object per cube, then the total.
+    /// Print JSON lines: one object per cube, then the total (with --fast:
+    /// one object).
     #[arg(long)]
     json: bool,
+    /// Solve one scramble (the arguments, or a random 25-move one) as fast
+    /// as this machine can and show the time: the largest table found (hK,
+    /// K from 11 down, in /mnt/huge, /data2/tables, /data/tables, ./tables),
+    /// all threads on the one cube (-c 1), after a warm-up cube; the time
+    /// is the cube's own (table load excluded). Don't run it beside other
+    /// heavy jobs: they share the cores and the time.
+    #[arg(long, conflicts_with_all = ["concurrency", "count"])]
+    fast: bool,
+    /// With --fast: the scramble (moves as arguments, or one quoted
+    /// string) [default: a random 25-move scramble].
+    #[arg(value_name = "SCRAMBLE", requires = "fast")]
+    scramble: Vec<String>,
+    /// With --fast: the cube solved first, to warm up threads, caches and
+    /// TLBs ("" for none) [default: a fixed 25-move scramble].
+    #[arg(long, value_name = "SCRAMBLE", requires = "fast")]
+    warmup: Option<String>,
     #[command(flatten)]
     load: LoadArgs,
     #[command(flatten)]
@@ -123,7 +155,17 @@ Output, one line per cube in completion order, then a summary:
 latency). Every solution is verified: a wrong one is reported as BAD <index>
 and makes the exit status 1. With --json, the same as JSON lines:
   {\"type\":\"solved\",\"index\":..,\"moves\":..,\"length\":..,\"nodes\":..,\"lookups\":..,\"seconds\":..,\"ok\":true}
-  {\"type\":\"total\",\"cubes\":..,\"wall\":..,\"wall_per_cube\":..,\"nodes_per_cube\":..,\"threads\":..,\"lanes\":..,\"concurrency\":..}";
+  {\"type\":\"total\",\"cubes\":..,\"wall\":..,\"wall_per_cube\":..,\"nodes_per_cube\":..,\"threads\":..,\"lanes\":..,\"concurrency\":..}
+
+With --fast:
+  table    <path>
+  threads  <t> (all on this one cube)
+  scramble <moves>
+  solution <moves>
+  length   <n> moves (optimal, verified)
+  time     <ms> ms   (<n> M nodes, <rate> M nodes/s)
+(with --json one object: table, threads, lanes, scramble, solution, length,
+nodes, lookups, seconds, ms, nodes_per_second).";
 
 /// A line of `--json` output.
 #[derive(serde::Serialize)]
@@ -165,7 +207,12 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
     args.verbosity.init_logging();
-    cli::exit_status("solve", run(&args))
+    let result = if args.fast {
+        run_fast(&args)
+    } else {
+        run(&args)
+    };
+    cli::exit_status("solve", result)
 }
 
 /// The cubes of the scrambles on stdin, one per line (blank lines
@@ -189,7 +236,9 @@ fn read_scrambles(count: usize) -> anyhow::Result<Vec<CubieCube>> {
 
 #[expect(clippy::cast_precision_loss, reason = "statistics")]
 fn run(args: &Args) -> anyhow::Result<ExitCode> {
-    let path = args.table.as_deref().context("no table")?;
+    let path = (args.table.as_deref())
+        .or(args.table_flag.as_deref())
+        .context("no table")?;
     let cubes = read_scrambles(args.count.unwrap_or(usize::MAX))?;
     let corners = Cocsep::generate();
     let table = args.load.open(path)?;
@@ -274,4 +323,188 @@ fn run(args: &Args) -> anyhow::Result<ExitCode> {
     } else {
         ExitCode::SUCCESS
     })
+}
+
+/// `--fast`'s warm-up cube (fast.sh's).
+const WARMUP: &str = "R U2 F' L D2 B R' U F2 D' L2 B' U R2 F D L' B2 U' R F' D2 L B U2";
+
+/// Where `--fast` looks for tables (for each K, from 11 down).
+const TABLE_DIRS: [&str; 4] = ["/mnt/huge", "/data2/tables", "/data/tables", "tables"];
+
+/// The largest table: hK of the largest K in `TABLE_DIRS`.
+fn largest_table() -> Option<String> {
+    (0..=11).rev().find_map(|k| {
+        TABLE_DIRS
+            .iter()
+            .map(|dir| format!("{dir}/h{k}"))
+            .find(|path| Path::new(path).is_file())
+    })
+}
+
+/// A random scramble of `length` moves: no face twice in a row, and no X Y X
+/// with Y opposite X (e.g. U D U, which is U2 D).
+fn random_scramble(rng: &mut Rng, length: usize) -> String {
+    // (Opposite faces have the same index mod 3: U D, R L, F B.)
+    const FACES: [char; 6] = ['U', 'R', 'F', 'D', 'L', 'B'];
+    const SUFFIXES: [&str; 3] = ["", "2", "'"];
+    let below = |rng: &mut Rng, n: u64| usize::try_from(rng.below(n)).expect("below 6");
+    let (mut previous, mut before) = (None, None);
+    let mut moves = Vec::with_capacity(length);
+    for _ in 0..length {
+        let face = loop {
+            let face = below(rng, 6);
+            let opposite_return =
+                previous.is_some_and(|p: usize| p % 3 == face % 3) && before == Some(face);
+            if previous != Some(face) && !opposite_return {
+                break face;
+            }
+        };
+        moves.push(format!("{}{}", FACES[face], SUFFIXES[below(rng, 3)]));
+        (before, previous) = (previous, Some(face));
+    }
+    moves.join(" ")
+}
+
+/// A seed from the clock and the process id. (The monotonic clock: reading
+/// `SystemTime` would change the code of the worker threads' `Instant::now`
+/// calls, which then pass the clock id instead of having it folded in.)
+fn time_seed() -> u64 {
+    let mut hasher = std::hash::DefaultHasher::new();
+    std::time::Instant::now().hash(&mut hasher);
+    std::process::id().hash(&mut hasher);
+    hasher.finish()
+}
+
+/// `--fast`'s JSON object.
+#[derive(serde::Serialize)]
+struct FastReport<'a> {
+    table: &'a str,
+    threads: usize,
+    lanes: usize,
+    scramble: &'a str,
+    solution: String,
+    length: usize,
+    nodes: u64,
+    lookups: u64,
+    seconds: f64,
+    ms: f64,
+    nodes_per_second: f64,
+}
+
+/// `solve --fast`: one scramble as fast as this machine can (fast.sh, as a
+/// flag): the largest table, all threads on the one cube (`-c 1`), a
+/// warm-up cube first in the same process (threads, page tables and TLBs
+/// are hot when the scramble starts). Prints fast.sh's lines; the time is
+/// the scramble's own solve time.
+#[expect(clippy::cast_precision_loss, reason = "statistics")]
+fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
+    // (A first argument that is a move, not a file, starts the scramble.)
+    let mut words = args.scramble.clone();
+    let mut table_arg = args.table.clone();
+    if let Some(first) =
+        table_arg.take_if(|first| !Path::new(first).is_file() && parse_moves(first).is_some())
+    {
+        words.insert(0, first);
+    }
+    let path = (table_arg.or_else(|| args.table_flag.clone()))
+        .or_else(largest_table)
+        .context("no table found; generate one, e.g.: target/release/gen 8 auto tables/h8")?;
+    let scramble = if words.is_empty() {
+        random_scramble(&mut Rng(time_seed()), 25)
+    } else {
+        words.join(" ")
+    };
+    let parse = |text: &str| {
+        parse_moves(text)
+            .map(|moves| CubieCube::SOLVED.apply_moves(&moves))
+            .ok_or_else(|| BadInput(format!("cannot parse {text:?}")))
+    };
+    let mut cubes = Vec::new();
+    let warmup = args.warmup.as_deref().unwrap_or(WARMUP);
+    if !warmup.trim().is_empty() {
+        cubes.push(parse(warmup)?);
+    }
+    cubes.push(parse(&scramble)?);
+    let threads = args.threads;
+    if !args.json {
+        println!("table    {path}");
+        println!("threads  {threads} (all on this one cube)");
+        println!("scramble {scramble}");
+    }
+    let corners = Cocsep::generate();
+    let table = args.load.open(&path)?;
+    let lanes = cli::lanes(args.lanes, &path, table.meta.k, threads);
+    let solver = Solver::new(&corners, &table);
+    let get = |i: usize| cubes.get(i).copied();
+    let last = cubes.len() - 1;
+    let result = Mutex::new(None);
+    let done = |i: usize, solution: Vec<u8>, stats: Stats, seconds: f64| {
+        if i == last {
+            *result.lock().unwrap() = Some((solution, stats, seconds));
+        }
+    };
+    solve_all_pinned(&solver, &get, threads, lanes, 1, &done);
+    let (solution, stats, seconds) = (result.into_inner().unwrap()).context("not solved")?;
+    anyhow::ensure!(
+        cubes[last].apply_moves(&solution) == CubieCube::SOLVED,
+        "BAD: {} does not solve the scramble",
+        format_moves(&solution)
+    );
+    // (The seconds of solve's line, as fast.sh read them.)
+    let seconds: f64 = format!("{seconds:.6}").parse()?;
+    let rate = if seconds > 0.0 {
+        stats.nodes as f64 / seconds
+    } else {
+        0.0
+    };
+    if args.json {
+        print_json(&FastReport {
+            table: &path,
+            threads,
+            lanes,
+            scramble: &scramble,
+            solution: format_moves(&solution),
+            length: solution.len(),
+            nodes: stats.nodes,
+            lookups: stats.lookups,
+            seconds,
+            ms: seconds * 1000.0,
+            nodes_per_second: rate,
+        })?;
+    } else {
+        println!("solution {}", format_moves(&solution));
+        println!("length   {} moves (optimal, verified)", solution.len());
+        println!(
+            "time     {:.3} ms   ({:.1} M nodes, {:.0} M nodes/s)",
+            seconds * 1000.0,
+            stats.nodes as f64 / 1e6,
+            rate / 1e6
+        );
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{random_scramble, Rng};
+    use cubeopt::cubie::parse_moves;
+
+    /// 25 moves, no face twice in a row, no X Y X on opposite faces.
+    #[test]
+    fn random_scrambles() {
+        let mut rng = Rng(7);
+        for _ in 0..1000 {
+            let scramble = random_scramble(&mut rng, 25);
+            let moves = parse_moves(&scramble).unwrap();
+            assert_eq!(moves.len(), 25, "{scramble}");
+            let faces: Vec<u8> = moves.iter().map(|m| m / 3).collect();
+            for w in faces.windows(2) {
+                assert_ne!(w[0], w[1], "{scramble}");
+            }
+            for w in faces.windows(3) {
+                let opposite = w[0] / 2 == w[1] / 2;
+                assert!(!(opposite && w[0] == w[2]), "{scramble}");
+            }
+        }
+    }
 }
