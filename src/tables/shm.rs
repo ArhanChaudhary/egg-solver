@@ -514,7 +514,7 @@ mod linux {
                     };
                     let memory = attachment.into_memory().map_err(call_error(key, "shmat"))?;
                     if options.prefault {
-                        memory.prefault();
+                        memory.prefault().map_err(call_error(key, "prefault"))?;
                     }
                     return Ok(Some((memory, segment)));
                 }
@@ -660,7 +660,8 @@ mod linux {
         super::super::read_parallel(&table_file, &writable, data_len)
             .map_err(file::io_error(path))?;
         // The copy is the file's table, and the file is not damaged.
-        let got = file::checksum(&writable.bytes()[..data_len], crate::thread_count());
+        let data = (writable.bytes()?.get(..data_len)).ok_or(TableError::TooLarge(trailer.k))?;
+        let got = file::checksum(data, crate::thread_count())?;
         let want = trailer.checksum.unwrap_or_default();
         if got != want {
             return Err(TableError::Checksum { got, want });
@@ -690,7 +691,7 @@ mod linux {
         };
         let memory = read_only.into_memory().map_err(call_error(key, "shmat"))?;
         if options.prefault {
-            memory.prefault();
+            memory.prefault().map_err(call_error(key, "prefault"))?;
         }
         Ok(Some((memory, segment)))
     }

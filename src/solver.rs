@@ -677,7 +677,7 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore = "Cocsep::generate is too slow under Miri")]
     fn hot_index_matches_reference_index() {
-        let corners = Cocsep::generate();
+        let corners = Cocsep::generate().unwrap();
         let mut rng = Rng(31);
         let mut cubes = vec![CubieCube::SOLVED];
         for scramble in [
@@ -704,7 +704,7 @@ mod tests {
             // (`index` does not read the table: a page stands in for it, so
             // that this also runs where h11 cannot be allocated, e.g. wasm32.)
             let table = H48Table {
-                memory: Memory::anonymous(4096),
+                memory: Memory::anonymous(4096).unwrap(),
                 meta: H48Meta { k, base: 10 },
             };
             let solver = Solver::new(&corners, &table);

@@ -20,6 +20,9 @@ use std::io::{Read, Seek, SeekFrom, Write};
 
 /// Size of the trailer at the end of a table file.
 pub const TRAILER_BYTES: u64 = 4096;
+/// `TRAILER_BYTES` as a length.
+const TRAILER_LEN: usize = 4096;
+const _: () = assert!(TRAILER_LEN as u64 == TRAILER_BYTES);
 const MAGIC: &str = "cubeopt h48 table v1\n";
 /// The index layout of the tables this code reads and writes.
 pub const LAYOUT: &str = "h48";
@@ -135,6 +138,37 @@ pub enum TableError {
         call: &'static str,
         source: std::io::Error,
     },
+    /// Table memory cannot be allocated (or mapped).
+    #[error("cannot allocate {bytes} bytes of table memory")]
+    Alloc {
+        bytes: usize,
+        source: std::io::Error,
+    },
+    /// Memory larger than a slice can be on this target (2 GiB on 32-bit
+    /// targets).
+    #[error("{0} bytes: larger than a slice can be on this target")]
+    TooLargeForSlice(usize),
+    /// A worker thread panicked (only where panics unwind, as in tests).
+    #[error(transparent)]
+    Worker(#[from] crate::parallel::WorkerPanicked),
+    /// An environment variable set to a value it cannot have.
+    #[error("{var}={value:?}: expected {expected}")]
+    BadEnv {
+        var: &'static str,
+        value: String,
+        expected: &'static str,
+    },
+    /// The cocsep table does not come out as it must (a bug in the cube
+    /// model).
+    #[error("cocsep table: {what} {found}, expected {expected} (a bug in the cube model)")]
+    CocsepModel {
+        what: &'static str,
+        found: usize,
+        expected: usize,
+    },
+    /// Table generation asked for something out of range.
+    #[error("table generation: {0}")]
+    Generate(String),
 }
 
 /// `TableError::Io` of the file at `path`.
@@ -159,15 +193,12 @@ pub struct Trailer {
 }
 
 impl Trailer {
-    /// The trailer as stored: text lines padded with NUL bytes.
-    ///
-    /// # Panics
-    /// Never: the text is far shorter than the trailer.
+    /// The trailer as stored: text lines padded with NUL bytes (the text is
+    /// far shorter than the trailer).
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
         use std::fmt::Write as _;
-        let trailer_len = usize::try_from(TRAILER_BYTES).unwrap();
-        let mut text = String::with_capacity(trailer_len);
+        let mut text = String::with_capacity(TRAILER_LEN);
         text.push_str(MAGIC);
         let _ = writeln!(text, "layout {LAYOUT}");
         let _ = writeln!(text, "k {}", self.k);
@@ -180,8 +211,7 @@ impl Trailer {
             let _ = writeln!(text, "checksum {c:016x}");
         }
         let mut bytes = text.into_bytes();
-        assert!(bytes.len() < trailer_len);
-        bytes.resize(trailer_len, 0);
+        bytes.resize(TRAILER_LEN, 0);
         bytes
     }
 
@@ -293,9 +323,6 @@ pub fn file_bytes(data_bytes: u64, hugetlbfs: bool) -> u64 {
 ///
 /// # Errors
 /// If the file cannot be read, or has a malformed trailer.
-///
-/// # Panics
-/// Never (a constant conversion).
 pub fn read_trailer(path: &str) -> Result<Option<Trailer>, TableError> {
     let read = || -> std::io::Result<Option<Vec<u8>>> {
         let f = std::fs::File::open(path)?;
@@ -303,7 +330,7 @@ pub fn read_trailer(path: &str) -> Result<Option<Trailer>, TableError> {
         if len < TRAILER_BYTES {
             return Ok(None);
         }
-        let mut buf = vec![0u8; usize::try_from(TRAILER_BYTES).unwrap()];
+        let mut buf = vec![0u8; TRAILER_LEN];
         (&f).seek(SeekFrom::Start(len - TRAILER_BYTES))?;
         (&f).read_exact(&mut buf)?;
         Ok(Some(buf))
@@ -321,9 +348,6 @@ pub fn read_trailer(path: &str) -> Result<Option<Trailer>, TableError> {
 /// If the file is too small to hold the data and a trailer after it (the
 /// data region is never written), or on any I/O error, or if the trailer
 /// does not read back as written.
-///
-/// # Panics
-/// If the file is larger than the address space.
 pub fn write_trailer(path: &str, trailer: &Trailer) -> Result<(), TableError> {
     let f = std::fs::OpenOptions::new()
         .read(true)
@@ -345,26 +369,36 @@ pub fn write_trailer(path: &str, trailer: &Trailer) -> Result<(), TableError> {
         // hugetlbfs has no write(): map the last page and copy the trailer in.
         let page = HUGE_PAGE.min(len);
         let page_start = len - page;
+        // (A page is at most 1 GiB, and the offset within it smaller: they
+        // fit in `usize` on any target.)
+        let as_usize = |x: u64| usize::try_from(x).map_err(std::io::Error::other);
+        let as_offset = |x: u64| libc::off_t::try_from(x).map_err(std::io::Error::other);
+        let (page_len, in_page, file_offset) = (|| {
+            Ok::<_, std::io::Error>((
+                as_usize(page)?,
+                as_usize(offset - page_start)?,
+                as_offset(page_start)?,
+            ))
+        })()
+        .map_err(io_error(path))?;
         // SAFETY: a fresh shared mapping of the file's last page; only the
         // trailer bytes (past the data, checked above) are written.
         unsafe {
             use std::os::unix::io::AsRawFd;
             let p = libc::mmap(
                 std::ptr::null_mut(),
-                usize::try_from(page).unwrap(),
+                page_len,
                 libc::PROT_READ | libc::PROT_WRITE,
                 libc::MAP_SHARED,
                 f.as_raw_fd(),
-                libc::off_t::try_from(page_start).unwrap(),
+                file_offset,
             );
             if p == libc::MAP_FAILED {
                 return Err(io_error(path)(std::io::Error::last_os_error()));
             }
-            let dst = p
-                .cast::<u8>()
-                .add(usize::try_from(offset - page_start).unwrap());
+            let dst = p.cast::<u8>().add(in_page);
             std::ptr::copy_nonoverlapping(bytes.as_ptr(), dst, bytes.len());
-            libc::munmap(p, usize::try_from(page).unwrap());
+            libc::munmap(p, page_len);
         }
         return read_back(path, trailer);
     }
@@ -398,16 +432,20 @@ fn mix(h: u64, x: u64) -> u64 {
 
 /// Hash of each `CHECKSUM_CHUNK` bytes of `data` (the last chunk may be
 /// shorter), in parallel.
-#[must_use]
-pub fn chunk_hashes(data: &[u8], threads: usize) -> Vec<u64> {
+///
+/// # Errors
+/// If a worker thread panicked.
+pub fn chunk_hashes(
+    data: &[u8],
+    threads: usize,
+) -> Result<Vec<u64>, crate::parallel::WorkerPanicked> {
     fn chunk_hash(chunk: &[u8]) -> u64 {
         // Four independent lanes (no single dependency chain), then folded.
         let mut lanes = [1u64, 2, 3, 4];
         let (words, rest) = chunk.as_chunks::<32>();
         for w in words {
-            for (i, lane) in lanes.iter_mut().enumerate() {
-                let x = u64::from_le_bytes(w[8 * i..8 * i + 8].try_into().unwrap());
-                *lane = mix(*lane, x);
+            for (lane, x) in lanes.iter_mut().zip(w.as_chunks::<8>().0) {
+                *lane = mix(*lane, u64::from_le_bytes(*x));
             }
         }
         let mut h = lanes.iter().fold(chunk.len() as u64, |h, &l| mix(h, l));
@@ -419,15 +457,14 @@ pub fn chunk_hashes(data: &[u8], threads: usize) -> Vec<u64> {
     let n = data.len().div_ceil(CHECKSUM_CHUNK);
     let threads = threads.clamp(1, n.max(1));
     let per = n.div_ceil(threads);
-    crate::parallel::on_threads(threads, |t| {
-        (t * per..((t + 1) * per).min(n))
-            .map(|i| {
-                let start = i * CHECKSUM_CHUNK;
-                chunk_hash(&data[start..(start + CHECKSUM_CHUNK).min(data.len())])
-            })
+    Ok(crate::parallel::on_threads(threads, |t| {
+        data.chunks(CHECKSUM_CHUNK)
+            .skip(t * per)
+            .take(per)
+            .map(chunk_hash)
             .collect::<Vec<u64>>()
-    })
-    .concat()
+    })?
+    .concat())
 }
 
 /// The checksum of `len` bytes of data from its `chunk_hashes` (so that a
@@ -440,9 +477,14 @@ pub fn combine_hashes(len: u64, hashes: &[u64]) -> u64 {
 /// Checksum of table data: a hash of each 1 MiB chunk (in parallel), then of
 /// the chunk hashes in order. Detects corruption (bit flips, truncation),
 /// not tampering.
-#[must_use]
-pub fn checksum(data: &[u8], threads: usize) -> u64 {
-    combine_hashes(data.len() as u64, &chunk_hashes(data, threads))
+///
+/// # Errors
+/// If a worker thread panicked.
+pub fn checksum(data: &[u8], threads: usize) -> Result<u64, crate::parallel::WorkerPanicked> {
+    Ok(combine_hashes(
+        data.len() as u64,
+        &chunk_hashes(data, threads)?,
+    ))
 }
 
 /// How `H48Table::open` brings a table file into memory.
@@ -496,38 +538,44 @@ impl LoadOptions {
     /// `copy` | `shm`, `CUBEOPT_PREFAULT` = `1` | `0`, `CUBEOPT_SHM_PAGES`
     /// (`ShmPages::parse`) and `CUBEOPT_SHM_KEY` (`shm::parse_key`).
     ///
-    /// # Panics
+    /// # Errors
     /// If a variable is set to another value.
-    #[must_use]
-    pub fn from_env() -> LoadOptions {
+    pub fn from_env() -> Result<LoadOptions, TableError> {
         let mut o = LoadOptions::default();
+        let bad = |var, value: String, expected| TableError::BadEnv {
+            var,
+            value,
+            expected,
+        };
         if let Ok(v) = std::env::var("CUBEOPT_LOAD") {
             o.mode = match v.as_str() {
                 "auto" | "" => LoadMode::Auto,
                 "map" => LoadMode::Map,
                 "copy" => LoadMode::Copy,
                 "shm" => LoadMode::Shm,
-                _ => panic!("CUBEOPT_LOAD={v:?}: expected auto, map, copy or shm"),
+                _ => return Err(bad("CUBEOPT_LOAD", v, "auto, map, copy or shm")),
             };
         }
         if let Ok(v) = std::env::var("CUBEOPT_SHM_PAGES") {
-            o.shm_pages = ShmPages::parse(&v)
-                .unwrap_or_else(|| panic!("CUBEOPT_SHM_PAGES={v:?}: expected e.g. 1g,2m,4k"));
+            o.shm_pages = match ShmPages::parse(&v) {
+                Some(pages) => pages,
+                None => return Err(bad("CUBEOPT_SHM_PAGES", v, "e.g. 1g,2m,4k")),
+            };
         }
         if let Ok(v) = std::env::var("CUBEOPT_SHM_KEY") {
-            o.shm_key = Some(
-                super::shm::parse_key(&v)
-                    .unwrap_or_else(|| panic!("CUBEOPT_SHM_KEY={v:?}: expected e.g. 0x636f0709")),
-            );
+            o.shm_key = match super::shm::parse_key(&v) {
+                Some(key) => Some(key),
+                None => return Err(bad("CUBEOPT_SHM_KEY", v, "e.g. 0x636f0709")),
+            };
         }
         if let Ok(v) = std::env::var("CUBEOPT_PREFAULT") {
             o.prefault = match v.as_str() {
                 "1" | "" => true,
                 "0" => false,
-                _ => panic!("CUBEOPT_PREFAULT={v:?}: expected 0 or 1"),
+                _ => return Err(bad("CUBEOPT_PREFAULT", v, "0 or 1")),
             };
         }
-        o
+        Ok(o)
     }
 
     /// The mode used for the file at `path` (resolves `Auto`, unless a
@@ -654,7 +702,7 @@ mod tests {
             base: 7,
             data_bytes: data.len() as u64,
             distribution: None,
-            checksum: Some(checksum(&data, 3)),
+            checksum: Some(checksum(&data, 3).unwrap()),
         };
         // Too small for data plus trailer: refused, file untouched.
         std::fs::write(&path, &data).unwrap();
@@ -672,16 +720,20 @@ mod tests {
     #[test]
     fn checksum_sees_every_byte() {
         let mut data = vec![0u8; 3 << 20 | 0x4D];
-        let c0 = checksum(&data, 4);
-        assert_eq!(c0, checksum(&data, 1), "independent of the thread count");
+        let c0 = checksum(&data, 4).unwrap();
+        assert_eq!(
+            c0,
+            checksum(&data, 1).unwrap(),
+            "independent of the thread count"
+        );
         let (a, b) = data.split_at(2 * CHECKSUM_CHUNK);
-        let parts = [chunk_hashes(a, 2), chunk_hashes(b, 3)].concat();
+        let parts = [chunk_hashes(a, 2).unwrap(), chunk_hashes(b, 3).unwrap()].concat();
         assert_eq!(combine_hashes(data.len() as u64, &parts), c0, "from parts");
         for pos in [0, 5, 1 << 20, (3 << 20) + 76] {
             data[pos] ^= 1;
-            assert_ne!(checksum(&data, 4), c0, "flip at {pos}");
+            assert_ne!(checksum(&data, 4).unwrap(), c0, "flip at {pos}");
             data[pos] ^= 1;
         }
-        assert_ne!(checksum(&data[1..], 4), c0);
+        assert_ne!(checksum(&data[1..], 4).unwrap(), c0);
     }
 }

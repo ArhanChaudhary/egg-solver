@@ -197,7 +197,7 @@ fn main() {
     let mode = args[3].as_str();
     let threads: usize = args.get(4).map_or(8, |x| x.parse().unwrap());
     let lanes: usize = args.get(5).map_or(20, |x| x.parse().unwrap());
-    let corners = Cocsep::generate();
+    let corners = Cocsep::generate().unwrap();
     let table = H48Table::open(&args[1]).expect("open table");
     let solver = Solver::new(&corners, &table);
     let reference = Reference {

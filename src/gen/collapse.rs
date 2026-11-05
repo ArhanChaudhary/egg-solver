@@ -8,8 +8,9 @@
 //! (`min(code)` is the code of the minimum), so for example h7..h10 of base
 //! 10 follow from h11, and this checks directly generated tables.
 
+use crate::parallel::WorkerPanicked;
 use crate::tables::{
-    entry_low_bits, h48_bytes, h48_rows, H48Meta, H48Table, Memory, WORDS_PER_ROW,
+    entry_low_bits, h48_bytes, h48_rows, H48Meta, H48Table, Memory, TableError, WORDS_PER_ROW,
 };
 use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
 
@@ -44,31 +45,52 @@ fn collapsed_word(rows: &[AtomicU64], w: usize) -> u64 {
     }
 }
 
+/// The rows of hk and the number of rows of h`larger_k` (`k <= larger_k`)
+/// that collapse into each, if `larger_words` holds them all.
+fn collapse_shape(
+    k: u32,
+    larger_k: u32,
+    larger_words: usize,
+) -> Result<(usize, usize), TableError> {
+    let shift = larger_k
+        .checked_sub(k)
+        .ok_or_else(|| TableError::Generate(format!("h{k} is not a collapse of h{larger_k}")))?;
+    let rows = usize::try_from(h48_rows(k)).map_err(|_| TableError::TooLarge(k))?;
+    let factor = 1usize.checked_shl(shift).unwrap_or(0);
+    // (Then every slice of rows below is within the larger table.)
+    match factor
+        .checked_mul(WORDS_PER_ROW)
+        .and_then(|x| x.checked_mul(rows))
+    {
+        Some(words) if factor > 0 && words <= larger_words => Ok((rows, factor)),
+        _ => Err(TableError::TooLarge(larger_k)),
+    }
+}
+
 /// hk of the same base from `src` (k <= src's k), in anonymous memory.
 ///
-/// # Panics
-/// If `k` is above `src`'s.
-#[must_use]
-pub fn derive(source: &H48Table, k: u32, threads: usize) -> H48Table {
-    assert!(k <= source.meta.k);
-    let factor = 1usize << (source.meta.k - k);
-    let memory = Memory::anonymous(usize::try_from(h48_bytes(k)).unwrap());
-    let rows = usize::try_from(h48_rows(k)).unwrap();
-    let words = memory.words();
-    let source_words = source.memory.words();
+/// # Errors
+/// If `k` is above `src`'s, the memory cannot be allocated, a table is larger
+/// than its memory or a slice can be, or a thread panicked.
+pub fn derive(source: &H48Table, k: u32, threads: usize) -> Result<H48Table, TableError> {
+    let source_words = source.memory.words()?;
+    let (rows, factor) = collapse_shape(k, source.meta.k, source_words.len())?;
+    let memory =
+        Memory::anonymous(usize::try_from(h48_bytes(k)).map_err(|_| TableError::TooLarge(k))?)?;
+    let words = memory.words()?;
     par_rows(rows, threads, |row| {
         let covered = &source_words[row * factor * 16..(row + 1) * factor * 16];
         for w in 0..16 {
             words[row * 16 + w].store(collapsed_word(covered, w), Relaxed);
         }
-    });
-    H48Table {
+    })?;
+    Ok(H48Table {
         memory,
         meta: H48Meta {
             k,
             base: source.meta.base,
         },
-    }
+    })
 }
 
 /// Differences found by `compare`.
@@ -88,19 +110,22 @@ pub struct Diff {
 /// Compare `table` with the collapse of `larger` to `table`'s k (the same
 /// table if the ks are equal).
 ///
-/// # Panics
-/// If the bases differ or `table`'s k is above `larger`'s.
-#[must_use]
-pub fn compare(table: &H48Table, larger: &H48Table, threads: usize) -> Diff {
-    assert_eq!(
-        table.meta.base, larger.meta.base,
-        "tables of different bases"
-    );
-    assert!(table.meta.k <= larger.meta.k);
+/// # Errors
+/// If the bases differ, `table`'s k is above `larger`'s, a table is larger
+/// than its memory or a slice can be, or a thread panicked.
+pub fn compare(table: &H48Table, larger: &H48Table, threads: usize) -> Result<Diff, TableError> {
+    if table.meta.base != larger.meta.base {
+        return Err(TableError::Generate(format!(
+            "tables of different bases ({} and {})",
+            table.meta.base, larger.meta.base
+        )));
+    }
     let base = u64::from(table.meta.base);
-    let factor = 1usize << (larger.meta.k - table.meta.k);
-    let rows = usize::try_from(h48_rows(table.meta.k)).unwrap();
-    let (words, larger_words) = (table.memory.words(), larger.memory.words());
+    let (words, larger_words) = (table.memory.words()?, larger.memory.words()?);
+    let (rows, factor) = collapse_shape(table.meta.k, larger.meta.k, larger_words.len())?;
+    if words.len() < rows * WORDS_PER_ROW {
+        return Err(TableError::TooLarge(table.meta.k));
+    }
     let total = [(); 4].map(|()| AtomicU64::new(0));
     par_rows_chunked(rows, threads, |first, end| {
         let mut counts = [0u64; 4];
@@ -129,21 +154,25 @@ pub fn compare(table: &H48Table, larger: &H48Table, threads: usize) -> Diff {
         for (sum, count) in total.iter().zip(counts) {
             sum.fetch_add(count, Relaxed);
         }
-    });
+    })?;
     let [entries, codes, group_minima, unread_group_minima] = total.map(AtomicU64::into_inner);
-    Diff {
+    Ok(Diff {
         entries,
         codes,
         group_minima,
         unread_group_minima,
-    }
+    })
 }
 
-fn par_rows(rows: usize, threads: usize, f: impl Fn(usize) + Sync) {
-    par_rows_chunked(rows, threads, |a, b| (a..b).for_each(&f));
+fn par_rows(rows: usize, threads: usize, f: impl Fn(usize) + Sync) -> Result<(), WorkerPanicked> {
+    par_rows_chunked(rows, threads, |a, b| (a..b).for_each(&f))
 }
 
-fn par_rows_chunked(rows: usize, threads: usize, f: impl Fn(usize, usize) + Sync) {
+fn par_rows_chunked(
+    rows: usize,
+    threads: usize,
+    f: impl Fn(usize, usize) + Sync,
+) -> Result<(), WorkerPanicked> {
     let chunk = 1 << 12;
     let next = std::sync::atomic::AtomicUsize::new(0);
     crate::parallel::on_threads(threads, |_| loop {
@@ -152,7 +181,8 @@ fn par_rows_chunked(rows: usize, threads: usize, f: impl Fn(usize, usize) + Sync
             break;
         }
         f(a, (a + chunk).min(rows));
-    });
+    })?;
+    Ok(())
 }
 
 #[cfg(test)]

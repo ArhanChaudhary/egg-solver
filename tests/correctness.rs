@@ -17,13 +17,17 @@ use std::sync::OnceLock;
 /// The cocsep table (built once).
 fn corners() -> &'static Cocsep {
     static CORNERS: OnceLock<Cocsep> = OnceLock::new();
-    CORNERS.get_or_init(Cocsep::generate)
+    CORNERS.get_or_init(|| Cocsep::generate().unwrap())
 }
 
 /// An h0 table with base 8 (generated once; ~0.5 GB).
 fn h0() -> &'static H48Table {
     static TABLE: OnceLock<H48Table> = OnceLock::new();
-    TABLE.get_or_init(|| cubeopt::generate(corners(), 0, 8, None, &[], cubeopt::thread_count()).0)
+    TABLE.get_or_init(|| {
+        cubeopt::generate(corners(), 0, 8, None, &[], cubeopt::thread_count())
+            .unwrap()
+            .0
+    })
 }
 
 /// The scrambles of a file in `testdata`.
@@ -88,7 +92,8 @@ fn ball(depth: u8) -> HashMap<[u8; 32], (Cube, u8)> {
 fn h0_table_matches_brute_force() {
     let corners = corners();
     let base = 3u8;
-    let (table, _) = cubeopt::generate(corners, 0, base, None, &[], cubeopt::thread_count());
+    let (table, _) =
+        cubeopt::generate(corners, 0, base, None, &[], cubeopt::thread_count()).unwrap();
     // The distance of each table entry: the least over the cubes it covers.
     let mut best: HashMap<u64, u8> = HashMap::new();
     for &(cube, distance) in ball(5).values() {
@@ -112,7 +117,7 @@ fn h0_table_matches_brute_force() {
             want[usize::from(expect)] += 1;
         }
     }
-    let counts = table.distribution();
+    let counts = table.distribution().unwrap();
     assert_eq!(&counts[..3], &want[..], "entries with depth <= base+2");
 }
 
@@ -496,27 +501,28 @@ fn dfs_table_in_parts(k: u32, prefix_depth: u8, parts: u64) -> H48Table {
         prefix_depth,
         verbose: false,
     };
-    let generator = cubeopt::gen::dfs::Generator::new(corners(), settings);
-    let memory = Memory::anonymous(usize::try_from(h48_bytes(k)).unwrap());
+    let generator = cubeopt::gen::dfs::Generator::new(corners(), settings).unwrap();
+    let memory = Memory::anonymous(usize::try_from(h48_bytes(k)).unwrap()).unwrap();
     let rows = h48_rows(k);
     let per = rows.div_ceil(parts);
     for start in (0..rows).step_by(usize::try_from(per).unwrap()) {
         let range = start..(start + per).min(rows);
         let part_mem =
-            Memory::anonymous(usize::try_from((range.end - range.start) * ROW_BYTES).unwrap());
+            Memory::anonymous(usize::try_from((range.end - range.start) * ROW_BYTES).unwrap())
+                .unwrap();
         let part = cubeopt::gen::dfs::Part {
-            words: part_mem.words(),
+            words: part_mem.words().unwrap(),
             first_slot: range.start * N_SLOTS as u64,
             end_slot: range.end * N_SLOTS as u64,
         };
-        generator.generate(&range, &part);
+        generator.generate(&range, &part).unwrap();
         let offset = usize::try_from(range.start * ROW_BYTES).unwrap();
         // SAFETY: the part's rows of the table's own memory.
         unsafe {
             std::ptr::copy_nonoverlapping(
                 part_mem.ptr(),
                 memory.ptr().add(offset),
-                part_mem.bytes().len(),
+                part_mem.bytes().unwrap().len(),
             );
         }
     }
@@ -538,11 +544,13 @@ fn dfs_generator_matches_bfs_and_brute_force() {
     let cs = corners();
     let base = 3u8;
     let len = usize::try_from(h48_bytes(0)).unwrap();
-    let bfs = cubeopt::generate(cs, 0, base, None, &[], cubeopt::thread_count()).0;
+    let bfs = cubeopt::generate(cs, 0, base, None, &[], cubeopt::thread_count())
+        .unwrap()
+        .0;
     for prefix_depth in [1, 2, 5] {
         let t = dfs_table(0, prefix_depth);
         assert!(
-            t.memory.bytes()[..len] == bfs.memory.bytes()[..len],
+            t.memory.bytes().unwrap()[..len] == bfs.memory.bytes().unwrap()[..len],
             "h0 with prefix depth {prefix_depth}"
         );
     }
@@ -562,7 +570,7 @@ fn dfs_generator_matches_bfs_and_brute_force() {
         let g = group_min.entry(idx >> 6).or_insert(d);
         *g = (*g).min(d);
     }
-    let dist = t.distribution();
+    let dist = t.distribution().unwrap();
     assert_eq!(
         dist[0] + dist[1] + dist[2],
         best.len() as u64,
@@ -578,19 +586,19 @@ fn dfs_generator_matches_bfs_and_brute_force() {
     for parts in [3, 7] {
         let t = dfs_table_in_parts(3, 2, parts);
         assert!(
-            t.memory.bytes()[..n3] == t3.memory.bytes()[..n3],
+            t.memory.bytes().unwrap()[..n3] == t3.memory.bytes().unwrap()[..n3],
             "h3 in {parts} parts"
         );
     }
     let threads = cubeopt::thread_count();
     for (small, want) in [(&t, 2), (&bfs, 0)] {
-        let derived = cubeopt::gen::collapse::derive(&t3, want, threads);
+        let derived = cubeopt::gen::collapse::derive(&t3, want, threads).unwrap();
         let n = usize::try_from(h48_bytes(want)).unwrap();
         assert!(
-            derived.memory.bytes()[..n] == small.memory.bytes()[..n],
+            derived.memory.bytes().unwrap()[..n] == small.memory.bytes().unwrap()[..n],
             "h3 -> h{want}"
         );
-        let diff = cubeopt::gen::collapse::compare(small, &t3, threads);
+        let diff = cubeopt::gen::collapse::compare(small, &t3, threads).unwrap();
         assert_eq!((diff.codes, diff.group_minima), (0, 0), "{diff:?}");
     }
 }

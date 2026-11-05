@@ -639,7 +639,7 @@ fn run_command(command: &Command, json: bool) -> anyhow::Result<()> {
         _ => Vec::new(),
     };
     let path = &table_args.table;
-    let corners = Cocsep::generate();
+    let corners = Cocsep::generate()?;
     let load_start = Instant::now();
     let table = table_args.load.open(path)?;
     eprintln!(

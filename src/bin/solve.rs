@@ -274,7 +274,7 @@ fn run(args: &Args) -> anyhow::Result<ExitCode> {
         .or(args.table_flag.as_deref())
         .context("no table")?;
     let cubes = read_scrambles(args.count.unwrap_or(usize::MAX))?;
-    let corners = Cocsep::generate();
+    let corners = Cocsep::generate()?;
     let table = args.load.open(path)?;
     let threads = args.threads;
     let lanes = cli::lanes(args.lanes, path, table.meta.k, threads);
@@ -465,7 +465,7 @@ fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
         println!("threads  {threads} (all on this one cube)");
         println!("scramble {scramble}");
     }
-    let corners = Cocsep::generate();
+    let corners = Cocsep::generate()?;
     let table = args.load.open(&path)?;
     let lanes = cli::lanes(args.lanes, &path, table.meta.k, threads);
     let solver = Solver::new(&corners, &table);

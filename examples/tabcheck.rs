@@ -38,7 +38,7 @@ fn main() {
     let samples: u64 = args[2].parse().unwrap();
     let seed: u64 = args[3].parse().unwrap();
     let threads: u64 = args.get(4).map_or(8, |x| x.parse().unwrap());
-    let corners = Cocsep::generate();
+    let corners = Cocsep::generate().unwrap();
     let table = H48Table::open(&args[1]).expect("open table");
     let k = table.meta.k;
     assert!(

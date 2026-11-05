@@ -324,7 +324,7 @@ fn generate(args: &GenerateArgs) -> anyhow::Result<ExitCode> {
         preflight_generate(k, out, parts, bfs, &args.derived)?;
     }
     let t = Instant::now();
-    let corners = Cocsep::generate();
+    let corners = Cocsep::generate()?;
     // (On a terminal: a progress bar, with the progress lines above it.)
     let bar = progress_bar(format!("h{k}"), 0);
     if let Some(bar) = &bar {
@@ -359,20 +359,20 @@ fn generate(args: &GenerateArgs) -> anyhow::Result<ExitCode> {
             in_place.then_some(out.as_str()),
             &derived,
             threads,
-        );
+        )?;
         for d in &ds {
             progress::line(format_args!(
                 "h{} base {} distribution {:?}",
                 d.meta.k,
                 d.meta.base,
-                d.distribution()
+                d.distribution()?
             ));
         }
         if in_place {
             file::read_trailer(out)?.context("no trailer written")?
         } else {
-            let trailer = table.trailer(threads);
-            write_table(out, table.memory.bytes(), &trailer)?;
+            let trailer = table.trailer(threads)?;
+            write_table(out, table.memory.bytes()?, &trailer)?;
             trailer
         }
     } else {
@@ -408,10 +408,10 @@ fn generate_dfs(
         k,
         base,
         threads,
-        prefix_depth: dfs::PREFIX_DEPTH.min(base + 2),
+        prefix_depth: dfs::PREFIX_DEPTH.min(base.saturating_add(2)),
         verbose: true,
     };
-    let generator = dfs::Generator::new(corners, settings);
+    let generator = dfs::Generator::new(corners, settings)?;
     let rows = h48_rows(k);
     let data_bytes = h48_bytes(k);
     let f = create_table_file(out, data_bytes)?;
@@ -423,20 +423,22 @@ fn generate_dfs(
     while start < rows {
         let range = start..(start + per).min(rows);
         let len = usize::try_from((range.end - range.start) * ROW_BYTES)?;
-        let mem = Memory::anonymous(len);
+        let mem = Memory::anonymous(len)?;
         let part = dfs::Part {
-            words: mem.words(),
+            words: mem.words()?,
             first_slot: range.start * 512,
             end_slot: range.end * 512,
         };
-        generator.generate(&range, &part);
-        for (d, x) in dist.iter_mut().zip(distribution(mem.words(), threads)) {
+        generator.generate(&range, &part)?;
+        for (d, x) in dist.iter_mut().zip(distribution(part.words, threads)?) {
             *d += x;
         }
-        // (Parts start at whole checksum chunks: 8192 rows are 1 MiB.)
-        hashes.extend(file::chunk_hashes(&mem.bytes()[..len], threads));
+        // (The part's `len` bytes. Parts start at whole checksum chunks: 8192
+        // rows are 1 MiB.)
+        let bytes = mem.bytes()?;
+        hashes.extend(file::chunk_hashes(bytes, threads)?);
         let tw = Instant::now();
-        write_at(&f, out, &mem.bytes()[..len], range.start * ROW_BYTES)?;
+        write_at(&f, out, bytes, range.start * ROW_BYTES)?;
         progress::line(format_args!(
             "[gen h{k}] rows {}..{} written in {:.1}s",
             range.start,
@@ -497,12 +499,14 @@ fn write_at(f: &std::fs::File, path: &str, data: &[u8], offset: u64) -> anyhow::
         unsafe {
             use std::os::unix::io::AsRawFd;
             let fd = f.as_raw_fd();
+            // (Requests and advice only: skipped for ranges beyond `off_t`.)
             let range =
-                |at: u64, len: usize| (i64::try_from(at).unwrap(), i64::try_from(len).unwrap());
-            let (start, len) = range(at, chunk.len());
-            libc::sync_file_range(fd, start, len, libc::SYNC_FILE_RANGE_WRITE);
-            if i > 0 {
-                let (start, len) = range(at - piece as u64, piece);
+                |at: u64, len: usize| Some((i64::try_from(at).ok()?, i64::try_from(len).ok()?));
+            if let Some((start, len)) = range(at, chunk.len()) {
+                libc::sync_file_range(fd, start, len, libc::SYNC_FILE_RANGE_WRITE);
+            }
+            let previous = at.checked_sub(piece as u64).filter(|_| i > 0);
+            if let Some((start, len)) = previous.and_then(|at| range(at, piece)) {
                 let wait = libc::SYNC_FILE_RANGE_WAIT_BEFORE
                     | libc::SYNC_FILE_RANGE_WRITE
                     | libc::SYNC_FILE_RANGE_WAIT_AFTER;
@@ -517,21 +521,20 @@ fn write_at(f: &std::fs::File, path: &str, data: &[u8], offset: u64) -> anyhow::
     {
         use std::os::unix::io::AsRawFd;
         let tail = offset + (data.len().saturating_sub(1) / piece * piece) as u64;
-        // SAFETY: advice on an open file.
-        unsafe {
-            libc::posix_fadvise(
-                f.as_raw_fd(),
-                libc::off_t::try_from(tail).unwrap(),
-                0,
-                libc::POSIX_FADV_DONTNEED,
-            );
+        if let Ok(tail) = libc::off_t::try_from(tail) {
+            // SAFETY: advice on an open file.
+            unsafe {
+                libc::posix_fadvise(f.as_raw_fd(), tail, 0, libc::POSIX_FADV_DONTNEED);
+            }
         }
     }
     Ok(())
 }
 
 fn write_table(path: &str, data: &[u8], trailer: &Trailer) -> anyhow::Result<()> {
-    let data = &data[..usize::try_from(trailer.data_bytes)?];
+    let data = data
+        .get(..usize::try_from(trailer.data_bytes)?)
+        .context("less data than the trailer says")?;
     let f = create_table_file(path, trailer.data_bytes)?;
     write_at(&f, path, data, 0)?;
     drop(f);
@@ -575,7 +578,7 @@ fn stamp(path: &str, k: u32, base: u8) -> anyhow::Result<ExitCode> {
         memory: data,
         meta: H48Meta { k, base },
     };
-    let trailer = table.trailer(cubeopt::thread_count());
+    let trailer = table.trailer(cubeopt::thread_count())?;
     drop(table);
     file::write_trailer(path, &trailer)?;
     drop_cache(path);
@@ -609,7 +612,7 @@ fn check(path: &str, json: bool) -> anyhow::Result<ExitCode> {
         anyhow::bail!("{path} has no trailer (k and base from its meta file)");
     };
     let progress = spinner(format!("checking {path}"));
-    let got = table.trailer(cubeopt::thread_count());
+    let got = table.trailer(cubeopt::thread_count())?;
     drop(table);
     drop_cache(path);
     if let Some(progress) = progress {
@@ -726,9 +729,9 @@ fn derive(source: &str, k: u32, out: &str, force: bool) -> anyhow::Result<ExitCo
     }
     let t = Instant::now();
     let progress = spinner(format!("deriving h{k} from {source}"));
-    let table = collapse::derive(&src, k, cubeopt::thread_count());
-    let trailer = table.trailer(cubeopt::thread_count());
-    write_table(out, table.memory.bytes(), &trailer)?;
+    let table = collapse::derive(&src, k, cubeopt::thread_count())?;
+    let trailer = table.trailer(cubeopt::thread_count())?;
+    write_table(out, table.memory.bytes()?, &trailer)?;
     drop(src);
     drop_cache(source);
     if let Some(progress) = progress {
@@ -753,7 +756,7 @@ fn compare(a: &str, b: &str) -> anyhow::Result<ExitCode> {
         .into());
     }
     let progress = spinner(format!("comparing {a} with {b}"));
-    let d = collapse::compare(&ta, &tb, cubeopt::thread_count());
+    let d = collapse::compare(&ta, &tb, cubeopt::thread_count())?;
     if let Some(progress) = progress {
         progress.finish_and_clear();
     }

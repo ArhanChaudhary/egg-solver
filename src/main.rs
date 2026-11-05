@@ -41,7 +41,7 @@ fn main() -> ExitCode {
 
 fn run(args: &Args) -> anyhow::Result<ExitCode> {
     let path = args.table.as_deref().context("no table")?;
-    let corners = Cocsep::generate();
+    let corners = Cocsep::generate()?;
     let table = args.load.open(path)?;
     let solver = Solver::new(&corners, &table);
     for line in std::io::stdin().lock().lines() {

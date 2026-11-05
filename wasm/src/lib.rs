@@ -58,7 +58,8 @@ pub extern "C" fn _initialize() {
 
 /// The module's state between calls.
 struct State {
-    corners: Cocsep,
+    /// The cocsep table, made on first use (`corners`).
+    corners: Option<Cocsep>,
     table: Option<H48Table>,
     /// A table file being copied in by the caller (`cubeopt_table_buffer`).
     incoming: Option<Memory>,
@@ -66,28 +67,32 @@ struct State {
     output: String,
 }
 
-static STATE: Mutex<Option<State>> = Mutex::new(None);
+static STATE: Mutex<State> = Mutex::new(State {
+    corners: None,
+    table: None,
+    incoming: None,
+    output: String::new(),
+});
 
-/// The state, created on first use (the cocsep table takes ~0.2 s).
-fn state() -> MutexGuard<'static, Option<State>> {
-    let mut guard = STATE.lock().unwrap_or_else(PoisonError::into_inner);
-    if guard.is_none() {
-        *guard = Some(State {
-            corners: Cocsep::generate(),
-            table: None,
-            incoming: None,
-            output: String::new(),
-        });
+/// The state.
+fn state() -> MutexGuard<'static, State> {
+    STATE.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// The cocsep table of the state (`State::corners`), made now if it is not
+/// yet (it takes ~0.2 s).
+fn corners(corners: &mut Option<Cocsep>) -> Result<&Cocsep, String> {
+    match corners {
+        Some(corners) => Ok(corners),
+        None => Ok(corners.insert(Cocsep::generate().map_err(|e| e.to_string())?)),
     }
-    guard
 }
 
 /// Run `f` on the state; its `Ok` text or `Err` message becomes the output.
 /// Returns 0 or -1.
 fn with_state(f: impl FnOnce(&mut State) -> Result<String, String>) -> i32 {
-    let mut guard = state();
-    let state = guard.as_mut().expect("created by `state`");
-    let (output, status) = match f(state) {
+    let mut state = state();
+    let (output, status) = match f(&mut state) {
         Ok(text) => (text, 0),
         Err(message) => (message, -1),
     };
@@ -175,15 +180,13 @@ pub unsafe extern "C" fn cubeopt_free(ptr: *mut u8, len: usize) {
 /// The output of the last call: JSON or an error message (UTF-8).
 #[unsafe(no_mangle)]
 pub extern "C" fn cubeopt_output() -> *const u8 {
-    state()
-        .as_ref()
-        .map_or(std::ptr::null(), |s| s.output.as_ptr())
+    state().output.as_ptr()
 }
 
 /// The length in bytes of `cubeopt_output`.
 #[unsafe(no_mangle)]
 pub extern "C" fn cubeopt_output_len() -> usize {
-    state().as_ref().map_or(0, |s| s.output.len())
+    state().output.len()
 }
 
 /// 1 in the threads build, else 0.
@@ -195,13 +198,9 @@ pub extern "C" fn cubeopt_has_threads() -> u32 {
 /// A buffer of `len` bytes for a whole table file (data and trailer), which
 /// the caller fills before `cubeopt_table_load`. Drops the current table
 /// first (wasm32 has room for one). Returns 0 if out of memory.
-///
-/// # Panics
-/// Never (the state exists once `state` returns).
 #[unsafe(no_mangle)]
 pub extern "C" fn cubeopt_table_buffer(len: usize) -> *mut u8 {
-    let mut guard = state();
-    let state = guard.as_mut().expect("created by `state`");
+    let mut state = state();
     state.table = None;
     state.incoming = None;
     state.incoming = Memory::try_anonymous(len);
@@ -265,7 +264,9 @@ pub extern "C" fn cubeopt_generate(k: u32, base: u32, threads: u32) -> i32 {
         // that it can be allocated first.)
         let bytes = usize::try_from(h48_bytes(k)).map_err(|_| format!("h{k} is too big"))?;
         drop(Memory::try_anonymous(bytes).ok_or(format!("no room for h{k} ({bytes} bytes)"))?);
-        let table = cubeopt::generate_table(&state.corners, k, base, threads_for(threads), false);
+        let corners = corners(&mut state.corners)?;
+        let table = cubeopt::generate_table(corners, k, base, threads_for(threads), false)
+            .map_err(|e| e.to_string())?;
         let info = table_json(&table);
         state.table = Some(table);
         Ok(info)
@@ -291,8 +292,9 @@ pub unsafe extern "C" fn cubeopt_solve(
     let text = unsafe { text_argument(text, len) };
     with_state(|state| {
         let cube = parse_cube(text?)?;
+        let corners = corners(&mut state.corners)?;
         let table = state.table.as_ref().ok_or("no table loaded")?;
-        let solver = Solver::new(&state.corners, table);
+        let solver = Solver::new(corners, table);
         let lanes = lanes_for(lanes);
         let threads = threads_for(threads);
         let get = |i: usize| (i == 0).then_some(cube);
@@ -309,7 +311,8 @@ pub unsafe extern "C" fn cubeopt_solve(
             pool.run(&solver, lanes, &stop, |i, solution, stats, seconds| {
                 done(i, solution, stats, seconds);
             });
-        });
+        })
+        .map_err(|e| e.to_string())?;
         let result = result.into_inner().unwrap_or_else(PoisonError::into_inner);
         result.ok_or_else(|| "not solved".to_string())
     })
@@ -336,14 +339,18 @@ pub unsafe extern "C" fn cubeopt_solve_batch(
             .filter(|l| !l.trim().is_empty())
             .map(parse_cube)
             .collect::<Result<_, _>>()?;
+        let corners = corners(&mut state.corners)?;
         let table = state.table.as_ref().ok_or("no table loaded")?;
-        let solver = Solver::new(&state.corners, table);
+        let solver = Solver::new(corners, table);
         let lanes = lanes_for(lanes);
         let get = |i: usize| cubes.get(i).copied();
         let results = Mutex::new(vec![String::new(); cubes.len()]);
         let done = |i: usize, solution: Vec<u8>, stats: Stats, seconds: f64| {
-            results.lock().unwrap_or_else(PoisonError::into_inner)[i] =
-                result_json(i, &solution, stats, seconds);
+            // (`i` is the index of a cube: `get` has no others.)
+            let mut results = results.lock().unwrap_or_else(PoisonError::into_inner);
+            if let Some(slot) = results.get_mut(i) {
+                *slot = result_json(i, &solution, stats, seconds);
+            }
         };
         stream(
             &solver,
@@ -352,7 +359,7 @@ pub unsafe extern "C" fn cubeopt_solve_batch(
             threads_for(threads),
             &AtomicBool::new(false),
             &done,
-        );
+        )?;
         let results = results.into_inner().unwrap_or_else(PoisonError::into_inner);
         Ok(format!("[{}]", results.join(",")))
     })
@@ -373,8 +380,9 @@ pub extern "C" fn cubeopt_bench(
     threads: u32,
 ) -> i32 {
     with_state(|state| {
+        let corners = corners(&mut state.corners)?;
         let table = state.table.as_ref().ok_or("no table loaded")?;
-        let solver = Solver::new(&state.corners, table);
+        let solver = Solver::new(corners, table);
         let lanes = lanes_for(lanes);
         let threads = threads_for(threads);
         let seed = u64::from(seed);
@@ -398,7 +406,7 @@ pub extern "C" fn cubeopt_bench(
                 counted.2 += stats.lookups;
             }
         };
-        stream(&solver, &cubes, lanes, threads, &stop, &done);
+        stream(&solver, &cubes, lanes, threads, &stop, &done)?;
         let (cubes_counted, nodes, lookups) =
             counted.into_inner().unwrap_or_else(PoisonError::into_inner);
         #[expect(clippy::cast_precision_loss, reason = "statistics")]
@@ -427,11 +435,13 @@ fn stream(
     threads: usize,
     stop: &AtomicBool,
     done: &(dyn Fn(usize, Vec<u8>, Stats, f64) + Sync),
-) {
+) -> Result<(), String> {
     let next = AtomicUsize::new(0);
     cubeopt::parallel::on_threads(threads, |_| {
         cubeopt::lanes::run_lanes(solver, cubes, &next, stop, lanes, done);
-    });
+    })
+    .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 /// Lanes per thread: as asked, else 16. Lanes pay off in wasm too (the

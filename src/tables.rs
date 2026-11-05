@@ -44,6 +44,11 @@ pub struct Cocsep {
     packed: Memory,
 }
 
+/// Bytes of memory for the packed entries (3 per coordinate, and the 4-byte
+/// load of the last one).
+const PACKED_LEN: usize = 2 << 20;
+const _: () = assert!(3 * N_COCSEP < PACKED_LEN);
+
 /// Class of a packed cocsep entry (`Cocsep::packed`).
 #[must_use]
 #[inline(always)]
@@ -86,11 +91,11 @@ impl Cocsep {
     /// Build the table: a breadth-first search (BFS) over the cocsep
     /// coordinate, then the symmetry classes.
     ///
-    /// # Panics
+    /// # Errors
     /// If the BFS does not find the expected number of coordinates or
-    /// classes (a bug in the cube model).
-    #[must_use]
-    pub fn generate() -> Cocsep {
+    /// classes, or depths above 15 (a bug in the cube model), or the 2 MiB
+    /// of packed entries cannot be allocated.
+    pub fn generate() -> Result<Cocsep, TableError> {
         // BFS over the cocsep coordinate, keeping a cube for each.
         let mut depth = vec![0xFFu8; N_COCSEP];
         let mut cube_of = vec![Cube::solved(); N_COCSEP];
@@ -112,10 +117,23 @@ impl Cocsep {
                 }
             }
         }
-        assert_eq!(order.len(), N_COCSEP);
+        let model_error = |what, found, expected| TableError::CocsepModel {
+            what,
+            found,
+            expected,
+        };
+        if order.len() != N_COCSEP {
+            return Err(model_error("coordinates", order.len(), N_COCSEP));
+        }
+        // (Depths are below 16: they fit the packed entries' 4 bits.)
         let mut distribution = vec![0u64; 16].into_boxed_slice();
         for &d in &depth {
-            distribution[usize::from(d)] += 1;
+            let count = distribution.get_mut(usize::from(d)).ok_or(model_error(
+                "a depth of",
+                usize::from(d),
+                15,
+            ))?;
+            *count += 1;
         }
         // Classes, in BFS order: the first coordinate of a class is its
         // representative; its 48 conjugates are the class's members.
@@ -130,7 +148,12 @@ impl Cocsep {
             if class[i] != u32::MAX {
                 continue;
             }
-            let new_class = u32::try_from(n_classes).unwrap();
+            // (Below `N_CLASSES`, so it fits in the entries and indexes the
+            // class arrays.)
+            let new_class = u32::try_from(n_classes)
+                .ok()
+                .filter(|_| n_classes < N_CLASSES)
+                .ok_or(model_error("more classes than", n_classes + 1, N_CLASSES))?;
             let rep = cube_of[i];
             let mut fixing = 0u64;
             for (sym, &inverse) in crate::simd::SYM_INVERSES.iter().enumerate() {
@@ -148,25 +171,32 @@ impl Cocsep {
             self_symmetries[n_classes] = fixing;
             n_classes += 1;
         }
-        assert_eq!(n_classes, N_CLASSES);
+        if n_classes != N_CLASSES {
+            return Err(model_error("classes", n_classes, N_CLASSES));
+        }
         let entries: Box<[u32]> = (0..N_COCSEP)
             .map(|i| (class[i] << 16) | (u32::from(sym_to_rep[i]) << 8) | u32::from(depth[i]))
             .collect();
         // 2 MiB: the kernel aligns it so that it gets one huge page.
-        let packed = Memory::anonymous(2 << 20);
+        let packed = Memory::anonymous(PACKED_LEN)?;
+        // SAFETY: `3 * N_COCSEP + 1` bytes of the fresh 2 MiB (`PACKED_LEN`),
+        // ours alone.
         let bytes = unsafe { std::slice::from_raw_parts_mut(packed.ptr(), 3 * N_COCSEP + 1) };
-        for i in 0..N_COCSEP {
-            assert!(depth[i] < 16);
-            let entry = (class[i] << 10) | (u32::from(sym_to_rep[i]) << 4) | u32::from(depth[i]);
-            bytes[3 * i..3 * i + 3].copy_from_slice(&entry.to_le_bytes()[..3]);
+        let packed_entries = class.iter().zip(&sym_to_rep).zip(&depth);
+        for (slot, ((&class, &sym_to_rep), &depth)) in
+            bytes.as_chunks_mut::<3>().0.iter_mut().zip(packed_entries)
+        {
+            let entry = (class << 10) | (u32::from(sym_to_rep) << 4) | u32::from(depth);
+            let [first, second, third, _] = entry.to_le_bytes();
+            *slot = [first, second, third];
         }
-        Cocsep {
+        Ok(Cocsep {
             entries,
             representatives,
             self_symmetries,
             distribution,
             packed,
-        }
+        })
     }
 
     /// A cheap stand-in for unit tests: corner depths from a BFS cut after
@@ -193,7 +223,7 @@ impl Cocsep {
         }
         // Packed entries `class << 10 | sym_to_rep << 4 | depth` with class
         // and sym_to_rep 0: just the depth byte.
-        let packed = Memory::anonymous(2 << 20);
+        let packed = Memory::anonymous(PACKED_LEN).unwrap();
         let bytes = unsafe { std::slice::from_raw_parts_mut(packed.ptr(), 3 * N_COCSEP + 1) };
         let mut distribution = vec![0u64; 16].into_boxed_slice();
         for (i, &d) in depths.iter().enumerate() {
@@ -267,11 +297,10 @@ unsafe impl Sync for Memory {}
 impl Memory {
     /// Anonymous zeroed memory, transparent huge pages requested.
     ///
-    /// # Panics
+    /// # Errors
     /// If `mmap` fails.
     #[cfg(unix)]
-    #[must_use]
-    pub fn anonymous(len: usize) -> Memory {
+    pub fn anonymous(len: usize) -> Result<Memory, TableError> {
         // (Miri supports only these flags, and no `madvise`.)
         #[cfg(not(miri))]
         let flags = libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_NORESERVE;
@@ -286,24 +315,31 @@ impl Memory {
                 -1,
                 0,
             );
-            assert!(p != libc::MAP_FAILED, "mmap failed");
+            if p == libc::MAP_FAILED {
+                return Err(TableError::Alloc {
+                    bytes: len,
+                    source: std::io::Error::last_os_error(),
+                });
+            }
             #[cfg(all(not(miri), target_os = "linux"))]
             libc::madvise(p, len, libc::MADV_HUGEPAGE);
-            Memory {
+            Ok(Memory {
                 ptr: p.cast::<u8>(),
                 len,
-            }
+            })
         }
     }
 
     /// Zeroed memory where there is no `mmap` (wasm, see `try_anonymous`).
     ///
-    /// # Panics
+    /// # Errors
     /// If there is not enough memory.
     #[cfg(not(unix))]
-    #[must_use]
-    pub fn anonymous(len: usize) -> Memory {
-        Memory::try_anonymous(len).expect("out of memory")
+    pub fn anonymous(len: usize) -> Result<Memory, TableError> {
+        Memory::try_anonymous(len).ok_or_else(|| TableError::Alloc {
+            bytes: len,
+            source: std::io::ErrorKind::OutOfMemory.into(),
+        })
     }
 
     /// Zeroed memory from the allocator, or `None` if there is not enough.
@@ -311,7 +347,7 @@ impl Memory {
     #[must_use]
     pub fn try_anonymous(len: usize) -> Option<Memory> {
         // SAFETY: a non-zero size; freed with the same layout in `drop`.
-        let ptr = unsafe { std::alloc::alloc_zeroed(Memory::layout(len)) };
+        let ptr = unsafe { std::alloc::alloc_zeroed(Memory::layout(len)?) };
         (!ptr.is_null()).then_some(Memory { ptr, len })
     }
 
@@ -368,9 +404,11 @@ impl Memory {
         })
     }
 
+    /// The allocator layout of `len` bytes (page aligned), if there is one
+    /// (`len` rounded up to the alignment is at most `isize::MAX`).
     #[cfg(all(not(unix), not(target_arch = "wasm32")))]
-    fn layout(len: usize) -> std::alloc::Layout {
-        std::alloc::Layout::from_size_align(len.max(1), 4096).expect("table size")
+    fn layout(len: usize) -> Option<std::alloc::Layout> {
+        std::alloc::Layout::from_size_align(len.max(1), 4096).ok()
     }
 
     /// Shared mapping of a file (e.g. on hugetlbfs, which gives 1GB pages;
@@ -474,39 +512,38 @@ impl Memory {
             libc::madvise(p, file_len, libc::MADV_HUGEPAGE);
         }
         if prefault && !(cfg!(target_os = "linux") && populate_in_kernel) {
-            memory.prefault();
+            memory.prefault()?;
         }
         Ok(memory)
     }
 
-    /// Fault every page of the mapping in, reading in parallel (16 threads).
+    /// Fault every page of the mapping in, reading in parallel (16 threads;
+    /// a range whose thread cannot be started is read on this one).
+    ///
+    /// # Errors
+    /// If a thread panicked.
     #[cfg(unix)]
-    fn prefault(&self) {
+    fn prefault(&self) -> std::io::Result<()> {
         let per = self.len.div_ceil(16).next_multiple_of(1 << 21);
         std::thread::scope(|s| {
+            let mut threads = Vec::with_capacity(16);
             for start in (0..self.len).step_by(per.max(1)) {
                 let len = per.min(self.len - start);
                 // (A raw pointer is not `Send`: pass the address.)
                 let address = self.ptr as usize + start;
-                s.spawn(move || {
-                    #[cfg(target_os = "linux")]
-                    // SAFETY: advice on a range of our own mapping.
-                    unsafe {
-                        let range = address as *mut libc::c_void;
-                        if libc::madvise(range, len, libc::MADV_POPULATE_READ) == 0 {
-                            return;
-                        }
-                    }
-                    // Touch one byte per 4 KiB (the smallest page size).
-                    let mut sum = 0u8;
-                    for offset in (0..len).step_by(4096) {
-                        // SAFETY: within the mapping.
-                        sum ^= unsafe { std::ptr::read_volatile((address + offset) as *const u8) };
-                    }
-                    std::hint::black_box(sum);
-                });
+                // SAFETY (both calls): a range of our own mapping.
+                let fault = move || unsafe { prefault_range(address, len) };
+                match std::thread::Builder::new().spawn_scoped(s, fault) {
+                    Ok(thread) => threads.push(thread),
+                    Err(_) => unsafe { prefault_range(address, len) },
+                }
             }
-        });
+            threads.into_iter().try_for_each(|thread| {
+                thread
+                    .join()
+                    .map_err(|_| std::io::Error::other("a prefault thread panicked"))
+            })
+        })
     }
 
     #[must_use]
@@ -523,26 +560,56 @@ impl Memory {
     }
     /// The memory as 64-bit words, for the table generator's atomic updates.
     ///
-    /// # Panics
-    /// On 32-bit targets, if the memory is larger than a slice can be
-    /// (`isize::MAX` bytes: 2 GiB).
-    #[must_use]
+    /// # Errors
+    /// If the memory is larger than a slice can be (`isize::MAX` bytes: 2
+    /// GiB on 32-bit targets).
     #[expect(clippy::cast_ptr_alignment, reason = "mappings are page aligned")]
-    pub fn words(&self) -> &[AtomicU64] {
-        #[cfg(target_pointer_width = "32")]
-        assert!(isize::try_from(self.len).is_ok(), "no slice of over 2 GiB");
-        unsafe { std::slice::from_raw_parts(self.ptr.cast::<AtomicU64>(), self.len / 8) }
+    pub fn words(&self) -> Result<&[AtomicU64], TableError> {
+        self.check_slice_len()?;
+        // SAFETY: our memory, of at most `isize::MAX` bytes, page aligned.
+        Ok(unsafe { std::slice::from_raw_parts(self.ptr.cast::<AtomicU64>(), self.len / 8) })
     }
+
     /// The memory as bytes.
     ///
-    /// # Panics
+    /// # Errors
     /// As `words`.
-    #[must_use]
-    pub fn bytes(&self) -> &[u8] {
-        #[cfg(target_pointer_width = "32")]
-        assert!(isize::try_from(self.len).is_ok(), "no slice of over 2 GiB");
-        unsafe { std::slice::from_raw_parts(self.ptr, self.len) }
+    pub fn bytes(&self) -> Result<&[u8], TableError> {
+        self.check_slice_len()?;
+        // SAFETY: our memory, of at most `isize::MAX` bytes.
+        Ok(unsafe { std::slice::from_raw_parts(self.ptr, self.len) })
     }
+
+    /// The memory can be a slice: at most `isize::MAX` bytes.
+    fn check_slice_len(&self) -> Result<(), TableError> {
+        match isize::try_from(self.len) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(TableError::TooLargeForSlice(self.len)),
+        }
+    }
+}
+
+/// Fault in `len` bytes from `address`: `MADV_POPULATE_READ`, else a read of
+/// a byte per 4 KiB (the smallest page size).
+///
+/// # Safety
+/// `address..address + len` is mapped (and readable).
+#[cfg(unix)]
+unsafe fn prefault_range(address: usize, len: usize) {
+    #[cfg(target_os = "linux")]
+    // SAFETY: advice on a mapped range (the caller's contract).
+    unsafe {
+        let range = address as *mut libc::c_void;
+        if libc::madvise(range, len, libc::MADV_POPULATE_READ) == 0 {
+            return;
+        }
+    }
+    let mut sum = 0u8;
+    for offset in (0..len).step_by(4096) {
+        // SAFETY: within the range (the caller's contract).
+        sum ^= unsafe { std::ptr::read_volatile((address + offset) as *const u8) };
+    }
+    std::hint::black_box(sum);
 }
 
 impl Drop for Memory {
@@ -553,9 +620,12 @@ impl Drop for Memory {
             libc::munmap(self.ptr.cast::<libc::c_void>(), self.len);
         }
         #[cfg(all(not(unix), not(target_arch = "wasm32")))]
-        // SAFETY: allocated by `anonymous` with this layout.
-        unsafe {
-            std::alloc::dealloc(self.ptr, Memory::layout(self.len));
+        // SAFETY: allocated by `try_anonymous` with this layout (which
+        // exists: it did then).
+        if let Some(layout) = Memory::layout(self.len) {
+            unsafe {
+                std::alloc::dealloc(self.ptr, layout);
+            }
         }
         #[cfg(all(target_arch = "wasm32", wasm_threads))]
         // SAFETY: from `posix_memalign` in `try_anonymous`, freed once.
@@ -683,22 +753,27 @@ impl H48Table {
 
     /// Distribution of the 2-bit codes over real entries.
     ///
-    /// # Panics
-    /// If a counting thread panics.
-    #[must_use]
-    pub fn distribution(&self) -> [u64; 4] {
-        let len = usize::try_from(h48_bytes(self.meta.k) / 8).expect("64-bit usize");
-        distribution(&self.memory.words()[..len], crate::thread_count())
+    /// # Errors
+    /// If the table is larger than its memory or a slice can be, or a
+    /// counting thread panicked.
+    pub fn distribution(&self) -> Result<[u64; 4], TableError> {
+        let words = self.memory.words()?;
+        let len = usize::try_from(h48_bytes(self.meta.k) / 8)
+            .map_err(|_| TableError::TooLarge(self.meta.k))?;
+        let words = words.get(..len).ok_or(TableError::TooLarge(self.meta.k))?;
+        Ok(distribution(words, crate::thread_count())?)
     }
 }
 
 /// Distribution of the 2-bit codes over the real entries of whole rows of a
 /// table (`words` from the start of a row).
 ///
-/// # Panics
-/// If a thread panics.
-#[must_use]
-pub fn distribution(words: &[AtomicU64], threads: usize) -> [u64; 4] {
+/// # Errors
+/// If a thread panicked.
+pub fn distribution(
+    words: &[AtomicU64],
+    threads: usize,
+) -> Result<[u64; 4], crate::parallel::WorkerPanicked> {
     let per_thread = words.len().div_ceil(threads.max(1)).max(1);
     let mut total = [0u64; 4];
     let chunks: Vec<&[AtomicU64]> = words.chunks(per_thread).collect();
@@ -715,13 +790,13 @@ pub fn distribution(words: &[AtomicU64], threads: usize) -> [u64; 4] {
             counts[0] += u64::from((mask & !lo & !hi).count_ones());
         }
         counts
-    });
+    })?;
     for thread_counts in counts {
         for (sum, count) in total.iter_mut().zip(thread_counts) {
             *sum += count;
         }
     }
-    total
+    Ok(total)
 }
 
 /// The source tree this binary was built from, whose `tables/` holds the
@@ -751,20 +826,15 @@ fn build_dir() -> String {
 }
 
 /// The meta file of a table file (for hugetlbfs files, which cannot hold
-/// small files, in the repository's `tables` directory).
-///
-/// # Panics
-/// If a hugetlbfs `path` has no file name.
+/// small files, in the repository's `tables` directory; a hugetlbfs path
+/// without a file name, like `/mnt/huge/..`, has the usual sidecar).
 #[must_use]
 pub fn meta_path(path: &str) -> String {
-    if path.starts_with("/mnt/huge") {
-        let name = std::path::Path::new(path)
-            .file_name()
-            .unwrap()
-            .to_string_lossy();
-        format!("{}/tables/{name}.hugemeta", build_dir())
-    } else {
-        format!("{path}.meta")
+    match std::path::Path::new(path).file_name() {
+        Some(name) if path.starts_with("/mnt/huge") => {
+            format!("{}/tables/{}.hugemeta", build_dir(), name.to_string_lossy())
+        }
+        _ => format!("{path}.meta"),
     }
 }
 
@@ -827,7 +897,7 @@ impl H48Table {
     /// # Errors
     /// See `open_with`.
     pub fn open(path: &str) -> Result<H48Table, TableError> {
-        H48Table::open_with(path, &file::LoadOptions::from_env())
+        H48Table::open_with(path, &file::LoadOptions::from_env()?)
     }
 
     /// Open a table file. Files on hugetlbfs (1 GiB pages) and `/dev/shm`
@@ -837,10 +907,7 @@ impl H48Table {
     ///
     /// # Errors
     /// If the table's meta cannot be read (`read_meta`), the file size does
-    /// not match its `k`, or reading or mapping fails.
-    ///
-    /// # Panics
-    /// If memory for a copy cannot be mapped.
+    /// not match its `k`, or reading, mapping or allocating fails.
     pub fn open_with(path: &str, options: &file::LoadOptions) -> Result<H48Table, TableError> {
         H48Table::open_reporting(path, options).map(|(table, _)| table)
     }
@@ -854,9 +921,6 @@ impl H48Table {
     /// As `open_with`; with `Shm`, also if the segment cannot be made or
     /// holds another table, or is being loaded by another process
     /// (`TableError::ShmLoading`: try again).
-    ///
-    /// # Panics
-    /// As `open_with`.
     pub fn open_reporting(
         path: &str,
         options: &file::LoadOptions,
@@ -894,7 +958,7 @@ impl H48Table {
             let memory = Memory::map_read_only(path, len, options.prefault).map_err(io_error)?;
             return Ok((H48Table { memory, meta }, report));
         }
-        let memory = Memory::anonymous(len);
+        let memory = Memory::anonymous(len)?;
         let table_file = std::fs::File::open(path).map_err(io_error)?;
         #[cfg(unix)]
         read_parallel(&table_file, &memory, len).map_err(file::io_error(path))?;
@@ -916,9 +980,6 @@ impl H48Table {
     /// # Errors
     /// If there is no valid trailer, the size does not match it, or the
     /// checksum differs.
-    ///
-    /// # Panics
-    /// Never (offsets within the memory fit in `usize`).
     pub fn from_file_memory(
         memory: Memory,
         verify: bool,
@@ -931,15 +992,19 @@ impl H48Table {
         // (Slices of at most 1 GiB: wasm32 has no slices over 2 GiB, h7 is
         // 3.6 GiB.)
         let piece = |start: u64, len: u64| -> &[u8] {
-            // SAFETY: within the memory (callers keep `start + len` at most
-            // `file_len`), which is ours and not written meanwhile.
-            unsafe {
-                std::slice::from_raw_parts(
-                    memory
-                        .ptr()
-                        .add(usize::try_from(start).expect("within the memory")),
-                    usize::try_from(len).expect("a short piece"),
-                )
+            // (Offsets within the memory, whose length is a `usize`, are
+            // `usize`s too; out of range, the piece is empty.)
+            match (usize::try_from(start), usize::try_from(len)) {
+                (Ok(start), Ok(len))
+                    if start
+                        .checked_add(len)
+                        .is_some_and(|end| end <= memory.len()) =>
+                {
+                    // SAFETY: within the memory (checked), which is ours and
+                    // not written meanwhile.
+                    unsafe { std::slice::from_raw_parts(memory.ptr().add(start), len) }
+                }
+                _ => &[],
             }
         };
         let trailer = file::Trailer::parse(piece(trailer_start, file::TRAILER_BYTES))?
@@ -960,12 +1025,14 @@ impl H48Table {
             // (Pieces of whole checksum chunks: the same chunk hashes as one
             // slice of all the data.)
             let piece_len = (file::CHECKSUM_CHUNK << 10) as u64;
-            let hashes: Vec<u64> = (0..data_len.div_ceil(piece_len))
-                .flat_map(|i| {
-                    let start = i * piece_len;
-                    file::chunk_hashes(piece(start, piece_len.min(data_len - start)), threads)
-                })
-                .collect();
+            let mut hashes = Vec::new();
+            for i in 0..data_len.div_ceil(piece_len) {
+                let start = i * piece_len;
+                hashes.extend(file::chunk_hashes(
+                    piece(start, piece_len.min(data_len - start)),
+                    threads,
+                )?);
+            }
             let got = file::combine_hashes(data_len, &hashes);
             if got != want {
                 return Err(TableError::Checksum { got, want });
@@ -979,7 +1046,7 @@ impl H48Table {
     #[cfg(test)]
     pub(crate) fn zeroed(k: u32, base: u8) -> H48Table {
         H48Table {
-            memory: Memory::anonymous(usize::try_from(h48_bytes(k)).unwrap()),
+            memory: Memory::anonymous(usize::try_from(h48_bytes(k)).unwrap()).unwrap(),
             meta: H48Meta { k, base },
         }
     }
@@ -987,94 +1054,126 @@ impl H48Table {
     /// The trailer describing this table (distribution and checksum
     /// computed from the data, with `threads` threads).
     ///
-    /// # Panics
-    /// If the table is larger than the address space.
-    #[must_use]
-    pub fn trailer(&self, threads: usize) -> file::Trailer {
-        let len = usize::try_from(h48_bytes(self.meta.k)).expect("64-bit usize");
-        file::Trailer {
+    /// # Errors
+    /// If the table is larger than its memory or a slice can be, or a
+    /// thread panicked.
+    pub fn trailer(&self, threads: usize) -> Result<file::Trailer, TableError> {
+        let data = self.data()?;
+        Ok(file::Trailer {
             k: self.meta.k,
             base: self.meta.base,
-            data_bytes: len as u64,
-            distribution: Some(self.distribution()),
-            checksum: Some(file::checksum(&self.memory.bytes()[..len], threads)),
-        }
+            data_bytes: data.len() as u64,
+            distribution: Some(self.distribution()?),
+            checksum: Some(file::checksum(data, threads)?),
+        })
+    }
+
+    /// The table's data: the first `h48_bytes(k)` bytes of its memory.
+    ///
+    /// # Errors
+    /// If the table is larger than its memory or a slice can be.
+    pub fn data(&self) -> Result<&[u8], TableError> {
+        let too_large = TableError::TooLarge(self.meta.k);
+        let len = usize::try_from(h48_bytes(self.meta.k)).map_err(|_| too_large)?;
+        self.memory
+            .bytes()?
+            .get(..len)
+            .ok_or(TableError::TooLarge(self.meta.k))
     }
 
     /// Write the table to a new file at `path`: the data, then its trailer.
     ///
     /// # Errors
     /// If the file cannot be written.
-    pub fn save(&self, path: &str) -> std::io::Result<()> {
-        let len = usize::try_from(h48_bytes(self.meta.k)).map_err(std::io::Error::other)?;
-        let mut out = std::fs::File::create(path)?;
-        std::io::Write::write_all(&mut out, &self.memory.bytes()[..len])?;
-        let trailer = self.trailer(crate::thread_count()).to_bytes();
-        std::io::Write::write_all(&mut out, &trailer)?;
-        out.sync_all()
+    pub fn save(&self, path: &str) -> Result<(), TableError> {
+        let trailer = self.trailer(crate::thread_count())?.to_bytes();
+        let data = self.data()?;
+        let write = || -> std::io::Result<()> {
+            let mut out = std::fs::File::create(path)?;
+            std::io::Write::write_all(&mut out, data)?;
+            std::io::Write::write_all(&mut out, &trailer)?;
+            out.sync_all()
+        };
+        write().map_err(file::io_error(path))
     }
 }
 
 /// Read the first `len` bytes of `table_file` into `memory`, in parallel (16
-/// threads: a disk or page cache copy of up to tens of GiB), each 64 MiB
-/// piece dropped from the page cache once copied (the copy is what is used).
+/// threads: a disk or page cache copy of up to tens of GiB; a range whose
+/// thread cannot be started is read on this one), each 64 MiB piece dropped
+/// from the page cache once copied (the copy is what is used).
 ///
 /// # Errors
-/// A read error of any thread (or a thread's panic).
+/// If a read fails, or a thread panicked.
 #[cfg(unix)]
 fn read_parallel(table_file: &std::fs::File, memory: &Memory, len: usize) -> std::io::Result<()> {
     let threads = 16usize;
     // (Whole 2 MiB pages per thread.)
     let per_thread = len.div_ceil(threads).next_multiple_of(1 << 21);
+    let len = len.min(memory.len());
     std::thread::scope(|s| {
-        let readers: Vec<_> = (0..threads)
-            .map(|t| {
-                s.spawn(move || -> std::io::Result<()> {
-                    read_range(
-                        table_file,
-                        memory,
-                        t * per_thread,
-                        ((t + 1) * per_thread).min(len),
-                    )
-                })
-            })
-            .collect();
-        readers.into_iter().try_for_each(|reader| {
-            reader
+        let mut spawned = Vec::with_capacity(threads);
+        let mut result = Ok(());
+        for t in 0..threads {
+            let start = t * per_thread;
+            let end = ((t + 1) * per_thread).min(len);
+            if start >= end {
+                continue;
+            }
+            // SAFETY (both calls): `start..end` is within the memory, and
+            // each range is read once, by one thread.
+            let read = move || unsafe { read_range(table_file, memory, start, end) };
+            match std::thread::Builder::new().spawn_scoped(s, read) {
+                Ok(thread) => spawned.push(thread),
+                Err(_) => {
+                    result = result.and(unsafe { read_range(table_file, memory, start, end) })
+                }
+            }
+        }
+        for thread in spawned {
+            let read = thread
                 .join()
-                .unwrap_or_else(|_| Err(std::io::Error::other("a reader thread panicked")))
-        })
+                .unwrap_or_else(|_| Err(std::io::Error::other("a reading thread panicked")));
+            result = result.and(read);
+        }
+        result
     })
 }
 
-/// `read_parallel`'s work for one thread: bytes `start..end`.
+/// Read bytes `start..end` of `table_file` into the same bytes of `memory`.
+///
+/// # Safety
+/// `start..end` is within `memory`, and nothing else accesses those bytes
+/// meanwhile.
 #[cfg(unix)]
-fn read_range(
+unsafe fn read_range(
     table_file: &std::fs::File,
     memory: &Memory,
     start: usize,
     end: usize,
 ) -> std::io::Result<()> {
     use std::os::unix::fs::FileExt;
-    if start >= end {
-        return Ok(());
-    }
-    // SAFETY: `start..end` is within the mapping, and each thread writes its
-    // own range.
+    // SAFETY: as the caller promises.
     let buf = unsafe { std::slice::from_raw_parts_mut(memory.ptr().add(start), end - start) };
     for (i, piece) in buf.chunks_mut(64 << 20).enumerate() {
         let offset = (start + (i << 26)) as u64;
         table_file.read_exact_at(piece, offset)?;
+        // (Advice only: skipped if the numbers do not fit.)
         #[cfg(target_os = "linux")]
-        // SAFETY: advice on an open file.
-        unsafe {
+        if let (Ok(offset), Ok(len)) = (
+            libc::off_t::try_from(offset),
+            libc::off_t::try_from(piece.len()),
+        ) {
             use std::os::unix::io::AsRawFd;
-            libc::posix_fadvise(
-                table_file.as_raw_fd(),
-                libc::off_t::try_from(offset).map_err(std::io::Error::other)?,
-                libc::off_t::try_from(piece.len()).map_err(std::io::Error::other)?,
-                libc::POSIX_FADV_DONTNEED,
-            );
+            // SAFETY: advice on an open file.
+            unsafe {
+                libc::posix_fadvise(
+                    table_file.as_raw_fd(),
+                    offset,
+                    len,
+                    libc::POSIX_FADV_DONTNEED,
+                );
+            }
         }
     }
     Ok(())
@@ -1133,7 +1232,7 @@ mod tests {
     fn table_from_file_memory_is_checked() {
         let data_len = usize::try_from(h48_bytes(0)).unwrap();
         let file_of = |data: &dyn Fn(usize) -> u8, trailer: &file::Trailer, extra: usize| {
-            let memory = Memory::anonymous(data_len + extra + 4096);
+            let memory = Memory::anonymous(data_len + extra + 4096).unwrap();
             // SAFETY: our own fresh memory, not yet shared.
             let bytes = unsafe { std::slice::from_raw_parts_mut(memory.ptr(), memory.len()) };
             for (i, b) in bytes[..data_len].iter_mut().enumerate() {
@@ -1150,11 +1249,11 @@ mod tests {
             base: 8,
             data_bytes: data_len as u64,
             distribution: None,
-            checksum: Some(file::checksum(&reference, 3)),
+            checksum: Some(file::checksum(&reference, 3).unwrap()),
         };
         let table = H48Table::from_file_memory(file_of(&pattern, &trailer, 0), true, 2).unwrap();
         assert_eq!((table.meta.k, table.meta.base), (0, 8));
-        assert_eq!(&table.memory.bytes()[..data_len], &reference[..]);
+        assert_eq!(&table.memory.bytes().unwrap()[..data_len], &reference[..]);
         // (Room before the trailer is allowed, as on hugetlbfs.)
         assert!(H48Table::from_file_memory(file_of(&pattern, &trailer, 8192), true, 1).is_ok());
         let damaged = |i: usize| if i == 12_345 { 7 } else { pattern(i) };
@@ -1162,9 +1261,9 @@ mod tests {
         assert!(H48Table::from_file_memory(file_of(&damaged, &trailer, 0), false, 1).is_ok());
         let wrong_k = file::Trailer { k: 1, ..trailer };
         assert!(H48Table::from_file_memory(file_of(&pattern, &wrong_k, 0), false, 1).is_err());
-        let no_trailer = Memory::anonymous(data_len + 4096);
+        let no_trailer = Memory::anonymous(data_len + 4096).unwrap();
         assert!(H48Table::from_file_memory(no_trailer, false, 1).is_err());
-        assert!(H48Table::from_file_memory(Memory::anonymous(100), false, 1).is_err());
+        assert!(H48Table::from_file_memory(Memory::anonymous(100).unwrap(), false, 1).is_err());
     }
 
     /// A table file opened for solving (hugetlbfs or /dev/shm) is mapped
@@ -1193,7 +1292,7 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore = "Cocsep::generate is too slow under Miri")]
     fn cocsep_classes_and_distribution() {
-        let cs = Cocsep::generate();
+        let cs = Cocsep::generate().unwrap();
         assert_eq!(cs.representatives.len(), 3393);
         assert_eq!(
             &cs.distribution[..10],

@@ -40,34 +40,41 @@ fn lock_state() -> MutexGuard<'static, State> {
 }
 
 /// `parallel::Runner`: `work(t)` for t in `0..n`, share 0 here and the others
-/// on the pool's threads (started as needed, never ended).
-///
-/// # Panics
-/// If called again while a job runs (`on_threads` inside `on_threads`: not
-/// done by this crate).
+/// on the pool's threads (started as needed, never ended). Shares without a
+/// thread (one that could not be started), and all of them when called
+/// again while a job runs (`on_threads` inside `on_threads`: not done by
+/// this crate), run here.
 pub fn run(n: usize, work: &(dyn Fn(usize) + Sync)) {
-    if n <= 1 {
-        work(0);
+    let mut state = lock_state();
+    if n <= 1 || state.work.is_some() {
+        drop(state);
+        (0..n.max(1)).for_each(work);
         return;
     }
     // SAFETY: the pool's threads use `work` only until `remaining` is 0,
     // which this function waits for before it returns.
     let work_static: &'static (dyn Fn(usize) + Sync) =
         unsafe { std::mem::transmute::<&(dyn Fn(usize) + Sync), _>(work) };
-    let mut state = lock_state();
-    assert!(state.work.is_none(), "nested parallel jobs");
     while state.threads < n - 1 {
-        state.threads += 1;
-        let (index, seen) = (state.threads, state.generation);
-        std::thread::spawn(move || serve(index, seen));
+        let (index, seen) = (state.threads + 1, state.generation);
+        if std::thread::Builder::new()
+            .spawn(move || serve(index, seen))
+            .is_err()
+        {
+            break;
+        }
+        state.threads = index;
     }
+    // Shares 1..=pooled run on the pool, the rest here.
+    let pooled = state.threads.min(n - 1);
     state.generation += 1;
-    state.shares = n;
+    state.shares = pooled + 1;
     state.work = Some(work_static);
-    state.remaining = n - 1;
+    state.remaining = pooled;
     STARTED.notify_all();
     drop(state);
     work(0);
+    (pooled + 1..n).for_each(work);
     let mut state = lock_state();
     while state.remaining > 0 {
         state = FINISHED.wait(state).unwrap_or_else(PoisonError::into_inner);

@@ -34,11 +34,12 @@
 use super::decode_index;
 use crate::coord::{cocsep, h11_key, index_sym, reduce_key, N_MSPLIT, N_SLOTS};
 use crate::cubie::Move;
+use crate::parallel::WorkerPanicked;
 use crate::simd::Cube;
 use crate::solver::{ALLOWED_AFTER, ALL_MOVES};
 use crate::tables::{
     entry_class, entry_low_bits, entry_position, entry_sym_to_rep, h48_rows, packed_class,
-    packed_sym_to_rep, Cocsep,
+    packed_sym_to_rep, Cocsep, TableError,
 };
 use hashbrown::HashSet;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering::Relaxed};
@@ -96,15 +97,21 @@ fn entry(corners: &Cocsep, c: Cube) -> u64 {
 }
 
 impl Prefix {
-    /// BFS on h11 entries up to `depth`.
-    fn build(corners: &Cocsep, depth: u8, threads: usize, verbose: bool) -> Prefix {
+    /// BFS on h11 entries up to `depth`: `depth + 1` levels.
+    fn build(
+        corners: &Cocsep,
+        depth: u8,
+        threads: usize,
+        verbose: bool,
+    ) -> Result<Prefix, WorkerPanicked> {
         let mut start = Vec::new();
         for_each_entry(corners, Cube::solved(), |e| start.push(e));
         start.sort_unstable();
         start.dedup();
         let mut levels = vec![start];
         for d in 1..=depth {
-            let last = &levels[usize::from(d - 1)];
+            // (Level `d - 1`: there is one per depth so far.)
+            let last = levels.last().map_or(&[][..], Vec::as_slice);
             let next_index = AtomicUsize::new(0);
             let chunk = 4096;
             let parts: Vec<Vec<u64>> = crate::parallel::on_threads(threads, |_| {
@@ -124,14 +131,17 @@ impl Prefix {
                 out.sort_unstable();
                 out.dedup();
                 out
-            });
+            })?;
             let mut next: Vec<u64> = parts.concat();
             next.sort_unstable();
             next.dedup();
             // Neighbours of depth d - 1 are at depth d - 2, d - 1 or d.
             let older = |e: &u64| {
                 let lower = usize::from(d.saturating_sub(2));
-                levels[lower..].iter().any(|l| l.binary_search(e).is_ok())
+                levels
+                    .iter()
+                    .skip(lower)
+                    .any(|l| l.binary_search(e).is_ok())
             };
             next.retain(|e| !older(e));
             if verbose {
@@ -142,11 +152,10 @@ impl Prefix {
             }
             levels.push(next);
         }
-        let n = levels.len();
-        let last_two_levels = &levels[n.saturating_sub(2)..];
-        let mut last_two = HashSet::with_capacity(last_two_levels.iter().map(Vec::len).sum());
-        last_two.extend(last_two_levels.iter().flatten().copied());
-        Prefix { levels, last_two }
+        let last_two_levels = levels.iter().skip(levels.len().saturating_sub(2));
+        let mut last_two = HashSet::with_capacity(last_two_levels.clone().map(Vec::len).sum());
+        last_two.extend(last_two_levels.flatten().copied());
+        Ok(Prefix { levels, last_two })
     }
 }
 
@@ -301,10 +310,11 @@ impl Run<'_, '_> {
     }
 
     /// One pass: mark the cosets at the end of paths of length `depth`.
-    fn pass(&self, depth: u8) {
+    fn pass(&self, depth: u8) -> Result<(), WorkerPanicked> {
         let base = self.settings.base;
         let code = u64::from(depth.saturating_sub(base).min(3));
-        let roots = &self.prefix.levels[usize::from(self.settings.prefix_depth)];
+        // (The prefix's last level is at `prefix_depth`.)
+        let roots = self.prefix.levels.last().map_or(&[][..], Vec::as_slice);
         let next = AtomicUsize::new(0);
         let done = AtomicUsize::new(0);
         let chunk = 64;
@@ -318,8 +328,9 @@ impl Run<'_, '_> {
                 format_args!("h{} depth {depth}", self.settings.k),
                 roots.len() as u64,
             );
-            if self.settings.verbose && !super::progress::installed() {
-                s.spawn(|| {
+            // (Without a progress thread if it cannot be started.)
+            let progress = (self.settings.verbose && !super::progress::installed()).then(|| {
+                std::thread::Builder::new().spawn_scoped(s, || {
                     let mut last = Instant::now();
                     while !finished.load(Relaxed) {
                         std::thread::sleep(std::time::Duration::from_millis(100));
@@ -336,9 +347,9 @@ impl Run<'_, '_> {
                             );
                         }
                     }
-                });
-            }
-            crate::parallel::on_threads(self.settings.threads, |_| {
+                })
+            });
+            let marked = crate::parallel::on_threads(self.settings.threads, |_| {
                 let mut marker = Marker {
                     part: self.part,
                     ring: [EMPTY; RING],
@@ -368,7 +379,11 @@ impl Run<'_, '_> {
                 marker.flush();
             });
             finished.store(true, Relaxed);
-        });
+            if let Some(Ok(progress)) = progress {
+                progress.join().map_err(|_| WorkerPanicked)?;
+            }
+            marked.map(drop)
+        })
     }
 }
 
@@ -383,11 +398,10 @@ pub struct Generator<'c> {
 impl<'c> Generator<'c> {
     /// Build the BFS prefix.
     ///
-    /// # Panics
+    /// # Errors
     /// If `settings` are out of range: `k` above 11, `base` above 12, or a
-    /// prefix depth not in `1..=base + 2`.
-    #[must_use]
-    pub fn new(corners: &'c Cocsep, settings: Settings) -> Generator<'c> {
+    /// prefix depth not in `1..=base + 2`; or a thread panicked.
+    pub fn new(corners: &'c Cocsep, settings: Settings) -> Result<Generator<'c>, TableError> {
         let Settings {
             k,
             base,
@@ -395,28 +409,34 @@ impl<'c> Generator<'c> {
             threads,
             verbose,
         } = settings;
-        assert!(k <= 11 && base <= 12 && (1..=base + 2).contains(&prefix_depth));
+        if !(k <= 11 && base <= 12 && (1..=base + 2).contains(&prefix_depth)) {
+            return Err(TableError::Generate(format!(
+                "h{k} base {base} prefix depth {prefix_depth}: k is at most 11, the base at \
+                 most 12, the prefix depth in 1..=base + 2"
+            )));
+        }
         let t0 = Instant::now();
-        let prefix = Prefix::build(corners, prefix_depth, threads, verbose);
+        let prefix = Prefix::build(corners, prefix_depth, threads, verbose)?;
         if verbose {
             super::progress::line(format_args!(
                 "[gen h{k}] prefix in {:.1}s",
                 t0.elapsed().as_secs_f64()
             ));
         }
-        Generator {
+        Ok(Generator {
             corners,
             settings,
             prefix,
-        }
+        })
     }
 
     /// Generate rows `rows` of hk into `part` (whose words are exactly
     /// those rows).
     ///
-    /// # Panics
-    /// If `rows` is empty or not within hk, or `part` does not match it.
-    pub fn generate(&self, rows: &std::ops::Range<u64>, part: &Part) {
+    /// # Errors
+    /// If `rows` is empty or not within hk, or `part` does not match it, or
+    /// a thread panicked.
+    pub fn generate(&self, rows: &std::ops::Range<u64>, part: &Part) -> Result<(), TableError> {
         let Settings {
             k,
             base,
@@ -424,21 +444,29 @@ impl<'c> Generator<'c> {
             threads,
             verbose,
         } = self.settings;
-        assert!(rows.start < rows.end && rows.end <= h48_rows(k));
         let t0 = Instant::now();
-        let n_slots = (rows.end - rows.start) * N_SLOTS as u64;
-        assert_eq!(part.words.len() as u64, n_slots / 32);
-        assert_eq!(part.first_slot, rows.start * N_SLOTS as u64);
-        assert_eq!(part.end_slot, rows.end * N_SLOTS as u64);
+        let n_slots = rows.end.saturating_sub(rows.start) * N_SLOTS as u64;
+        if !(rows.start < rows.end
+            && rows.end <= h48_rows(k)
+            && part.words.len() as u64 == n_slots / 32
+            && part.first_slot == rows.start * N_SLOTS as u64
+            && part.end_slot == rows.end * N_SLOTS as u64)
+        {
+            return Err(TableError::Generate(format!(
+                "rows {rows:?} of h{k} into a part of {} words, slots {}..{}",
+                part.words.len(),
+                part.first_slot,
+                part.end_slot
+            )));
+        }
         let words = part.words;
         par_chunks(words.len(), threads, |a, b| {
             for w in &words[a..b] {
                 w.store(u64::MAX, Relaxed);
             }
-        });
+        })?;
         // The prefix levels: every entry of each.
-        for (d, level) in self.prefix.levels.iter().enumerate() {
-            let depth = u8::try_from(d).unwrap();
+        for (depth, level) in (0u8..).zip(&self.prefix.levels) {
             let mut marker = Marker {
                 part,
                 ring: [EMPTY; RING],
@@ -453,8 +481,9 @@ impl<'c> Generator<'c> {
         }
         // (A row is `(class * 70 + msplit) << k | top k eo bits`.)
         let rows_per_class = (N_MSPLIT as u64) << k;
-        let first_class = usize::try_from(rows.start / rows_per_class).unwrap();
-        let last_class = usize::try_from((rows.end - 1) / rows_per_class).unwrap();
+        let class =
+            |row: u64| usize::try_from(row / rows_per_class).map_err(|_| TableError::TooLarge(k));
+        let (first_class, last_class) = (class(rows.start)?, class(rows.end - 1)?);
         let (row_mul, eo_mask) = index_consts(k);
         let run = Run {
             corners: self.corners,
@@ -467,7 +496,7 @@ impl<'c> Generator<'c> {
         };
         for depth in prefix_depth + 1..=base + 2 {
             let tp = Instant::now();
-            run.pass(depth);
+            run.pass(depth)?;
             if verbose {
                 super::progress::line(format_args!(
                     "[gen h{k}] rows {}..{}: depth {depth} in {:.1}s ({:.1}s for these rows)",
@@ -478,16 +507,20 @@ impl<'c> Generator<'c> {
                 ));
             }
         }
-        finish_group_minima(words, base, threads);
+        Ok(finish_group_minima(words, base, threads)?)
     }
 }
 
 /// Group minima of the groups without an entry of depth <= base: base + 1
 /// if one has code 1, else base + 2 if one has code 2 (else they stay 15).
-fn finish_group_minima(words: &[AtomicU64], base: u8, threads: usize) {
-    par_chunks(words.len() / 2, threads, |a, b| {
-        for g in a..b {
-            let (w0, w1) = (&words[2 * g], &words[2 * g + 1]);
+fn finish_group_minima(
+    words: &[AtomicU64],
+    base: u8,
+    threads: usize,
+) -> Result<(), WorkerPanicked> {
+    let groups = words.as_chunks::<2>().0;
+    par_chunks(groups.len(), threads, |a, b| {
+        for (g, [w0, w1]) in (a..b).zip(&groups[a..b]) {
             let (x0, x1) = (w0.load(Relaxed), w1.load(Relaxed));
             if x0 & 15 != 15 {
                 continue;
@@ -517,11 +550,15 @@ fn finish_group_minima(words: &[AtomicU64], base: u8, threads: usize) {
             };
             w0.store((x0 & !15) | min, Relaxed);
         }
-    });
+    })
 }
 
 /// Run `f(start, end)` over `n` items in parallel chunks.
-fn par_chunks(n: usize, threads: usize, f: impl Fn(usize, usize) + Sync) {
+fn par_chunks(
+    n: usize,
+    threads: usize,
+    f: impl Fn(usize, usize) + Sync,
+) -> Result<(), WorkerPanicked> {
     let chunk = 1 << 16;
     let next = AtomicUsize::new(0);
     crate::parallel::on_threads(threads, |_| loop {
@@ -530,5 +567,6 @@ fn par_chunks(n: usize, threads: usize, f: impl Fn(usize, usize) + Sync) {
             break;
         }
         f(a, (a + chunk).min(n));
-    });
+    })?;
+    Ok(())
 }
