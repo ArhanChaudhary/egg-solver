@@ -23,12 +23,50 @@
 //! its latency). Every solution is verified; a wrong one is reported as
 //! `BAD <index>` and makes the exit status 1.
 use cubeopt::cubie::{format_moves, parse_moves, CubieCube};
+use cubeopt::lanes::share::Pool;
 use cubeopt::solver::{Solver, Stats};
 use cubeopt::tables::{Cocsep, H48Table};
 use std::io::{BufRead, Write};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
+
+// `share::Worker::rounds`'s section starts on a page boundary, `SHARE_LINE`
+// bytes before the library's 64-byte pad (a binary's module asm comes before
+// the library's), so the round loop starts at page offset 0x310, as on main,
+// whatever code or data is added before it (`.text` starts after the
+// unwind tables, which grow with every function). Only in `solve`: `bench`
+// keeps main's layout (s9).
+#[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+const SHARE_LINE: usize = 0x300;
+#[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+core::arch::global_asm!(
+    ".pushsection .text.hot_share,\"ax\",@progbits",
+    ".p2align 12",
+    ".skip {pad}, 0xcc",
+    ".popsection",
+    pad = const SHARE_LINE,
+);
+
+/// `share::solve_all` with `Pool::run_pinned`: each worker's state and stack
+/// frames at fixed offsets within a page (main's offsets, so -c 1 is
+/// unchanged; see `Pool::run_pinned`).
+fn solve_all_pinned(
+    solver: &Solver,
+    cubes: &(dyn Fn(usize) -> Option<CubieCube> + Sync),
+    threads: usize,
+    lanes: usize,
+    max_active: usize,
+    done: &(dyn Fn(usize, Vec<u8>, Stats, f64) + Sync),
+) {
+    let pool = Pool::new(cubes, max_active, threads);
+    let stop = AtomicBool::new(false);
+    std::thread::scope(|scope| {
+        for _ in 0..threads.max(1) {
+            scope.spawn(|| pool.run_pinned(solver, lanes, &stop, done));
+        }
+    });
+}
 
 /// Print the usage and exit with status 2.
 fn usage() -> ! {
@@ -112,7 +150,7 @@ fn main() {
         let _ = out.flush();
     };
     let start = Instant::now();
-    cubeopt::lanes::share::solve_all(&solver, &get, threads, lanes, max_active, &done);
+    solve_all_pinned(&solver, &get, threads, lanes, max_active, &done);
     let wall = start.elapsed().as_secs_f64();
     let n = cubes.len();
     assert_eq!(n_done.load(Ordering::Relaxed), n, "cubes not reported");
