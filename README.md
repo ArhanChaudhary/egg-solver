@@ -68,6 +68,16 @@ The default solves the whole input as a batch on all cores (highest
 throughput); `solve -c 1` solves one cube at a time with all cores (lowest
 latency), `-t` sets the threads.
 
+The fastest optimal solve of one scramble this machine can do: the largest
+table found (hK, K from 11 down, in /mnt/huge, /data2/tables, /data/tables
+and ./tables; `--table` sets one), all cores on the one cube, after a
+warm-up cube; the time shown is the cube's own (table load excluded):
+
+```sh
+target/release/solve --fast                       # a random 25-move scramble
+target/release/solve --fast "R U R' U' F2 D L'"   # your own
+```
+
 Every binary has `--help` and `--version`. `--json` prints JSON lines
 (`solve`: one per cube, then the total; `bench`; `gen check`). `-v` logs to
 stderr how the table was loaded (map or copy, page sizes) and the threads

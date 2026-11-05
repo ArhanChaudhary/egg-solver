@@ -178,6 +178,67 @@ fn solve_legacy_forms() {
     }
 }
 
+/// `solve --fast` (fast.sh's lines), with a given table and scramble and a
+/// short warm-up cube (fast.sh's own takes minutes on h0).
+#[test]
+fn solve_fast() {
+    let table = h0();
+    let solve = env!("CARGO_BIN_EXE_solve");
+    let fast = ["--fast", "-t", "2", "--warmup", "F2 D"];
+    for args in [
+        [&fast[..], &["--table", table, "R", "U", "R'", "U'"]].concat(),
+        [&[table], &fast[..], &["R U R' U'"]].concat(),
+    ] {
+        let out = ok(&run(solve, &args, ""));
+        let lines: Vec<&str> = out.lines().collect();
+        assert_eq!(lines.len(), 6, "{out}");
+        assert_eq!(lines[0], format!("table    {table}"));
+        assert_eq!(lines[1], "threads  2 (all on this one cube)");
+        assert_eq!(lines[2], "scramble R U R' U'");
+        assert_eq!(lines[3].split(' ').count(), 5, "{out}");
+        assert!(lines[3].starts_with("solution "), "{out}");
+        assert_eq!(lines[4], "length   4 moves (optimal, verified)");
+        // `time     <ms> ms   (<n> M nodes, <rate> M nodes/s)`
+        assert!(
+            lines[5].starts_with("time     ") && lines[5].contains(" ms   ("),
+            "{out}"
+        );
+        let time: Vec<&str> = lines[5].split_whitespace().collect();
+        assert_eq!(time.len(), 9, "{out}");
+        let words = [time[0], time[2], time[4], time[5], time[7], time[8]];
+        assert_eq!(
+            words,
+            ["time", "ms", "M", "nodes,", "M", "nodes/s)"],
+            "{out}"
+        );
+        let numbers = [time[1], time[3].trim_start_matches('('), time[6]];
+        assert!(numbers.iter().all(|x| x.parse::<f64>().is_ok()), "{out}");
+    }
+    let args = [&fast[..], &["--table", table, "--json", "R U R' U'"]].concat();
+    let report: serde_json::Value =
+        serde_json::from_str(ok(&run(solve, &args, "")).trim()).unwrap();
+    assert_eq!(report["length"], 4);
+    assert_eq!(report["threads"], 2);
+    assert_eq!(report["scramble"], "R U R' U'");
+    let missing = scratch_file("missing");
+    assert_eq!(
+        run(solve, &["--fast", "--table", &missing, "R"], "")
+            .status
+            .code(),
+        Some(2)
+    );
+    assert_eq!(
+        run(
+            solve,
+            &[&fast[..], &["--table", table, "R", "X"]].concat(),
+            ""
+        )
+        .status
+        .code(),
+        Some(2)
+    );
+}
+
 #[test]
 fn solve_json_env_and_logging() {
     let env = [("CUBEOPT_TABLE", h0()), ("CUBEOPT_PREFAULT", "0")];
