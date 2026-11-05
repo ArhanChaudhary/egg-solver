@@ -726,9 +726,9 @@ pub struct Symmetry {
 ///
 /// # Panics
 /// Never: every symmetry maps faces to faces.
-pub fn symmetries() -> &'static Vec<Symmetry> {
+pub fn symmetries() -> &'static [Symmetry] {
     use std::sync::OnceLock;
-    static SYMMETRIES: OnceLock<Vec<Symmetry>> = OnceLock::new();
+    static SYMMETRIES: OnceLock<Box<[Symmetry]>> = OnceLock::new();
     SYMMETRIES.get_or_init(|| {
         // Signed permutation matrices: each axis maps to some axis, either way.
         let mut matrices: Vec<Matrix> = Vec::new();
