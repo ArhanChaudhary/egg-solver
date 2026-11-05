@@ -69,6 +69,7 @@ fn run_env(binary: &str, args: &[&str], stdin: &str, env: &[(&str, &str)]) -> Ou
         "CUBEOPT_PREFAULT",
         "CUBEOPT_TABLE",
         "CUBEOPT_THREADS",
+        "CUBEOPT_PREFLIGHT_LIMIT",
         "RUST_LOG",
     ] {
         command.env_remove(variable);
@@ -445,6 +446,54 @@ fn gen_legacy_forms() {
     let out = run(gen, &["check", &damaged], "");
     assert_eq!(out.status.code(), Some(1));
     assert!(text(&out.stdout).contains("MISMATCH checksum"));
+}
+
+/// The checks before a run (disk, memory), with every measured amount cut
+/// to 1 MB (`CUBEOPT_PREFLIGHT_LIMIT`, for tests): exit 2 with the numbers
+/// before any work, nothing written; `--force` skips them.
+#[test]
+fn preflight_failures() {
+    let table = h0();
+    let gen = env!("CARGO_BIN_EXE_gen");
+    let limit = [("CUBEOPT_PREFLIGHT_LIMIT", "1000000")];
+    let out = scratch_file("h0-preflight");
+    let failed = run_env(gen, &["0", "8", &out, "-t", "2"], "", &limit);
+    assert_eq!(failed.status.code(), Some(2));
+    let message = text(&failed.stderr);
+    assert!(message.starts_with("gen: "), "{message}");
+    assert!(
+        message.contains(" GiB free, h0 needs 0.0 GiB (+ 0.1 GiB margin)"),
+        "{message}"
+    );
+    assert!(message.contains("--force"), "{message}");
+    assert!(!std::path::Path::new(&out).exists());
+    let failed = run_env(gen, &["derive", table, "0", &out], "", &limit);
+    assert_eq!(failed.status.code(), Some(2), "{}", text(&failed.stderr));
+    let forced = run_env(gen, &["0", "8", &out, "-t", "2", "--force"], "", &limit);
+    ok(&forced);
+    // A missing folder fails at once too.
+    let nowhere = scratch_file("no-such-folder/h0");
+    let failed = run(gen, &["0", "8", &nowhere], "");
+    assert_eq!(failed.status.code(), Some(2));
+    assert!(
+        text(&failed.stderr).contains("its folder"),
+        "{}",
+        text(&failed.stderr)
+    );
+    // solve: copying the table into memory needs its size in memory.
+    let solve = env!("CARGO_BIN_EXE_solve");
+    let args = [table, "--load", "copy", "-t", "2"];
+    let failed = run_env(solve, &args, "R U\n", &limit);
+    assert_eq!(failed.status.code(), Some(2));
+    let message = text(&failed.stderr);
+    assert!(
+        message.contains("of memory available (MemAvailable"),
+        "{message}"
+    );
+    assert!(message.contains("hugetlbfs"), "{message}");
+    // (Mapped: no copy, no check.)
+    let args = [table, "--load", "map", "-t", "2"];
+    ok(&run_env(solve, &args, "R U\n", &limit));
 }
 
 #[test]

@@ -5,6 +5,8 @@
 //! one. (JSON is printed by the binaries: `serde_json`'s `PartialEq` impls
 //! would break type inference in the library's tests.)
 
+pub mod preflight;
+
 use crate::tables::file::{LoadMode, LoadOptions};
 use crate::tables::{h48_bytes, H48Table, TableError};
 use std::io::Write as _;
@@ -119,6 +121,7 @@ impl LoadArgs {
     /// As `H48Table::open_with`, as a `BadInput` (exit status 2, as `solve`
     /// gave before).
     pub fn open(self, path: &str) -> anyhow::Result<H48Table> {
+        self.preflight(path)?;
         self.open_logged(path).map_err(|error| {
             // (Most messages name the file already.)
             let what = if error.to_string().contains(path) {
@@ -128,6 +131,23 @@ impl LoadArgs {
             };
             anyhow::Error::new(error).context(BadInput(what))
         })
+    }
+
+    /// Before a copy into memory (`--load copy`, or `auto` off hugetlbfs and
+    /// /dev/shm on Linux): that the memory is there (`preflight`).
+    fn preflight(self, path: &str) -> anyhow::Result<()> {
+        if self.options().mode_for(path) != LoadMode::Copy {
+            return Ok(());
+        }
+        // (A table that does not open fails in `open_logged`.)
+        let Ok(meta) = crate::tables::read_meta(path) else {
+            return Ok(());
+        };
+        preflight::memory(
+            &format!("copying table {path} (h{}) into memory", meta.k),
+            h48_bytes(meta.k),
+            "use a copy on hugetlbfs (mapped, not copied: --load map) or a smaller table",
+        )
     }
 
     /// `open`, with the table's own error.
