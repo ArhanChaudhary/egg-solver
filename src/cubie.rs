@@ -731,7 +731,7 @@ pub fn symmetries() -> &'static [Symmetry] {
     static SYMMETRIES: OnceLock<Box<[Symmetry]>> = OnceLock::new();
     SYMMETRIES.get_or_init(|| {
         // Signed permutation matrices: each axis maps to some axis, either way.
-        let mut matrices: Vec<Matrix> = Vec::new();
+        let mut matrices: Vec<Matrix> = Vec::with_capacity(48);
         let axis_perms = [
             [0, 1, 2],
             [0, 2, 1],
