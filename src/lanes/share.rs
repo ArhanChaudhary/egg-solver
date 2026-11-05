@@ -466,14 +466,54 @@ struct RarelyWritten {
 }
 
 /// The solutions of a cube's first pass (`Inner::phases`): the shortest
-/// found so far (empty if none) until it is reported, its phase, and the
-/// number of leading phases whose entries have all ended. A solution is
-/// optimal once the phases below its own ended.
+/// found so far (empty if none) until it is reported, its phase + 1 (0 if
+/// none), and the number of leading phases whose entries have all ended. A
+/// solution is optimal once the phases below its own ended.
 #[derive(Default)]
 struct PassState {
     candidate: Vec<u8>,
-    candidate_phase: u32,
+    /// (Kept once the candidate is taken to be reported: a later solution
+    /// of a phase as high is no shorter.)
+    shortest: u32,
     phases_ended: u32,
+}
+
+/// What a first pass does with a solution (`PassState::offer`).
+enum Offer {
+    /// It is optimal (the phases below its own ended): report it.
+    Report(Vec<u8>),
+    /// The shortest so far: kept until the phases below it end.
+    Candidate,
+    /// One as short was found before: of no use.
+    Useless,
+}
+
+impl PassState {
+    /// A solution of phase `phase` was found (its entry has not ended).
+    fn offer(&mut self, phase: u32, solution: Vec<u8>) -> Offer {
+        // (Compared with the shortest one found, not with the candidate:
+        // between `ended` taking it and its report, a solution of a later
+        // phase, longer, could be reported first.)
+        if self.shortest != 0 && phase + 1 >= self.shortest {
+            return Offer::Useless;
+        }
+        self.shortest = phase + 1;
+        if phase <= self.phases_ended {
+            return Offer::Report(solution);
+        }
+        self.candidate = solution;
+        Offer::Candidate
+    }
+
+    /// Count the leading phases (of `phases`) that ended (`ended(phase)`);
+    /// returns the candidate, taken, if it is optimal now.
+    fn ended(&mut self, phases: u32, ended: impl Fn(u32) -> bool) -> Option<Vec<u8>> {
+        while self.phases_ended < phases && ended(self.phases_ended) {
+            self.phases_ended += 1;
+        }
+        (!self.candidate.is_empty() && self.shortest <= self.phases_ended + 1)
+            .then(|| std::mem::take(&mut self.candidate))
+    }
 }
 
 // `inner` is only written by the builder while nobody else accesses it.
@@ -792,6 +832,10 @@ impl<'a> Pool<'a> {
                 .unwrap_or_else(PoisonError::into_inner)
                 .push(bufs);
         }
+        // (Built here, not by a `Worker::new`: that shrank this thread's
+        // stack frame by 320 bytes, with `rounds` unchanged, and took solve
+        // -c 1 on 17-move scrambles from 0.59 to 0.64 ms at 48T, depth-17
+        // states from 0.65 to 0.72 ms (r8, 4 paired holds).)
         let mut worker = Worker {
             pool: self,
             solver,
@@ -2460,19 +2504,18 @@ impl Worker<'_, '_> {
         }
         let ctx = ctx.clone();
         let solution = sl.lane.reconstruct();
-        let phase = u32::from(sl.phase);
         let mut pass = ctx.pass.lock().unwrap();
-        if phase <= pass.phases_ended {
-            drop(pass);
-            self.report_pass(&ctx, solution);
-            return;
-        }
-        if pass.candidate.is_empty() || phase < pass.candidate_phase {
-            ctx.rarely_written.pass_limit.store(sl.lane.target, Relaxed);
-            pass.candidate = solution;
-            pass.candidate_phase = phase;
-            drop(pass);
-            self.pool.solved.fetch_add(1, Release);
+        match pass.offer(u32::from(sl.phase), solution) {
+            Offer::Report(solution) => {
+                drop(pass);
+                self.report_pass(&ctx, solution);
+            }
+            Offer::Candidate => {
+                ctx.rarely_written.pass_limit.store(sl.lane.target, Relaxed);
+                drop(pass);
+                self.pool.solved.fetch_add(1, Release);
+            }
+            Offer::Useless => {}
         }
     }
 
@@ -2480,15 +2523,9 @@ impl Worker<'_, '_> {
     /// its shortest solution if the phases below it have all ended now.
     fn phase_done(&mut self, ctx: &CubeCtx) {
         let phases = ctx.inner().phases;
-        let mut pass = ctx.pass.lock().unwrap();
-        while pass.phases_ended < phases
-            && ctx.phase_left[pass.phases_ended as usize].load(Acquire) == 0
-        {
-            pass.phases_ended += 1;
-        }
-        if !pass.candidate.is_empty() && pass.candidate_phase <= pass.phases_ended {
-            let solution = std::mem::take(&mut pass.candidate);
-            drop(pass);
+        let ended = |phase: u32| ctx.phase_left[phase as usize].load(Acquire) == 0;
+        let solution = ctx.pass.lock().unwrap().ended(phases, ended);
+        if let Some(solution) = solution {
             self.report_pass(ctx, solution);
         }
     }
@@ -3850,6 +3887,116 @@ mod tests {
             .collect();
         assert!(got.iter().eq(want.iter().map(|w| &w.2)));
         assert_eq!(inner.feasible, first + want.iter().filter(|w| !w.0).count());
+    }
+
+    /// Thread `id` of `pool` with `nlanes` lanes, driven by hand (as
+    /// `Pool::run` makes them).
+    fn hand_worker<'w, 'a>(
+        pool: &'w Pool<'a>,
+        solver: &'w Solver<'w>,
+        id: usize,
+        nlanes: usize,
+        done: &'w mut Done<'w>,
+    ) -> Worker<'w, 'a> {
+        Worker {
+            pool,
+            solver,
+            id,
+            done,
+            lanes: (0..nlanes).map(|_| SharedLane::new()).collect(),
+            active_lanes: 0,
+            locals: Vec::new(),
+            scratch: Box::new(Lane::new()),
+            bufs: Bufs::own(),
+            epoch: 0,
+            solved: 0,
+            split_wait: 0,
+            split_backoff: 0,
+            donate_wait: 0,
+            donate_backoff: 0,
+            counts: [0; NCOUNT],
+        }
+    }
+
+    /// A cube whose first build is a first pass of at least 3 phases (with
+    /// the tiny search of the tests above).
+    fn first_pass_cube(solver: &Solver) -> CubieCube {
+        let mut rng = crate::cubie::Rng(5);
+        loop {
+            let moves: Vec<u8> = (0..6)
+                .map(|_| u8::try_from(rng.below(18)).unwrap())
+                .collect();
+            let cube = CubieCube::SOLVED.apply_moves(&moves);
+            let root = Cube::from_cubie(&cube);
+            let target = solver
+                .lower_bound(root)
+                .max(solver.lower_bound(root.inverse()));
+            if (4..=6).contains(&target) {
+                return cube;
+            }
+        }
+    }
+
+    /// Start the next entry of `slot` in lane `li`, claiming more if needed
+    /// (false: none is left to claim).
+    fn take_next(worker: &mut Worker, li: usize, slot: usize) -> bool {
+        loop {
+            if worker.take(li, slot) {
+                return true;
+            }
+            if !worker.claim(slot) {
+                return false;
+            }
+        }
+    }
+
+    /// Run the entries of `slot` in lane `li` (from the one it runs), each
+    /// ended at once as if its search found nothing, up to the first of
+    /// phase `phase` or later, which is left running (false if none is).
+    fn run_up_to_phase(worker: &mut Worker, li: usize, slot: usize, phase: u8) -> bool {
+        loop {
+            if worker.lanes[li].slot != NO_SLOT {
+                if worker.lanes[li].phase >= phase {
+                    return true;
+                }
+                worker.end_job(li, false);
+            }
+            if !take_next(worker, li, slot) {
+                return false;
+            }
+        }
+    }
+
+    /// While a first pass's candidate is being reported (taken when the
+    /// phases below it ended), a solution found in a later phase, longer,
+    /// is of no use. (It was reported, and could be reported first.)
+    #[test]
+    fn first_pass_reports_no_longer_solution_while_reporting_one() {
+        let corners = Cocsep::truncated(4);
+        let table = H48Table::zeroed(0, 2);
+        let solver = Solver::new(&corners, &table);
+        let cube = first_pass_cube(&solver);
+        let get = |i: usize| (i == 0).then_some(cube);
+        let pool = Pool::new(&get, 1, 2);
+        let mut report = |_, _, _, _| {};
+        let mut worker = hand_worker(&pool, &solver, 0, 1, &mut report);
+        assert!(worker.fresh(0));
+        worker.active_lanes = 1;
+        let slot = worker.lanes[0].slot;
+        let ctx = worker.locals[slot].as_ref().unwrap().ctx.clone();
+        assert!(ctx.inner().phases >= 3);
+        // The worker ran phases 0 and 1, and runs an entry of a later one;
+        // another thread took a solution of phase 1 to report it.
+        assert!(run_up_to_phase(&mut worker, 0, slot, 2));
+        {
+            let mut pass = ctx.pass.lock().unwrap();
+            assert_eq!(pass.phases_ended, u32::from(worker.lanes[0].phase));
+            assert_eq!(pass.candidate, []);
+            pass.shortest = 2;
+        }
+        // The lane finds a solution (whatever its moves are here).
+        worker.found(0);
+        assert!(!ctx.done.load(Relaxed), "a longer solution was reported");
     }
 
     /// The staged sort (its tasks run in any order within a stage) gives
