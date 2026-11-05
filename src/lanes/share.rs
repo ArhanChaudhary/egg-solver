@@ -3600,6 +3600,109 @@ impl Worker<'_, '_> {
     }
 }
 
+// Fixed placement of a share worker's state and stack frames within a 4 KiB
+// page, for `solve` (s9). Zen 5 holds a load behind an older in-flight
+// store that matches it in address bits 11..0 in another page ("4K
+// aliasing"); a thread's stack starts at a fixed page offset, so these
+// offsets were sums of the callers' frame sizes, and an edit anywhere above
+// moved them (r8: a `Worker::new` shrank `Pool::run`'s frame by 0x140
+// bytes: solve -c 1 at 48T 8% slower). Kept apart from `Pool::run` (and
+// only used by `solve`), so that `bench` stays byte-identical.
+
+/// Page offset of the pinned `Worker`: 0x040, where main had it.
+#[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+const WORKER_OFFSET: usize = 0x40;
+
+/// Stack bytes between the worker's page boundary and the frame that calls
+/// the round loop: 384 puts `Worker::rounds`'s entry at page offset 0xe38,
+/// as on main (checked with gdb).
+#[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+const WORKER_DEPTH: usize = 384;
+
+/// The `Worker` at byte `WORKER_OFFSET` of a page-aligned stack slot.
+#[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+#[repr(C, align(4096))]
+struct PinnedWorker<'w, 'a> {
+    _pad: [std::mem::MaybeUninit<u8>; WORKER_OFFSET],
+    worker: Worker<'w, 'a>,
+}
+
+/// Calls `f` from a frame about `WORKER_DEPTH` bytes deeper.
+#[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+#[inline(never)]
+fn deeper<R>(f: impl FnOnce() -> R) -> R {
+    let pad = [std::mem::MaybeUninit::<u8>::uninit(); WORKER_DEPTH];
+    std::hint::black_box(&pad);
+    f()
+}
+
+impl Pool<'_> {
+    /// `run` with the worker's state and stack frames at fixed offsets
+    /// within a page (`PinnedWorker`, `WORKER_DEPTH`), as `solve` runs it:
+    /// main's offsets, so -c 1 is unchanged (48T table in s9's commit). (A
+    /// copy of `run` rather than a change to it: `bench` keeps main's code
+    /// layout byte for byte; every pinned layout of its stream loop tried ran
+    /// 0.3-1.5% slower at 1T than main's.)
+    pub fn run_pinned(
+        &self,
+        solver: &Solver,
+        nlanes: usize,
+        stop: &AtomicBool,
+        mut done: impl FnMut(usize, Vec<u8>, Stats, f64),
+    ) {
+        let id = self.next_thread_id.fetch_add(1, Relaxed);
+        if id < WARM_BUFFERS {
+            let inner = Inner::touched();
+            let mut bufs = Bufs::sized();
+            bufs.pooled = true;
+            self.spare.lock().push(inner);
+            self.bufs.lock().push(bufs);
+        }
+        let worker = Worker {
+            pool: self,
+            solver,
+            id,
+            done: &mut done,
+            lanes: (0..nlanes.max(1)).map(|_| SharedLane::new()).collect(),
+            active_lanes: 0,
+            locals: Vec::new(),
+            scratch: Box::new(Lane::new()),
+            bufs: Bufs::own(),
+            epoch: 0,
+            solved: 0,
+            split_wait: 0,
+            split_backoff: 0,
+            donate_wait: 0,
+            donate_backoff: 0,
+            counts: [0; NCOUNT],
+        };
+        // The worker in a page-aligned slot of this frame (realigned to a
+        // page), its loops' frames `WORKER_DEPTH` deeper.
+        #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+        let counts = {
+            let mut slot = PinnedWorker {
+                _pad: [std::mem::MaybeUninit::uninit(); WORKER_OFFSET],
+                worker,
+            };
+            let worker = &mut std::hint::black_box(&mut slot).worker;
+            deeper(|| {
+                worker.run(stop);
+                worker.counts
+            })
+        };
+        #[cfg(not(all(target_arch = "x86_64", target_os = "linux")))]
+        let counts = {
+            let mut worker = worker;
+            worker.run(stop);
+            worker.counts
+        };
+        let mut counters = self.counters.lock();
+        for (sum, count) in counters.iter_mut().zip(counts) {
+            *sum += count;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
