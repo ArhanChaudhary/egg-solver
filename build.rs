@@ -22,8 +22,14 @@ fn simd_bytes(cube: &cubie::CubieCube) -> [u8; 32] {
 
 /// Rust source of a list of numbers: `1,2,3`.
 fn list<T: std::fmt::Display>(values: impl IntoIterator<Item = T>) -> String {
-    let strings: Vec<String> = values.into_iter().map(|x| format!("{x}")).collect();
-    strings.join(",")
+    let mut text = String::new();
+    for (i, value) in values.into_iter().enumerate() {
+        if i > 0 {
+            text.push(',');
+        }
+        let _ = write!(text, "{value}");
+    }
+    text
 }
 
 /// Rust source of an `Aligned32` constant.

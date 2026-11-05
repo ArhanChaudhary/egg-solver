@@ -658,11 +658,18 @@ pub fn move_cubes() -> &'static [CubieCube; N_MOVES] {
 /// Singmaster name of a move: `U`, `U2`, `U'`, ...
 #[must_use]
 pub fn move_name(mv: u8) -> String {
-    let face = FACE_NAMES[usize::from(mv / 3)];
+    let mut name = String::with_capacity(2);
+    push_move_name(&mut name, mv);
+    name
+}
+
+/// Appends the Singmaster name of `mv` to `text`.
+fn push_move_name(text: &mut String, mv: u8) {
+    text.push(FACE_NAMES[usize::from(mv / 3)]);
     match mv % 3 {
-        0 => format!("{face}"),
-        1 => format!("{face}2"),
-        _ => format!("{face}'"),
+        0 => {}
+        1 => text.push('2'),
+        _ => text.push('\''),
     }
 }
 
@@ -696,11 +703,16 @@ pub fn parse_moves(text: &str) -> Option<Vec<u8>> {
 /// A move sequence in Singmaster notation, separated by spaces.
 #[must_use]
 pub fn format_moves(moves: &[u8]) -> String {
-    moves
-        .iter()
-        .map(|&mv| move_name(mv))
-        .collect::<Vec<_>>()
-        .join(" ")
+    // (One String, not a String per move, a Vec and a join: `solve -c 1`
+    // allocates 6.5 instead of 25.2 times per cube.)
+    let mut text = String::with_capacity(3 * moves.len());
+    for (i, &mv) in moves.iter().enumerate() {
+        if i > 0 {
+            text.push(' ');
+        }
+        push_move_name(&mut text, mv);
+    }
+    text
 }
 
 /// A symmetry of the cube: one of the 48 rotations and reflections that map
