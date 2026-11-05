@@ -533,6 +533,32 @@ fn face_letter(normal: Vec3) -> char {
     FACE_NAMES[face.expect("a face normal")]
 }
 
+/// Why a facelet string is not a cube (`CubieCube::from_facelets`).
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum FaceletError {
+    /// Not 54 stickers (whitespace aside).
+    #[error("{0} stickers, a cube has 54")]
+    StickerCount(usize),
+    /// Two centers of one color.
+    #[error("two centers are {0:?}")]
+    SameCenters(char),
+    /// A sticker (numbered from 1) of a color that no center has.
+    #[error("sticker {sticker} is {color:?}, no center's color")]
+    UnknownColor { sticker: usize, color: char },
+    /// The stickers at a corner position are no corner's colors.
+    #[error("corner {0}: no such piece")]
+    NoSuchCorner(usize),
+    /// The stickers at an edge position are no edge's colors.
+    #[error("edge {0}: no such piece")]
+    NoSuchEdge(usize),
+    /// Pieces of a cube, but in a position no face turns reach.
+    #[error(
+        "not a reachable position (a piece twice, a twisted corner, a flipped edge or two pieces swapped)"
+    )]
+    Unreachable,
+}
+
 impl CubieCube {
     /// The cube of a facelet string: 54 stickers, face by face in the order
     /// U R F D L B, each face row by row as seen from outside (U with B at
@@ -547,25 +573,28 @@ impl CubieCube {
     ///
     /// # Panics
     /// Never (every sticker is a facelet).
-    pub fn from_facelets(text: &str) -> Result<CubieCube, String> {
+    pub fn from_facelets(text: &str) -> Result<CubieCube, FaceletError> {
         let colors: Vec<char> = text.chars().filter(|c| !c.is_whitespace()).collect();
         if colors.len() != 54 {
-            return Err(format!("{} stickers, a cube has 54", colors.len()));
+            return Err(FaceletError::StickerCount(colors.len()));
         }
         // The face of each color, from the centers.
         let centers: [char; 6] = std::array::from_fn(|face| colors[9 * face + 4]);
         for (face, center) in centers.iter().enumerate() {
             if centers[..face].contains(center) {
-                return Err(format!("two centers are {center:?}"));
+                return Err(FaceletError::SameCenters(*center));
             }
         }
-        let normal_at = |sticker: Sticker| -> Result<Vec3, String> {
+        let normal_at = |sticker: Sticker| -> Result<Vec3, FaceletError> {
             let i = (0..54)
                 .find(|&i| facelet_sticker(i) == sticker)
                 .expect("every sticker has a facelet");
             let face = centers.iter().position(|&c| c == colors[i]);
             face.map(|face| FACELET_FACES[face].0)
-                .ok_or_else(|| format!("sticker {} is {:?}, no center's color", i + 1, colors[i]))
+                .ok_or(FaceletError::UnknownColor {
+                    sticker: i + 1,
+                    color: colors[i],
+                })
         };
         let mut cube = CubieCube::SOLVED;
         for position in 0..8 {
@@ -577,8 +606,7 @@ impl CubieCube {
                 let home = corner_stickers(piece);
                 (0..3).all(|j| seen[(twist + j) % 3] == home[j].normal)
             });
-            let (piece, twist) =
-                found.ok_or_else(|| format!("corner {position}: no such piece"))?;
+            let (piece, twist) = found.ok_or(FaceletError::NoSuchCorner(position))?;
             cube.corner_perm[position] = u8::try_from(piece).expect("below 8");
             cube.corner_orient[position] = u8::try_from(twist).expect("below 3");
         }
@@ -590,14 +618,14 @@ impl CubieCube {
                 let home = edge_stickers(piece);
                 (0..2).all(|j| seen[(flip + j) % 2] == home[j].normal)
             });
-            let (piece, flip) = found.ok_or_else(|| format!("edge {position}: no such piece"))?;
+            let (piece, flip) = found.ok_or(FaceletError::NoSuchEdge(position))?;
             cube.edge_perm[position] = u8::try_from(piece).expect("below 12");
             cube.edge_orient[position] = u8::try_from(flip).expect("below 2");
         }
         if cube.is_solvable() {
             Ok(cube)
         } else {
-            Err("not a reachable position (a piece twice, a twisted corner, a flipped edge or two pieces swapped)".to_string())
+            Err(FaceletError::Unreachable)
         }
     }
 

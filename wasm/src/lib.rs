@@ -120,7 +120,7 @@ fn parse_cube(text: &str) -> Result<CubieCube, String> {
         && symbols.len() == 6
         && !symbols.iter().any(|c| matches!(c, '1' | '2' | '3' | '\''));
     if is_facelets {
-        return CubieCube::from_facelets(text);
+        return CubieCube::from_facelets(text).map_err(|e| e.to_string());
     }
     parse_moves(text)
         .map(|moves| CubieCube::SOLVED.apply_moves(&moves))

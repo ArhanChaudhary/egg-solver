@@ -7,6 +7,12 @@ edition = "2021"
 crossbeam-utils = "0.8"
 hashbrown = "0.16"
 libc = "0.2"
+# The library's error types (`tables::TableError`, `cubie::FaceletError`).
+thiserror = "2"
+
+[build-dependencies]
+# (build.rs includes src/cubie.rs.)
+thiserror = "2"
 
 # parking_lot only where it can park a thread on stable Rust (not on wasm:
 # see lanes/share.rs).

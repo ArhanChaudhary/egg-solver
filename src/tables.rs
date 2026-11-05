@@ -11,6 +11,7 @@
 //!   and loaded from a file (58 GiB for h11).
 
 pub mod file;
+pub use file::TableError;
 
 use crate::coord::{cocsep, h11_key, reduce_key, N_CLASSES, N_COCSEP, N_MSPLIT, N_SLOTS};
 use crate::simd::Cube;
@@ -780,31 +781,22 @@ fn checked_meta(k: u32, base: u32) -> Option<H48Meta> {
 /// # Errors
 /// If neither can be read, or they do not hold `k <= 11` and a base of at
 /// most 12, or the trailer's data size is not that of `k`.
-pub fn read_meta(path: &str) -> std::io::Result<H48Meta> {
+pub fn read_meta(path: &str) -> Result<H48Meta, TableError> {
     if let Some(trailer) = file::read_trailer(path)? {
         return match checked_meta(trailer.k, u32::from(trailer.base)) {
             Some(meta) if trailer.data_bytes == h48_bytes(meta.k) => Ok(meta),
-            _ => Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("{path}: bad table trailer {trailer:?}"),
-            )),
+            _ => Err(TableError::BadTrailer {
+                path: path.to_string(),
+                trailer,
+            }),
         };
     }
-    let text = std::fs::read_to_string(meta_path(path)).map_err(|e| {
-        std::io::Error::new(
-            e.kind(),
-            format!(
-                "{path}: no table trailer, and no meta file {}: {e}",
-                meta_path(path)
-            ),
-        )
+    let text = std::fs::read_to_string(meta_path(path)).map_err(|source| TableError::NoMeta {
+        path: path.to_string(),
+        meta_path: meta_path(path),
+        source,
     })?;
-    let invalid = || {
-        std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            format!("bad table meta {text:?}"),
-        )
-    };
+    let invalid = || TableError::BadMeta(text.clone());
     let numbers: Vec<u32> = text
         .split_whitespace()
         .map(|x| x.parse().map_err(|_| invalid()))
@@ -820,7 +812,7 @@ impl H48Table {
     ///
     /// # Errors
     /// See `open_with`.
-    pub fn open(path: &str) -> std::io::Result<H48Table> {
+    pub fn open(path: &str) -> Result<H48Table, TableError> {
         H48Table::open_with(path, &file::LoadOptions::from_env())
     }
 
@@ -834,32 +826,36 @@ impl H48Table {
     ///
     /// # Panics
     /// If reading a copied table fails half-way.
-    pub fn open_with(path: &str, options: &file::LoadOptions) -> std::io::Result<H48Table> {
+    pub fn open_with(path: &str, options: &file::LoadOptions) -> Result<H48Table, TableError> {
         let meta = read_meta(path)?;
-        let len = usize::try_from(h48_bytes(meta.k)).map_err(std::io::Error::other)?;
+        let len = usize::try_from(h48_bytes(meta.k)).map_err(|_| TableError::TooLarge(meta.k))?;
         // A file of another `k` (a stale or wrong meta) would give wrong,
         // possibly too high, bounds: its size must match (plus a trailer;
         // hugetlbfs files are rounded up to whole 1 GiB pages).
-        let file_len = std::fs::metadata(path)?.len();
+        let io_error = file::io_error(path);
+        let file_len = std::fs::metadata(path).map_err(io_error)?.len();
         if file_len < len as u64 || file_len >= len as u64 + file::TRAILER_BYTES + file::HUGE_PAGE {
-            return Err(std::io::Error::other(format!(
-                "table file {path}: {file_len} bytes, but h{} needs {len}",
-                meta.k
-            )));
+            return Err(TableError::WrongSize {
+                path: path.to_string(),
+                bytes: file_len,
+                k: meta.k,
+                needed: len as u64,
+            });
         }
+        let io_error = file::io_error(path);
         if options.mode_for(path) == file::LoadMode::Map {
-            let memory = Memory::map_read_only(path, len, options.prefault)?;
+            let memory = Memory::map_read_only(path, len, options.prefault).map_err(io_error)?;
             return Ok(H48Table { memory, meta });
         }
         let memory = Memory::anonymous(len);
-        let table_file = std::fs::File::open(path)?;
+        let table_file = std::fs::File::open(path).map_err(io_error)?;
         #[cfg(unix)]
         read_parallel(&table_file, &memory, len);
         #[cfg(not(unix))]
         {
             // SAFETY: `len` bytes of our own memory.
             let buf = unsafe { std::slice::from_raw_parts_mut(memory.ptr(), len) };
-            std::io::Read::read_exact(&mut &table_file, buf)?;
+            std::io::Read::read_exact(&mut &table_file, buf).map_err(file::io_error(path))?;
         }
         Ok(H48Table { memory, meta })
     }
@@ -880,12 +876,11 @@ impl H48Table {
         memory: Memory,
         verify: bool,
         threads: usize,
-    ) -> std::io::Result<H48Table> {
-        let invalid = |what: String| std::io::Error::new(std::io::ErrorKind::InvalidData, what);
+    ) -> Result<H48Table, TableError> {
         let file_len = memory.len() as u64;
         let trailer_start = file_len
             .checked_sub(file::TRAILER_BYTES)
-            .ok_or_else(|| invalid(format!("{file_len} bytes: not a table file")))?;
+            .ok_or(TableError::NotATableFile(file_len))?;
         // (Slices of at most 1 GiB: wasm32 has no slices over 2 GiB, h7 is
         // 3.6 GiB.)
         let piece = |start: u64, len: u64| -> &[u8] {
@@ -901,17 +896,18 @@ impl H48Table {
             }
         };
         let trailer = file::Trailer::parse(piece(trailer_start, file::TRAILER_BYTES))?
-            .ok_or_else(|| invalid("no table trailer at the end".to_string()))?;
+            .ok_or(TableError::NoTrailer)?;
         let meta = checked_meta(trailer.k, u32::from(trailer.base))
             .filter(|meta| trailer.data_bytes == h48_bytes(meta.k))
-            .ok_or_else(|| invalid(format!("bad table trailer {trailer:?}")))?;
+            .ok_or(TableError::UnusableTrailer(trailer))?;
         // (As in `open_with`; hugetlbfs files have up to a page of slack.)
         let data_len = trailer.data_bytes;
         if trailer_start < data_len || trailer_start >= data_len + file::HUGE_PAGE {
-            return Err(invalid(format!(
-                "{file_len} bytes, but h{} needs {data_len} and a trailer",
-                meta.k
-            )));
+            return Err(TableError::WrongMemorySize {
+                bytes: file_len,
+                k: meta.k,
+                needed: data_len,
+            });
         }
         if let (true, Some(want)) = (verify, trailer.checksum) {
             // (Pieces of whole checksum chunks: the same chunk hashes as one
@@ -925,9 +921,7 @@ impl H48Table {
                 .collect();
             let got = file::combine_hashes(data_len, &hashes);
             if got != want {
-                return Err(invalid(format!(
-                    "checksum {got:016x}, the trailer says {want:016x}: the data is damaged"
-                )));
+                return Err(TableError::Checksum { got, want });
             }
         }
         Ok(H48Table { memory, meta })

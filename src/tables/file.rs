@@ -13,7 +13,7 @@
 //! a `<path>.meta` sidecar (`k base`), or, for the legacy tables on
 //! `/mnt/huge`, by `tables/<name>.hugemeta` in the build folder.
 
-use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
+use std::io::{Read, Seek, SeekFrom, Write};
 
 /// Size of the trailer at the end of a table file.
 pub const TRAILER_BYTES: u64 = 4096;
@@ -23,6 +23,87 @@ pub const LAYOUT: &str = "h48";
 
 /// Page size of hugetlbfs mounts used for tables (files there are whole pages).
 pub const HUGE_PAGE: u64 = 1 << 30;
+
+/// Why a table file (or the bytes of one in memory) cannot be read,
+/// written or used. Errors of the file at `path` carry its path.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum TableError {
+    /// Reading or writing the file failed.
+    #[error("{path}")]
+    Io {
+        path: String,
+        source: std::io::Error,
+    },
+    /// Neither a trailer nor a meta file gives the table's `k` and base.
+    #[error("{path}: no table trailer, and no meta file {meta_path}")]
+    NoMeta {
+        path: String,
+        meta_path: String,
+        source: std::io::Error,
+    },
+    /// A meta file that is not `k base`, or with values the search cannot
+    /// use (`k` above 11, a base above 12).
+    #[error("bad table meta {0:?}")]
+    BadMeta(String),
+    /// A trailer whose text does not parse.
+    #[error("table trailer: {0}")]
+    MalformedTrailer(String),
+    /// A trailer with values the search cannot use, or whose data size is
+    /// not that of its `k`.
+    #[error("{path}: bad table trailer {trailer:?}")]
+    BadTrailer { path: String, trailer: Trailer },
+    /// A file whose size does not match the table's `k`.
+    #[error("table file {path}: {bytes} bytes, but h{k} needs {needed}")]
+    WrongSize {
+        path: String,
+        bytes: u64,
+        k: u32,
+        needed: u64,
+    },
+    /// A table larger than the address space (h7 and up on wasm32).
+    #[error("h{0} is larger than the address space")]
+    TooLarge(u32),
+    /// `write_trailer`: no room after the data.
+    #[error("{path}: {bytes} bytes, no room for a trailer after {data_bytes} bytes of data")]
+    NoRoom {
+        path: String,
+        bytes: u64,
+        data_bytes: u64,
+    },
+    /// `write_trailer`: the trailer does not read back as written.
+    #[error("{path}: trailer reads back as {read:?}, wrote {wrote:?}")]
+    ReadBack {
+        path: String,
+        read: Option<Box<Trailer>>,
+        wrote: Box<Trailer>,
+    },
+    /// Table bytes in memory (`H48Table::from_file_memory`) shorter than a
+    /// trailer.
+    #[error("{0} bytes: not a table file")]
+    NotATableFile(u64),
+    /// Table bytes in memory without a trailer at the end.
+    #[error("no table trailer at the end")]
+    NoTrailer,
+    /// Table bytes in memory with an unusable trailer (as `BadTrailer`).
+    #[error("bad table trailer {0:?}")]
+    UnusableTrailer(Trailer),
+    /// Table bytes in memory of another size than their trailer's `k`
+    /// needs.
+    #[error("{bytes} bytes, but h{k} needs {needed} and a trailer")]
+    WrongMemorySize { bytes: u64, k: u32, needed: u64 },
+    /// The data's checksum is not the trailer's.
+    #[error("checksum {got:016x}, the trailer says {want:016x}: the data is damaged")]
+    Checksum { got: u64, want: u64 },
+}
+
+/// `TableError::Io` of the file at `path`.
+pub(crate) fn io_error(path: &str) -> impl FnOnce(std::io::Error) -> TableError + '_ {
+    move |source| TableError::Io {
+        path: path.to_string(),
+        source,
+    }
+}
 
 /// What a table's trailer says about it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -68,14 +149,14 @@ impl Trailer {
     /// magic line (a file without a trailer).
     ///
     /// # Errors
-    /// If the magic line is there but the rest is malformed.
-    pub fn parse(bytes: &[u8]) -> std::io::Result<Option<Trailer>> {
+    /// `MalformedTrailer` if the magic line is there but the rest is
+    /// malformed.
+    pub fn parse(bytes: &[u8]) -> Result<Option<Trailer>, TableError> {
         let Some(rest) = bytes.strip_prefix(MAGIC.as_bytes()) else {
             return Ok(None);
         };
         let end = rest.iter().position(|&b| b == 0).unwrap_or(rest.len());
-        let invalid =
-            |what: &str| Error::new(ErrorKind::InvalidData, format!("table trailer: {what}"));
+        let invalid = |what: &str| TableError::MalformedTrailer(what.to_string());
         let text = std::str::from_utf8(&rest[..end]).map_err(|_| invalid("not text"))?;
         let (mut k, mut base, mut data_bytes) = (None, None, None);
         let (mut distribution, mut checksum) = (None, None);
@@ -83,7 +164,7 @@ impl Trailer {
             let mut words = line.split_whitespace();
             let key = words.next().unwrap_or("");
             let values: Vec<&str> = words.collect();
-            let number = |i: usize| -> std::io::Result<u64> {
+            let number = |i: usize| -> Result<u64, TableError> {
                 values
                     .get(i)
                     .and_then(|v| v.parse().ok())
@@ -175,16 +256,22 @@ pub fn file_bytes(data_bytes: u64, hugetlbfs: bool) -> u64 {
 ///
 /// # Panics
 /// Never (a constant conversion).
-pub fn read_trailer(path: &str) -> std::io::Result<Option<Trailer>> {
-    let f = std::fs::File::open(path)?;
-    let len = f.metadata()?.len();
-    if len < TRAILER_BYTES {
-        return Ok(None);
+pub fn read_trailer(path: &str) -> Result<Option<Trailer>, TableError> {
+    let read = || -> std::io::Result<Option<Vec<u8>>> {
+        let f = std::fs::File::open(path)?;
+        let len = f.metadata()?.len();
+        if len < TRAILER_BYTES {
+            return Ok(None);
+        }
+        let mut buf = vec![0u8; usize::try_from(TRAILER_BYTES).unwrap()];
+        (&f).seek(SeekFrom::Start(len - TRAILER_BYTES))?;
+        (&f).read_exact(&mut buf)?;
+        Ok(Some(buf))
+    };
+    match read().map_err(io_error(path))? {
+        Some(buf) => Trailer::parse(&buf),
+        None => Ok(None),
     }
-    let mut buf = vec![0u8; usize::try_from(TRAILER_BYTES).unwrap()];
-    (&f).seek(SeekFrom::Start(len - TRAILER_BYTES))?;
-    (&f).read_exact(&mut buf)?;
-    Trailer::parse(&buf)
 }
 
 /// Write `trailer` into the last 4 KiB of an existing table file, then read
@@ -197,17 +284,19 @@ pub fn read_trailer(path: &str) -> std::io::Result<Option<Trailer>> {
 ///
 /// # Panics
 /// If the file is larger than the address space.
-pub fn write_trailer(path: &str, trailer: &Trailer) -> std::io::Result<()> {
+pub fn write_trailer(path: &str, trailer: &Trailer) -> Result<(), TableError> {
     let f = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
-        .open(path)?;
-    let len = f.metadata()?.len();
+        .open(path)
+        .map_err(io_error(path))?;
+    let len = f.metadata().map_err(io_error(path))?.len();
     if len < trailer.data_bytes + TRAILER_BYTES {
-        return Err(Error::other(format!(
-            "{path}: {len} bytes, no room for a trailer after {} bytes of data",
-            trailer.data_bytes
-        )));
+        return Err(TableError::NoRoom {
+            path: path.to_string(),
+            bytes: len,
+            data_bytes: trailer.data_bytes,
+        });
     }
     let offset = len - TRAILER_BYTES;
     let bytes = trailer.to_bytes();
@@ -229,7 +318,7 @@ pub fn write_trailer(path: &str, trailer: &Trailer) -> std::io::Result<()> {
                 libc::off_t::try_from(page_start).unwrap(),
             );
             if p == libc::MAP_FAILED {
-                return Err(Error::last_os_error());
+                return Err(io_error(path)(std::io::Error::last_os_error()));
             }
             let dst = p
                 .cast::<u8>()
@@ -239,19 +328,24 @@ pub fn write_trailer(path: &str, trailer: &Trailer) -> std::io::Result<()> {
         }
         return read_back(path, trailer);
     }
-    (&f).seek(SeekFrom::Start(offset))?;
-    (&f).write_all(&bytes)?;
-    f.sync_data()?;
+    let write = || -> std::io::Result<()> {
+        (&f).seek(SeekFrom::Start(offset))?;
+        (&f).write_all(&bytes)?;
+        f.sync_data()
+    };
+    write().map_err(io_error(path))?;
     read_back(path, trailer)
 }
 
 /// Check that the trailer of `path` reads back as `trailer`.
-fn read_back(path: &str, trailer: &Trailer) -> std::io::Result<()> {
+fn read_back(path: &str, trailer: &Trailer) -> Result<(), TableError> {
     match read_trailer(path)? {
         Some(t) if t == *trailer => Ok(()),
-        other => Err(Error::other(format!(
-            "{path}: trailer reads back as {other:?}, wrote {trailer:?}"
-        ))),
+        read => Err(TableError::ReadBack {
+            path: path.to_string(),
+            read: read.map(Box::new),
+            wrote: Box::new(*trailer),
+        }),
     }
 }
 
