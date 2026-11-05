@@ -26,6 +26,12 @@ use crate::tables::{packed_class, packed_depth, packed_sym_to_rep, Cocsep, H48Ta
 
 /// All 18 moves (the low 18 bits).
 pub const ALL_MOVES: u32 = u32::MAX.unbounded_shr(32 - 18);
+
+/// The largest target (iteration depth) searched: every position is solved
+/// in at most 20 moves (God's number), so needing a later iteration means
+/// an unsolvable cube or a table whose bounds are too high, and the cube is
+/// given up (no solution). It also bounds the search stacks' depth.
+pub const MAX_TARGET: u8 = 20;
 /// Quarter turns only (moves with m % 3 != 1).
 pub const QUARTER_TURNS: u32 = 0b101_101_101_101_101_101;
 
@@ -293,12 +299,14 @@ impl<'a> Solver<'a> {
         }
     }
 
-    /// Find one optimal solution.
+    /// Find one optimal solution: `None` if there is none within
+    /// `MAX_TARGET` moves (an unsolvable cube, or a table whose bounds are
+    /// too high).
     #[must_use]
-    pub fn solve(&self, cube: &CubieCube) -> (Vec<u8>, Stats) {
+    pub fn solve(&self, cube: &CubieCube) -> (Option<Vec<u8>>, Stats) {
         let cube = Cube::from_cubie(cube);
         if cube.is_solved() {
-            return (vec![], Stats::default());
+            return (Some(vec![]), Stats::default());
         }
         let inverse = cube.inverse();
         let normal_bound = self.lower_bound(cube);
@@ -323,8 +331,12 @@ impl<'a> Solver<'a> {
         }];
         let mut target = normal_bound.max(inverse_bound).max(1);
         loop {
+            // (Also keeps the moves within `SearchState::moves`.)
+            if target > MAX_TARGET {
+                return (None, state.stats);
+            }
             let job_len = self.job_len(target);
-            while (jobs[0].len as usize) < job_len {
+            while jobs.first().is_some_and(|j| usize::from(j.len) < job_len) {
                 jobs = Self::extend_jobs(&jobs, &filter);
                 self.job_bounds(&mut jobs);
             }
@@ -357,7 +369,14 @@ impl<'a> Solver<'a> {
                 if normal_bound == remaining_depth {
                     inverse_moves &= QUARTER_TURNS;
                 }
-                state.moves[..j.len as usize].copy_from_slice(&j.moves[..j.len as usize]);
+                for (to, &mv) in state
+                    .moves
+                    .iter_mut()
+                    .zip(&j.moves)
+                    .take(usize::from(j.len))
+                {
+                    *to = mv;
+                }
                 state.n_moves = j.len as usize;
                 state.n_premoves = 0;
                 let found = self.search(
@@ -376,7 +395,7 @@ impl<'a> Solver<'a> {
                     for k in (0..state.n_premoves).rev() {
                         solution.push(inverse_move(state.premoves[k]));
                     }
-                    return (solution, state.stats);
+                    return (Some(solution), state.stats);
                 }
             }
             target += 1;

@@ -1126,7 +1126,7 @@ fn read_parallel(table_file: &std::fs::File, memory: &Memory, len: usize) -> std
             match std::thread::Builder::new().spawn_scoped(s, read) {
                 Ok(thread) => spawned.push(thread),
                 Err(_) => {
-                    result = result.and(unsafe { read_range(table_file, memory, start, end) })
+                    result = result.and(unsafe { read_range(table_file, memory, start, end) });
                 }
             }
         }

@@ -3,6 +3,7 @@
 //! For speed use `solve` (the `lanes` search) instead.
 //!
 //! Usage: cubeopt <table path>
+
 use anyhow::Context as _;
 use clap::Parser;
 use cubeopt::cli::{self, LoadArgs, Verbosity};
@@ -53,6 +54,10 @@ fn run(args: &Args) -> anyhow::Result<ExitCode> {
         };
         let start = std::time::Instant::now();
         let (solution, stats) = solver.solve(&cube);
+        let Some(solution) = solution else {
+            println!("no solution within 20 moves (is the table damaged?)");
+            continue;
+        };
         println!(
             "{} ({}) {:.3}s nodes {}",
             format_moves(&solution),

@@ -132,8 +132,12 @@ fn parse_cube(text: &str) -> Result<CubieCube, String> {
         .ok_or_else(|| format!("neither a scramble nor 54 facelets: {text:?}"))
 }
 
-/// A solved cube as JSON.
-fn result_json(index: usize, solution: &[u8], stats: Stats, seconds: f64) -> String {
+/// A solved cube as JSON (`{"index":..,"error":..}` if it has no
+/// solution).
+fn result_json(index: usize, solution: Option<&[u8]>, stats: Stats, seconds: f64) -> String {
+    let Some(solution) = solution else {
+        return format!(r#"{{"index":{index},"error":"{NO_SOLUTION}"}}"#);
+    };
     format!(
         r#"{{"index":{index},"moves":"{}","length":{},"nodes":{},"lookups":{},"seconds":{seconds:.6}}}"#,
         format_moves(solution),
@@ -142,6 +146,9 @@ fn result_json(index: usize, solution: &[u8], stats: Stats, seconds: f64) -> Str
         stats.lookups
     )
 }
+
+/// Why a cube has no solution (see `solver::MAX_TARGET`).
+const NO_SOLUTION: &str = "no solution within 20 moves: is the table damaged?";
 
 /// Threads to use: as asked (0: all the host offers), 1 without threads.
 fn threads_for(asked: u32) -> usize {
@@ -299,9 +306,9 @@ pub unsafe extern "C" fn cubeopt_solve(
         let threads = threads_for(threads);
         let get = |i: usize| (i == 0).then_some(cube);
         let result = Mutex::new(None);
-        let done = |i: usize, solution: Vec<u8>, stats: Stats, seconds: f64| {
+        let done = |i: usize, solution: Option<Vec<u8>>, stats: Stats, seconds: f64| {
             *result.lock().unwrap_or_else(PoisonError::into_inner) =
-                Some(result_json(i, &solution, stats, seconds));
+                Some(solution.map(|solution| result_json(i, Some(&solution), stats, seconds)));
         };
         // (`share::solve_all`, on `on_threads`: the pool's threads in the
         // threads build, this thread alone in the other.)
@@ -314,7 +321,9 @@ pub unsafe extern "C" fn cubeopt_solve(
         })
         .map_err(|e| e.to_string())?;
         let result = result.into_inner().unwrap_or_else(PoisonError::into_inner);
-        result.ok_or_else(|| "not solved".to_string())
+        result
+            .ok_or("not solved")?
+            .ok_or_else(|| NO_SOLUTION.to_string())
     })
 }
 
@@ -345,11 +354,11 @@ pub unsafe extern "C" fn cubeopt_solve_batch(
         let lanes = lanes_for(lanes);
         let get = |i: usize| cubes.get(i).copied();
         let results = Mutex::new(vec![String::new(); cubes.len()]);
-        let done = |i: usize, solution: Vec<u8>, stats: Stats, seconds: f64| {
+        let done = |i: usize, solution: Option<Vec<u8>>, stats: Stats, seconds: f64| {
             // (`i` is the index of a cube: `get` has no others.)
             let mut results = results.lock().unwrap_or_else(PoisonError::into_inner);
             if let Some(slot) = results.get_mut(i) {
-                *slot = result_json(i, &solution, stats, seconds);
+                *slot = result_json(i, solution.as_deref(), stats, seconds);
             }
         };
         stream(
@@ -395,7 +404,7 @@ pub extern "C" fn cubeopt_bench(
         // (solves, nodes, lookups) in the window.
         let counted = Mutex::new((0u64, 0u64, 0u64));
         let start = std::time::Instant::now();
-        let done = |_: usize, _: Vec<u8>, stats: Stats, _: f64| {
+        let done = |_: usize, _: Option<Vec<u8>>, stats: Stats, _: f64| {
             let at = start.elapsed().as_secs_f64();
             if at >= warmup + window {
                 stop.store(true, std::sync::atomic::Ordering::Relaxed);
@@ -434,7 +443,7 @@ fn stream(
     lanes: usize,
     threads: usize,
     stop: &AtomicBool,
-    done: &(dyn Fn(usize, Vec<u8>, Stats, f64) + Sync),
+    done: &(dyn Fn(usize, Option<Vec<u8>>, Stats, f64) + Sync),
 ) -> Result<(), String> {
     let next = AtomicUsize::new(0);
     cubeopt::parallel::on_threads(threads, |_| {

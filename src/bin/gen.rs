@@ -23,6 +23,7 @@
 //! ```
 //! On a terminal, long steps show a progress bar on stderr; elsewhere (logs,
 //! pipes) stderr has the progress lines only.
+
 use anyhow::Context as _;
 use clap::{Args, Parser, Subcommand};
 use cubeopt::cli::{self, preflight, BadInput, Verbosity};

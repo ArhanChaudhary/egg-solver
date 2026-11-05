@@ -57,7 +57,7 @@
 use super::{job_weight, moves_after, Job, Lane, Node, Phase, Step, MAXD, MAX_JOB_LEN};
 use crate::cubie::CubieCube;
 use crate::simd::Cube;
-use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES};
+use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES, MAX_TARGET};
 use crate::symstart::SymFilter;
 use crossbeam_utils::CachePadded;
 // parking_lot's Mutex instead of std's for the share mode's mutexes (native
@@ -119,8 +119,10 @@ const TAIL_LANES: usize = 8;
 const NO_SLOT: usize = usize::MAX;
 
 /// Called once per cube: (index, solution, stats, seconds from its start to
-/// its solution).
-pub type Done<'d> = dyn FnMut(usize, Vec<u8>, Stats, f64) + 'd;
+/// its solution). The solution is `None` if there is none within
+/// `MAX_TARGET` moves (an unsolvable cube, or a table whose bounds are too
+/// high).
+pub type Done<'d> = dyn FnMut(usize, Option<Vec<u8>>, Stats, f64) + 'd;
 
 /// Iteration data, written only by the thread that builds an iteration, while
 /// no job of the cube is outstanding (nobody else reads it then).
@@ -465,8 +467,8 @@ struct CubeCtx {
     parts: Pad<AtomicU32>,
     /// Written now and then (not to disturb the read-mostly fields).
     rarely_written: Pad<RarelyWritten>,
-    /// (solution, seconds).
-    result: Mutex<(Vec<u8>, f64)>,
+    /// (solution, seconds): `None` until solved, or if given up.
+    result: Mutex<(Option<Vec<u8>>, f64)>,
     /// A first pass's shortest solution so far.
     pass: Mutex<PassState>,
     inner: UnsafeCell<Inner>,
@@ -840,13 +842,13 @@ impl<'a> Pool<'a> {
 
     /// Work on the pool with `nlanes` interleaved lanes until all cubes are
     /// solved or `stop` is set. Calls `done(index, solution, stats,
-    /// seconds)` for the cubes whose last worker is this thread.
+    /// seconds)` (see `Done`) for the cubes whose last worker is this thread.
     pub fn run(
         &self,
         solver: &Solver,
         nlanes: usize,
         stop: &AtomicBool,
-        mut done: impl FnMut(usize, Vec<u8>, Stats, f64),
+        mut done: impl FnMut(usize, Option<Vec<u8>>, Stats, f64),
     ) {
         let id = self.next_thread_id.fetch_add(1, Relaxed);
         if id < WARM_BUFFERS {
@@ -1018,22 +1020,42 @@ fn keep_open(ctx: &Arc<CubeCtx>) -> bool {
 
 /// Solve all cubes of `cubes` (until it returns None) with `threads` threads
 /// of `nlanes` lanes, at most `max_active` cubes at a time; `done` is called
-/// once per cube (from any thread).
+/// once per cube (from any thread; see `Done`).
+///
+/// # Errors
+/// If a thread cannot be started (the others are stopped), or panicked.
 pub fn solve_all(
     solver: &Solver,
     cubes: &(dyn Fn(usize) -> Option<CubieCube> + Sync),
     threads: usize,
     nlanes: usize,
     max_active: usize,
-    done: &(dyn Fn(usize, Vec<u8>, Stats, f64) + Sync),
-) {
+    done: &(dyn Fn(usize, Option<Vec<u8>>, Stats, f64) + Sync),
+) -> std::io::Result<()> {
     let pool = Pool::new(cubes, max_active, threads);
     let stop = AtomicBool::new(false);
     std::thread::scope(|scope| {
+        let mut spawned = Vec::with_capacity(threads.max(1));
+        let mut result = Ok(());
         for _ in 0..threads.max(1) {
-            scope.spawn(|| pool.run(solver, nlanes, &stop, done));
+            match std::thread::Builder::new()
+                .spawn_scoped(scope, || pool.run(solver, nlanes, &stop, done))
+            {
+                Ok(thread) => spawned.push(thread),
+                Err(error) => {
+                    stop.store(true, Relaxed);
+                    result = Err(error);
+                    break;
+                }
+            }
         }
-    });
+        for thread in spawned {
+            if thread.join().is_err() {
+                result = Err(std::io::Error::other("a share thread panicked"));
+            }
+        }
+        result
+    })
 }
 
 /// A thread's share of a cube: jobs claimed and the stats of its lanes.
@@ -1159,9 +1181,8 @@ fn build(
     }
     inner.build_started = now;
     inner.extended = now;
-    if !first {
-        inner.target += 1;
-    }
+    // (The next target, after the first.)
+    inner.target += u8::from(!first);
     // The iterations up to the first one with jobs of `FIRST_PASS_JOB_LEN`
     // moves (from a target at most `first_pass_span` below) run as one pass
     // on its jobs, without barriers (`Inner::phases`): the ones below it
@@ -1174,6 +1195,7 @@ fn build(
     let pass_target = solver.base + 3 + FIRST_PASS_JOB_LEN;
     inner.phases = 1;
     if inner.target < pass_target
+        && pass_target <= MAX_TARGET
         && inner.target + pool.first_pass_span >= pass_target
         && usize::from(inner.target) > solver.job_len(pass_target)
     {
@@ -1181,9 +1203,10 @@ fn build(
         inner.target = pass_target;
     }
     inner.sort_by_bounds = first;
+    // The stack depth stays below the target, at most `MAX_TARGET` (< `MAXD`; only
+    // a first bound above it is lowered: nothing is found, `settle` gives up).
+    inner.target = inner.target.min(MAX_TARGET);
     let target = inner.target;
-    // (As in `start_iteration`: the stack depth stays below the target.)
-    assert!((target as usize) < MAXD);
     // Stream mode's prefixes: 4-move prefixes from iteration 15 on cost +8%
     // -c 1 latency at 48T (l6-share-2).
     let job_len = solver.job_len(target);
@@ -1251,7 +1274,7 @@ fn build(
             }
             bufs.child_offsets.push(offset);
             bufs.out.clear();
-            assert!(offset as usize <= bufs.out.capacity());
+            bufs.out.reserve(offset as usize); // (the tasks write via `out_ptr`)
             bufs.out_ptr = TaskPtr(bufs.out.as_mut_ptr());
             open_stage(pool, ctx, ST_EXT, bufs.child_offsets.len() - 1);
             return true;
@@ -1736,13 +1759,16 @@ fn sort_setup(inner: &mut Inner) -> usize {
     bufs.splitters = sample;
     bufs.bucket_counts.clear();
     bufs.bucket_counts.resize(chunks * NBUCKETS, 0);
+    // (Room for `n` entries in each buffer that the tasks write through its
+    // pointer: the buffers are sized for them already.)
     for keys in [&mut bufs.keys, &mut bufs.keys_tmp] {
         keys.clear();
-        assert!(n <= keys.capacity());
+        keys.reserve(n);
     }
     bufs.key_buckets.clear();
+    bufs.key_buckets.reserve(n);
     bufs.out.clear();
-    assert!(n <= bufs.key_buckets.capacity() && n <= bufs.out.capacity());
+    bufs.out.reserve(n);
     bufs.keys_ptr = TaskPtr(bufs.keys.as_mut_ptr());
     bufs.keys_tmp_ptr = TaskPtr(bufs.keys_tmp.as_mut_ptr());
     bufs.key_buckets_ptr = TaskPtr(bufs.key_buckets.as_mut_ptr());
@@ -1752,8 +1778,9 @@ fn sort_setup(inner: &mut Inner) -> usize {
         bufs.lead_counts.clear();
         bufs.lead_counts.resize(chunks * LEAD_BUCKETS, 0);
         bufs.rest_children.clear();
+        bufs.rest_children.reserve(n);
         inner.runs.clear();
-        assert!(n <= bufs.rest_children.capacity() && 2 * n <= inner.runs.capacity());
+        inner.runs.reserve(2 * n);
         bufs.rest_children_ptr = TaskPtr(bufs.rest_children.as_mut_ptr());
         bufs.lead_counts_ptr = TaskPtr(bufs.lead_counts.as_mut_ptr());
         bufs.runs_ptr = TaskPtr(inner.runs.as_mut_ptr());
@@ -2078,9 +2105,15 @@ fn build_task(
                 let bufs = &inner.b;
                 let first = bufs.child_offsets[task] as usize;
                 let children = bufs.child_offsets[task + 1] as usize - first;
-                assert_eq!(scratch.jobs.len(), children);
+                // `kept_children` counted exactly the children that
+                // `extend_jobs` keeps (the same `keep` filter on the same
+                // canonical moves; a filter that dedups never extends in
+                // parallel). (Should they differ, the copy still reads no
+                // more jobs than there are.)
+                debug_assert_eq!(scratch.jobs.len(), children);
                 let out = bufs.out_ptr.0.add(first);
-                std::ptr::copy_nonoverlapping(scratch.jobs.as_ptr(), out, children);
+                let copied = scratch.jobs.len().min(children);
+                std::ptr::copy_nonoverlapping(scratch.jobs.as_ptr(), out, copied);
             }
             _ => sort_task(inner, stage, task),
         }
@@ -2099,7 +2132,8 @@ fn build_task(
         match stage {
             ST_EXT => {
                 let bufs = &mut inner.b;
-                let children = *bufs.child_offsets.last().unwrap() as usize;
+                // (The last offset is the total: `build` pushes it.)
+                let children = bufs.child_offsets.last().map_or(0, |&end| end as usize);
                 // SAFETY: the tasks wrote all of `out`.
                 unsafe { bufs.out.set_len(children) };
                 std::mem::swap(&mut inner.jobs, &mut bufs.out);
@@ -2515,7 +2549,12 @@ impl Worker<'_, '_> {
     /// are then dropped (`take`, `cancel_done`).
     fn found(&mut self, i: usize) {
         let sl = &self.lanes[i];
-        let ctx = &self.locals[sl.slot].as_ref().unwrap().ctx;
+        // (Always joined: a lane with a job holds its cube's slot, as
+        // `end_job` relies on.)
+        let Some(Some(local)) = self.locals.get(sl.slot) else {
+            return;
+        };
+        let ctx = &local.ctx;
         if ctx.inner().phases == 1 {
             self.report(i);
             return;
@@ -2567,13 +2606,17 @@ impl Worker<'_, '_> {
             );
         }
         self.counts[C_PASS_SOLUTIONS] += 1;
-        self.publish_solution(ctx, solution, seconds);
+        self.publish_solution(ctx, Some(solution), seconds);
     }
 
     /// Record lane `i`'s solution if it is the first for its cube.
     fn report(&mut self, i: usize) {
         let sl = &self.lanes[i];
-        let ctx = &self.locals[sl.slot].as_ref().unwrap().ctx;
+        // (Always joined, as in `found`.)
+        let Some(Some(local)) = self.locals.get(sl.slot) else {
+            return;
+        };
+        let ctx = &local.ctx;
         if ctx.done.swap(true, AcqRel) {
             return;
         }
@@ -2582,11 +2625,21 @@ impl Worker<'_, '_> {
         if self.pool.trace {
             trace_found(self.pool, ctx, sl, self.active_lanes, seconds);
         }
-        self.publish_solution(ctx, solution, seconds);
+        self.publish_solution(ctx, Some(solution), seconds);
     }
 
-    /// `ctx` is solved (`done` was set by this thread): publish the result.
-    fn publish_solution(&self, ctx: &CubeCtx, solution: Vec<u8>, seconds: f64) {
+    /// Give `ctx` up (no solution within `MAX_TARGET` moves), unless it is
+    /// solved already.
+    fn give_up(&mut self, ctx: &CubeCtx) {
+        if ctx.done.swap(true, AcqRel) {
+            return;
+        }
+        self.publish_solution(ctx, None, ctx.started.elapsed().as_secs_f64());
+    }
+
+    /// `ctx` is solved or given up (`done` was set by this thread): publish
+    /// the result.
+    fn publish_solution(&self, ctx: &CubeCtx, solution: Option<Vec<u8>>, seconds: f64) {
         *ctx.result.lock() = (solution, seconds);
         self.pool.active.fetch_sub(1, AcqRel);
         self.pool.epoch.fetch_add(1, Release);
@@ -3008,6 +3061,11 @@ impl Worker<'_, '_> {
             if self.pass_solution(&ctx) {
                 return;
             }
+            // No iteration past `MAX_TARGET` (see `build`): no solution.
+            if ctx.inner().target >= MAX_TARGET {
+                self.give_up(&ctx);
+                return;
+            }
             self.counts[C_BUILDS] += 1;
             if build(
                 &mut self.scratch,
@@ -3024,7 +3082,10 @@ impl Worker<'_, '_> {
 
     /// Leave the cube in `slot` (nothing pending).
     fn release(&mut self, slot: usize) {
-        let loc = self.locals[slot].take().unwrap();
+        // (Always joined: see `settle`.)
+        let Some(loc) = self.locals.get_mut(slot).and_then(Option::take) else {
+            return;
+        };
         // (`counted_down`: every path that ends the last pending job of a
         // cube settles it, also at the exit of `run`.)
         debug_assert!(loc.pending == 0 && loc.claimed == 0);
@@ -3070,6 +3131,11 @@ impl Worker<'_, '_> {
                 Err(now) => parts = now,
             }
         }
+        Some(self.add_local(ctx))
+    }
+
+    /// Join `ctx`, for which this thread has taken a part: its new slot.
+    fn add_local(&mut self, ctx: &Arc<CubeCtx>) -> usize {
         let loc = Local {
             ctx: ctx.clone(),
             next: 0,
@@ -3083,12 +3149,17 @@ impl Worker<'_, '_> {
             iteration_nodes: 0,
             iteration_jobs: 0,
         };
-        if let Some(slot) = self.locals.iter().position(Option::is_none) {
-            self.locals[slot] = Some(loc);
-            Some(slot)
+        let free = self
+            .locals
+            .iter_mut()
+            .enumerate()
+            .find(|(_, l)| l.is_none());
+        if let Some((slot, free)) = free {
+            *free = Some(loc);
+            slot
         } else {
             self.locals.push(Some(loc));
-            Some(self.locals.len() - 1)
+            self.locals.len() - 1
         }
     }
 
@@ -3116,7 +3187,7 @@ impl Worker<'_, '_> {
             let root = Cube::from_cubie(&cubie);
             if root.is_solved() {
                 pool.active.fetch_sub(1, AcqRel);
-                (self.done)(index, vec![], Stats::default(), 0.0);
+                (self.done)(index, Some(vec![]), Stats::default(), 0.0);
                 continue;
             }
             let root_inverse = root.inverse();
@@ -3144,7 +3215,7 @@ impl Worker<'_, '_> {
                     pass_limit: AtomicU8::new(u8::MAX),
                     ..RarelyWritten::default()
                 }),
-                result: Mutex::new((vec![], 0.0)),
+                result: Mutex::new((None, 0.0)),
                 pass: Mutex::new(PassState::default()),
                 task_log: (0..1024).map(|_| Default::default()).collect(),
                 thread_done_ns: (0..pool.nthreads).map(|_| AtomicU64::new(0)).collect(),
@@ -3166,8 +3237,10 @@ impl Worker<'_, '_> {
                 inner.extended = started;
             }
             // Join before `build` publishes the cube: from then on another
-            // thread may solve and report it, and joining would fail.
-            let slot = self.local(&ctx).unwrap();
+            // thread may solve and report it, and joining would fail. (Not
+            // yet: the "unsolved" part, which this thread holds, keeps it.)
+            ctx.parts.fetch_add(1, AcqRel);
+            let slot = self.add_local(&ctx);
             if build(&mut self.scratch, &mut self.bufs, solver, pool, &ctx, true) {
                 while build_task(&mut self.scratch, solver, pool, &ctx, self.id) {}
             }
@@ -3329,8 +3402,9 @@ impl Worker<'_, '_> {
         let Some((busy, depth, give)) = self.find_split(SPLIT_R_LOCAL, li) else {
             return false;
         };
+        // (Two lanes: `find_split` excludes lane `li`.)
         let Ok([from, to]) = self.lanes.get_disjoint_mut([busy, li]) else {
-            unreachable!("`find_split` excludes lane `li`");
+            return false;
         };
         // SAFETY: `find_split` returns a depth of the lane's stack (below
         // MAXD).
@@ -3655,7 +3729,7 @@ impl Pool<'_> {
         solver: &Solver,
         nlanes: usize,
         stop: &AtomicBool,
-        mut done: impl FnMut(usize, Vec<u8>, Stats, f64),
+        mut done: impl FnMut(usize, Option<Vec<u8>>, Stats, f64),
     ) {
         let id = self.next_thread_id.fetch_add(1, Relaxed);
         if id < WARM_BUFFERS {
@@ -3768,7 +3842,10 @@ mod tests {
         let solutions = solutions
             .into_iter()
             .enumerate()
-            .map(|(i, s)| s.unwrap_or_else(|| panic!("cube {i} not reported")))
+            .map(|(i, s)| {
+                s.flatten()
+                    .unwrap_or_else(|| panic!("cube {i} not reported or solved"))
+            })
             .collect();
         let counts = *pool.counters.lock();
         (solutions, counts)
@@ -3812,7 +3889,10 @@ mod tests {
                 CubieCube::SOLVED.apply_moves(&moves).unwrap()
             })
             .collect();
-        let optimal: Vec<usize> = cubes.iter().map(|c| solver.solve(c).0.len()).collect();
+        let optimal: Vec<usize> = cubes
+            .iter()
+            .map(|c| solver.solve(c).0.unwrap().len())
+            .collect();
         // (threads, lanes per thread, cubes in progress)
         let configs: &[(usize, usize, usize)] = if cfg!(miri) {
             &[(3, 2, usize::MAX), (2, 1, 1)]
@@ -3862,7 +3942,10 @@ mod tests {
                 CubieCube::SOLVED.apply_moves(&moves).unwrap()
             })
             .collect();
-        let optimal: Vec<usize> = cubes.iter().map(|c| solver.solve(c).0.len()).collect();
+        let optimal: Vec<usize> = cubes
+            .iter()
+            .map(|c| solver.solve(c).0.unwrap().len())
+            .collect();
         let configs: &[(usize, usize, usize)] = if cfg!(miri) {
             &[(2, 2, 1)]
         } else {
@@ -4185,7 +4268,7 @@ mod tests {
         second.release_done();
         let joined = first.locals.iter().chain(&second.locals);
         assert!(joined.flatten().next().is_none());
-        assert_eq!(*reported.lock(), [(0, vec![0])]);
+        assert_eq!(*reported.lock(), [(0, Some(vec![0]))]);
     }
 
     /// While a first pass's candidate is being reported (taken when the

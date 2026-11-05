@@ -148,7 +148,7 @@ fn solve_all(
     mode: &str,
     threads: usize,
     lanes: usize,
-    record: &(dyn Fn(usize, Vec<u8>, Stats, f64) + Sync),
+    record: &(dyn Fn(usize, Option<Vec<u8>>, Stats, f64) + Sync),
 ) {
     let get = |i: usize| cubes.get(i).copied();
     let next = AtomicUsize::new(0);
@@ -177,7 +177,7 @@ fn solve_all(
                     let (solution, stats) = if mode == "rec" {
                         solver.solve(&cube)
                     } else {
-                        (reference.solve(&cube), Stats::default())
+                        (Some(reference.solve(&cube)), Stats::default())
                     };
                     record(i, solution, stats, 0.0);
                 },
@@ -207,13 +207,14 @@ fn main() {
     let solutions: Mutex<Vec<Option<Vec<u8>>>> = Mutex::new(vec![None; cubes.len()]);
     let reported_twice = AtomicBool::new(false);
     let nodes = AtomicU64::new(0);
-    let record = |i: usize, solution: Vec<u8>, stats: Stats, _seconds: f64| {
+    let record = |i: usize, solution: Option<Vec<u8>>, stats: Stats, _seconds: f64| {
         nodes.fetch_add(stats.nodes, Relaxed);
         let mut all = solutions.lock().unwrap();
         if all[i].is_some() {
             reported_twice.store(true, Relaxed);
         }
-        all[i] = Some(solution);
+        // (No solution: an empty one, which is BAD.)
+        all[i] = Some(solution.unwrap_or_default());
     };
     let start = std::time::Instant::now();
     solve_all(&solver, &reference, &cubes, mode, threads, lanes, &record);

@@ -427,9 +427,12 @@ impl Cube {
     #[must_use]
     pub fn to_bytes(self) -> [u8; 32] {
         let used = USED_BYTES.load();
+        let corners = self.corners.and(used.corners).to_array();
+        let edges = self.edges.and(used.edges).to_array();
         let mut bytes = [0u8; 32];
-        bytes[..16].copy_from_slice(&self.corners.and(used.corners).to_array());
-        bytes[16..].copy_from_slice(&self.edges.and(used.edges).to_array());
+        for (byte, x) in bytes.iter_mut().zip(corners.into_iter().chain(edges)) {
+            *byte = x;
+        }
         bytes
     }
 

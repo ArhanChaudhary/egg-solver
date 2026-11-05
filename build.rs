@@ -1,6 +1,8 @@
 //! Generates move and symmetry constants (in the SIMD byte layout of
 //! `src/simd.rs`) from the geometric cube model in `src/cubie.rs`, as Rust
-//! source in `$OUT_DIR/consts.rs` (included by `simd.rs`).
+//! source in `$OUT_DIR/consts.rs` (included by `simd.rs`), and the cubie
+//! level moves, symmetries and facelet tables in `$OUT_DIR/cubie_consts.rs`
+//! (included by `cubie.rs`). A failure of the model fails the build.
 
 #[allow(dead_code)]
 #[path = "src/cubie.rs"]

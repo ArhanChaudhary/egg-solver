@@ -58,7 +58,7 @@ fn par_solve(cubes: &[CubieCube], table: &H48Table) -> Vec<Vec<u8>> {
                     break;
                 }
                 let (solution, _) = solver.solve(&cubes[i]);
-                out.lock().unwrap()[i] = solution;
+                out.lock().unwrap()[i] = solution.unwrap();
             });
         }
     });
@@ -223,7 +223,7 @@ fn lanes_solve(cubes: &[CubieCube], table: &H48Table, nlanes: usize) -> Vec<Vec<
         for _ in 0..4 {
             s.spawn(|| {
                 cubeopt::lanes::run_lanes(&solver, &get, &next, &stop, nlanes, |i, sol, _, _| {
-                    out.lock().unwrap()[i] = sol;
+                    out.lock().unwrap()[i] = sol.unwrap();
                 });
             });
         }
@@ -299,7 +299,10 @@ fn share_solve(
     let solutions = solutions
         .into_iter()
         .enumerate()
-        .map(|(i, s)| s.unwrap_or_else(|| panic!("cube {i} not reported")))
+        .map(|(i, s)| {
+            s.flatten()
+                .unwrap_or_else(|| panic!("cube {i} not reported or solved"))
+        })
         .collect();
     (solutions, pool.counters())
 }
@@ -677,6 +680,7 @@ fn lanes_lengths_and_nodes(solver: &Solver, cubes: &[CubieCube]) -> Vec<(usize, 
         for _ in 0..3 {
             scope.spawn(|| {
                 cubeopt::lanes::run_lanes(solver, &get, &next, &stop, 5, |i, sol, stats, _| {
+                    let sol = sol.unwrap();
                     assert_eq!(cubes[i].apply_moves(&sol), Some(CubieCube::SOLVED));
                     out.lock().unwrap()[i] = (sol.len(), stats.nodes);
                 });
@@ -701,6 +705,7 @@ fn share_lengths_and_nodes(
         for _ in 0..3 {
             scope.spawn(|| {
                 pool.run(solver, 4, &stop, |i, sol, stats, _| {
+                    let sol = sol.unwrap();
                     assert_eq!(cubes[i].apply_moves(&sol), Some(CubieCube::SOLVED));
                     out.lock().unwrap()[i] = (sol.len(), stats.nodes);
                 });
@@ -739,6 +744,7 @@ fn symmetric_start_keeps_optimal_lengths() {
             .iter()
             .map(|cube| {
                 let (solution, stats) = solver.solve(cube);
+                let solution = solution.unwrap();
                 assert_eq!(cube.apply_moves(&solution), Some(CubieCube::SOLVED));
                 (solution.len(), stats.nodes)
             })
