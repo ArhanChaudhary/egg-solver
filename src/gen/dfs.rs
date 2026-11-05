@@ -39,6 +39,7 @@ use crate::tables::{
     entry_class, entry_low_bits, entry_position, entry_sym_to_rep, h48_rows, packed_class,
     packed_sym_to_rep, Cocsep,
 };
+use hashbrown::HashSet;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering::Relaxed};
 use std::time::Instant;
 
@@ -63,57 +64,10 @@ struct Prefix {
     levels: Vec<Vec<u64>>,
     /// The entries of the last two levels (the depths a root's child can
     /// have, when not one deeper).
-    last_two: HashSet,
-}
-
-/// An open-addressing set of h11 entries (which are below 2^40).
-struct HashSet {
-    slots: Vec<u64>,
-    shift: u32,
-}
-
-const EMPTY: u64 = u64::MAX;
-
-impl HashSet {
-    fn new(entries: impl Iterator<Item = u64> + Clone) -> HashSet {
-        let n = entries.clone().count();
-        // At most half full.
-        let bits = (2 * n.max(1)).next_power_of_two().trailing_zeros().max(4);
-        let mut set = HashSet {
-            slots: vec![EMPTY; 1 << bits],
-            shift: 64 - bits,
-        };
-        for e in entries {
-            let mut i = set.slot(e);
-            while set.slots[i] != EMPTY && set.slots[i] != e {
-                i = (i + 1) & (set.slots.len() - 1);
-            }
-            set.slots[i] = e;
-        }
-        set
-    }
-
-    #[inline(always)]
-    fn slot(&self, e: u64) -> usize {
-        usize::try_from(e.wrapping_mul(0x9E37_79B9_7F4A_7C15) >> self.shift).unwrap()
-    }
-
-    #[inline(always)]
-    fn contains(&self, e: u64) -> bool {
-        let mask = self.slots.len() - 1;
-        let mut i = self.slot(e);
-        loop {
-            // SAFETY: `i` is masked to the slot count (a power of two).
-            let s = unsafe { *self.slots.get_unchecked(i) };
-            if s == e {
-                return true;
-            }
-            if s == EMPTY {
-                return false;
-            }
-            i = (i + 1) & mask;
-        }
-    }
+    // A hashbrown set instead of our own open-addressing one: a lookup that
+    // misses is mostly answered by its control bytes, 1/8 of the slots' size
+    // (gen 2 8 at 8 threads: 5.4 -> 4.0 s, -26%; d1).
+    last_two: HashSet<u64>,
 }
 
 /// The h11 entries of the coset of `cube` (one, or more if its corner class
@@ -185,7 +139,9 @@ impl Prefix {
             levels.push(next);
         }
         let n = levels.len();
-        let last_two = HashSet::new(levels[n.saturating_sub(2)..].iter().flatten().copied());
+        let last_two_levels = &levels[n.saturating_sub(2)..];
+        let mut last_two = HashSet::with_capacity(last_two_levels.iter().map(Vec::len).sum());
+        last_two.extend(last_two_levels.iter().flatten().copied());
         Prefix { levels, last_two }
     }
 }
@@ -212,6 +168,9 @@ struct Marker<'p, 'a> {
 }
 
 const RING: usize = 32;
+
+/// An empty ring slot.
+const EMPTY: u64 = u64::MAX;
 
 impl Marker<'_, '_> {
     #[inline(always)]
@@ -321,7 +280,7 @@ impl Run<'_, '_> {
             let m = moves.trailing_zeros() as usize;
             moves ^= moves.isolate_lowest_one();
             let child = c.apply_move(m);
-            if prune_prefix && self.prefix.last_two.contains(entry(self.corners, child)) {
+            if prune_prefix && self.prefix.last_two.contains(&entry(self.corners, child)) {
                 continue;
             }
             if remaining == 1 {

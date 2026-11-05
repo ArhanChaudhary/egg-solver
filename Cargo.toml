@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 crossbeam-utils = "0.8"
+hashbrown = "0.16"
 libc = "0.2"
 
 # parking_lot only where it can park a thread on stable Rust (not on wasm:
