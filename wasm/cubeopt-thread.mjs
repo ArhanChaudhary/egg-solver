@@ -5,24 +5,16 @@
 
 import { wasiImports, threadSpawn, slotBase, SLOT_IDLE, SLOT_RUN } from './cubeopt.mjs';
 
-const isNode = typeof process !== 'undefined' && process.versions?.node !== undefined;
-const port = isNode ? (await import('node:worker_threads')).parentPort : self;
-const post = (message) => port.postMessage(message);
-const fs = isNode ? await import('node:fs') : null;
+const post = (message) => self.postMessage(message);
 
 /**
  * A thread that traps (a Rust panic aborts) never tells the threads waiting
- * for it: they would wait forever. Say so at once (a Node worker's console
- * goes through the main thread, which may be the one waiting) and, in Node,
- * end the process.
+ * for it: they would wait forever. Say so, and in Bun end the process (a page
+ * stays stuck: its solver worker may be the one waiting).
  */
 function fatal(message) {
-  if (isNode) {
-    fs.writeSync(2, `${message}\n`);
-    process.kill(process.pid, 'SIGTERM');
-  } else {
-    console.error(message);
-  }
+  console.error(message);
+  globalThis.process?.kill(globalThis.process.pid, 'SIGTERM');
 }
 
 async function serve({ module, memory, control, slot }) {
@@ -57,8 +49,4 @@ async function serve({ module, memory, control, slot }) {
   }
 }
 
-if (isNode) {
-  port.once('message', serve);
-} else {
-  self.onmessage = (e) => serve(e.data);
-}
+self.onmessage = (e) => serve(e.data);

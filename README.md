@@ -94,9 +94,9 @@ cargo build --release --features scalar                    # the scalar backend,
 ## WebAssembly
 
 The solver also compiles to WebAssembly (SIMD128) and runs in browsers and
-in Node: the same search on the same table files, with the same solutions
-and node counts as natively, about 5.7 times slower than the native x86
-build (see "Speed").
+in [Bun](https://bun.sh) (tested: 1.4.4): the same search on the same table
+files, with the same solutions and node counts as natively, about 5.7 times
+slower than the native x86 build (see "Speed").
 
 ### Build
 
@@ -114,7 +114,7 @@ so neither a WASI runtime nor wasm-bindgen is needed.
 ```js
 import { Cubeopt } from './wasm/cubeopt.mjs';
 const solver = await Cubeopt.create({ wasm: 'wasm/dist/cubeopt.wasm' });
-await solver.loadTable('h6');             // a path (Node), URL, File or bytes
+await solver.loadTable('h6');             // a path (Bun), URL, File or bytes
 // or: await solver.generateTable(4, 8);   // h4 base 8, made in the module
 solver.solve("R U R' U' F2 D L2");         // { moves, length, nodes, lookups, seconds }
 solver.solve('UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB');  // facelets
@@ -127,42 +127,46 @@ the top, D with F at the top, the others with U at the top), any six
 symbols for the colors (as in Kociemba's solvers). `solve` puts all lanes
 (and threads) on one cube; `solveMany` gives each lane its own cube.
 
-### Node
+`cubeopt.mjs` uses web APIs only (Worker, fetch, Blob, Atomics), plus Bun's
+`Bun.file` for local paths, so the same file serves browsers and Bun.
+
+### Bun
 
 ```sh
-node wasm/demo.mjs --table ~/cube-tables/h6 < testdata/random_state.txt
-node wasm/demo.mjs --gen 4:8 --random 5:1             # h4 base 8, 5 random states
-node wasm/demo.mjs --table ~/cube-tables/h6 --threads 8 < scrambles.txt
-node wasm/demo.mjs --table ~/cube-tables/h6 --batch < scrambles.txt   # throughput
+bun wasm/demo.mjs --table ~/cube-tables/h6 < testdata/random_state.txt
+bun wasm/demo.mjs --gen 4:8 --random 5:1             # h4 base 8, 5 random states
+bun wasm/demo.mjs --table ~/cube-tables/h6 --threads 8 < scrambles.txt
+bun wasm/demo.mjs --table ~/cube-tables/h6 --batch < scrambles.txt   # throughput
 ```
 
 ### Browser
 
 ```sh
-node wasm/serve.mjs --tables ~/cube-tables    # then open http://localhost:8000/
+bun wasm/serve.mjs --tables ~/cube-tables    # then open http://localhost:8000/
 ```
 
 `wasm/index.html` generates h0..h4 in the page or loads a table file (file
 picker, or a URL such as `/tables/h6`), and solves scrambles, facelet
-strings or random states. Any static server works for one thread;
-`serve.mjs` also sends the headers the threads build needs.
+strings or random states, in plain web JavaScript (`demo-worker.mjs`,
+`cubeopt.mjs`). Any static server works for one thread; `serve.mjs` (a
+`Bun.serve` server) also sends the headers the threads build needs.
 
 ### Tables
 
 wasm32 has at most 4 GiB of memory, for the table and everything else
 (tens of MB; ~0.2 GB with 8 threads). Small tables can be generated in the module; larger ones are made
 by the native `gen` (see "Running on a laptop") and loaded from the file.
-Time per random-state cube, one at a time, in V8 (Node 26; Chrome has the
-same engine), mean and median of 10 cubes (h4: 5), on Zen 5 cores (8
-threads: one L3 domain):
+Time per random-state cube, one at a time, mean and median of 10 cubes
+(h4: 5), on Zen 5 cores (8 threads: one L3 domain), in V8 (Chrome's engine;
+measured in Node 26) and in Bun (JavaScriptCore, Safari's engine):
 
-| table     | size     | runs in                     | made by                    | 1 thread         | 8 threads        |
-|-----------|---------:|-----------------------------|----------------------------|------------------|------------------|
-| h0..h3    | ≤ 0.2 GiB| any browser                 | the module: h0 in 2.5 s    | short scrambles  |                  |
-| h4 base 8 | 0.45 GiB | any browser                 | the module: 75 s (8 threads: 13 s) | 21.6 s, 20.7 s |    |
-| h5        | 0.9 GiB  | desktop browsers            | `gen 5 auto`               | 19.4 s, 10.3 s   |                  |
-| h6        | 1.8 GiB  | desktop browsers            | `gen 6 auto`               | 12.6 s, 5.0 s    | 1.6 s, 0.65 s    |
-| h7        | 3.6 GiB  | Node; Chrome (tested headless) | `gen 7 auto`            | 6.7 s, 2.9 s     | 0.93 s, 0.44 s   |
+| table     | size     | runs in                     | made by                    | 1 thread: V8     | 1 thread: Bun    | 8 threads: V8    | 8 threads: Bun   |
+|-----------|---------:|-----------------------------|----------------------------|------------------|------------------|------------------|------------------|
+| h0..h3    | ≤ 0.2 GiB| any browser                 | the module: h0 in 2.5 s    | short scrambles  |                  |                  |                  |
+| h4 base 8 | 0.45 GiB | any browser                 | the module: 75 s (8 threads: 13 s) | 21.6 s, 20.7 s |          |                  |                  |
+| h5        | 0.9 GiB  | desktop browsers            | `gen 5 auto`               | 19.4 s, 10.3 s   |                  |                  |                  |
+| h6        | 1.8 GiB  | desktop browsers            | `gen 6 auto`               | 12.6 s, 5.0 s    | 12.2 s, 4.9 s    | 1.6 s, 0.65 s    | 1.6 s, 0.65 s              |
+| h7        | 3.6 GiB  | Bun; Chrome (tested headless) | `gen 7 auto`             | 6.7 s, 2.9 s     | 6.5 s, 2.9 s     | 0.93 s, 0.44 s   | 0.91 s, 0.44 s             |
 
 Loading from a file takes seconds (from a local server into headless
 Chromium: h6 3-13 s, h7 15 s; `verify` adds a checksum pass). The 4 GiB are
@@ -176,7 +180,7 @@ which this build does not use.
 std threads work through wasi-threads, so the work-sharing mode (`solve`,
 all threads on one cube) and the stream mode (`solveMany`) run as natively.
 `cubeopt.mjs` implements wasi-threads' `thread-spawn` with a pool of
-workers (`cubeopt-thread.mjs`, Web Workers or Node `worker_threads`) that
+workers (`cubeopt-thread.mjs`, Web Workers in browsers and in Bun) that
 share the module's memory. That needs `SharedArrayBuffer`:
 
 - In browsers, a cross-origin isolated page, served with the headers
@@ -185,7 +189,7 @@ share the module's memory. That needs `SharedArrayBuffer`:
 - The solver must run in a worker, not on the page's main thread: a solve
   waits for its threads (`Atomics.wait`), which the main thread may not do.
   `index.html` runs it in `demo-worker.mjs`.
-- Node needs nothing special.
+- Bun needs nothing special (its main thread may wait).
 
 `Cubeopt.create({ wasm, threads })` starts the pool once (threads + 1
 workers); a call then uses all of them. Other hosts must call the module's
@@ -204,6 +208,7 @@ without which threads end up waiting forever.
 | native scalar (`--features scalar`)| 74.5 s  | 20       |
 | wasm in wasmtime 44                | 122 s   | 12.2     |
 | wasm in V8 (Node 26)               | 124 s   | 11.9     |
+| wasm in Bun 1.4.4 (JavaScriptCore) | 127 s   | 11.7     |
 
 (NEON was only run under qemu here, which says nothing about speed.) Two
 things matter for wasm speed, both handled:
@@ -212,21 +217,23 @@ things matter for wasm speed, both handled:
   which starts the cache miss just as well (+53% in wasmtime, +45% in V8).
   Lanes still pay off: 1 lane 200.6 s, 8 lanes 123.8 s, flat up to 64; the
   module uses 16.
-- V8 (browsers, Node) starts new code in its baseline compiler and gives a
-  function optimized code only from its next call: a long first solve would
-  run slowly to its end (187.7 s instead of 129.5 s here). `loadTable` and
+- V8 (Chrome) starts new code in its baseline compiler and gives a function
+  optimized code only from its next call: a long first solve would run
+  slowly to its end (187.7 s instead of 129.5 s here). `loadTable` and
   `generateTable` therefore run a short warm-up (`warmUp`, ~0.6 s), and all
-  exports share one copy of the search loop.
+  exports share one copy of the search loop. JavaScriptCore (Bun, Safari)
+  moves a running loop to optimized code: in Bun the warm-up is skipped
+  (126.5 and 127.2 s without it, 127.0 and 127.9 s with it).
 
 With 8 threads (`cubeopt-threads.wasm`, one L3 domain), one cube at a time
-gets 7.2-7.8 times the one-thread speed (h6: 88.6 Mnodes/s; in headless
-Chromium 0.66 s instead of 5.15 s for the same cube), and generating h4
-base 8 takes 13 s instead of 75 s.
+gets 7.2-7.8 times the one-thread speed (h6: 88.6 Mnodes/s in V8, 90.7 in
+Bun; in headless Chromium 0.63-0.66 s instead of 5.15 s for the same cube),
+and generating h4 base 8 takes 13 s instead of 75 s.
 
 ### Tests
 
 `check.sh` runs the library tests in wasm under wasmtime (v44 or older:
 later versions dropped wasi-threads; `WASMTIME=path`) and `wasm/test.mjs`
-(both modules in Node), when installed. The node counts match native ones
+(both modules in Bun), when installed. The node counts match native ones
 (h5, 20 random states: identical nodes, lookups and lengths in x86,
-scalar, wasmtime and Node).
+scalar, wasmtime and V8; h6, 100 depth-17 cubes: the same in Bun).

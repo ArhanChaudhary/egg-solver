@@ -18,7 +18,7 @@ no_failure || exit 1
 # library for wasm32-unknown-unknown). Their library tests run with the
 # scalar backend here, with NEON under qemu and with wasm under wasmtime
 # (wasi-threads: up to v44) when installed, and the wasm module (wasm/) gets a
-# smoke test in Node. Skipped (with a note) where a target or tool is missing;
+# smoke test in Bun. Skipped (with a note) where a target or tool is missing;
 # CHECK_BACKENDS=0 skips all.
 if [ "${CHECK_BACKENDS:-1}" != 0 ]; then
     installed=$(rustup target list --installed 2>/dev/null || true)
@@ -52,14 +52,14 @@ if [ "${CHECK_BACKENDS:-1}" != 0 ]; then
         else
             echo "check: wasmtime with wasi-threads (v44 or older; WASMTIME=path) missing: wasm tests not run" >&2
         fi
-        if grep -qx wasm32-wasip1 <<< "$installed" && command -v node > /dev/null; then
+        if grep -qx wasm32-wasip1 <<< "$installed" && command -v bun > /dev/null; then
             wasm/build.sh > /dev/null
-            if ! timeout -s KILL 300 node wasm/test.mjs; then
+            if ! timeout -s KILL 300 bun wasm/test.mjs; then
                 echo "check: wasm/test.mjs failed (or hung: killed after 300 s)" >&2
                 exit 1
             fi
         else
-            echo "check: node or target wasm32-wasip1 missing: wasm module not tested" >&2
+            echo "check: bun or target wasm32-wasip1 missing: wasm module not tested" >&2
         fi
     fi
     cargo clippy --release --all-targets --features scalar -- -D warnings

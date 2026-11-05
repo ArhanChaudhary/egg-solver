@@ -1,7 +1,7 @@
 #!/bin/bash
 # Build the WebAssembly modules into wasm/dist/:
 #   cubeopt.wasm          one thread (wasm32-wasip1), runs anywhere
-#   cubeopt-threads.wasm  threads (wasm32-wasip1-threads): Node, or a
+#   cubeopt-threads.wasm  threads (wasm32-wasip1-threads): Bun, or a
 #                         cross-origin isolated page
 # Needs the targets: rustup target add wasm32-wasip1 wasm32-wasip1-threads
 # (SIMD128 and the memory limit are set in .cargo/config.toml.)
