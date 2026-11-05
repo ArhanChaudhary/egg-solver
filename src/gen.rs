@@ -17,6 +17,7 @@
 
 pub mod collapse;
 pub mod dfs;
+pub mod progress;
 
 use crate::coord::{cocsep, cube_from_edge_key, h11_key, reduce_key, split_index};
 use crate::simd::Cube;
@@ -159,9 +160,15 @@ impl Generator<'_> {
         let entries: u64 = h48_rows(self.k) * 495;
         let mut counts = vec![start.len() as u64];
         let mut total = start.len() as u64;
-        eprintln!("[gen h{}] depth 0: {} entries", self.k, total);
+        progress::line(format_args!("[gen h{}] depth 0: {} entries", self.k, total));
         let last = u64::from(self.base) + 2;
+        // (Progress: each level's expansion and finishing pass, by chunks.)
+        let chunks = n_words.div_ceil(WORDS_PER_ROW << 12) as u64;
         for depth in 1..=last {
+            progress::start(
+                format_args!("h{} depth {depth} of {last}", self.k),
+                2 * chunks,
+            );
             let frontier = counts[counts.len() - 1];
             let unvisited = entries - total;
             // Forward costs ~18 neighbors per frontier entry, backward up
@@ -169,10 +176,14 @@ impl Generator<'_> {
             let forward = frontier.saturating_mul(18) < unvisited.saturating_mul(4);
             let level_start = Instant::now();
             if forward {
-                self.for_word_chunks(n_words, |first, end| self.expand_forward(words, first, end));
+                self.for_word_chunks(n_words, |first, end| {
+                    self.expand_forward(words, first, end);
+                    progress::advance(1);
+                });
             } else {
                 self.for_word_chunks(n_words, |first, end| {
                     self.expand_backward(words, first, end);
+                    progress::advance(1);
                 });
             }
             let step_seconds = level_start.elapsed().as_secs_f64();
@@ -181,23 +192,24 @@ impl Generator<'_> {
             self.for_word_chunks(n_words, |first, end| {
                 let count = self.finish_level(words, first, end, depth, relabel);
                 new_entries.fetch_add(count, Relaxed);
+                progress::advance(1);
             });
             let count = new_entries.load(Relaxed);
             counts.push(count);
             total += count;
-            eprintln!(
+            progress::line(format_args!(
                 "[gen h{}] depth {depth}: {count} entries ({}, {step_seconds:.1}s step, {:.1}s total)",
                 self.k,
                 if forward { "forward" } else { "backward" },
                 t0.elapsed().as_secs_f64()
-            );
+            ));
         }
-        eprintln!(
+        progress::line(format_args!(
             "[gen h{}] >= {}: {} entries",
             self.k,
             last + 1,
             entries - total
-        );
+        ));
         counts.push(entries - total);
         counts
     }

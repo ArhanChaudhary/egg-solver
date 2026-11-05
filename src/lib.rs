@@ -19,7 +19,10 @@
 //!   cubes.
 //! * `symstart`: for cubes with a symmetry, one job of each class of
 //!   equivalent job prefixes.
+//! * `cli` (feature `cli`, on by default): what the binaries share.
 
+#[cfg(feature = "cli")]
+pub mod cli;
 pub mod coord;
 pub mod cubie;
 pub mod gen;
