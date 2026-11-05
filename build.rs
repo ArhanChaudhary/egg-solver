@@ -59,6 +59,12 @@ fn main() {
         "cargo::rustc-check-cfg=cfg(backend, values(\"x86\", \"neon\", \"wasm\", \"scalar\"))"
     );
     println!("cargo::rustc-check-cfg=cfg(avx512)");
+    // The wasm threads target (its `atomics` feature is not visible to
+    // `cfg(target_feature)`): `tables::Memory` allocates there differently.
+    println!("cargo::rustc-check-cfg=cfg(wasm_threads)");
+    if std::env::var("TARGET").is_ok_and(|t| t.starts_with("wasm32") && t.ends_with("-threads")) {
+        println!("cargo::rustc-cfg=wasm_threads");
+    }
     let backend = backend(has);
     println!("cargo::rustc-cfg=backend=\"{backend}\"");
     // AVX-512 helpers of the lanes kernel (`lanes.rs`) on the x86 backend.

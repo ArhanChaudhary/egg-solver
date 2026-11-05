@@ -188,7 +188,10 @@ share the module's memory. That needs `SharedArrayBuffer`:
 - Node needs nothing special.
 
 `Cubeopt.create({ wasm, threads })` starts the pool once (threads + 1
-workers); a call then uses all of them.
+workers); a call then uses all of them. Other hosts must call the module's
+`_initialize` export once, on the main thread, before anything else (as
+`cubeopt.mjs` does): it sets up wasi-libc's record of the main thread,
+without which threads end up waiting forever.
 
 ### Speed
 

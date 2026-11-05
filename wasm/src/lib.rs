@@ -20,8 +20,41 @@ use std::fmt::Write as _;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
+#[cfg(wasm_threads)]
+mod threads;
+
 /// Whether this build has threads (`wasm32-wasip1-threads`, see build.rs).
 const THREADS: bool = cfg!(wasm_threads);
+
+/// The WASI reactor initializer, which a Rust cdylib does not get from
+/// wasi-libc (its `crt1-reactor`): the host calls it once, on the main
+/// thread, before any other export (`cubeopt.mjs` does). In the threads
+/// build it first sets up the main thread's pthread record. Without that,
+/// wasi-libc's thread list grew from a zeroed record and came apart: an
+/// exiting thread could find itself alone in the list and call `exit(0)`
+/// instead of finishing its exit, so a `join` on it waited forever (the
+/// intermittent hang of `wasm/test.mjs`, at ~1 in 3 runs under load). It
+/// then installs the thread pool (`threads.rs`).
+#[unsafe(no_mangle)]
+pub extern "C" fn _initialize() {
+    static DONE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    unsafe extern "C" {
+        #[cfg(wasm_threads)]
+        fn __wasi_init_tp();
+        fn __wasm_call_ctors();
+    }
+    if DONE.swap(true, std::sync::atomic::Ordering::Relaxed) {
+        return;
+    }
+    // SAFETY: wasi-libc's and the linker's initializers, run once, first.
+    unsafe {
+        #[cfg(wasm_threads)]
+        __wasi_init_tp();
+        __wasm_call_ctors();
+    }
+    #[cfg(wasm_threads)]
+    let _ = cubeopt::parallel::set_runner(threads::run);
+}
 
 /// The module's state between calls.
 struct State {
@@ -268,13 +301,15 @@ pub unsafe extern "C" fn cubeopt_solve(
             *result.lock().unwrap_or_else(PoisonError::into_inner) =
                 Some(result_json(i, &solution, stats, seconds));
         };
-        if threads > 1 {
-            cubeopt::lanes::share::solve_all(&solver, &get, threads, lanes, 1, &done);
-        } else {
-            // (One thread: the pool's worker runs here; nothing is spawned.)
-            let pool = Pool::new(&get, 1, 1);
-            pool.run(&solver, lanes, &AtomicBool::new(false), done);
-        }
+        // (`share::solve_all`, on `on_threads`: the pool's threads in the
+        // threads build, this thread alone in the other.)
+        let pool = Pool::new(&get, 1, threads);
+        let stop = AtomicBool::new(false);
+        cubeopt::parallel::on_threads(threads, |_| {
+            pool.run(&solver, lanes, &stop, |i, solution, stats, seconds| {
+                done(i, solution, stats, seconds);
+            });
+        });
         let result = result.into_inner().unwrap_or_else(PoisonError::into_inner);
         result.ok_or_else(|| "not solved".to_string())
     })

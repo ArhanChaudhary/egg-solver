@@ -8,6 +8,22 @@ import { wasiImports, threadSpawn, slotBase, SLOT_IDLE, SLOT_RUN } from './cubeo
 const isNode = typeof process !== 'undefined' && process.versions?.node !== undefined;
 const port = isNode ? (await import('node:worker_threads')).parentPort : self;
 const post = (message) => port.postMessage(message);
+const fs = isNode ? await import('node:fs') : null;
+
+/**
+ * A thread that traps (a Rust panic aborts) never tells the threads waiting
+ * for it: they would wait forever. Say so at once (a Node worker's console
+ * goes through the main thread, which may be the one waiting) and, in Node,
+ * end the process.
+ */
+function fatal(message) {
+  if (isNode) {
+    fs.writeSync(2, `${message}\n`);
+    process.kill(process.pid, 'SIGTERM');
+  } else {
+    console.error(message);
+  }
+}
 
 async function serve({ module, memory, control, slot }) {
   let instance;
@@ -34,8 +50,8 @@ async function serve({ module, memory, control, slot }) {
     try {
       instance.exports.wasi_thread_start(tid, startArg);
     } catch (e) {
-      // (A panic aborts its thread here; the message went to the console.)
-      console.error(`cubeopt thread ${tid}: ${e.message}`);
+      fatal(`cubeopt: thread ${tid} failed (${e.message}); the module cannot go on`);
+      return;
     }
     Atomics.store(control, base, SLOT_IDLE);
   }
