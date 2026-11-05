@@ -32,6 +32,21 @@
 //! `solve --shm-load TABLE` loads a table into a shared memory segment that
 //! later runs attach at once (`--shm`; README.md "Shared memory"), `solve
 //! --shm-remove TABLE` removes it.
+
+// No intentional panics in shipped code (user request; asserts, which no
+// lint covers, are checked by tests/no_runtime_panics.rs).
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::unreachable,
+        clippy::todo,
+        clippy::unimplemented
+    )
+)]
+
 use anyhow::Context as _;
 use clap::Parser;
 use cubeopt::cli::{self, BadInput, LoadArgs, Verbosity};

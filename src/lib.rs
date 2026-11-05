@@ -21,6 +21,20 @@
 //!   equivalent job prefixes.
 //! * `cli` (feature `cli`, on by default): what the binaries share.
 
+// No intentional panics in shipped code (user request; asserts, which no
+// lint covers, are checked by tests/no_runtime_panics.rs).
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::unreachable,
+        clippy::todo,
+        clippy::unimplemented
+    )
+)]
+
 #[cfg(feature = "cli")]
 pub mod cli;
 pub mod coord;

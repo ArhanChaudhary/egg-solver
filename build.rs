@@ -4,6 +4,20 @@
 //! level moves, symmetries and facelet tables in `$OUT_DIR/cubie_consts.rs`
 //! (included by `cubie.rs`). A failure of the model fails the build.
 
+// No intentional panics in shipped code (user request; asserts, which no
+// lint covers, are checked by tests/no_runtime_panics.rs).
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::unreachable,
+        clippy::todo,
+        clippy::unimplemented
+    )
+)]
+
 #[allow(dead_code)]
 #[path = "src/cubie.rs"]
 mod cubie;

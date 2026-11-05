@@ -12,6 +12,20 @@
 //! threads through wasi-threads: the share and stream modes run on several
 //! threads as natively). See README.md, "WebAssembly".
 
+// No intentional panics in shipped code (user request; asserts, which no
+// lint covers, are checked by tests/no_runtime_panics.rs).
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::unreachable,
+        clippy::todo,
+        clippy::unimplemented
+    )
+)]
+
 use cubeopt::cubie::{format_moves, parse_moves, CubieCube, Rng};
 use cubeopt::lanes::share::Pool;
 use cubeopt::solver::{Solver, Stats};

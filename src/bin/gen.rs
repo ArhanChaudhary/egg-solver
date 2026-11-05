@@ -24,6 +24,20 @@
 //! On a terminal, long steps show a progress bar on stderr; elsewhere (logs,
 //! pipes) stderr has the progress lines only.
 
+// No intentional panics in shipped code (user request; asserts, which no
+// lint covers, are checked by tests/no_runtime_panics.rs).
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::unreachable,
+        clippy::todo,
+        clippy::unimplemented
+    )
+)]
+
 use anyhow::Context as _;
 use clap::{Args, Parser, Subcommand};
 use cubeopt::cli::{self, preflight, BadInput, Verbosity};
