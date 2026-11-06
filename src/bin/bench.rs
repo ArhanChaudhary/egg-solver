@@ -90,8 +90,13 @@ fn run(
     let t0 = Instant::now();
     // (Each mode's thread code is a function of its own, not inlined here:
     // `share_thread`, and `stream_thread`, which is the stream's hot loop.)
+    let duration = duration
+        .map(std::time::Duration::try_from_secs_f64)
+        .transpose()
+        .context("benchmark duration is out of range")?;
     let threads_ok = std::thread::scope(|s| {
         let mut spawned = Vec::with_capacity(threads);
+        let mut result = Ok(());
         for _ in 0..threads {
             let thread = std::thread::Builder::new().spawn_scoped(s, || {
                 let record = |i: usize, solution: Option<Vec<u8>>, stats: Stats, seconds: f64| {
@@ -130,15 +135,24 @@ fn run(
                 Ok(thread) => spawned.push(thread),
                 Err(error) => {
                     stop.store(true, Ordering::Relaxed);
-                    return Err(anyhow::Error::from(error).context("cannot start a thread"));
+                    result = Err(anyhow::Error::from(error).context("cannot start a thread"));
+                    break;
                 }
             }
         }
-        if let Some(duration) = duration {
-            std::thread::sleep(std::time::Duration::from_secs_f64(duration));
+        if let Some(duration) = duration.filter(|_| result.is_ok()) {
+            std::thread::sleep(duration);
             stop.store(true, Ordering::Relaxed);
         }
-        Ok(spawned.into_iter().all(|thread| thread.join().is_ok()))
+        let mut all_ok = true;
+        for thread in spawned {
+            if thread.join().is_err() {
+                stop.store(true, Ordering::Relaxed);
+                all_ok = false;
+            }
+        }
+        result?;
+        Ok::<_, anyhow::Error>(all_ok)
     })?;
     anyhow::ensure!(threads_ok, "a thread panicked");
     let bad = bad.load(Ordering::Relaxed);
@@ -330,7 +344,7 @@ struct TuneArgs {
 /// A duration in seconds: a finite number, not negative.
 fn seconds(text: &str) -> Result<f64, String> {
     match text.parse::<f64>() {
-        Ok(s) if s.is_finite() && s >= 0.0 => Ok(s),
+        Ok(s) if std::time::Duration::try_from_secs_f64(s).is_ok() => Ok(s),
         _ => Err("expected seconds (a number, 0 or more)".to_string()),
     }
 }
@@ -703,6 +717,14 @@ fn run_command(command: &Command, json: bool) -> anyhow::Result<()> {
 mod tests {
     use super::{cube_set, legacy};
     use cubeopt::cubie::{CubieCube, Rng};
+
+    #[test]
+    fn seconds_reject_unrepresentable_durations() {
+        for value in ["-1", "NaN", "inf", "1e300"] {
+            assert!(super::seconds(value).is_err(), "{value}");
+        }
+        assert_eq!(super::seconds("0.5"), Ok(0.5));
+    }
 
     /// `random:N:SEED` is N random states from `Rng(SEED)`, as before.
     #[test]

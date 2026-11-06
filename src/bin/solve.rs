@@ -94,6 +94,7 @@ fn solve_all_pinned(
     let stop = AtomicBool::new(false);
     std::thread::scope(|scope| {
         let mut spawned = Vec::with_capacity(threads.max(1));
+        let mut result = Ok(());
         for _ in 0..threads.max(1) {
             let thread = std::thread::Builder::new()
                 .spawn_scoped(scope, || pool.run_pinned(solver, lanes, &stop, done));
@@ -101,11 +102,19 @@ fn solve_all_pinned(
                 Ok(thread) => spawned.push(thread),
                 Err(error) => {
                     stop.store(true, Ordering::Relaxed);
-                    return Err(anyhow::Error::from(error).context("cannot start a thread"));
+                    result = Err(anyhow::Error::from(error).context("cannot start a thread"));
+                    break;
                 }
             }
         }
-        let all_ok = spawned.into_iter().all(|thread| thread.join().is_ok());
+        let mut all_ok = true;
+        for thread in spawned {
+            if thread.join().is_err() {
+                stop.store(true, Ordering::Relaxed);
+                all_ok = false;
+            }
+        }
+        result?;
         anyhow::ensure!(all_ok, "a thread panicked");
         Ok(())
     })

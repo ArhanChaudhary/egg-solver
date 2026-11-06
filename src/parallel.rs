@@ -64,12 +64,17 @@ pub fn on_threads<R: Send>(
             })
             .collect();
         let first = work(0);
-        std::iter::once(Ok(first))
-            .chain(spawned.into_iter().map(|(t, spawned)| match spawned {
+        // Join every worker before propagating an error. A short-circuiting
+        // Result collection would leave later handles to the scope, whose
+        // automatic joins would panic if another worker also failed.
+        let joined: Vec<_> = spawned
+            .into_iter()
+            .map(|(t, spawned)| match spawned {
                 Ok(handle) => handle.join().map_err(|_| WorkerPanicked),
                 Err(_) => Ok(work(t)),
-            }))
-            .collect()
+            })
+            .collect();
+        std::iter::once(Ok(first)).chain(joined).collect()
     })
 }
 
@@ -82,5 +87,15 @@ mod tests {
             let want: Vec<usize> = (0..threads.max(1)).map(|t| t * 10).collect();
             assert_eq!(results, want);
         }
+    }
+
+    #[test]
+    #[cfg(panic = "unwind")]
+    fn on_threads_joins_all_failed_workers_before_returning_error() {
+        let result = super::on_threads(3, |thread| {
+            assert_eq!(thread, 0, "worker failure for error propagation test");
+            thread
+        });
+        assert!(result.is_err());
     }
 }

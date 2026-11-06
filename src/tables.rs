@@ -538,11 +538,13 @@ impl Memory {
                     Err(_) => unsafe { prefault_range(address, len) },
                 }
             }
-            threads.into_iter().try_for_each(|thread| {
-                thread
-                    .join()
-                    .map_err(|_| std::io::Error::other("a prefault thread panicked"))
-            })
+            let mut result = Ok(());
+            for thread in threads {
+                if thread.join().is_err() {
+                    result = Err(std::io::Error::other("a prefault thread panicked"));
+                }
+            }
+            result
         })
     }
 
