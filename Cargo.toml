@@ -102,6 +102,8 @@ inline_always = "allow"
 # build` here still builds only this package.
 [workspace]
 members = [".", "wasm"]
+# Keep the minimally patched dependency outside first-party fmt/test members.
+exclude = ["vendor/parking_lot_core"]
 
 # The WebAssembly module's build (`wasm/build.sh`): release without debug
 # info, for a small `.wasm`.
@@ -109,3 +111,7 @@ members = [".", "wasm"]
 inherits = "release"
 debug = 0
 strip = true
+
+# Backport upstream explicit futex pointer arguments; see the retained vendor note.
+[patch.crates-io]
+parking_lot_core = { path = "vendor/parking_lot_core" }

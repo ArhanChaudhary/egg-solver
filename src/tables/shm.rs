@@ -938,6 +938,16 @@ mod segment_tests {
     use crate::tables::file::{self, LoadMode, LoadOptions, TableError, Trailer};
     use crate::tables::{h48_bytes, scratch_path, H48Table};
 
+    // The interrupted-loader test forks. Its child inherits every live SysV
+    // mapping in this process, which would perturb another test's nattch checks.
+    static SEGMENT_TESTS: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    fn segment_test_guard() -> std::sync::MutexGuard<'static, ()> {
+        SEGMENT_TESTS
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
     /// Test `n`'s key in this process (0x40000000 and up, below "co"
     /// keys), and its segment removed on drop.
     struct TestKey(u32);
@@ -1025,6 +1035,7 @@ mod segment_tests {
     /// removes it, and `Auto` then loads the file.
     #[test]
     fn segment_is_made_once_then_attached() {
+        let _serial = segment_test_guard();
         let key = TestKey::new(0);
         let table = TableFile::new("shm-made", 0);
         let (first, report) = table.open(&key.options(LoadMode::Shm, "4k")).unwrap();
@@ -1086,6 +1097,7 @@ mod segment_tests {
     /// refused by `Shm` and passed over by `Auto`, which loads the file.
     #[test]
     fn another_table_under_the_key_is_never_used() {
+        let _serial = segment_test_guard();
         let key = TestKey::new(1);
         let first = TableFile::new("shm-first", 0);
         let second = TableFile::new("shm-second", 1);
@@ -1114,6 +1126,7 @@ mod segment_tests {
     /// maker is gone: `Shm` removes it and loads anew).
     #[test]
     fn unfinished_segments_are_found() {
+        let _serial = segment_test_guard();
         let key = TestKey::new(2);
         let table = TableFile::new("shm-unfinished", 0);
         let bytes = segment_bytes(h48_bytes(0), NORMAL_PAGE);
@@ -1165,6 +1178,7 @@ mod segment_tests {
     /// with a note that says why; a table without a checksum gets none.
     #[test]
     fn huge_pages_fall_back_with_a_note() {
+        let _serial = segment_test_guard();
         let key = TestKey::new(3);
         let table = TableFile::new("shm-pages", 0);
         let (_, report) = table.open(&key.options(LoadMode::Shm, "2m,4k")).unwrap();
@@ -1202,6 +1216,7 @@ mod segment_tests {
     /// with how to fix them.
     #[test]
     fn preflight_verdicts() {
+        let _serial = segment_test_guard();
         // h7 on 1 GiB pages: 4 pages.
         let h7 = segment_bytes(h48_bytes(7), 1 << 30);
         assert!(pool_verdict(1 << 30, h7, 70, 4).is_ok());
@@ -1235,6 +1250,7 @@ mod segment_tests {
     /// A segment's trailer is the file's, with its page size and source.
     #[test]
     fn segment_trailer_round_trip() {
+        let _serial = segment_test_guard();
         let trailer = Trailer {
             k: 7,
             base: 9,

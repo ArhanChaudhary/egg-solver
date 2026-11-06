@@ -5,7 +5,19 @@ cd "$(dirname "$0")"
 cargo fmt --all --check
 # A private log, so concurrent runs (several worktrees) never read each other's output.
 log=$(mktemp -t egg-solver-test.XXXXXX.log)
-trap 'rm -f "$log"' EXIT
+finish_check() {
+    check_status=$?
+    if [ "$check_status" -ne 0 ]; then
+        # A filtered pipeline can hide the failing test's name and output.
+        # Keep its complete log and include the useful tail in the CI output.
+        tail -100 "$log" >&2
+        echo "check: failed; full test log retained at $log" >&2
+    else
+        rm -f "$log"
+    fi
+    exit "$check_status"
+}
+trap finish_check EXIT
 # No intentional panics in shipped code (user request): no assert!,
 # assert_eq!, assert_ne!, panic!, unreachable!, todo!, unimplemented!,
 # .unwrap() or .expect( outside test and compile-time code. Clippy's

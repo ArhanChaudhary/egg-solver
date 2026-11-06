@@ -4025,6 +4025,26 @@ mod tests {
         }
     }
 
+    /// Keep the mutex contended long enough to exercise native park/wake FFI.
+    #[test]
+    fn mutex_contention_parks_and_wakes() {
+        let value = Mutex::new(0);
+        let entered = AtomicBool::new(false);
+        let held = value.lock();
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                entered.store(true, Release);
+                *value.lock() += 1;
+            });
+            while !entered.load(Acquire) {
+                std::thread::yield_now();
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            drop(held);
+        });
+        assert_eq!(*value.lock(), 1);
+    }
+
     /// Run a stage's disjoint tasks concurrently, joining before its barrier.
     /// Reverse atomic claims also vary the task order from the serial builder.
     fn run_sort_stage(inner: &Inner, stage: usize, tasks: usize) {
