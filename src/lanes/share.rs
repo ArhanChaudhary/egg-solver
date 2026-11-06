@@ -4025,6 +4025,25 @@ mod tests {
         }
     }
 
+    /// Run a stage's disjoint tasks concurrently, joining before its barrier.
+    /// Reverse atomic claims also vary the task order from the serial builder.
+    fn run_sort_stage(inner: &Inner, stage: usize, tasks: usize) {
+        let remaining = AtomicUsize::new(tasks);
+        std::thread::scope(|scope| {
+            for _ in 0..tasks.min(3) {
+                scope.spawn(|| {
+                    while let Ok(task) =
+                        remaining.try_update(Relaxed, Relaxed, |n| n.checked_sub(1))
+                    {
+                        // SAFETY: each task is claimed once, its output ranges
+                        // are disjoint, and every worker joins before the barrier.
+                        unsafe { sort_task(inner, stage, task - 1) };
+                    }
+                });
+            }
+        });
+    }
+
     /// A split iteration's staged sort: each job's root children run once,
     /// in its first-part run (a lead of the cube above the threshold: its
     /// group) or its rest run; the first-part runs by decreasing lead
@@ -4075,10 +4094,7 @@ mod tests {
         let mut tasks = sort_setup(&mut inner);
         let mut stage = ST_KEYS;
         loop {
-            for task in (0..tasks).rev() {
-                // SAFETY: one task at a time.
-                unsafe { sort_task(&inner, stage, task) };
-            }
+            run_sort_stage(&inner, stage, tasks);
             match sort_stage_done(&mut inner, stage) {
                 Some((next_stage, next_tasks)) => (stage, tasks) = (next_stage, next_tasks),
                 None => break,
@@ -4356,10 +4372,7 @@ mod tests {
             let mut tasks = sort_setup(&mut inner);
             let mut stage = ST_KEYS;
             loop {
-                for task in (0..tasks).rev() {
-                    // SAFETY: one task at a time.
-                    unsafe { sort_task(&inner, stage, task) };
-                }
+                run_sort_stage(&inner, stage, tasks);
                 match sort_stage_done(&mut inner, stage) {
                     Some((next_stage, next_tasks)) => (stage, tasks) = (next_stage, next_tasks),
                     None => break,
