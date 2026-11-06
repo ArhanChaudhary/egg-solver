@@ -185,7 +185,7 @@ of the build machine. For binaries that run on other machines:
 ```sh
 RUSTFLAGS="-C target-cpu=x86-64-v4" cargo build --release  # x86 with AVX-512
 RUSTFLAGS="-C target-cpu=x86-64-v3" cargo build --release  # x86 with AVX2 + BMI2
-RUSTFLAGS="-C target-cpu=x86-64" cargo build --release     # any x86-64 (scalar, slower)
+RUSTFLAGS="-C target-cpu=x86-64" cargo build --release     # any x86-64 (portable backend)
 cargo build --release --target aarch64-apple-darwin        # Apple Silicon (NEON)
 cargo build --release --features scalar                    # the scalar backend, any target
 ```
@@ -315,7 +315,6 @@ without which threads end up waiting forever.
 | build                              | time    | Mnodes/s |
 |------------------------------------|--------:|---------:|
 | native x86 (AVX-512, `simd.rs`)    | 21.7 s  | 68       |
-| native scalar (`--features scalar`)| 74.5 s  | 20       |
 | wasm in wasmtime 44                | 122 s   | 12.2     |
 | wasm in V8 (Node 26)               | 124 s   | 11.9     |
 | wasm in Bun 1.4.4 (JavaScriptCore) | 127 s   | 11.7     |
