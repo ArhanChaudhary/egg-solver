@@ -39,6 +39,7 @@
 pub mod cli;
 pub mod coord;
 pub mod cubie;
+pub mod env;
 pub mod gen;
 pub mod hot;
 pub mod lanes;

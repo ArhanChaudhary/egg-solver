@@ -16,7 +16,7 @@
 # The profile flags are added to the repo's own rustflags (.cargo/config.toml:
 # target-cpu=native on x86-64). Env: OUT (default target/pgo-solve);
 # PGO_PROFILE=<file.profdata> skips steps 1-2 and reuses that profile;
-# CUBEOPT_SHARE_PAD as for any build (src/hot.rs; default here 0, see below).
+# EGG_SOLVER_SHARE_PAD as for any build (src/hot.rs; default here 0, see below).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 TABLE=${1:?usage: scripts/pgo-solve.sh <table> [threads]}
@@ -32,7 +32,7 @@ fi
 # from main's 16 to 0 (1T `solve -c 1` on 585b3b6, PGO against main at pad
 # 16, ms/cube, 2 pairs each: pad 0 -2.0 -3.4%, 16 +0.6 +0.5%, 32 -2.0 -1.7%,
 # 48 -2.2 -2.9%; on 3a9a50a pad 0 was the best too).
-export CUBEOPT_SHARE_PAD=${CUBEOPT_SHARE_PAD:-0}
+export EGG_SOLVER_SHARE_PAD=${EGG_SOLVER_SHARE_PAD:-0}
 # Extra rustflags for every target (joined with the repo's per-target flags).
 flags() { echo "target.'cfg(all())'.rustflags=[\"$1\"]"; }
 

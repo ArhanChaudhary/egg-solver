@@ -36,11 +36,11 @@
 
 use anyhow::Context as _;
 use clap::{Args, Parser, Subcommand};
-use cubeopt::cli::{self, BadInput, LoadArgs, Verbosity};
-use cubeopt::cubie::{parse_moves, CubieCube, Rng};
-use cubeopt::lanes::share::Pool;
-use cubeopt::solver::{Solver, Stats};
-use cubeopt::tables::Cocsep;
+use egg_solver::cli::{self, BadInput, LoadArgs, Verbosity};
+use egg_solver::cubie::{parse_moves, CubieCube, Rng};
+use egg_solver::lanes::share::Pool;
+use egg_solver::solver::{Solver, Stats};
+use egg_solver::tables::Cocsep;
 use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::process::ExitCode;
@@ -83,7 +83,7 @@ fn run(
         } else {
             max_active
         };
-        cubeopt::lanes::share::Pool::new(cubes, max_active, threads)
+        egg_solver::lanes::share::Pool::new(cubes, max_active, threads)
     });
     let records = Mutex::new(Vec::new());
     let bad = AtomicU64::new(0);
@@ -179,7 +179,7 @@ fn share_thread(
 }
 
 // `stream_thread`'s section: it starts at a fixed offset of a 64-byte line
-// in every build (see `cubeopt::hot`).
+// in every build (see `egg_solver::hot`).
 // Match the measured stream function's page offset (0xa90 with pad 16).
 // Together with cold completion reporting: +0.83% 1T h8 throughput when
 // added; 48T neutral (+0.19% median, five pairs).
@@ -190,7 +190,7 @@ core::arch::global_asm!(
     ".skip 0xa80, 0xcc",
     ".popsection",
 );
-cubeopt::hot_section!(".text.hot_stream", cubeopt::hot::STREAM_PAD);
+egg_solver::hot_section!(".text.hot_stream", egg_solver::hot::STREAM_PAD);
 
 /// A thread of a stream-mode run (`run_lanes`).
 #[inline(never)]
@@ -206,7 +206,7 @@ fn stream_thread(
     lanes: usize,
     record: impl FnMut(usize, Option<Vec<u8>>, Stats, f64),
 ) {
-    cubeopt::lanes::run_lanes(solver, cubes, next, stop, lanes, record);
+    egg_solver::lanes::run_lanes(solver, cubes, next, stop, lanes, record);
 }
 
 /// Stream throughput (solves/s) of `threads` x `lanes` lanes, over a
@@ -274,7 +274,7 @@ enum Command {
 #[derive(Args, Debug)]
 struct TableArgs {
     /// The table file (made by `gen`).
-    #[arg(env = "CUBEOPT_TABLE")]
+    #[arg(env = egg_solver::env::name("EGG_SOLVER_TABLE"))]
     table: String,
     #[command(flatten)]
     load: LoadArgs,
@@ -287,8 +287,8 @@ struct RunArgs {
     #[arg(
         short,
         long,
-        env = "CUBEOPT_THREADS",
-        default_value_t = cubeopt::thread_count(),
+        env = egg_solver::env::name("EGG_SOLVER_THREADS"),
+        default_value_t = egg_solver::thread_count(),
         value_parser = cli::positive(),
     )]
     threads: usize,
@@ -513,7 +513,7 @@ fn print(json: bool, report: &Report, text: impl FnOnce()) -> anyhow::Result<()>
 /// `bench tune`: the best lane count at 1 thread and at all threads (each
 /// candidate measured for `window` seconds), saved to `<table>.tune`.
 fn tune(solver: &Solver, path: &str, window: f64, json: bool) -> anyhow::Result<()> {
-    let all = cubeopt::thread_count();
+    let all = egg_solver::thread_count();
     let candidates = [8, 12, 16, 20, 24, 32, 40, 48];
     let mut best = Vec::new();
     for threads in if all > 1 { vec![1, all] } else { vec![1] } {
@@ -545,7 +545,7 @@ fn tune(solver: &Solver, path: &str, window: f64, json: bool) -> anyhow::Result<
         })?;
         best.push((threads, top.1));
     }
-    let saved = cubeopt::tables::file::save_tuned_lanes(path, &best);
+    let saved = egg_solver::tables::file::save_tuned_lanes(path, &best);
     let report = Report::Saved {
         path: saved.as_ref().ok().cloned(),
         error: saved.as_ref().err().map(ToString::to_string),
@@ -726,7 +726,7 @@ fn run_command(command: &Command, json: bool) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{cube_set, legacy};
-    use cubeopt::cubie::{CubieCube, Rng};
+    use egg_solver::cubie::{CubieCube, Rng};
 
     #[test]
     fn seconds_reject_unrepresentable_durations() {

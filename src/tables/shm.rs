@@ -8,7 +8,7 @@
 //! trailer in the segment's last 4 KiB, with `segment-*` lines added. The
 //! trailer is written last, after the data is in and its checksum checked:
 //! a segment without one is still loading, or its load was interrupted. The
-//! key is ASCII "co" (cubeopt), then k, then base (`key`: 0x636f0b0a for h11
+//! key is legacy ASCII "co" (retained for compatibility), then k, then base (`key`: 0x636f0b0a for h11
 //! base 10), so every run of a table finds the same segment; every attach
 //! compares the segment's trailer with the table file's (k, base, size,
 //! distribution, checksum), so a segment of another table under that key is
@@ -33,7 +33,7 @@
 use super::file::{self, LoadOptions, TableError};
 use super::Memory;
 
-/// The first two bytes of every key: ASCII "co" (cubeopt).
+/// The first two bytes of every key: legacy ASCII "co" (retained for compatibility).
 pub const KEY_PREFIX: u32 = 0x636f_0000;
 
 /// The segment key of table hk with `base`: `KEY_PREFIX`, then k and base,
@@ -823,14 +823,14 @@ mod linux {
     /// (the kernel allows them to the group `vm.hugetlb_shm_group` and to
     /// `CAP_IPC_LOCK`).
     fn no_permission() -> Option<String> {
-        // (`CUBEOPT_SHM_DENY_HUGE`, for tests, undocumented: as if it were
+        // (`EGG_SOLVER_SHM_DENY_HUGE`, for tests, undocumented: as if it were
         // missing, without asking the kernel.)
-        let simulated = std::env::var_os("CUBEOPT_SHM_DENY_HUGE").is_some();
+        let simulated = crate::env::var_os("EGG_SOLVER_SHM_DENY_HUGE").is_some();
         let group = read_number("/proc/sys/vm/hugetlb_shm_group");
         if simulated {
             // SAFETY: no pointers.
             let message = permission_message(group.unwrap_or(0), unsafe { libc::getegid() });
-            return Some(format!("{message} (simulated: CUBEOPT_SHM_DENY_HUGE)"));
+            return Some(format!("{message} (simulated: EGG_SOLVER_SHM_DENY_HUGE)"));
         }
         let group = group?;
         // SAFETY: no pointers; then a buffer of the size asked for.

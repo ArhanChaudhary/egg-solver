@@ -40,12 +40,12 @@
 
 use anyhow::Context as _;
 use clap::{Args, Parser, Subcommand};
-use cubeopt::cli::{self, preflight, BadInput, Verbosity};
-use cubeopt::gen::progress;
-use cubeopt::gen::{collapse, dfs};
-use cubeopt::tables::file::{self, LoadMode, LoadOptions, Trailer};
-use cubeopt::tables::{default_base, distribution, h48_bytes, h48_rows, Cocsep};
-use cubeopt::tables::{H48Meta, H48Table, Memory, ROW_BYTES};
+use egg_solver::cli::{self, preflight, BadInput, Verbosity};
+use egg_solver::gen::progress;
+use egg_solver::gen::{collapse, dfs};
+use egg_solver::tables::file::{self, LoadMode, LoadOptions, Trailer};
+use egg_solver::tables::{default_base, distribution, h48_bytes, h48_rows, Cocsep};
+use egg_solver::tables::{H48Meta, H48Table, Memory, ROW_BYTES};
 use std::io::IsTerminal as _;
 use std::process::ExitCode;
 use std::time::Instant;
@@ -130,8 +130,8 @@ struct GenerateArgs {
     #[arg(
         short,
         long,
-        env = "CUBEOPT_THREADS",
-        default_value_t = cubeopt::thread_count(),
+        env = egg_solver::env::name("EGG_SOLVER_THREADS"),
+        default_value_t = egg_solver::thread_count(),
         value_parser = cli::positive(),
     )]
     threads: usize,
@@ -254,7 +254,7 @@ fn spinner(message: String) -> Option<indicatif::ProgressBar> {
     Some(bar)
 }
 
-/// Shows the generators' progress (`cubeopt::gen::progress`) on a progress
+/// Shows the generators' progress (`egg_solver::gen::progress`) on a progress
 /// bar, their lines above it.
 struct BarReporter(indicatif::ProgressBar);
 
@@ -367,7 +367,7 @@ fn generate(args: &GenerateArgs) -> anyhow::Result<ExitCode> {
             },
             derived.len()
         );
-        let (table, ds) = cubeopt::generate(
+        let (table, ds) = egg_solver::generate(
             &corners,
             k,
             base,
@@ -593,7 +593,7 @@ fn stamp(path: &str, k: u32, base: u8) -> anyhow::Result<ExitCode> {
         memory: data,
         meta: H48Meta { k, base },
     };
-    let trailer = table.trailer(cubeopt::thread_count())?;
+    let trailer = table.trailer(egg_solver::thread_count())?;
     drop(table);
     file::write_trailer(path, &trailer)?;
     drop_cache(path);
@@ -627,7 +627,7 @@ fn check(path: &str, json: bool) -> anyhow::Result<ExitCode> {
         anyhow::bail!("{path} has no trailer (k and base from its meta file)");
     };
     let progress = spinner(format!("checking {path}"));
-    let got = table.trailer(cubeopt::thread_count())?;
+    let got = table.trailer(egg_solver::thread_count())?;
     drop(table);
     drop_cache(path);
     if let Some(progress) = progress {
@@ -744,8 +744,8 @@ fn derive(source: &str, k: u32, out: &str, force: bool) -> anyhow::Result<ExitCo
     }
     let t = Instant::now();
     let progress = spinner(format!("deriving h{k} from {source}"));
-    let table = collapse::derive(&src, k, cubeopt::thread_count())?;
-    let trailer = table.trailer(cubeopt::thread_count())?;
+    let table = collapse::derive(&src, k, egg_solver::thread_count())?;
+    let trailer = table.trailer(egg_solver::thread_count())?;
     write_table(out, table.memory.bytes()?, &trailer)?;
     drop(src);
     drop_cache(source);
@@ -771,7 +771,7 @@ fn compare(a: &str, b: &str) -> anyhow::Result<ExitCode> {
         .into());
     }
     let progress = spinner(format!("comparing {a} with {b}"));
-    let d = collapse::compare(&ta, &tb, cubeopt::thread_count())?;
+    let d = collapse::compare(&ta, &tb, egg_solver::thread_count())?;
     if let Some(progress) = progress {
         progress.finish_and_clear();
     }

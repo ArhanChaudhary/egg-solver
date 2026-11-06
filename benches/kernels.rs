@@ -19,10 +19,10 @@
 )]
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use cubeopt::cubie::{CubieCube, Move, Rng};
-use cubeopt::simd::Cube;
-use cubeopt::solver::Solver;
-use cubeopt::tables::Cocsep;
+use egg_solver::cubie::{CubieCube, Move, Rng};
+use egg_solver::simd::Cube;
+use egg_solver::solver::Solver;
+use egg_solver::tables::Cocsep;
 use std::hint::black_box;
 
 /// 1024 random cubes.
@@ -72,7 +72,8 @@ fn kernels(c: &mut Criterion) {
         b.iter(|| corners.index(black_box(cubes[next()]), 11));
     });
     // (h0, made in memory: a few seconds.)
-    let table = match cubeopt::generate_table(&corners, 0, 8, cubeopt::thread_count(), false) {
+    let table = match egg_solver::generate_table(&corners, 0, 8, egg_solver::thread_count(), false)
+    {
         Ok(table) => table,
         Err(error) => {
             eprintln!("kernels: {error}");

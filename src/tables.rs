@@ -1195,7 +1195,7 @@ pub(crate) fn scratch_path(name: &str) -> std::path::PathBuf {
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(0, |d| d.as_nanos()),
     );
-    dir.join(format!("cubeopt-{name}-{id}"))
+    dir.join(format!("egg-solver-{name}-{id}"))
 }
 
 #[cfg(test)]
@@ -1274,7 +1274,7 @@ mod tests {
     #[cfg_attr(miri, ignore = "files")]
     #[cfg_attr(not(target_os = "linux"), ignore = "Linux mappings")]
     fn opened_table_file_is_read_only() {
-        let path = format!("/dev/shm/cubeopt-test-{}-h0", std::process::id());
+        let path = format!("/dev/shm/egg-solver-test-{}-h0", std::process::id());
         let len = usize::try_from(h48_bytes(0)).unwrap();
         std::fs::write(&path, vec![0u8; len]).unwrap();
         std::fs::write(meta_path(&path), "0 8\n").unwrap();

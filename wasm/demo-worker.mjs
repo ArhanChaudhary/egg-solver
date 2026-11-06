@@ -3,15 +3,15 @@
 // Messages in: { id, cmd, ... }; out: { id, result } or { id, error }, and
 // { progress } while a table loads.
 
-import { Cubeopt } from './cubeopt.mjs';
+import { EggSolver } from './egg-solver.mjs';
 
 let solver = null;
 
 const commands = {
   async init({ threads }) {
     solver?.close();
-    const wasm = new URL(threads > 1 ? 'dist/cubeopt-threads.wasm' : 'dist/cubeopt.wasm', import.meta.url);
-    solver = await Cubeopt.create({ wasm, threads: threads > 1 ? threads : undefined });
+    const wasm = new URL(threads > 1 ? 'dist/egg-solver-threads.wasm' : 'dist/egg-solver.wasm', import.meta.url);
+    solver = await EggSolver.create({ wasm, threads: threads > 1 ? threads : undefined });
     return { threads: solver.threads };
   },
   generate({ k, base }) {

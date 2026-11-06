@@ -57,10 +57,10 @@ pub fn check(needed: u64, margin: u64, available: u64) -> Result<(), Short> {
     }
 }
 
-/// `CUBEOPT_PREFLIGHT_LIMIT` (bytes; for tests, undocumented): every
+/// `EGG_SOLVER_PREFLIGHT_LIMIT` (bytes; for tests, undocumented): every
 /// measured amount is at most this, to try the failures without a full disk.
 fn limit(available: u64) -> u64 {
-    std::env::var("CUBEOPT_PREFLIGHT_LIMIT")
+    crate::env::var("EGG_SOLVER_PREFLIGHT_LIMIT")
         .ok()
         .and_then(|v| v.parse().ok())
         .map_or(available, |limit: u64| available.min(limit))

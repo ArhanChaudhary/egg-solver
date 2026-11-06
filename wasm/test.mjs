@@ -6,7 +6,7 @@
 // agree in length with the other modes; a facelet string must give the cube
 // of its moves.
 
-import { Cubeopt } from './cubeopt.mjs';
+import { EggSolver } from './egg-solver.mjs';
 
 const fail = (message) => {
   console.error(`wasm test: ${message}`);
@@ -21,10 +21,10 @@ const scrambles = [
   "L2 D' R U2 B' F' L U R'",
 ];
 const dist = new URL('./dist/', import.meta.url);
-for (const [name, threads] of [['cubeopt.wasm', undefined], ['cubeopt-threads.wasm', 3]]) {
+for (const [name, threads] of [['egg-solver.wasm', undefined], ['egg-solver-threads.wasm', 3]]) {
   const start = performance.now();
-  const solver = await Cubeopt.create({ wasm: new URL(name, dist), threads });
-  if (solver.exports.cubeopt_has_threads() !== (threads ? 1 : 0)) fail(`${name}: has_threads`);
+  const solver = await EggSolver.create({ wasm: new URL(name, dist), threads });
+  if (solver.exports.egg_solver_has_threads() !== (threads ? 1 : 0)) fail(`${name}: has_threads`);
   const table = await solver.generateTable(0);
   if (table.k !== 0) fail(`${name}: generated h${table.k}`);
   const single = scrambles.map((s) => solver.solve(s));

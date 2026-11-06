@@ -5,7 +5,7 @@
 //! ```text
 //! symgen <word length> <count> <seed> [sym|anti|mix]
 //! ```
-use cubeopt::cubie::{conjugate, format_moves, inverse_move, symmetries, CubieCube, Rng};
+use egg_solver::cubie::{conjugate, format_moves, inverse_move, symmetries, CubieCube, Rng};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();

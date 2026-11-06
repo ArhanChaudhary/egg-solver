@@ -49,11 +49,11 @@
 
 use anyhow::Context as _;
 use clap::Parser;
-use cubeopt::cli::{self, BadInput, LoadArgs, Verbosity};
-use cubeopt::cubie::{format_moves, parse_moves, CubieCube, Rng};
-use cubeopt::lanes::share::Pool;
-use cubeopt::solver::{Solver, Stats};
-use cubeopt::tables::Cocsep;
+use egg_solver::cli::{self, BadInput, LoadArgs, Verbosity};
+use egg_solver::cubie::{format_moves, parse_moves, CubieCube, Rng};
+use egg_solver::lanes::share::Pool;
+use egg_solver::solver::{Solver, Stats};
+use egg_solver::tables::Cocsep;
 use std::hash::{Hash as _, Hasher as _};
 use std::io::{BufRead, Write};
 use std::path::Path;
@@ -140,15 +140,15 @@ struct Args {
         long = "table",
         id = "table_flag",
         value_name = "TABLE",
-        env = "CUBEOPT_TABLE"
+        env = egg_solver::env::name("EGG_SOLVER_TABLE")
     )]
     table_flag: Option<String>,
     /// Threads.
     #[arg(
         short,
         long,
-        env = "CUBEOPT_THREADS",
-        default_value_t = cubeopt::thread_count(),
+        env = egg_solver::env::name("EGG_SOLVER_THREADS"),
+        default_value_t = egg_solver::thread_count(),
         value_parser = cli::positive(),
     )]
     threads: usize,
@@ -570,7 +570,7 @@ fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
 #[cfg(test)]
 mod tests {
     use super::{random_scramble, Rng};
-    use cubeopt::cubie::parse_moves;
+    use egg_solver::cubie::parse_moves;
 
     /// 25 moves, no face twice in a row, no X Y X on opposite faces.
     #[test]

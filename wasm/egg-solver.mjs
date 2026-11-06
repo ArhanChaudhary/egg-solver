@@ -1,14 +1,14 @@
-// cubeopt in WebAssembly: a JavaScript wrapper for Bun and browsers.
+// egg-solver in WebAssembly: a JavaScript wrapper for Bun and browsers.
 //
-//   import { Cubeopt } from './cubeopt.mjs';
-//   const solver = await Cubeopt.create({ wasm: 'dist/cubeopt.wasm' });
+//   import { EggSolver } from './egg-solver.mjs';
+//   const solver = await EggSolver.create({ wasm: 'dist/egg-solver.wasm' });
 //   await solver.loadTable('/path/to/h6');        // or await generateTable(4)
 //   solver.solve("R U R' U' F2 D L2");             // { moves, length, nodes, ... }
 //
 // The module is built for WASI (wasm32-wasip1, or wasm32-wasip1-threads for
 // several threads): this file provides the few WASI functions it imports
 // (clock, console output, sleep), and for the threads build the
-// `thread-spawn` of wasi-threads with a pool of workers (`cubeopt-thread.mjs`)
+// `thread-spawn` of wasi-threads with a pool of workers (`egg-solver-thread.mjs`)
 // on a shared memory. In browsers the threads build needs a cross-origin
 // isolated page (COOP/COEP headers, see `serve.mjs`) and must run in a worker
 // (the main thread may not block). See README.md, "WebAssembly".
@@ -142,7 +142,7 @@ export function wasiImports(getMemory, module) {
       return ERRNO_SUCCESS;
     },
     proc_exit(code) {
-      throw new Error(`cubeopt: exit ${code}`);
+      throw new Error(`egg-solver: exit ${code}`);
     },
   };
   const imports = {};
@@ -186,7 +186,7 @@ export function threadSpawn(control) {
         return tid;
       }
     }
-    console.error('cubeopt: no idle worker for a new thread (raise `threads`)');
+    console.error('egg-solver: no idle worker for a new thread (raise `threads`)');
     return -ERRNO_AGAIN;
   };
 }
@@ -264,9 +264,9 @@ async function readSource(source) {
   return new Uint8Array(await response.arrayBuffer());
 }
 
-/** Start a pool worker (`cubeopt-thread.mjs`) and wait until it is idle. */
+/** Start a pool worker (`egg-solver-thread.mjs`) and wait until it is idle. */
 async function startWorker(module, memory, control, slot) {
-  const url = new URL('./cubeopt-thread.mjs', import.meta.url);
+  const url = new URL('./egg-solver-thread.mjs', import.meta.url);
   const worker = new Worker(url, { type: 'module' });
   await new Promise((resolve, reject) => {
     worker.onmessage = (e) => (e.data === 'ready' ? resolve() : reject(new Error(e.data)));
@@ -279,7 +279,7 @@ async function startWorker(module, memory, control, slot) {
 }
 
 /** The solver: one WebAssembly instance with its table. */
-export class Cubeopt {
+export class EggSolver {
   /**
    * Instantiate the module. `wasm`: a path (Bun), URL, bytes or a compiled
    * `WebAssembly.Module`; `threads`: threads to use with the threads build
@@ -320,7 +320,7 @@ export class Cubeopt {
         workers.push(await startWorker(module, memory, control, slot));
       }
     }
-    return new Cubeopt(instance, instanceMemory, threads, workers);
+    return new EggSolver(instance, instanceMemory, threads, workers);
   }
 
   constructor(instance, memory, threads, workers) {
@@ -336,8 +336,8 @@ export class Cubeopt {
   /** The output of the last call (JSON or an error message). */
   output() {
     // (Addresses and sizes are unsigned: `>>> 0`, from 2 GiB up.)
-    const ptr = this.exports.cubeopt_output() >>> 0;
-    const len = this.exports.cubeopt_output_len() >>> 0;
+    const ptr = this.exports.egg_solver_output() >>> 0;
+    const len = this.exports.egg_solver_output_len() >>> 0;
     return new TextDecoder().decode(copyOut(this.memory, ptr, len));
   }
 
@@ -349,23 +349,23 @@ export class Cubeopt {
     } catch (e) {
       // A Rust panic aborts the instance (its message went to the console).
       this.broken = true;
-      throw new Error(`cubeopt: ${name} failed (${e.message}); create a new instance`);
+      throw new Error(`egg-solver: ${name} failed (${e.message}); create a new instance`);
     }
     const text = this.output();
-    if (status !== 0) throw new Error(`cubeopt: ${text}`);
+    if (status !== 0) throw new Error(`egg-solver: ${text}`);
     return JSON.parse(text);
   }
 
   /** Pass a string to `f(ptr, len)` in a module buffer. */
   withText(text, f) {
     const bytes = new TextEncoder().encode(text);
-    const ptr = this.exports.cubeopt_alloc(bytes.length) >>> 0;
-    if (ptr === 0) throw new Error('cubeopt: out of memory');
+    const ptr = this.exports.egg_solver_alloc(bytes.length) >>> 0;
+    if (ptr === 0) throw new Error('egg-solver: out of memory');
     try {
       new Uint8Array(this.memory.buffer, ptr, bytes.length).set(bytes);
       return f(ptr, bytes.length);
     } finally {
-      this.exports.cubeopt_free(ptr, bytes.length);
+      this.exports.egg_solver_free(ptr, bytes.length);
     }
   }
 
@@ -403,14 +403,14 @@ export class Cubeopt {
   /** Allocate the table buffer, let `fill` write the file into it, install it. */
   async fillTable(size, fill, verify) {
     this.table = null;
-    const ptr = this.exports.cubeopt_table_buffer(size) >>> 0;
+    const ptr = this.exports.egg_solver_table_buffer(size) >>> 0;
     if (ptr === 0) {
-      throw new Error(`cubeopt: no room for a ${size}-byte table (wasm32 has at most 4 GiB in all)`);
+      throw new Error(`egg-solver: no room for a ${size}-byte table (wasm32 has at most 4 GiB in all)`);
     }
     // (A view of the buffer from `offset`; memory.buffer is re-read since
     // growing the memory replaces it.)
     await fill((offset, len = size - offset) => new Uint8Array(this.memory.buffer, ptr + offset, len));
-    this.table = this.call('cubeopt_table_load', verify ? 1 : 0);
+    this.table = this.call('egg_solver_table_load', verify ? 1 : 0);
     await this.warmUp();
     return this.table;
   }
@@ -421,7 +421,7 @@ export class Cubeopt {
    */
   async generateTable(k, base = 0) {
     this.table = null;
-    this.table = this.call('cubeopt_generate', k, base, this.threads);
+    this.table = this.call('egg_solver_generate', k, base, this.threads);
     await this.warmUp();
     return this.table;
   }
@@ -432,13 +432,13 @@ export class Cubeopt {
    * threads work on it. Returns `{ moves, length, nodes, lookups, seconds }`.
    */
   solve(cube, { lanes = 0 } = {}) {
-    return this.withText(cube, (ptr, len) => this.call('cubeopt_solve', ptr, len, lanes, this.threads));
+    return this.withText(cube, (ptr, len) => this.call('egg_solver_solve', ptr, len, lanes, this.threads));
   }
 
   /** Solve many cubes for throughput (each lane solves its own cube); results in input order. */
   solveMany(cubes, { lanes = 0 } = {}) {
     return this.withText(cubes.join('\n'), (ptr, len) =>
-      this.call('cubeopt_solve_batch', ptr, len, lanes, this.threads));
+      this.call('egg_solver_solve_batch', ptr, len, lanes, this.threads));
   }
 
   /**
@@ -447,7 +447,7 @@ export class Cubeopt {
    * `{ solves_per_second, nodes_per_cube, lookups_per_cube, cubes, threads, lanes }`.
    */
   bench({ seed = 2026, warmup = 5, window = 20, lanes = 0 } = {}) {
-    return this.call('cubeopt_bench', seed, warmup, window, lanes, this.threads);
+    return this.call('egg_solver_bench', seed, warmup, window, lanes, this.threads);
   }
 
   /**
@@ -486,7 +486,7 @@ export class Cubeopt {
 
   /** `count` random cube states (facelet strings): those of the native `bench random:count:seed`. */
   randomCubes(seed, count) {
-    return this.call('cubeopt_random', seed, count);
+    return this.call('egg_solver_random', seed, count);
   }
 
   /** Stop the thread pool's workers. */

@@ -1,5 +1,5 @@
 [package]
-name = "cubeopt"
+name = "egg-solver"
 version = "0.1.0"
 edition = "2021"
 
@@ -35,7 +35,7 @@ parking_lot = "0.12"
 
 [features]
 default = ["cli"]
-# The binaries and `cubeopt::cli` (the library alone needs none of it: the
+# The binaries and `egg_solver::cli` (the library alone needs none of it: the
 # wasm module builds without it).
 cli = [
     "dep:clap",
@@ -53,7 +53,7 @@ scalar = []
 bench = ["dep:criterion"]
 
 [[bin]]
-name = "cubeopt"
+name = "egg-solver"
 path = "src/main.rs"
 required-features = ["cli"]
 
