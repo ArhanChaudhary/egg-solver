@@ -105,7 +105,9 @@ pub fn generate(
         .collect::<Result<_, _>>()?;
     let derived_words = derived_memory
         .iter()
-        .map(Memory::words)
+        // SAFETY: fresh writable mappings, shared only through atomic words
+        // until generation has joined every worker.
+        .map(|memory| unsafe { memory.words() })
         .collect::<Result<Vec<_>, _>>()?;
     let generator = gen::Generator {
         corners,
@@ -126,7 +128,8 @@ pub fn generate(
             })
             .collect(),
     };
-    let _counts = generator.run(&memory)?;
+    // SAFETY: fresh writable memory, not exposed to readers before this ends.
+    let _counts = unsafe { generator.run(&memory)? };
     let table = H48Table {
         memory,
         meta: H48Meta { k, base },
@@ -182,7 +185,8 @@ pub fn generate_table(
     let memory = Memory::anonymous(len)?;
     let rows = 0..h48_rows(k);
     let part = gen::dfs::Part {
-        words: memory.words()?,
+        // SAFETY: our fresh writable mapping, read only after generation ends.
+        words: unsafe { memory.words()? },
         first_slot: 0,
         end_slot: rows.end * coord::N_SLOTS as u64,
     };

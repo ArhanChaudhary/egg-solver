@@ -440,7 +440,8 @@ fn generate_dfs(
         let len = usize::try_from((range.end - range.start) * ROW_BYTES)?;
         let mem = Memory::anonymous(len)?;
         let part = dfs::Part {
-            words: mem.words()?,
+            // SAFETY: our writable part, with byte access only after generation.
+            words: unsafe { mem.words()? },
             first_slot: range.start * 512,
             end_slot: range.end * 512,
         };

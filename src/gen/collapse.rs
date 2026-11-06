@@ -73,11 +73,13 @@ fn collapse_shape(
 /// If `k` is above `src`'s, the memory cannot be allocated, a table is larger
 /// than its memory or a slice can be, or a thread panicked.
 pub fn derive(source: &H48Table, k: u32, threads: usize) -> Result<H48Table, TableError> {
-    let source_words = source.memory.words()?;
+    // SAFETY: source words are only loaded, never mutated.
+    let source_words = unsafe { source.memory.words()? };
     let (rows, factor) = collapse_shape(k, source.meta.k, source_words.len())?;
     let memory =
         Memory::anonymous(usize::try_from(h48_bytes(k)).map_err(|_| TableError::TooLarge(k))?)?;
-    let words = memory.words()?;
+    // SAFETY: fresh writable memory, read only after all workers finish.
+    let words = unsafe { memory.words()? };
     par_rows(rows, threads, |row| {
         let covered = &source_words[row * factor * 16..(row + 1) * factor * 16];
         for w in 0..16 {
@@ -121,7 +123,8 @@ pub fn compare(table: &H48Table, larger: &H48Table, threads: usize) -> Result<Di
         )));
     }
     let base = u64::from(table.meta.base);
-    let (words, larger_words) = (table.memory.words()?, larger.memory.words()?);
+    // SAFETY: both views are only loaded, never mutated.
+    let (words, larger_words) = unsafe { (table.memory.words()?, larger.memory.words()?) };
     let (rows, factor) = collapse_shape(table.meta.k, larger.meta.k, larger_words.len())?;
     if words.len() < rows * WORDS_PER_ROW {
         return Err(TableError::TooLarge(table.meta.k));

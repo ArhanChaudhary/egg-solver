@@ -131,10 +131,14 @@ impl Generator<'_> {
     /// Run the BFS, filling `memory` and the derived tables. Returns the
     /// number of entries per depth.
     ///
+    /// # Safety
+    /// `memory` must be writable, with no non-atomic access or immutable byte
+    /// reference to its contents until generation finishes.
+    ///
     /// # Errors
     /// If `k` is not 0 or 11 (the BFS needs a true coordinate), a memory is
     /// smaller than its table, or a thread panicked.
-    pub fn run(&self, memory: &Memory) -> Result<Vec<u64>, TableError> {
+    pub unsafe fn run(&self, memory: &Memory) -> Result<Vec<u64>, TableError> {
         if self.k != 0 && self.k != 11 {
             return Err(TableError::Generate(format!(
                 "BFS only on true coordinates (h0, h11), not h{}",
@@ -142,7 +146,8 @@ impl Generator<'_> {
             )));
         }
         let n_words = table_words(self.k)?;
-        let words = memory.words()?;
+        // SAFETY: the caller grants writable memory without byte aliases.
+        let words = unsafe { memory.words()? };
         // (Every word index below is below the table's words.)
         let too_small = |k| TableError::Generate(format!("memory smaller than h{k}"));
         if words.len() < n_words {

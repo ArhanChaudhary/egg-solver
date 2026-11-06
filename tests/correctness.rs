@@ -521,7 +521,8 @@ fn dfs_table_in_parts(k: u32, prefix_depth: u8, parts: u64) -> H48Table {
             Memory::anonymous(usize::try_from((range.end - range.start) * ROW_BYTES).unwrap())
                 .unwrap();
         let part = egg_solver::gen::dfs::Part {
-            words: part_mem.words().unwrap(),
+            // SAFETY: fresh writable memory, copied only after workers finish.
+            words: unsafe { part_mem.words().unwrap() },
             first_slot: range.start * N_SLOTS as u64,
             end_slot: range.end * N_SLOTS as u64,
         };

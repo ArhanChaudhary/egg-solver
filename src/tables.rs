@@ -562,11 +562,24 @@ impl Memory {
     }
     /// The memory as 64-bit words, for the table generator's atomic updates.
     ///
+    /// # Safety
+    /// Before mutating a word, the caller must ensure the mapping is writable
+    /// and that no non-atomic access or immutable byte reference overlaps the
+    /// mutation. A view used only for loads may coexist with other readers.
+    ///
+    /// ```compile_fail,E0133
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let memory = egg_solver::tables::Memory::anonymous(8)?;
+    /// let _words = memory.words()?; // Requires an explicit unsafe contract.
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Errors
     /// If the memory is larger than a slice can be (`isize::MAX` bytes: 2
     /// GiB on 32-bit targets).
     #[expect(clippy::cast_ptr_alignment, reason = "mappings are page aligned")]
-    pub fn words(&self) -> Result<&[AtomicU64], TableError> {
+    pub unsafe fn words(&self) -> Result<&[AtomicU64], TableError> {
         self.check_slice_len()?;
         // SAFETY: our memory, of at most `isize::MAX` bytes, page aligned.
         Ok(unsafe { std::slice::from_raw_parts(self.ptr.cast::<AtomicU64>(), self.len / 8) })
@@ -759,7 +772,8 @@ impl H48Table {
     /// If the table is larger than its memory or a slice can be, or a
     /// counting thread panicked.
     pub fn distribution(&self) -> Result<[u64; 4], TableError> {
-        let words = self.memory.words()?;
+        // SAFETY: distribution only loads the words; it never mutates them.
+        let words = unsafe { self.memory.words()? };
         let len = usize::try_from(h48_bytes(self.meta.k) / 8)
             .map_err(|_| TableError::TooLarge(self.meta.k))?;
         let words = words.get(..len).ok_or(TableError::TooLarge(self.meta.k))?;
@@ -1202,6 +1216,26 @@ pub(crate) fn scratch_path(name: &str) -> std::path::PathBuf {
 mod tests {
     use super::*;
     use crate::cubie::*;
+
+    /// Atomic generator writes finish before any immutable byte view is made.
+    #[test]
+    fn atomic_updates_finish_before_byte_reads() {
+        let memory = Memory::anonymous(16).unwrap();
+        let values = [0x0123_4567_89ab_cdef_u64, 0xfedc_ba98_7654_3210];
+        {
+            // SAFETY: fresh writable memory, exposed only as atomic words
+            // until both scoped workers have finished.
+            let words = unsafe { memory.words().unwrap() };
+            std::thread::scope(|scope| {
+                for (word, value) in words.iter().zip(values) {
+                    scope.spawn(move || word.store(value, Ordering::Relaxed));
+                }
+            });
+        }
+        let bytes = memory.bytes().unwrap();
+        assert_eq!(&bytes[..8], &values[0].to_ne_bytes());
+        assert_eq!(&bytes[8..], &values[1].to_ne_bytes());
+    }
 
     /// Tables open only with a valid meta and a file of the size its `k`
     /// needs (a wrong meta would give wrong, possibly too high, bounds).
