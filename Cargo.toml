@@ -88,6 +88,11 @@ debug = 1
 [profile.test]
 opt-level = 3
 
+[lints.rust]
+# Set by build.rs for the library (not for the build script's own copy of
+# src/cubie.rs): the cube model's constants are generated.
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(cubie_generated)"] }
+
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 # Hot kernels use `#[inline(always)]` deliberately (measured).

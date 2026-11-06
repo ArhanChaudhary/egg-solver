@@ -514,7 +514,7 @@ mod linux {
                     };
                     let memory = attachment.into_memory().map_err(call_error(key, "shmat"))?;
                     if options.prefault {
-                        memory.prefault();
+                        memory.prefault().map_err(call_error(key, "prefault"))?;
                     }
                     return Ok(Some((memory, segment)));
                 }
@@ -660,7 +660,8 @@ mod linux {
         super::super::read_parallel(&table_file, &writable, data_len)
             .map_err(file::io_error(path))?;
         // The copy is the file's table, and the file is not damaged.
-        let got = file::checksum(&writable.bytes()[..data_len], crate::thread_count());
+        let data = (writable.bytes()?.get(..data_len)).ok_or(TableError::TooLarge(trailer.k))?;
+        let got = file::checksum(data, crate::thread_count())?;
         let want = trailer.checksum.unwrap_or_default();
         if got != want {
             return Err(TableError::Checksum { got, want });
@@ -690,7 +691,7 @@ mod linux {
         };
         let memory = read_only.into_memory().map_err(call_error(key, "shmat"))?;
         if options.prefault {
-            memory.prefault();
+            memory.prefault().map_err(call_error(key, "prefault"))?;
         }
         Ok(Some((memory, segment)))
     }
@@ -985,7 +986,7 @@ mod segment_tests {
                 base: 8,
                 data_bytes: len as u64,
                 distribution: None,
-                checksum: Some(file::checksum(&data, 4)),
+                checksum: Some(file::checksum(&data, 4).unwrap()),
             };
             let path = scratch_path(name).to_string_lossy().into_owned();
             std::fs::write(&path, [&data[..], &trailer.to_bytes()].concat()).unwrap();
@@ -1035,8 +1036,11 @@ mod segment_tests {
         assert_eq!(segment.bytes, segment_bytes(h48_bytes(0), NORMAL_PAGE));
         assert_eq!(segment.source, table.path);
         assert_eq!((first.meta.k, first.meta.base), (0, 8));
-        assert_eq!(&first.memory.bytes()[..table.data.len()], &table.data[..]);
-        let end = &first.memory.bytes()[first.memory.len() - 4096..];
+        assert_eq!(
+            &first.memory.bytes().unwrap()[..table.data.len()],
+            &table.data[..]
+        );
+        let end = &first.memory.bytes().unwrap()[first.memory.len() - 4096..];
         let header = parse_header(end).unwrap().unwrap();
         assert_eq!(header.trailer, table.trailer);
         assert_eq!(header.page_bytes, Some(NORMAL_PAGE));
@@ -1052,7 +1056,10 @@ mod segment_tests {
                 (segment.id, segment.bytes, NORMAL_PAGE)
             );
             assert_eq!(report.mode, LoadMode::Shm);
-            assert_eq!(&again.memory.bytes()[..table.data.len()], &table.data[..]);
+            assert_eq!(
+                &again.memory.bytes().unwrap()[..table.data.len()],
+                &table.data[..]
+            );
             assert_eq!(attached(segment.id), 2);
         }
         // Explicit map and copy loads never use a segment.
@@ -1096,7 +1103,10 @@ mod segment_tests {
             "{:?}",
             report.notes
         );
-        assert_eq!(&table.memory.bytes()[..second.data.len()], &second.data[..]);
+        assert_eq!(
+            &table.memory.bytes().unwrap()[..second.data.len()],
+            &second.data[..]
+        );
     }
 
     /// A segment without a trailer is being loaded (its maker runs: `Shm`
@@ -1145,7 +1155,10 @@ mod segment_tests {
             "{:?}",
             report.notes
         );
-        assert_eq!(&loaded.memory.bytes()[..table.data.len()], &table.data[..]);
+        assert_eq!(
+            &loaded.memory.bytes().unwrap()[..table.data.len()],
+            &table.data[..]
+        );
     }
 
     /// Without huge pages to be had, a segment falls back to the next size

@@ -22,7 +22,12 @@
 /// had it (its four pads were within the noise of each other at 1T), and
 /// the best pad for m8's loop on def2cd0 (1T against main at 16, 2 pairs
 /// per pad: 0 -0.3 +0.6%, 16 +4.0 +0.5%, 32 -0.1 +1.2%, 48 +2.4 +1.3%).
-pub const STREAM_PAD: usize = pad(option_env!("CUBEOPT_STREAM_PAD"), 16);
+pub const STREAM_PAD: usize = {
+    let pad = pad(option_env!("CUBEOPT_STREAM_PAD"), 16);
+    // (A compile-time check: a build with another value fails.)
+    assert!(is_pad(pad), "CUBEOPT_STREAM_PAD is 0, 16, 32 or 48");
+    pad
+};
 
 /// Offset of the share mode's round loop (`share::Worker::rounds`) in its
 /// 64-byte line: 16. (With the loop visiting the lanes by pointer, m8 on
@@ -30,31 +35,34 @@ pub const STREAM_PAD: usize = pad(option_env!("CUBEOPT_STREAM_PAD"), 16);
 /// +1.8%, 16 +5.3 +3.2%, 32 +1.6 +1.0%, 48 +1.7 +1.9%. Before: at 48T the
 /// four pads were within the noise, +-0.3%; at 1T share, 0 against 48:
 /// +1.7 +0.1 +0.0%.)
-pub const SHARE_PAD: usize = pad(option_env!("CUBEOPT_SHARE_PAD"), 16);
+pub const SHARE_PAD: usize = {
+    let pad = pad(option_env!("CUBEOPT_SHARE_PAD"), 16);
+    assert!(is_pad(pad), "CUBEOPT_SHARE_PAD is 0, 16, 32 or 48");
+    pad
+};
 
-/// The value of a pad build variable (decimal), or `default`.
-///
-/// # Panics
-/// At compile time (it is used in constants) if the value is not 0, 16, 32
-/// or 48.
-#[must_use]
-pub const fn pad(var: Option<&str>, default: usize) -> usize {
-    let p = match var {
-        None => default,
-        Some(s) => {
-            let digits = s.as_bytes();
-            let mut v = 0;
-            let mut i = 0;
-            while i < digits.len() {
-                assert!(digits[i].is_ascii_digit(), "a pad is a decimal number");
-                v = v * 10 + (digits[i] - b'0') as usize;
-                i += 1;
-            }
-            v
-        }
+/// The value of a pad build variable (decimal; `usize::MAX` if it is not
+/// a number), or `default`. (Evaluated at compile time only: the pads are
+/// constants.)
+const fn pad(var: Option<&str>, default: usize) -> usize {
+    let Some(text) = var else {
+        return default;
     };
-    assert!(p < 64 && p.is_multiple_of(16), "a pad is 0, 16, 32 or 48");
-    p
+    let mut value = 0usize;
+    let mut digits = text.as_bytes();
+    while let [digit, rest @ ..] = digits {
+        if !digit.is_ascii_digit() || value > 64 {
+            return usize::MAX;
+        }
+        value = value * 10 + (*digit - b'0') as usize;
+        digits = rest;
+    }
+    value
+}
+
+/// Whether `pad` is a valid pad: 0, 16, 32 or 48.
+const fn is_pad(pad: usize) -> bool {
+    pad < 64 && pad.is_multiple_of(16)
 }
 
 /// Starts section `$name` on a 64-byte boundary, followed by `$pad` bytes

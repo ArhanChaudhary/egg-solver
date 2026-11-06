@@ -11,6 +11,20 @@
 //! `__heap_end`, still fits in 32 bits), wasi-libc's `malloc` has it all
 //! without growing; the engine maps it, untouched pages cost no RAM.
 
+// No intentional panics in shipped code (user request; asserts, which no
+// lint covers, are checked by tests/no_runtime_panics.rs).
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::unreachable,
+        clippy::todo,
+        clippy::unimplemented
+    )
+)]
+
 fn main() {
     println!("cargo::rustc-check-cfg=cfg(wasm_threads)");
     if std::env::var("TARGET").is_ok_and(|target| target.ends_with("-threads")) {

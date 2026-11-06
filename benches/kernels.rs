@@ -4,8 +4,22 @@
 //! alone: the solver's speed comes from interleaving them across lanes
 //! (`bench` measures that).
 
+// No intentional panics in shipped code (user request; asserts, which no
+// lint covers, are checked by tests/no_runtime_panics.rs).
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::unreachable,
+        clippy::todo,
+        clippy::unimplemented
+    )
+)]
+
 use criterion::{criterion_group, criterion_main, Criterion};
-use cubeopt::cubie::{CubieCube, Rng};
+use cubeopt::cubie::{CubieCube, Move, Rng};
 use cubeopt::simd::Cube;
 use cubeopt::solver::Solver;
 use cubeopt::tables::Cocsep;
@@ -21,7 +35,13 @@ fn cubes() -> Vec<Cube> {
 
 fn kernels(c: &mut Criterion) {
     let cubes = cubes();
-    let corners = Cocsep::generate();
+    let corners = match Cocsep::generate() {
+        Ok(corners) => corners,
+        Err(error) => {
+            eprintln!("kernels: {error}");
+            return;
+        }
+    };
     let mut i = 0usize;
     let mut next = move || {
         i = (i + 1) % 1024;
@@ -30,7 +50,7 @@ fn kernels(c: &mut Criterion) {
     c.bench_function("apply_move", |b| {
         b.iter(|| {
             let i = next();
-            black_box(cubes[i]).apply_move(black_box(i % 18))
+            black_box(cubes[i]).apply_move(black_box(Move::ALL[i % 18]))
         });
     });
     c.bench_function("child_lookup", |b| {
@@ -52,7 +72,13 @@ fn kernels(c: &mut Criterion) {
         b.iter(|| corners.index(black_box(cubes[next()]), 11));
     });
     // (h0, made in memory: a few seconds.)
-    let table = cubeopt::generate_table(&corners, 0, 8, cubeopt::thread_count(), false);
+    let table = match cubeopt::generate_table(&corners, 0, 8, cubeopt::thread_count(), false) {
+        Ok(table) => table,
+        Err(error) => {
+            eprintln!("kernels: {error}");
+            return;
+        }
+    };
     let solver = Solver::new(&corners, &table);
     c.bench_function("lower_bound (index and h0 lookup)", |b| {
         b.iter(|| solver.lower_bound(black_box(cubes[next()])));

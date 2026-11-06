@@ -15,7 +15,7 @@
 //! status is 1 if one is wrong, 2 if a cube is not reported (or twice).
 use cubeopt::coord::cocsep;
 use cubeopt::cubie::{
-    conjugate, format_moves, inverse_move, parse_moves, symmetries, CubieCube, Rng,
+    conjugate, format_moves, inverse_move, parse_moves, symmetries, CubieCube, Move, Rng,
 };
 use cubeopt::simd::Cube;
 use cubeopt::solver::{Solver, Stats};
@@ -66,7 +66,7 @@ impl Reference<'_> {
             {
                 continue;
             }
-            let child = cube.apply_move(usize::from(m));
+            let child = cube.apply_move(Move::ALL[usize::from(m)]);
             children[count] = (child, m, self.bound(child));
             count += 1;
         }
@@ -112,7 +112,7 @@ fn load_set(spec: &str) -> Vec<CubieCube> {
         return (0..v[0])
             .map(|_| {
                 let moves: Vec<u8> = (0..v[1]).map(|_| random_move(&mut rng)).collect();
-                CubieCube::SOLVED.apply_moves(&moves)
+                CubieCube::SOLVED.apply_moves(&moves).unwrap()
             })
             .collect();
     }
@@ -132,7 +132,11 @@ fn load_set(spec: &str) -> Vec<CubieCube> {
         .unwrap()
         .lines()
         .filter(|l| !l.trim().is_empty() && !l.starts_with('#'))
-        .map(|l| CubieCube::SOLVED.apply_moves(&parse_moves(l).expect("parse")))
+        .map(|l| {
+            CubieCube::SOLVED
+                .apply_moves(&parse_moves(l).expect("parse"))
+                .unwrap()
+        })
         .collect()
 }
 
@@ -144,7 +148,7 @@ fn solve_all(
     mode: &str,
     threads: usize,
     lanes: usize,
-    record: &(dyn Fn(usize, Vec<u8>, Stats, f64) + Sync),
+    record: &(dyn Fn(usize, Option<Vec<u8>>, Stats, f64) + Sync),
 ) {
     let get = |i: usize| cubes.get(i).copied();
     let next = AtomicUsize::new(0);
@@ -173,7 +177,7 @@ fn solve_all(
                     let (solution, stats) = if mode == "rec" {
                         solver.solve(&cube)
                     } else {
-                        (reference.solve(&cube), Stats::default())
+                        (Some(reference.solve(&cube)), Stats::default())
                     };
                     record(i, solution, stats, 0.0);
                 },
@@ -193,7 +197,7 @@ fn main() {
     let mode = args[3].as_str();
     let threads: usize = args.get(4).map_or(8, |x| x.parse().unwrap());
     let lanes: usize = args.get(5).map_or(20, |x| x.parse().unwrap());
-    let corners = Cocsep::generate();
+    let corners = Cocsep::generate().unwrap();
     let table = H48Table::open(&args[1]).expect("open table");
     let solver = Solver::new(&corners, &table);
     let reference = Reference {
@@ -203,13 +207,14 @@ fn main() {
     let solutions: Mutex<Vec<Option<Vec<u8>>>> = Mutex::new(vec![None; cubes.len()]);
     let reported_twice = AtomicBool::new(false);
     let nodes = AtomicU64::new(0);
-    let record = |i: usize, solution: Vec<u8>, stats: Stats, _seconds: f64| {
+    let record = |i: usize, solution: Option<Vec<u8>>, stats: Stats, _seconds: f64| {
         nodes.fetch_add(stats.nodes, Relaxed);
         let mut all = solutions.lock().unwrap();
         if all[i].is_some() {
             reported_twice.store(true, Relaxed);
         }
-        all[i] = Some(solution);
+        // (No solution: an empty one, which is BAD.)
+        all[i] = Some(solution.unwrap_or_default());
     };
     let start = std::time::Instant::now();
     solve_all(&solver, &reference, &cubes, mode, threads, lanes, &record);
@@ -223,7 +228,7 @@ fn main() {
             missing = true;
             continue;
         };
-        let ok = cubes[i].apply_moves(solution) == CubieCube::SOLVED;
+        let ok = cubes[i].apply_moves(solution) == Some(CubieCube::SOLVED);
         bad |= !ok;
         lengths[solution.len()] += 1;
         // (The inverse of the solution is a scramble of the cube: input for

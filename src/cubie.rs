@@ -6,6 +6,11 @@
 //! from which the fast SIMD representation (`simd`), the move tables and the
 //! 48 symmetries are derived, and against which they are tested.
 //!
+//! The derivation (`model`: moves and symmetries as rotations and
+//! reflections of the 48 stickers) runs in build.rs, which writes the moves,
+//! symmetries and facelet tables as constants for the library
+//! (`cfg(cubie_generated)`), and in the tests.
+//!
 //! Piece numbering follows nissy so that cheap bit tricks give the H48
 //! coordinates:
 //! * corners `UFR UBL DFL DBR | UFL UBR DFR DBL` (bit 2 = tetrad),
@@ -64,17 +69,23 @@ pub const FACE_NORMALS: [Vec3; 6] = [
 pub const FACE_NAMES: [char; 6] = ['U', 'D', 'R', 'L', 'F', 'B'];
 
 /// A cube state, piece by piece.
+///
+/// Valid by construction: the fields are private to the crate, and every
+/// way to make one (`SOLVED`, moves, `compose`, `inverse`, `random`,
+/// `from_facelets`, the SIMD cube's `to_cubie`) gives permutations of the
+/// pieces and orientations in range, so the pieces index the tables below
+/// in range.
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]
 pub struct CubieCube {
     /// The corner piece in each corner position.
-    pub corner_perm: [u8; 8],
+    pub(crate) corner_perm: [u8; 8],
     /// The twist of each corner position's piece: by how many clockwise
     /// steps (0..3) its U/D sticker is turned away from the U/D face.
-    pub corner_orient: [u8; 8],
+    pub(crate) corner_orient: [u8; 8],
     /// The edge piece in each edge position.
-    pub edge_perm: [u8; 12],
+    pub(crate) edge_perm: [u8; 12],
     /// Whether each edge position's piece is flipped (0 or 1).
-    pub edge_orient: [u8; 12],
+    pub(crate) edge_orient: [u8; 12],
 }
 
 impl CubieCube {
@@ -130,20 +141,21 @@ impl CubieCube {
         result
     }
 
-    /// This state followed by move `mv` (0..18).
+    /// This state followed by move `mv`.
+    #[cfg(cubie_generated)]
     #[must_use]
-    pub fn apply_move(&self, mv: usize) -> CubieCube {
-        self.compose(&move_cubes()[mv])
+    pub fn apply_move(&self, mv: Move) -> CubieCube {
+        self.compose(&MOVE_CUBES[mv.index()])
     }
 
-    /// This state followed by a move sequence.
+    /// This state followed by a move sequence (moves numbered as `Move`),
+    /// or `None` if a number is not a move.
+    #[cfg(cubie_generated)]
     #[must_use]
-    pub fn apply_moves(&self, moves: &[u8]) -> CubieCube {
-        let mut cube = *self;
-        for &mv in moves {
-            cube = cube.apply_move(usize::from(mv));
-        }
-        cube
+    pub fn apply_moves(&self, moves: &[u8]) -> Option<CubieCube> {
+        moves.iter().try_fold(*self, |cube, &mv| {
+            Some(cube.apply_move(Move::from_index(usize::from(mv))?))
+        })
     }
 
     /// Parity (0 even, 1 odd) of the corner permutation.
@@ -165,16 +177,16 @@ impl CubieCube {
         let mut seen_corners = [false; 8];
         let mut seen_edges = [false; 12];
         for &piece in &self.corner_perm {
-            if piece >= 8 || seen_corners[usize::from(piece)] {
-                return false;
+            match seen_corners.get_mut(usize::from(piece)) {
+                Some(seen @ false) => *seen = true,
+                _ => return false,
             }
-            seen_corners[usize::from(piece)] = true;
         }
         for &piece in &self.edge_perm {
-            if piece >= 12 || seen_edges[usize::from(piece)] {
-                return false;
+            match seen_edges.get_mut(usize::from(piece)) {
+                Some(seen @ false) => *seen = true,
+                _ => return false,
             }
-            seen_edges[usize::from(piece)] = true;
         }
         let total = |orients: &[u8]| orients.iter().map(|&x| u32::from(x)).sum::<u32>();
         total(&self.corner_orient).is_multiple_of(3)
@@ -221,7 +233,7 @@ impl CubieCube {
 fn permutation_parity(perm: &[u8]) -> u32 {
     let mut parity = 0;
     for (i, &a) in perm.iter().enumerate() {
-        for &b in &perm[i + 1..] {
+        for &b in perm.iter().skip(i + 1) {
             if a > b {
                 parity ^= 1;
             }
@@ -248,290 +260,113 @@ impl Rng {
     }
 
     /// `below` for small numbers (moves, orientations).
-    ///
-    /// # Panics
-    /// Cannot panic: the result is below `n`.
+    #[expect(clippy::cast_possible_truncation, reason = "below n, a u8")]
     pub fn below_u8(&mut self, n: u8) -> u8 {
-        u8::try_from(self.below(n.into())).expect("below n")
+        self.below(n.into()) as u8
     }
 
     /// `below` for indices.
-    ///
-    /// # Panics
-    /// Cannot panic: the result is below `n` (and `usize` is 64 bits).
+    #[expect(clippy::cast_possible_truncation, reason = "below n, a usize")]
     pub fn below_usize(&mut self, n: usize) -> usize {
-        let n = u64::try_from(n).expect("64-bit usize");
-        usize::try_from(self.below(n)).expect("below n")
+        self.below(n as u64) as usize
     }
 }
 
-// ---------------------------------------------------------------------------
-// Sticker model: moves and symmetries are rotations and reflections of the
-// 48 stickers; the cubie-level moves and symmetries are read off from them.
-// ---------------------------------------------------------------------------
+// (`below_usize` widens a `usize` to `u64`.)
+const _: () = assert!(usize::BITS <= u64::BITS);
 
-/// A sticker location: a cubie position vector and the outward normal.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-struct Sticker {
-    position: Vec3,
-    normal: Vec3,
+/// Number of moves (turns of 90, 180 and 270 degrees of the 6 faces).
+pub const N_MOVES: usize = 18;
+
+/// A move: face `index / 3` (U D R L F B) turned clockwise by `index % 3 +
+/// 1` quarter turns; `X3` is X'. Only the 18 moves exist, so a `Move`
+/// indexes the 18-entry move tables without a check.
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[repr(u8)]
+pub enum Move {
+    U,
+    U2,
+    U3,
+    D,
+    D2,
+    D3,
+    R,
+    R2,
+    R3,
+    L,
+    L2,
+    L3,
+    F,
+    F2,
+    F3,
+    B,
+    B2,
+    B3,
 }
 
-/// The unit vector `sign` along `axis`.
-fn axis_vector(axis: usize, sign: i32) -> Vec3 {
-    let mut v = [0; 3];
-    v[axis] = sign;
-    v
-}
+impl Move {
+    /// All moves, in order of their numbers.
+    pub const ALL: [Move; N_MOVES] = [
+        Move::U,
+        Move::U2,
+        Move::U3,
+        Move::D,
+        Move::D2,
+        Move::D3,
+        Move::R,
+        Move::R2,
+        Move::R3,
+        Move::L,
+        Move::L2,
+        Move::L3,
+        Move::F,
+        Move::F2,
+        Move::F3,
+        Move::B,
+        Move::B2,
+        Move::B3,
+    ];
 
-/// Determinant of the matrix with rows `a`, `b`, `c`.
-fn determinant(a: Vec3, b: Vec3, c: Vec3) -> i32 {
-    a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0])
-        + a[2] * (b[0] * c[1] - b[1] * c[0])
-}
-
-/// Stickers of corner position `i` in clockwise order, starting from the U/D one.
-fn corner_stickers(i: usize) -> [Sticker; 3] {
-    let position = CORNER_POSITIONS[i];
-    let up_down = axis_vector(1, position[1]);
-    let a = axis_vector(0, position[0]);
-    let b = axis_vector(2, position[2]);
-    // (Clockwise seen from outside: a positive determinant.)
-    let (second, third) = if determinant(up_down, a, b) > 0 {
-        (a, b)
-    } else {
-        (b, a)
-    };
-    [up_down, second, third].map(|normal| Sticker { position, normal })
-}
-
-/// Stickers of edge position `i`, the reference (U/D, else F/B) one first.
-fn edge_stickers(i: usize) -> [Sticker; 2] {
-    let position = EDGE_POSITIONS[i];
-    let (reference, other) = if position[1] != 0 {
-        let other = if position[0] != 0 {
-            axis_vector(0, position[0])
-        } else {
-            axis_vector(2, position[2])
-        };
-        (axis_vector(1, position[1]), other)
-    } else {
-        (axis_vector(2, position[2]), axis_vector(0, position[0]))
-    };
-    [reference, other].map(|normal| Sticker { position, normal })
-}
-
-/// All 48 stickers: 3 per corner position, then 2 per edge position.
-fn all_stickers() -> Vec<Sticker> {
-    let mut stickers = Vec::with_capacity(48);
-    for i in 0..8 {
-        stickers.extend_from_slice(&corner_stickers(i));
-    }
-    for i in 0..12 {
-        stickers.extend_from_slice(&edge_stickers(i));
-    }
-    stickers
-}
-
-/// Index of a sticker in `all_stickers()`.
-fn sticker_index(all: &[Sticker], sticker: Sticker) -> u8 {
-    let index = all.iter().position(|&x| x == sticker).expect("bad sticker");
-    u8::try_from(index).expect("48 stickers")
-}
-
-/// A 3x3 integer matrix (rotations and reflections), row major.
-type Matrix = [[i32; 3]; 3];
-
-/// `m` times the column vector `v`.
-fn matrix_apply(m: &Matrix, v: Vec3) -> Vec3 {
-    let mut result = [0; 3];
-    for (row, x) in m.iter().zip(&mut result) {
-        *x = row[0] * v[0] + row[1] * v[1] + row[2] * v[2];
-    }
-    result
-}
-
-fn matrix_determinant(m: &Matrix) -> i32 {
-    determinant(m[0], m[1], m[2])
-}
-
-fn matrix_product(a: &Matrix, b: &Matrix) -> Matrix {
-    let mut product = [[0; 3]; 3];
-    for i in 0..3 {
-        for j in 0..3 {
-            product[i][j] = (0..3).map(|k| a[i][k] * b[k][j]).sum();
-        }
-    }
-    product
-}
-
-/// The image of a sticker under `m`.
-fn matrix_apply_sticker(m: &Matrix, sticker: Sticker) -> Sticker {
-    Sticker {
-        position: matrix_apply(m, sticker.position),
-        normal: matrix_apply(m, sticker.normal),
-    }
-}
-
-/// Rotation by -90 degrees about unit axis `u` (clockwise seen from outside).
-#[expect(clippy::needless_range_loop, reason = "matrix indices")]
-fn quarter_turn_matrix(u: Vec3) -> Matrix {
-    // Column j is the image of the unit vector e_j: R v = -(u x v) + u (u.v).
-    let mut m = [[0; 3]; 3];
-    for j in 0..3 {
-        let v = axis_vector(j, 1);
-        let cross = [
-            u[1] * v[2] - u[2] * v[1],
-            u[2] * v[0] - u[0] * v[2],
-            u[0] * v[1] - u[1] * v[0],
-        ];
-        let dot = u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
-        for i in 0..3 {
-            m[i][j] = -cross[i] + u[i] * dot;
-        }
-    }
-    m
-}
-
-/// A sticker state: `self.0[location]` is the identity (home location
-/// index) of the sticker at `location`.
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct StickerCube(pub [u8; 48]);
-
-impl StickerCube {
+    /// The move numbered `index`, if there is one (`index < 18`).
     #[must_use]
-    pub fn solved() -> StickerCube {
-        let mut stickers = [0u8; 48];
-        for (x, i) in stickers.iter_mut().zip(0..) {
-            *x = i;
-        }
-        StickerCube(stickers)
+    #[inline(always)]
+    pub fn from_index(index: usize) -> Option<Move> {
+        Move::ALL.get(index).copied()
     }
 
-    /// Apply a face move (`face` in 0..6, clockwise quarter turns).
+    /// The lowest move of a move mask (bit `m` for move `m`), or `None` if
+    /// it has none. (For masks of moves only, as the search's are: then
+    /// `while let Some(mv) = Move::lowest(mask)` visits all of them.)
     #[must_use]
-    pub fn apply_face(&self, face: usize, quarter_turns: usize) -> StickerCube {
-        let all = all_stickers();
-        let axis = FACE_NORMALS[face];
-        let turn = quarter_turn_matrix(axis);
-        let mut current = self.clone();
-        for _ in 0..quarter_turns {
-            let mut next = current.clone();
-            for (from, &sticker) in all.iter().enumerate() {
-                // (The face's layer: the stickers on its side of the center.)
-                let p = sticker.position;
-                if p[0] * axis[0] + p[1] * axis[1] + p[2] * axis[2] > 0 {
-                    let to = sticker_index(&all, matrix_apply_sticker(&turn, sticker));
-                    next.0[usize::from(to)] = current.0[from];
-                }
-            }
-            current = next;
-        }
-        current
+    #[inline(always)]
+    pub fn lowest(mask: u32) -> Option<Move> {
+        Move::from_index(mask.trailing_zeros() as usize)
     }
 
-    /// Conjugate by a spatial symmetry `m`: `out[m(L)] = m(self[L])`.
+    /// Its number (0..18).
     #[must_use]
-    pub fn conjugate(&self, m: &Matrix) -> StickerCube {
-        let all = all_stickers();
-        let map = |index: u8| -> u8 {
-            sticker_index(&all, matrix_apply_sticker(m, all[usize::from(index)]))
-        };
-        let mut out = [0u8; 48];
-        for (location, &identity) in (0..).zip(&self.0) {
-            out[usize::from(map(location))] = map(identity);
-        }
-        StickerCube(out)
-    }
-
-    /// State with `self[L] = m(L)`: the cubie-level "cube" of a symmetry.
-    fn symmetry_state(m: &Matrix) -> StickerCube {
-        let all = all_stickers();
-        let mut out = [0u8; 48];
-        for (x, &sticker) in out.iter_mut().zip(&all) {
-            *x = sticker_index(&all, matrix_apply_sticker(m, sticker));
-        }
-        StickerCube(out)
-    }
-
-    /// The cubie state of this sticker state (which must be one).
-    #[must_use]
-    pub fn to_cubie(&self) -> CubieCube {
-        let mut cube = CubieCube::SOLVED;
-        for i in 0..8 {
-            // The piece's reference sticker is 3 * piece; where it is gives
-            // the twist.
-            let piece = self.0[3 * i] / 3;
-            cube.corner_perm[i] = piece;
-            for (k, &identity) in (0..).zip(&self.0[3 * i..3 * i + 3]) {
-                if identity == 3 * piece {
-                    cube.corner_orient[i] = k;
-                }
-            }
-        }
-        for i in 0..12 {
-            let identity = self.0[24 + 2 * i] - 24;
-            cube.edge_perm[i] = identity / 2;
-            cube.edge_orient[i] = identity % 2;
-        }
-        cube
-    }
-
-    #[must_use]
-    pub fn from_cubie(cube: &CubieCube) -> StickerCube {
-        let mut stickers = [0u8; 48];
-        for i in 0..8 {
-            let piece = cube.corner_perm[i];
-            for k in 0..3 {
-                // piece sticker j sits at position sticker (twist + j) % 3
-                let j = (k + 3 - cube.corner_orient[i]) % 3;
-                stickers[3 * i + usize::from(k)] = 3 * piece + j;
-            }
-        }
-        for i in 0..12 {
-            let piece = cube.edge_perm[i];
-            for k in 0..2 {
-                let j = (k + cube.edge_orient[i]) % 2;
-                stickers[24 + 2 * i + usize::from(k)] = 24 + 2 * piece + j;
-            }
-        }
-        StickerCube(stickers)
+    #[inline(always)]
+    pub const fn index(self) -> usize {
+        self as usize
     }
 }
+
+// (A `Move` is its number: `index` is the identity.)
+const _: () = {
+    let mut i = 0;
+    while i < N_MOVES {
+        assert!(Move::ALL[i] as usize == i);
+        i += 1;
+    }
+};
 
 // ---------------------------------------------------------------------------
 // Facelet strings
 // ---------------------------------------------------------------------------
 
-/// The faces of a facelet string in its order (U R F D L B, as in Kociemba's
-/// solvers), each as its outward normal and the directions of "right" and
-/// "down" as the face is seen from outside: U with B at the top, D with F at
-/// the top, the side faces with U at the top.
-const FACELET_FACES: [(Vec3, Vec3, Vec3); 6] = [
-    ([0, 1, 0], [1, 0, 0], [0, 0, 1]),
-    ([1, 0, 0], [0, 0, -1], [0, -1, 0]),
-    ([0, 0, 1], [1, 0, 0], [0, -1, 0]),
-    ([0, -1, 0], [1, 0, 0], [0, 0, -1]),
-    ([-1, 0, 0], [0, 0, 1], [0, -1, 0]),
-    ([0, 0, -1], [-1, 0, 0], [0, -1, 0]),
-];
-
-/// The sticker of facelet `i` (0..54: 9 per face, row by row).
-fn facelet_sticker(i: usize) -> Sticker {
-    let (normal, right, down) = FACELET_FACES[i / 9];
-    let offset = |x: usize| i32::try_from(x).expect("below 3") - 1;
-    let (row, column) = (offset(i % 9 / 3), offset(i % 3));
-    Sticker {
-        position: std::array::from_fn(|a| normal[a] + column * right[a] + row * down[a]),
-        normal,
-    }
-}
-
-/// The face letter of an outward normal.
-fn face_letter(normal: Vec3) -> char {
-    let face = FACE_NORMALS.iter().position(|&n| n == normal);
-    FACE_NAMES[face.expect("a face normal")]
-}
+/// The face letters of a facelet string, in its order of faces (U R F D L
+/// B, as in Kociemba's solvers).
+const FACELET_LETTERS: [char; 6] = ['U', 'R', 'F', 'D', 'L', 'B'];
 
 /// Why a facelet string is not a cube (`CubieCube::from_facelets`).
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -559,6 +394,23 @@ pub enum FaceletError {
     Unreachable,
 }
 
+// (Every facelet number in the tables is below 54, so the tables index a
+// facelet string, and a facelet number / 9 the faces, in range.)
+#[cfg(cubie_generated)]
+const _: () = {
+    let mut i = 0;
+    while i < 8 * 3 {
+        assert!(CORNER_FACELETS[i / 3][i % 3] < 54);
+        i += 1;
+    }
+    let mut i = 0;
+    while i < 12 * 2 {
+        assert!(EDGE_FACELETS[i / 2][i % 2] < 54);
+        i += 1;
+    }
+};
+
+#[cfg(cubie_generated)]
 impl CubieCube {
     /// The cube of a facelet string: 54 stickers, face by face in the order
     /// U R F D L B, each face row by row as seen from outside (U with B at
@@ -570,57 +422,59 @@ impl CubieCube {
     /// If the string is not 54 stickers of six colors, one per center, or
     /// does not describe pieces of a cube, or a position that can be reached
     /// by turning faces (e.g. a single twisted corner).
-    ///
-    /// # Panics
-    /// Never (every sticker is a facelet).
     pub fn from_facelets(text: &str) -> Result<CubieCube, FaceletError> {
         let colors: Vec<char> = text.chars().filter(|c| !c.is_whitespace()).collect();
-        if colors.len() != 54 {
-            return Err(FaceletError::StickerCount(colors.len()));
+        let colors: [char; 54] = colors
+            .try_into()
+            .map_err(|colors: Vec<char>| FaceletError::StickerCount(colors.len()))?;
+        // The face of each color, from the centers (each face's fifth sticker).
+        let mut centers = ['\0'; 6];
+        for (center, face) in centers.iter_mut().zip(colors.as_chunks::<9>().0) {
+            *center = face[4];
         }
-        // The face of each color, from the centers.
-        let centers: [char; 6] = std::array::from_fn(|face| colors[9 * face + 4]);
         for (face, center) in centers.iter().enumerate() {
-            if centers[..face].contains(center) {
+            if centers.iter().take(face).any(|c| c == center) {
                 return Err(FaceletError::SameCenters(*center));
             }
         }
-        let normal_at = |sticker: Sticker| -> Result<Vec3, FaceletError> {
-            let i = (0..54)
-                .find(|&i| facelet_sticker(i) == sticker)
-                .expect("every sticker has a facelet");
-            let face = centers.iter().position(|&c| c == colors[i]);
-            face.map(|face| FACELET_FACES[face].0)
+        // The face (in facelet order) of the color of facelet `facelet`.
+        let face_of = |facelet: u8| -> Result<u8, FaceletError> {
+            let color = colors[usize::from(facelet)];
+            (0..)
+                .zip(&centers)
+                .find(|&(_, &center)| center == color)
+                .map(|(face, _)| face)
                 .ok_or(FaceletError::UnknownColor {
-                    sticker: i + 1,
-                    color: colors[i],
+                    sticker: usize::from(facelet) + 1,
+                    color,
                 })
         };
         let mut cube = CubieCube::SOLVED;
-        for position in 0..8 {
-            let [first, second, third] = corner_stickers(position).map(&normal_at);
+        let corners = cube.corner_perm.iter_mut().zip(&mut cube.corner_orient);
+        for (position, ((perm, orient), facelets)) in corners.zip(&CORNER_FACELETS).enumerate() {
+            let [first, second, third] = facelets.map(face_of);
             let seen = [first?, second?, third?];
-            // The piece whose stickers' colors are these, turned by `twist`.
-            let found = (0..8).flat_map(|piece| (0..3).map(move |twist| (piece, twist)));
-            let found = found.into_iter().find(|&(piece, twist)| {
-                let home = corner_stickers(piece);
-                (0..3).all(|j| seen[(twist + j) % 3] == home[j].normal)
+            // The piece whose stickers' faces are these, turned by `twist`
+            // (the faces of a piece's stickers: those of its home facelets).
+            let found = (0u8..).zip(&CORNER_FACELETS).find_map(|(piece, home)| {
+                (0u8..3)
+                    .find(|&twist| {
+                        (0..3).all(|j| seen[(usize::from(twist) + j) % 3] == home[j] / 9)
+                    })
+                    .map(|twist| (piece, twist))
             });
-            let (piece, twist) = found.ok_or(FaceletError::NoSuchCorner(position))?;
-            cube.corner_perm[position] = u8::try_from(piece).expect("below 8");
-            cube.corner_orient[position] = u8::try_from(twist).expect("below 3");
+            (*perm, *orient) = found.ok_or(FaceletError::NoSuchCorner(position))?;
         }
-        for position in 0..12 {
-            let [first, second] = edge_stickers(position).map(&normal_at);
+        let edges = cube.edge_perm.iter_mut().zip(&mut cube.edge_orient);
+        for (position, ((perm, orient), facelets)) in edges.zip(&EDGE_FACELETS).enumerate() {
+            let [first, second] = facelets.map(face_of);
             let seen = [first?, second?];
-            let found = (0..12).flat_map(|piece| (0..2).map(move |flip| (piece, flip)));
-            let found = found.into_iter().find(|&(piece, flip)| {
-                let home = edge_stickers(piece);
-                (0..2).all(|j| seen[(flip + j) % 2] == home[j].normal)
+            let found = (0u8..).zip(&EDGE_FACELETS).find_map(|(piece, home)| {
+                (0u8..2)
+                    .find(|&flip| (0..2).all(|j| seen[(usize::from(flip) + j) % 2] == home[j] / 9))
+                    .map(|flip| (piece, flip))
             });
-            let (piece, flip) = found.ok_or(FaceletError::NoSuchEdge(position))?;
-            cube.edge_perm[position] = u8::try_from(piece).expect("below 12");
-            cube.edge_orient[position] = u8::try_from(flip).expect("below 2");
+            (*perm, *orient) = found.ok_or(FaceletError::NoSuchEdge(position))?;
         }
         if cube.is_solvable() {
             Ok(cube)
@@ -633,30 +487,34 @@ impl CubieCube {
     /// letters U R F D L B as colors.
     #[must_use]
     pub fn to_facelets(self) -> String {
-        (0..54)
-            .map(|i| {
-                let sticker = facelet_sticker(i);
-                if i % 9 == 4 {
-                    return face_letter(sticker.normal);
-                }
-                for position in 0..8 {
-                    if let Some(k) = corner_stickers(position).iter().position(|&s| s == sticker) {
-                        let (piece, twist) =
-                            (self.corner_perm[position], self.corner_orient[position]);
-                        let j = (k + 3 - usize::from(twist)) % 3;
-                        return face_letter(corner_stickers(usize::from(piece))[j].normal);
-                    }
-                }
-                for position in 0..12 {
-                    if let Some(k) = edge_stickers(position).iter().position(|&s| s == sticker) {
-                        let (piece, flip) = (self.edge_perm[position], self.edge_orient[position]);
-                        let j = (k + usize::from(flip)) % 2;
-                        return face_letter(edge_stickers(usize::from(piece))[j].normal);
-                    }
-                }
-                unreachable!("every facelet is a center, corner or edge sticker")
-            })
-            .collect()
+        // (Every facelet is written: the centers, then each corner's and
+        // edge's stickers.)
+        let mut letters = [' '; 54];
+        for (face, &letter) in letters
+            .as_chunks_mut::<9>()
+            .0
+            .iter_mut()
+            .zip(&FACELET_LETTERS)
+        {
+            face[4] = letter;
+        }
+        // The letter of the face of a home facelet.
+        let letter = |facelet: u8| FACELET_LETTERS[usize::from(facelet / 9)];
+        let corners = self.corner_perm.iter().zip(&self.corner_orient);
+        for ((&piece, &twist), facelets) in corners.zip(&CORNER_FACELETS) {
+            let home = CORNER_FACELETS[usize::from(piece)];
+            for (k, &facelet) in facelets.iter().enumerate() {
+                letters[usize::from(facelet)] = letter(home[(k + 3 - usize::from(twist)) % 3]);
+            }
+        }
+        let edges = self.edge_perm.iter().zip(&self.edge_orient);
+        for ((&piece, &flip), facelets) in edges.zip(&EDGE_FACELETS) {
+            let home = EDGE_FACELETS[usize::from(piece)];
+            for (k, &facelet) in facelets.iter().enumerate() {
+                letters[usize::from(facelet)] = letter(home[(k + usize::from(flip)) % 2]);
+            }
+        }
+        letters.iter().collect()
     }
 }
 
@@ -664,26 +522,15 @@ impl CubieCube {
 // Moves and symmetries
 // ---------------------------------------------------------------------------
 
-/// Number of moves (turns of 90, 180 and 270 degrees of the 6 faces).
-pub const N_MOVES: usize = 18;
-
 /// The cube state of each move.
+#[cfg(cubie_generated)]
+#[must_use]
 pub fn move_cubes() -> &'static [CubieCube; N_MOVES] {
-    use std::sync::OnceLock;
-    static MOVES: OnceLock<[CubieCube; N_MOVES]> = OnceLock::new();
-    MOVES.get_or_init(|| {
-        let mut moves = [CubieCube::SOLVED; N_MOVES];
-        for face in 0..6 {
-            for turns in 1..=3 {
-                moves[3 * face + turns - 1] =
-                    StickerCube::solved().apply_face(face, turns).to_cubie();
-            }
-        }
-        moves
-    })
+    &MOVE_CUBES
 }
 
-/// Singmaster name of a move: `U`, `U2`, `U'`, ...
+/// Singmaster name of a move (numbered as `Move`): `U`, `U2`, `U'`, ...
+/// (`?` for a number that is not a move).
 #[must_use]
 pub fn move_name(mv: u8) -> String {
     let mut name = String::with_capacity(2);
@@ -691,9 +538,13 @@ pub fn move_name(mv: u8) -> String {
     name
 }
 
-/// Appends the Singmaster name of `mv` to `text`.
+/// Appends the Singmaster name of `mv` to `text` (`?` if it is no move).
 fn push_move_name(text: &mut String, mv: u8) {
-    text.push(FACE_NAMES[usize::from(mv / 3)]);
+    let Some(&face) = FACE_NAMES.get(usize::from(mv / 3)) else {
+        text.push('?');
+        return;
+    };
+    text.push(face);
     match mv % 3 {
         0 => {}
         1 => text.push('2'),
@@ -707,7 +558,8 @@ pub fn inverse_move(mv: u8) -> u8 {
     3 * (mv / 3) + 2 - mv % 3
 }
 
-/// Parse "R U2 F' D3 B1" style sequences (both Singmaster and 1/2/3 suffixes).
+/// Parse "R U2 F' D3 B1" style sequences (both Singmaster and 1/2/3
+/// suffixes) into move numbers (as `Move`, so each below 18).
 #[must_use]
 pub fn parse_moves(text: &str) -> Option<Vec<u8>> {
     let mut moves = Vec::new();
@@ -743,6 +595,9 @@ pub fn format_moves(moves: &[u8]) -> String {
     text
 }
 
+/// A 3x3 integer matrix (rotations and reflections), row major.
+pub type Matrix = [[i32; 3]; 3];
+
 /// A symmetry of the cube: one of the 48 rotations and reflections that map
 /// the cube onto itself.
 #[derive(Clone, Debug)]
@@ -759,66 +614,10 @@ pub struct Symmetry {
 }
 
 /// All 48 symmetries; index 0 is the identity.
-///
-/// # Panics
-/// Never: every symmetry maps faces to faces.
+#[cfg(cubie_generated)]
+#[must_use]
 pub fn symmetries() -> &'static [Symmetry] {
-    use std::sync::OnceLock;
-    static SYMMETRIES: OnceLock<Box<[Symmetry]>> = OnceLock::new();
-    SYMMETRIES.get_or_init(|| {
-        // Signed permutation matrices: each axis maps to some axis, either way.
-        let mut matrices: Vec<Matrix> = Vec::with_capacity(48);
-        let axis_perms = [
-            [0, 1, 2],
-            [0, 2, 1],
-            [1, 0, 2],
-            [1, 2, 0],
-            [2, 0, 1],
-            [2, 1, 0],
-        ];
-        for perm in axis_perms {
-            for signs in 0..8 {
-                let mut m = [[0; 3]; 3];
-                for i in 0..3 {
-                    m[i][perm[i]] = if signs >> i & 1 == 1 { -1 } else { 1 };
-                }
-                matrices.push(m);
-            }
-        }
-        // identity first
-        let identity = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
-        let pos = matrices.iter().position(|m| *m == identity).unwrap();
-        matrices.swap(0, pos);
-        matrices
-            .iter()
-            .map(|m| {
-                let mirror = matrix_determinant(m) < 0;
-                let cube = StickerCube::symmetry_state(m).to_cubie();
-                let mut move_map = [0u8; N_MOVES];
-                for (face, &normal) in (0..).zip(&FACE_NORMALS) {
-                    let image = matrix_apply(m, normal);
-                    let image_face = FACE_NORMALS
-                        .iter()
-                        .zip(0..)
-                        .find(|&(&x, _)| x == image)
-                        .unwrap()
-                        .1;
-                    for turns in 0..3 {
-                        // (A mirror turns clockwise into counterclockwise.)
-                        let image_turns = if mirror { 2 - turns } else { turns };
-                        move_map[usize::from(3 * face + turns)] = 3 * image_face + image_turns;
-                    }
-                }
-                Symmetry {
-                    matrix: *m,
-                    mirror,
-                    cube,
-                    cube_inverse: cube.inverse(),
-                    move_map,
-                }
-            })
-            .collect()
-    })
+    &SYMMETRIES
 }
 
 /// Conjugate `cube` by `sym` at the cubie level: `T c T^-1` (corner twists
@@ -835,29 +634,367 @@ pub fn conjugate(cube: &CubieCube, sym: &Symmetry) -> CubieCube {
 }
 
 /// Index of the inverse of each symmetry.
+#[cfg(cubie_generated)]
+#[must_use]
 pub fn symmetry_inverses() -> &'static [u8; 48] {
-    use std::sync::OnceLock;
-    static INVERSES: OnceLock<[u8; 48]> = OnceLock::new();
-    INVERSES.get_or_init(|| {
-        let syms = symmetries();
-        let mut inverses = [0u8; 48];
-        for (inverse, sym) in inverses.iter_mut().zip(syms) {
-            for (j, other) in (0..).zip(syms) {
-                if matrix_product(&sym.matrix, &other.matrix) == syms[0].matrix {
-                    *inverse = j;
-                }
-            }
-        }
-        inverses
-    })
+    &SYMMETRY_INVERSES
 }
 
-/// Reference conjugation through the sticker model (slow; for tests).
-#[must_use]
-pub fn conjugate_by_stickers(cube: &CubieCube, sym: &Symmetry) -> CubieCube {
-    StickerCube::from_cubie(cube)
-        .conjugate(&sym.matrix)
-        .to_cubie()
+// The moves (`MOVE_CUBES`), symmetries (`SYMMETRIES`, `SYMMETRY_INVERSES`)
+// and the facelets of each piece's stickers (`CORNER_FACELETS`,
+// `EDGE_FACELETS`), derived from the sticker model by build.rs.
+#[cfg(cubie_generated)]
+include!(concat!(env!("OUT_DIR"), "/cubie_consts.rs"));
+
+/// The sticker model: moves and symmetries are rotations and reflections of
+/// the 48 stickers; the cubie-level moves, symmetries and facelet tables are
+/// read off from them. Run by build.rs (which writes them as constants for
+/// the library) and the tests. Every step returns `None` on a bug in the
+/// model instead of panicking (the build then fails with a message).
+#[cfg(any(test, not(cubie_generated)))]
+pub(crate) mod model {
+    use super::{
+        CubieCube, Matrix, Symmetry, Vec3, CORNER_POSITIONS, EDGE_POSITIONS, FACE_NORMALS, N_MOVES,
+    };
+
+    /// A sticker location: a cubie position vector and the outward normal.
+    #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+    struct Sticker {
+        position: Vec3,
+        normal: Vec3,
+    }
+
+    /// The unit vector `sign` along `axis`.
+    fn axis_vector(axis: usize, sign: i32) -> Vec3 {
+        std::array::from_fn(|a| if a == axis { sign } else { 0 })
+    }
+
+    /// Determinant of the matrix with rows `a`, `b`, `c`.
+    fn determinant(a: Vec3, b: Vec3, c: Vec3) -> i32 {
+        a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0])
+            + a[2] * (b[0] * c[1] - b[1] * c[0])
+    }
+
+    /// Stickers of the corner at `position` in clockwise order, starting
+    /// from the U/D one.
+    fn corner_stickers(position: Vec3) -> [Sticker; 3] {
+        let up_down = axis_vector(1, position[1]);
+        let a = axis_vector(0, position[0]);
+        let b = axis_vector(2, position[2]);
+        // (Clockwise seen from outside: a positive determinant.)
+        let (second, third) = if determinant(up_down, a, b) > 0 {
+            (a, b)
+        } else {
+            (b, a)
+        };
+        [up_down, second, third].map(|normal| Sticker { position, normal })
+    }
+
+    /// Stickers of the edge at `position`, the reference (U/D, else F/B)
+    /// one first.
+    fn edge_stickers(position: Vec3) -> [Sticker; 2] {
+        let (reference, other) = if position[1] != 0 {
+            let other = if position[0] != 0 {
+                axis_vector(0, position[0])
+            } else {
+                axis_vector(2, position[2])
+            };
+            (axis_vector(1, position[1]), other)
+        } else {
+            (axis_vector(2, position[2]), axis_vector(0, position[0]))
+        };
+        [reference, other].map(|normal| Sticker { position, normal })
+    }
+
+    /// All 48 stickers: 3 per corner position, then 2 per edge position.
+    fn all_stickers() -> Vec<Sticker> {
+        let corners = CORNER_POSITIONS.iter().flat_map(|&p| corner_stickers(p));
+        let edges = EDGE_POSITIONS.iter().flat_map(|&p| edge_stickers(p));
+        corners.chain(edges).collect()
+    }
+
+    /// Index of a sticker in `all_stickers()`.
+    fn sticker_index(all: &[Sticker], sticker: Sticker) -> Option<u8> {
+        let index = all.iter().position(|&x| x == sticker)?;
+        u8::try_from(index).ok()
+    }
+
+    /// `m` times the column vector `v`.
+    fn matrix_apply(m: &Matrix, v: Vec3) -> Vec3 {
+        m.map(|row| row[0] * v[0] + row[1] * v[1] + row[2] * v[2])
+    }
+
+    fn matrix_determinant(m: &Matrix) -> i32 {
+        determinant(m[0], m[1], m[2])
+    }
+
+    fn matrix_product(a: &Matrix, b: &Matrix) -> Matrix {
+        a.map(|row| std::array::from_fn(|j| row.iter().zip(b).map(|(x, b_row)| x * b_row[j]).sum()))
+    }
+
+    /// The image of a sticker under `m`.
+    fn matrix_apply_sticker(m: &Matrix, sticker: Sticker) -> Sticker {
+        Sticker {
+            position: matrix_apply(m, sticker.position),
+            normal: matrix_apply(m, sticker.normal),
+        }
+    }
+
+    /// Rotation by -90 degrees about unit axis `u` (clockwise seen from
+    /// outside).
+    fn quarter_turn_matrix(u: Vec3) -> Matrix {
+        // Column j is the image of the unit vector e_j: R v = -(u x v) + u (u.v).
+        let columns: [Vec3; 3] = std::array::from_fn(|j| {
+            let v = axis_vector(j, 1);
+            let cross = [
+                u[1] * v[2] - u[2] * v[1],
+                u[2] * v[0] - u[0] * v[2],
+                u[0] * v[1] - u[1] * v[0],
+            ];
+            let dot = u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
+            std::array::from_fn(|i| -cross[i] + u[i] * dot)
+        });
+        std::array::from_fn(|i| columns.map(|column| column[i]))
+    }
+
+    /// A sticker state: `self.0[location]` is the identity (home location
+    /// index) of the sticker at `location`.
+    #[derive(Clone, PartialEq, Eq, Debug)]
+    pub(crate) struct StickerCube(pub(crate) [u8; 48]);
+
+    impl StickerCube {
+        pub(crate) fn solved() -> StickerCube {
+            let mut stickers = [0u8; 48];
+            for (x, i) in stickers.iter_mut().zip(0..) {
+                *x = i;
+            }
+            StickerCube(stickers)
+        }
+
+        /// Apply a face move (`face` in 0..6, clockwise quarter turns).
+        pub(crate) fn apply_face(&self, face: usize, quarter_turns: usize) -> Option<StickerCube> {
+            let all = all_stickers();
+            let axis = *FACE_NORMALS.get(face)?;
+            let turn = quarter_turn_matrix(axis);
+            let mut current = self.clone();
+            for _ in 0..quarter_turns {
+                let mut next = current.clone();
+                for (&sticker, &identity) in all.iter().zip(&current.0) {
+                    // (The face's layer: the stickers on its side of the center.)
+                    let p = sticker.position;
+                    if p[0] * axis[0] + p[1] * axis[1] + p[2] * axis[2] > 0 {
+                        let to = sticker_index(&all, matrix_apply_sticker(&turn, sticker))?;
+                        *next.0.get_mut(usize::from(to))? = identity;
+                    }
+                }
+                current = next;
+            }
+            Some(current)
+        }
+
+        /// Conjugate by a spatial symmetry `m`: `out[m(L)] = m(self[L])`.
+        #[cfg(test)]
+        pub(crate) fn conjugate(&self, m: &Matrix) -> Option<StickerCube> {
+            let all = all_stickers();
+            let map = |index: u8| -> Option<u8> {
+                sticker_index(&all, matrix_apply_sticker(m, *all.get(usize::from(index))?))
+            };
+            let mut out = [0u8; 48];
+            for (location, &identity) in (0..).zip(&self.0) {
+                *out.get_mut(usize::from(map(location)?))? = map(identity)?;
+            }
+            Some(StickerCube(out))
+        }
+
+        /// State with `self[L] = m(L)`: the cubie-level "cube" of a symmetry.
+        fn symmetry_state(m: &Matrix) -> Option<StickerCube> {
+            let all = all_stickers();
+            let mut out = [0u8; 48];
+            for (x, &sticker) in out.iter_mut().zip(&all) {
+                *x = sticker_index(&all, matrix_apply_sticker(m, sticker))?;
+            }
+            Some(StickerCube(out))
+        }
+
+        /// The cubie state of this sticker state (which must be one).
+        pub(crate) fn to_cubie(&self) -> Option<CubieCube> {
+            let mut cube = CubieCube::SOLVED;
+            let (corners, edges) = self.0.split_first_chunk::<24>()?;
+            let corner_slots = cube.corner_perm.iter_mut().zip(&mut cube.corner_orient);
+            for ((perm, orient), stickers) in corner_slots.zip(corners.as_chunks::<3>().0) {
+                // The piece's reference sticker is 3 * piece; where it is gives
+                // the twist.
+                let piece = stickers[0] / 3;
+                *perm = piece;
+                *orient = (0..).zip(stickers).find(|&(_, &x)| x == 3 * piece)?.0;
+            }
+            let edge_slots = cube.edge_perm.iter_mut().zip(&mut cube.edge_orient);
+            for ((perm, orient), stickers) in edge_slots.zip(edges.as_chunks::<2>().0) {
+                let identity = stickers[0].checked_sub(24)?;
+                *perm = identity / 2;
+                *orient = identity % 2;
+            }
+            Some(cube)
+        }
+
+        #[cfg(test)]
+        pub(crate) fn from_cubie(cube: &CubieCube) -> StickerCube {
+            let mut stickers = [0u8; 48];
+            let (corners, edges) = stickers.split_at_mut(24);
+            let corner_pieces = cube.corner_perm.iter().zip(&cube.corner_orient);
+            for ((&piece, &twist), slots) in corner_pieces.zip(corners.as_chunks_mut::<3>().0) {
+                for (k, slot) in (0..).zip(slots) {
+                    // piece sticker j sits at position sticker (twist + j) % 3
+                    *slot = 3 * piece + (k + 3 - twist) % 3;
+                }
+            }
+            let edge_pieces = cube.edge_perm.iter().zip(&cube.edge_orient);
+            for ((&piece, &flip), slots) in edge_pieces.zip(edges.as_chunks_mut::<2>().0) {
+                for (k, slot) in (0..).zip(slots) {
+                    *slot = 24 + 2 * piece + (k + flip) % 2;
+                }
+            }
+            StickerCube(stickers)
+        }
+    }
+
+    /// The cube state of each move.
+    pub(crate) fn move_cubes() -> Option<[CubieCube; N_MOVES]> {
+        let mut moves = [CubieCube::SOLVED; N_MOVES];
+        for (mv, cube) in moves.iter_mut().enumerate() {
+            *cube = StickerCube::solved()
+                .apply_face(mv / 3, mv % 3 + 1)?
+                .to_cubie()?;
+        }
+        Some(moves)
+    }
+
+    /// All 48 symmetries; index 0 is the identity.
+    pub(crate) fn symmetries() -> Option<Vec<Symmetry>> {
+        // Signed permutation matrices: each axis maps to some axis, either way.
+        let axis_perms = [
+            [0, 1, 2],
+            [0, 2, 1],
+            [1, 0, 2],
+            [1, 2, 0],
+            [2, 0, 1],
+            [2, 1, 0],
+        ];
+        let mut matrices: Vec<Matrix> = Vec::with_capacity(48);
+        for perm in axis_perms {
+            for signs in 0..8 {
+                let sign = |i: usize| if signs >> i & 1 == 1 { -1 } else { 1 };
+                matrices.push(std::array::from_fn(|i| {
+                    std::array::from_fn(|j| if perm[i] == j { sign(i) } else { 0 })
+                }));
+            }
+        }
+        // identity first
+        let identity = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+        let pos = matrices.iter().position(|m| *m == identity)?;
+        matrices.swap(0, pos);
+        matrices
+            .iter()
+            .map(|m| {
+                let mirror = matrix_determinant(m) < 0;
+                let cube = StickerCube::symmetry_state(m)?.to_cubie()?;
+                let mut move_map = [0u8; N_MOVES];
+                let faces = move_map.as_chunks_mut::<3>().0;
+                for (face_moves, &normal) in faces.iter_mut().zip(&FACE_NORMALS) {
+                    let image = matrix_apply(m, normal);
+                    let image_face = FACE_NORMALS.iter().zip(0..).find(|&(&x, _)| x == image)?.1;
+                    for (turns, image_move) in (0..).zip(face_moves) {
+                        // (A mirror turns clockwise into counterclockwise.)
+                        let image_turns = if mirror { 2 - turns } else { turns };
+                        *image_move = 3 * image_face + image_turns;
+                    }
+                }
+                Some(Symmetry {
+                    matrix: *m,
+                    mirror,
+                    cube,
+                    cube_inverse: cube.inverse(),
+                    move_map,
+                })
+            })
+            .collect()
+    }
+
+    /// Index of the inverse of each symmetry of `syms` (`symmetries()`).
+    pub(crate) fn symmetry_inverses(syms: &[Symmetry]) -> Option<[u8; 48]> {
+        let identity = syms.first()?.matrix;
+        let mut inverses = [0u8; 48];
+        for (inverse, sym) in inverses.iter_mut().zip(syms) {
+            *inverse = (0..)
+                .zip(syms)
+                .find(|(_, other)| matrix_product(&sym.matrix, &other.matrix) == identity)?
+                .0;
+        }
+        Some(inverses)
+    }
+
+    /// The faces of a facelet string in its order (U R F D L B), each as its
+    /// outward normal and the directions of "right" and "down" as the face
+    /// is seen from outside: U with B at the top, D with F at the top, the
+    /// side faces with U at the top.
+    const FACELET_FACES: [(Vec3, Vec3, Vec3); 6] = [
+        ([0, 1, 0], [1, 0, 0], [0, 0, 1]),
+        ([1, 0, 0], [0, 0, -1], [0, -1, 0]),
+        ([0, 0, 1], [1, 0, 0], [0, -1, 0]),
+        ([0, -1, 0], [1, 0, 0], [0, 0, -1]),
+        ([-1, 0, 0], [0, 0, 1], [0, -1, 0]),
+        ([0, 0, -1], [-1, 0, 0], [0, -1, 0]),
+    ];
+
+    /// The facelet (0..54: 9 per face, row by row) of a sticker.
+    fn facelet(sticker: Sticker) -> Option<u8> {
+        let facelets = FACELET_FACES.iter().flat_map(|&(normal, right, down)| {
+            (-1..=1).flat_map(move |row| {
+                (-1..=1).map(move |column| Sticker {
+                    position: std::array::from_fn(|a| {
+                        normal[a] + column * right[a] + row * down[a]
+                    }),
+                    normal,
+                })
+            })
+        });
+        (0..)
+            .zip(facelets)
+            .find(|&(_, x)| x == sticker)
+            .map(|(i, _)| i)
+    }
+
+    /// The facelet of each sticker of each corner position (in
+    /// `corner_stickers` order).
+    pub(crate) fn corner_facelets() -> Option<[[u8; 3]; 8]> {
+        let mut table = [[0; 3]; 8];
+        for (row, &position) in table.iter_mut().zip(&CORNER_POSITIONS) {
+            for (x, sticker) in row.iter_mut().zip(corner_stickers(position)) {
+                *x = facelet(sticker)?;
+            }
+        }
+        Some(table)
+    }
+
+    /// The facelet of each sticker of each edge position (in
+    /// `edge_stickers` order).
+    pub(crate) fn edge_facelets() -> Option<[[u8; 2]; 12]> {
+        let mut table = [[0; 2]; 12];
+        for (row, &position) in table.iter_mut().zip(&EDGE_POSITIONS) {
+            for (x, sticker) in row.iter_mut().zip(edge_stickers(position)) {
+                *x = facelet(sticker)?;
+            }
+        }
+        Some(table)
+    }
+
+    /// Reference conjugation through the sticker model (slow; for tests).
+    #[cfg(test)]
+    pub(crate) fn conjugate_by_stickers(cube: &CubieCube, sym: &Symmetry) -> Option<CubieCube> {
+        StickerCube::from_cubie(cube)
+            .conjugate(&sym.matrix)?
+            .to_cubie()
+    }
 }
 
 #[cfg(test)]
@@ -869,7 +1006,11 @@ mod tests {
     /// rejected non-positions.
     #[test]
     fn facelets() {
-        let cube_of = |moves: &str| CubieCube::SOLVED.apply_moves(&parse_moves(moves).unwrap());
+        let cube_of = |moves: &str| {
+            CubieCube::SOLVED
+                .apply_moves(&parse_moves(moves).unwrap())
+                .unwrap()
+        };
         let known = [
             ("", "UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB"),
             (
@@ -935,7 +1076,7 @@ mod tests {
         let mut rng = Rng(1);
         for _ in 0..100 {
             let cube = CubieCube::random(&mut rng);
-            assert_eq!(StickerCube::from_cubie(&cube).to_cubie(), cube);
+            assert_eq!(model::StickerCube::from_cubie(&cube).to_cubie(), Some(cube));
         }
     }
 
@@ -943,13 +1084,13 @@ mod tests {
     fn moves_match_sticker_model() {
         let mut rng = Rng(2);
         for _ in 0..50 {
-            let mut stickers = StickerCube::solved();
+            let mut stickers = model::StickerCube::solved();
             let mut cube = CubieCube::SOLVED;
             for _ in 0..30 {
                 let mv = rng.below_usize(N_MOVES);
-                stickers = stickers.apply_face(mv / 3, mv % 3 + 1);
-                cube = cube.apply_move(mv);
-                assert_eq!(stickers.to_cubie(), cube);
+                stickers = stickers.apply_face(mv / 3, mv % 3 + 1).unwrap();
+                cube = cube.apply_move(Move::ALL[mv]);
+                assert_eq!(stickers.to_cubie(), Some(cube));
                 assert!(cube.is_solvable());
             }
         }
@@ -977,7 +1118,7 @@ mod tests {
         let seq = parse_moves("R U R' U'").unwrap();
         let mut cube = CubieCube::SOLVED;
         for _ in 0..6 {
-            cube = cube.apply_moves(&seq);
+            cube = cube.apply_moves(&seq).unwrap();
         }
         assert_eq!(cube, CubieCube::SOLVED);
     }
@@ -999,7 +1140,10 @@ mod tests {
         for sym in syms {
             for _ in 0..20 {
                 let cube = CubieCube::random(&mut rng);
-                assert_eq!(conjugate(&cube, sym), conjugate_by_stickers(&cube, sym));
+                assert_eq!(
+                    Some(conjugate(&cube, sym)),
+                    model::conjugate_by_stickers(&cube, sym)
+                );
             }
             for mv in 0..N_MOVES {
                 assert_eq!(
@@ -1014,5 +1158,34 @@ mod tests {
             let back = conjugate(&conjugate(&cube, sym), &syms[usize::from(inverse)]);
             assert_eq!(cube, back);
         }
+    }
+
+    /// The constants from build.rs are the sticker model's.
+    #[test]
+    fn generated_constants_match_model() {
+        assert_eq!(model::move_cubes().as_ref(), Some(move_cubes()));
+        let syms = model::symmetries().unwrap();
+        assert_eq!(syms.len(), symmetries().len());
+        for (a, b) in syms.iter().zip(symmetries()) {
+            assert_eq!(
+                (a.matrix, a.mirror, a.cube, a.cube_inverse, a.move_map),
+                (b.matrix, b.mirror, b.cube, b.cube_inverse, b.move_map)
+            );
+        }
+        assert_eq!(
+            model::symmetry_inverses(&syms).as_ref(),
+            Some(symmetry_inverses())
+        );
+        assert_eq!(model::corner_facelets(), Some(CORNER_FACELETS));
+        assert_eq!(model::edge_facelets(), Some(EDGE_FACELETS));
+        for (mv, index) in Move::ALL.iter().zip(0..) {
+            assert_eq!(mv.index(), index);
+            assert_eq!(Move::from_index(index), Some(*mv));
+            assert_eq!(Move::lowest(1 << index | 1 << 17), Some(*mv));
+        }
+        assert_eq!(Move::from_index(N_MOVES), None);
+        assert_eq!(Move::lowest(0), None);
+        assert_eq!(CubieCube::SOLVED.apply_moves(&[0, 18]), None);
+        assert_eq!(format_moves(&[0, 18, 17]), "U ? B'");
     }
 }

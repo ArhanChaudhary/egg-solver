@@ -19,13 +19,19 @@
 //! +46% at 48T on a batch when added, job-order).
 
 use crate::coord::{cocsep_x3, index_sym};
-use crate::cubie::{inverse_move, CubieCube};
+use crate::cubie::{inverse_move, CubieCube, Move};
 use crate::simd::Cube;
 use crate::symstart::SymFilter;
 use crate::tables::{packed_class, packed_depth, packed_sym_to_rep, Cocsep, H48Table};
 
 /// All 18 moves (the low 18 bits).
 pub const ALL_MOVES: u32 = u32::MAX.unbounded_shr(32 - 18);
+
+/// The largest target (iteration depth) searched: every position is solved
+/// in at most 20 moves (God's number), so needing a later iteration means
+/// an unsolvable cube or a table whose bounds are too high, and the cube is
+/// given up (no solution). It also bounds the search stacks' depth.
+pub const MAX_TARGET: u8 = 20;
 /// Quarter turns only (moves with m % 3 != 1).
 pub const QUARTER_TURNS: u32 = 0b101_101_101_101_101_101;
 
@@ -245,7 +251,6 @@ impl<'a> Solver<'a> {
 
     /// Extend jobs by one move; children inherit the parent's stat. Jobs
     /// that `filter` drops (symmetric start) are left out.
-    #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
     fn extend_jobs(jobs: &[Job], filter: &SymFilter) -> Vec<Job> {
         let mut out = Vec::with_capacity(jobs.len() * 15);
         for j in jobs {
@@ -255,8 +260,7 @@ impl<'a> Solver<'a> {
                 ALLOWED_AFTER[(j.moves[j.len as usize - 1] / 3) as usize]
             };
             let mut todo = allowed;
-            while todo != 0 {
-                let mv = todo.trailing_zeros() as usize;
+            while let Some(mv) = Move::lowest(todo) {
                 todo ^= todo.isolate_lowest_one();
                 let mut child = *j;
                 child.moves[child.len as usize] = mv as u8;
@@ -295,12 +299,14 @@ impl<'a> Solver<'a> {
         }
     }
 
-    /// Find one optimal solution.
+    /// Find one optimal solution: `None` if there is none within
+    /// `MAX_TARGET` moves (an unsolvable cube, or a table whose bounds are
+    /// too high).
     #[must_use]
-    pub fn solve(&self, cube: &CubieCube) -> (Vec<u8>, Stats) {
+    pub fn solve(&self, cube: &CubieCube) -> (Option<Vec<u8>>, Stats) {
         let cube = Cube::from_cubie(cube);
         if cube.is_solved() {
-            return (vec![], Stats::default());
+            return (Some(vec![]), Stats::default());
         }
         let inverse = cube.inverse();
         let normal_bound = self.lower_bound(cube);
@@ -325,8 +331,12 @@ impl<'a> Solver<'a> {
         }];
         let mut target = normal_bound.max(inverse_bound).max(1);
         loop {
+            // (Also keeps the moves within `SearchState::moves`.)
+            if target > MAX_TARGET {
+                return (None, state.stats);
+            }
             let job_len = self.job_len(target);
-            while (jobs[0].len as usize) < job_len {
+            while jobs.first().is_some_and(|j| usize::from(j.len) < job_len) {
                 jobs = Self::extend_jobs(&jobs, &filter);
                 self.job_bounds(&mut jobs);
             }
@@ -359,7 +369,14 @@ impl<'a> Solver<'a> {
                 if normal_bound == remaining_depth {
                     inverse_moves &= QUARTER_TURNS;
                 }
-                state.moves[..j.len as usize].copy_from_slice(&j.moves[..j.len as usize]);
+                for (to, &mv) in state
+                    .moves
+                    .iter_mut()
+                    .zip(&j.moves)
+                    .take(usize::from(j.len))
+                {
+                    *to = mv;
+                }
                 state.n_moves = j.len as usize;
                 state.n_premoves = 0;
                 let found = self.search(
@@ -378,7 +395,7 @@ impl<'a> Solver<'a> {
                     for k in (0..state.n_premoves).rev() {
                         solution.push(inverse_move(state.premoves[k]));
                     }
-                    return (solution, state.stats);
+                    return (Some(solution), state.stats);
                 }
             }
             target += 1;
@@ -515,11 +532,9 @@ impl<'a> Solver<'a> {
 
     /// The last move of a search: is one of `moves` (allowed on both sides)
     /// a solution? (Nodes with one move left always move the normal cube.)
-    #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
     fn last_move(state: &mut SearchState, cube: Cube, moves: u32) -> u8 {
         let mut todo = moves;
-        while todo != 0 {
-            let mv = todo.trailing_zeros() as usize;
+        while let Some(mv) = Move::lowest(todo) {
             todo ^= todo.isolate_lowest_one();
             state.stats.nodes += 1;
             if cube.apply_move(mv).is_solved() {
@@ -539,7 +554,6 @@ impl<'a> Solver<'a> {
     /// (every half turn lies in the subgroup whose cosets the table
     /// indexes), so its child keeps the node's other-side bound: children
     /// whose bound is already too high are not generated.
-    #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
     #[inline(always)]
     fn generate_children(
         state: &mut SearchState,
@@ -560,16 +574,15 @@ impl<'a> Solver<'a> {
         }; 18];
         let mut n_children = 0;
         let mut todo = allowed;
-        while todo != 0 {
-            let mv = todo.trailing_zeros() as usize;
+        while let Some(mv) = Move::lowest(todo) {
             todo ^= todo.isolate_lowest_one();
-            let other_bound = if mv % 3 == 1 {
+            let other_bound = if mv.index() % 3 == 1 {
                 other_side_bound
             } else {
                 UNKNOWN
             };
             if other_bound != UNKNOWN && other_bound > child_remaining {
-                face_bound[mv / 3] = face_bound[mv / 3].max(other_bound);
+                face_bound[mv.index() / 3] = face_bound[mv.index() / 3].max(other_bound);
                 continue;
             }
             state.stats.nodes += 1;
@@ -683,7 +696,7 @@ mod tests {
     #[test]
     #[cfg_attr(miri, ignore = "Cocsep::generate is too slow under Miri")]
     fn hot_index_matches_reference_index() {
-        let corners = Cocsep::generate();
+        let corners = Cocsep::generate().unwrap();
         let mut rng = Rng(31);
         let mut cubes = vec![CubieCube::SOLVED];
         for scramble in [
@@ -691,7 +704,11 @@ mod tests {
             "U D' R L' F B' U D'",
             "U R2 F B R B2 R U2 L B2 R U' D' R2 F R' L B2 U2 F2",
         ] {
-            cubes.push(CubieCube::SOLVED.apply_moves(&parse_moves(scramble).unwrap()));
+            cubes.push(
+                CubieCube::SOLVED
+                    .apply_moves(&parse_moves(scramble).unwrap())
+                    .unwrap(),
+            );
         }
         for _ in 0..40 {
             cubes.push(CubieCube::random(&mut rng));
@@ -706,7 +723,7 @@ mod tests {
             // (`index` does not read the table: a page stands in for it, so
             // that this also runs where h11 cannot be allocated, e.g. wasm32.)
             let table = H48Table {
-                memory: Memory::anonymous(4096),
+                memory: Memory::anonymous(4096).unwrap(),
                 meta: H48Meta { k, base: 10 },
             };
             let solver = Solver::new(&corners, &table);

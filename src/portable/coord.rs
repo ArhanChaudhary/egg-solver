@@ -171,7 +171,7 @@ mod tests {
 #[cfg(all(test, backend = "x86"))]
 mod cross_check {
     use super::*;
-    use crate::cubie::{CubieCube, Rng};
+    use crate::cubie::{CubieCube, Move, Rng};
     use crate::simd::Cube as X86Cube;
 
     /// `coord::cocsep` from the portable parts.
@@ -218,7 +218,7 @@ mod cross_check {
             let (mut pi, mut xi) = (p.inverse(), x.inverse());
             assert_eq!(pi.to_bytes(), xi.to_bytes());
             for _ in 0..30 {
-                let mv = usize::try_from(rng.below(18)).unwrap();
+                let mv = Move::ALL[usize::try_from(rng.below(18)).unwrap()];
                 (p, x) = (p.apply_move(mv), x.apply_move(mv));
                 (pi, xi) = (pi.premove_inverse(mv), xi.premove_inverse(mv));
                 check_coordinates(p, x);
@@ -230,16 +230,16 @@ mod cross_check {
                     // SAFETY: `mv < 18`.
                     unsafe {
                         assert_eq!(
-                            Cube::child_lookup(p, pi, mv, mask).to_bytes(),
-                            X86Cube::child_lookup(x, xi, mv, mask).to_bytes()
+                            Cube::child_lookup(p, pi, mv.index(), mask).to_bytes(),
+                            X86Cube::child_lookup(x, xi, mv.index(), mask).to_bytes()
                         );
                         assert_eq!(
-                            p.apply_move_unchecked(mv).to_bytes(),
-                            x.apply_move_unchecked(mv).to_bytes()
+                            p.apply_move_unchecked(mv.index()).to_bytes(),
+                            x.apply_move_unchecked(mv.index()).to_bytes()
                         );
                         assert_eq!(
-                            pi.premove_inverse_unchecked(mv).to_bytes(),
-                            xi.premove_inverse_unchecked(mv).to_bytes()
+                            pi.premove_inverse_unchecked(mv.index()).to_bytes(),
+                            xi.premove_inverse_unchecked(mv.index()).to_bytes()
                         );
                     }
                 }

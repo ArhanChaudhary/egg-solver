@@ -3,6 +3,21 @@
 //! For speed use `solve` (the `lanes` search) instead.
 //!
 //! Usage: cubeopt <table path>
+
+// No intentional panics in shipped code (user request; asserts, which no
+// lint covers, are checked by tests/no_runtime_panics.rs).
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::unreachable,
+        clippy::todo,
+        clippy::unimplemented
+    )
+)]
+
 use anyhow::Context as _;
 use clap::Parser;
 use cubeopt::cli::{self, LoadArgs, Verbosity};
@@ -41,18 +56,22 @@ fn main() -> ExitCode {
 
 fn run(args: &Args) -> anyhow::Result<ExitCode> {
     let path = args.table.as_deref().context("no table")?;
-    let corners = Cocsep::generate();
+    let corners = Cocsep::generate()?;
     let table = args.load.open(path)?;
     let solver = Solver::new(&corners, &table);
     for line in std::io::stdin().lock().lines() {
         let line = line.context("cannot read stdin")?;
-        let Some(moves) = parse_moves(&line) else {
+        let Some(cube) = parse_moves(&line).and_then(|moves| CubieCube::SOLVED.apply_moves(&moves))
+        else {
             println!("parse error");
             continue;
         };
-        let cube = CubieCube::SOLVED.apply_moves(&moves);
         let start = std::time::Instant::now();
         let (solution, stats) = solver.solve(&cube);
+        let Some(solution) = solution else {
+            println!("no solution within 20 moves (is the table damaged?)");
+            continue;
+        };
         println!(
             "{} ({}) {:.3}s nodes {}",
             format_moves(&solution),

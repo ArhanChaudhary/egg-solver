@@ -10,7 +10,7 @@
 //! the second cube are added, and a subtract-and-unsigned-min wraps them
 //! back into range.
 
-use crate::cubie::CubieCube;
+use crate::cubie::{CubieCube, Move};
 #[cfg(target_feature = "avx512bw")]
 use std::arch::x86_64::_mm256_mask_blend_epi8;
 use std::arch::x86_64::{
@@ -296,15 +296,11 @@ impl Cube {
     }
 
     /// This cube followed by move `mv`.
-    ///
-    /// # Panics
-    /// If `mv` is not a move (below 18).
     #[inline(always)]
     #[must_use]
-    pub fn apply_move(self, mv: usize) -> Cube {
-        assert!(mv < 18, "not a move");
-        // SAFETY: checked above.
-        unsafe { self.apply_move_unchecked(mv) }
+    pub fn apply_move(self, mv: Move) -> Cube {
+        // SAFETY: a `Move` is below 18.
+        unsafe { self.apply_move_unchecked(mv.index()) }
     }
 
     /// `apply_move` without the bounds check of the move tables (for the
@@ -328,15 +324,11 @@ impl Cube {
 
     /// Given the inverse of a cube `c` (`self`), the inverse of `c` followed
     /// by move `mv`: the inverse move applied *before* `self`.
-    ///
-    /// # Panics
-    /// If `mv` is not a move (below 18).
     #[inline(always)]
     #[must_use]
-    pub fn premove_inverse(self, mv: usize) -> Cube {
-        assert!(mv < 18, "not a move");
-        // SAFETY: checked above.
-        unsafe { self.premove_inverse_unchecked(mv) }
+    pub fn premove_inverse(self, mv: Move) -> Cube {
+        // SAFETY: a `Move` is below 18.
+        unsafe { self.premove_inverse_unchecked(mv.index()) }
     }
 
     /// `premove_inverse` without the bounds check of the move table.
@@ -524,23 +516,23 @@ mod tests {
             assert_eq!(sa.to_cubie(), a);
             assert_eq!(sa.compose(sb).to_cubie(), a.compose(&b));
             assert_eq!(sa.inverse().to_cubie(), a.inverse());
-            for mv in 0..18 {
-                assert_eq!(sa.apply_move(mv).to_cubie(), a.apply_move(mv));
+            for (mv, m) in (0..18).zip(Move::ALL) {
+                assert_eq!(sa.apply_move(m).to_cubie(), a.apply_move(m));
                 assert_eq!(
-                    sa.inverse().premove_inverse(mv).to_cubie(),
-                    a.apply_move(mv).inverse()
+                    sa.inverse().premove_inverse(m).to_cubie(),
+                    a.apply_move(m).inverse()
                 );
                 let (inverse_a, inverse_b) = (sa.inverse(), sb.inverse());
                 // SAFETY: `mv < 18`.
                 let lookup =
                     |moved, other, mask| unsafe { Cube::child_lookup(moved, other, mv, mask) };
-                assert_eq!(lookup(sa, inverse_b, 0), sa.apply_move(mv));
-                assert_eq!(lookup(sa, inverse_b, !0), inverse_b.premove_inverse(mv));
-                assert_eq!(lookup(inverse_a, sb, !0), sb.premove_inverse(mv));
+                assert_eq!(lookup(sa, inverse_b, 0), sa.apply_move(m));
+                assert_eq!(lookup(sa, inverse_b, !0), inverse_b.premove_inverse(m));
+                assert_eq!(lookup(inverse_a, sb, !0), sb.premove_inverse(m));
                 // SAFETY: `mv < 18`.
                 unsafe {
-                    assert_eq!(sa.apply_move_unchecked(mv), sa.apply_move(mv));
-                    assert_eq!(sa.premove_inverse_unchecked(mv), sa.premove_inverse(mv));
+                    assert_eq!(sa.apply_move_unchecked(mv), sa.apply_move(m));
+                    assert_eq!(sa.premove_inverse_unchecked(mv), sa.premove_inverse(m));
                 }
             }
             for (t, sym) in syms.iter().enumerate() {

@@ -19,6 +19,21 @@
 //!   bench <table> stream [warmup] [window] [threads] [lanes] [seed] [share[:C]]
 //!   bench <table> <scramble file | random:N:SEED> [count] [threads] [lanes] [share[:C]]
 //!   bench <table> tune [seconds]
+
+// No intentional panics in shipped code (user request; asserts, which no
+// lint covers, are checked by tests/no_runtime_panics.rs).
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::unreachable,
+        clippy::todo,
+        clippy::unimplemented
+    )
+)]
+
 use anyhow::Context as _;
 use clap::{Args, Parser, Subcommand};
 use cubeopt::cli::{self, BadInput, LoadArgs, Verbosity};
@@ -30,7 +45,7 @@ use std::collections::BTreeMap;
 use std::ffi::OsString;
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::Mutex;
+use std::sync::{Mutex, PoisonError};
 use std::time::Instant;
 
 /// One solved cube.
@@ -48,6 +63,10 @@ struct Record {
 /// with that many cubes at once) until `cubes` returns `None` or `duration`
 /// seconds have passed. Every solution is checked. Returns the records and
 /// the elapsed seconds.
+///
+/// # Errors
+/// If a cube got no solution or a wrong one, or a thread could not be
+/// started or panicked.
 fn run(
     solver: &Solver,
     cubes: &(dyn Fn(usize) -> Option<CubieCube> + Sync),
@@ -55,7 +74,7 @@ fn run(
     lanes: usize,
     duration: Option<f64>,
     share: Option<usize>,
-) -> (Vec<Record>, f64) {
+) -> anyhow::Result<(Vec<Record>, f64)> {
     let next = AtomicUsize::new(0);
     let stop = AtomicBool::new(false);
     let pool = share.map(|max_active| {
@@ -71,20 +90,32 @@ fn run(
     let t0 = Instant::now();
     // (Each mode's thread code is a function of its own, not inlined here:
     // `share_thread`, and `stream_thread`, which is the stream's hot loop.)
-    std::thread::scope(|s| {
+    let duration = duration
+        .map(std::time::Duration::try_from_secs_f64)
+        .transpose()
+        .context("benchmark duration is out of range")?;
+    let threads_ok = std::thread::scope(|s| {
+        let mut spawned = Vec::with_capacity(threads);
+        let mut result = Ok(());
         for _ in 0..threads {
-            s.spawn(|| {
-                let record = |i: usize, solution: Vec<u8>, stats: Stats, seconds: f64| {
-                    let cube = cubes(i).unwrap();
-                    if cube.apply_moves(&solution) != CubieCube::SOLVED {
+            let thread = std::thread::Builder::new().spawn_scoped(s, || {
+                let record = |i: usize, solution: Option<Vec<u8>>, stats: Stats, seconds: f64| {
+                    // (No solution, or one that does not solve the cube: bad.)
+                    let solves_cube = |moves: &[u8]| {
+                        cubes(i).and_then(|cube| cube.apply_moves(moves)) == Some(CubieCube::SOLVED)
+                    };
+                    if !solution.as_deref().is_some_and(solves_cube) {
                         bad.fetch_add(1, Ordering::Relaxed);
                     }
-                    records.lock().unwrap().push(Record {
-                        finished: t0.elapsed().as_secs_f64(),
-                        seconds,
-                        length: solution.len(),
-                        stats,
-                    });
+                    records
+                        .lock()
+                        .unwrap_or_else(PoisonError::into_inner)
+                        .push(Record {
+                            finished: t0.elapsed().as_secs_f64(),
+                            seconds,
+                            length: solution.map_or(0, |moves| moves.len()),
+                            stats,
+                        });
                 };
                 if let Some(pool) = &pool {
                     share_thread(pool, solver, lanes, &stop, record);
@@ -100,17 +131,37 @@ fn run(
                     }
                 }
             });
+            match thread {
+                Ok(thread) => spawned.push(thread),
+                Err(error) => {
+                    stop.store(true, Ordering::Relaxed);
+                    result = Err(anyhow::Error::from(error).context("cannot start a thread"));
+                    break;
+                }
+            }
         }
-        if let Some(duration) = duration {
-            std::thread::sleep(std::time::Duration::from_secs_f64(duration));
+        if let Some(duration) = duration.filter(|_| result.is_ok()) {
+            std::thread::sleep(duration);
             stop.store(true, Ordering::Relaxed);
         }
-    });
-    assert_eq!(bad.load(Ordering::Relaxed), 0, "bad solutions");
+        let mut all_ok = true;
+        for thread in spawned {
+            if thread.join().is_err() {
+                stop.store(true, Ordering::Relaxed);
+                all_ok = false;
+            }
+        }
+        result?;
+        Ok::<_, anyhow::Error>(all_ok)
+    })?;
+    anyhow::ensure!(threads_ok, "a thread panicked");
+    let bad = bad.load(Ordering::Relaxed);
+    anyhow::ensure!(bad == 0, "{bad} bad solutions");
     if let Some(pool) = &pool {
         eprintln!("share: {}", pool.counters());
     }
-    (records.into_inner().unwrap(), t0.elapsed().as_secs_f64())
+    let records = records.into_inner().unwrap_or_else(PoisonError::into_inner);
+    Ok((records, t0.elapsed().as_secs_f64()))
 }
 
 /// A thread of a share-mode run. (This and `stream_thread` are not inlined
@@ -122,7 +173,7 @@ fn share_thread(
     solver: &Solver,
     lanes: usize,
     stop: &AtomicBool,
-    record: impl FnMut(usize, Vec<u8>, Stats, f64),
+    record: impl FnMut(usize, Option<Vec<u8>>, Stats, f64),
 ) {
     pool.run(solver, lanes, stop, record);
 }
@@ -143,28 +194,33 @@ fn stream_thread(
     next: &AtomicUsize,
     stop: &AtomicBool,
     lanes: usize,
-    record: impl FnMut(usize, Vec<u8>, Stats, f64),
+    record: impl FnMut(usize, Option<Vec<u8>>, Stats, f64),
 ) {
     cubeopt::lanes::run_lanes(solver, cubes, next, stop, lanes, record);
 }
 
 /// Stream throughput (solves/s) of `threads` x `lanes` lanes, over a
 /// `window` after a warm-up of half as long.
-fn stream_throughput(solver: &Solver, threads: usize, lanes: usize, window: f64) -> f64 {
+fn stream_throughput(
+    solver: &Solver,
+    threads: usize,
+    lanes: usize,
+    window: f64,
+) -> anyhow::Result<f64> {
     let cubes = |i: usize| {
         let mut rng = Rng(2026u64.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ (i as u64));
         rng.next_u64();
         Some(CubieCube::random(&mut rng))
     };
     let warmup = window / 2.0;
-    let (records, _) = run(solver, &cubes, threads, lanes, Some(warmup + window), None);
+    let (records, _) = run(solver, &cubes, threads, lanes, Some(warmup + window), None)?;
     let done = records
         .iter()
         .filter(|r| r.finished >= warmup && r.finished < warmup + window)
         .count();
     #[expect(clippy::cast_precision_loss, reason = "a rate")]
     let rate = done as f64 / window;
-    rate
+    Ok(rate)
 }
 
 /// Optimal-solve throughput benchmark: solves per second, nodes and
@@ -288,7 +344,7 @@ struct TuneArgs {
 /// A duration in seconds: a finite number, not negative.
 fn seconds(text: &str) -> Result<f64, String> {
     match text.parse::<f64>() {
-        Ok(s) if s.is_finite() && s >= 0.0 => Ok(s),
+        Ok(s) if std::time::Duration::try_from_secs_f64(s).is_ok() => Ok(s),
         _ => Err("expected seconds (a number, 0 or more)".to_string()),
     }
 }
@@ -453,7 +509,7 @@ fn tune(solver: &Solver, path: &str, window: f64, json: bool) -> anyhow::Result<
     for threads in if all > 1 { vec![1, all] } else { vec![1] } {
         let mut top = (0.0, 0);
         for &lanes in &candidates {
-            let rate = stream_throughput(solver, threads, lanes, window);
+            let rate = stream_throughput(solver, threads, lanes, window)?;
             let report = Report::Tune {
                 threads,
                 lanes,
@@ -502,7 +558,7 @@ fn stream(solver: &Solver, args: &StreamArgs, lanes: usize, json: bool) -> anyho
         rng.next_u64();
         Some(CubieCube::random(&mut rng))
     };
-    let (records, _) = run(solver, &cubes, threads, lanes, Some(warmup + window), share);
+    let (records, _) = run(solver, &cubes, threads, lanes, Some(warmup + window), share)?;
     let in_window: Vec<Record> = records
         .into_iter()
         .filter(|r| r.finished >= warmup && r.finished < warmup + window)
@@ -543,9 +599,11 @@ fn cube_set(set: &str) -> anyhow::Result<Vec<CubieCube>> {
         .enumerate()
         .filter(|(_, line)| !line.trim().is_empty())
         .map(|(n, line)| {
-            let moves = parse_moves(line)
-                .ok_or_else(|| BadInput(format!("{set}: line {}: cannot parse {line:?}", n + 1)))?;
-            Ok(CubieCube::SOLVED.apply_moves(&moves))
+            parse_moves(line)
+                .and_then(|moves| CubieCube::SOLVED.apply_moves(&moves))
+                .ok_or_else(|| {
+                    BadInput(format!("{set}: line {}: cannot parse {line:?}", n + 1)).into()
+                })
         })
         .collect()
 }
@@ -561,7 +619,7 @@ fn batch(
 ) -> anyhow::Result<()> {
     let (threads, share) = (args.run.threads, args.run.share);
     let get = |i: usize| cubes.get(i).copied();
-    let (records, elapsed) = run(solver, &get, threads, lanes, None, share);
+    let (records, elapsed) = run(solver, &get, threads, lanes, None, share)?;
     anyhow::ensure!(records.len() == cubes.len(), "cubes not reported");
     let n = cubes.len() as f64;
     let mut times: Vec<f64> = records.iter().map(|r| r.seconds).collect();
@@ -637,7 +695,7 @@ fn run_command(command: &Command, json: bool) -> anyhow::Result<()> {
         _ => Vec::new(),
     };
     let path = &table_args.table;
-    let corners = Cocsep::generate();
+    let corners = Cocsep::generate()?;
     let load_start = Instant::now();
     let table = table_args.load.open(path)?;
     eprintln!(
@@ -659,6 +717,14 @@ fn run_command(command: &Command, json: bool) -> anyhow::Result<()> {
 mod tests {
     use super::{cube_set, legacy};
     use cubeopt::cubie::{CubieCube, Rng};
+
+    #[test]
+    fn seconds_reject_unrepresentable_durations() {
+        for value in ["-1", "NaN", "inf", "1e300"] {
+            assert!(super::seconds(value).is_err(), "{value}");
+        }
+        assert_eq!(super::seconds("0.5"), Ok(0.5));
+    }
 
     /// `random:N:SEED` is N random states from `Rng(SEED)`, as before.
     #[test]

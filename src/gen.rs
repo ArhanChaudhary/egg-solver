@@ -20,10 +20,11 @@ pub mod dfs;
 pub mod progress;
 
 use crate::coord::{cocsep, cube_from_edge_key, h11_key, reduce_key, split_index};
+use crate::cubie::Move;
 use crate::simd::Cube;
 use crate::tables::{
     entry_class, entry_low_bits, entry_position, entry_sym_to_rep, h48_bytes, h48_rows, Cocsep,
-    H48Meta, Memory, WORDS_PER_ROW,
+    H48Meta, Memory, TableError, WORDS_PER_ROW,
 };
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering::Relaxed};
 use std::time::Instant;
@@ -36,8 +37,9 @@ pub struct Generator<'a> {
     pub k: u32,
     pub base: u8,
     pub threads: usize,
-    /// Derived tables (`k` < the main table's) and their memory.
-    pub derived: Vec<(H48Meta, &'a Memory)>,
+    /// Derived tables (`k` < the main table's) and their memory (as words:
+    /// `Memory::words`).
+    pub derived: Vec<(H48Meta, &'a [AtomicU64])>,
 }
 
 /// A cube of table entry `index`.
@@ -109,7 +111,11 @@ impl Generator<'_> {
     }
 
     /// Run `f(first_word, end_word)` over chunks of whole rows in parallel.
-    fn for_word_chunks(&self, words: usize, f: impl Fn(usize, usize) + Sync) {
+    fn for_word_chunks(
+        &self,
+        words: usize,
+        f: impl Fn(usize, usize) + Sync,
+    ) -> Result<(), crate::parallel::WorkerPanicked> {
         let chunk = WORDS_PER_ROW << 12;
         let next = AtomicUsize::new(0);
         crate::parallel::on_threads(self.threads, |_| loop {
@@ -118,29 +124,48 @@ impl Generator<'_> {
                 break;
             }
             f(start, (start + chunk).min(words));
-        });
+        })?;
+        Ok(())
     }
 
     /// Run the BFS, filling `memory` and the derived tables. Returns the
     /// number of entries per depth.
-    #[must_use]
-    pub fn run(&self, memory: &Memory) -> Vec<u64> {
-        let n_words = table_words(self.k);
-        let words = memory.words();
+    ///
+    /// # Errors
+    /// If `k` is not 0 or 11 (the BFS needs a true coordinate), a memory is
+    /// smaller than its table, or a thread panicked.
+    pub fn run(&self, memory: &Memory) -> Result<Vec<u64>, TableError> {
+        if self.k != 0 && self.k != 11 {
+            return Err(TableError::Generate(format!(
+                "BFS only on true coordinates (h0, h11), not h{}",
+                self.k
+            )));
+        }
+        let n_words = table_words(self.k)?;
+        let words = memory.words()?;
+        // (Every word index below is below the table's words.)
+        let too_small = |k| TableError::Generate(format!("memory smaller than h{k}"));
+        if words.len() < n_words {
+            return Err(too_small(self.k));
+        }
+        for (meta, derived_words) in &self.derived {
+            if meta.k > self.k || derived_words.len() < table_words(meta.k)? {
+                return Err(too_small(meta.k));
+            }
+        }
         let t0 = Instant::now();
         // init: all entries 3, all group minima 15
         self.for_word_chunks(n_words, |first, end| {
             for word in &words[first..end] {
                 word.store(u64::MAX, Relaxed);
             }
-        });
-        for (meta, memory) in &self.derived {
-            let derived_words = memory.words();
-            self.for_word_chunks(table_words(meta.k), |first, end| {
+        })?;
+        for (meta, derived_words) in &self.derived {
+            self.for_word_chunks(table_words(meta.k)?, |first, end| {
                 for word in &derived_words[first..end] {
                     word.store(u64::MAX, Relaxed);
                 }
-            });
+            })?;
         }
         // depth 0
         let mut start = Vec::new();
@@ -153,13 +178,14 @@ impl Generator<'_> {
                 words[w].fetch_and(!(2u64 << shift), Relaxed); // 3 -> 1
             }
             lower_group_min(words, w, 0);
-            for (meta, memory) in &self.derived {
-                lower_derived(memory.words(), reduce_index(i, self.k, meta.k), 0, 0);
+            for (meta, derived_words) in &self.derived {
+                lower_derived(derived_words, reduce_index(i, self.k, meta.k), 0, 0);
             }
         }
         let entries: u64 = h48_rows(self.k) * 495;
         let mut counts = vec![start.len() as u64];
         let mut total = start.len() as u64;
+        let mut frontier = total;
         progress::line(format_args!("[gen h{}] depth 0: {} entries", self.k, total));
         let last = u64::from(self.base) + 2;
         // (Progress: each level's expansion and finishing pass, by chunks.)
@@ -169,7 +195,6 @@ impl Generator<'_> {
                 format_args!("h{} depth {depth} of {last}", self.k),
                 2 * chunks,
             );
-            let frontier = counts[counts.len() - 1];
             let unvisited = entries - total;
             // Forward costs ~18 neighbors per frontier entry, backward up
             // to 18 lookups per unvisited one, but stops at the first hit.
@@ -179,12 +204,12 @@ impl Generator<'_> {
                 self.for_word_chunks(n_words, |first, end| {
                     self.expand_forward(words, first, end);
                     progress::advance(1);
-                });
+                })?;
             } else {
                 self.for_word_chunks(n_words, |first, end| {
                     self.expand_backward(words, first, end);
                     progress::advance(1);
-                });
+                })?;
             }
             let step_seconds = level_start.elapsed().as_secs_f64();
             let relabel = depth != last;
@@ -193,10 +218,11 @@ impl Generator<'_> {
                 let count = self.finish_level(words, first, end, depth, relabel);
                 new_entries.fetch_add(count, Relaxed);
                 progress::advance(1);
-            });
+            })?;
             let count = new_entries.load(Relaxed);
             counts.push(count);
             total += count;
+            frontier = count;
             progress::line(format_args!(
                 "[gen h{}] depth {depth}: {count} entries ({}, {step_seconds:.1}s step, {:.1}s total)",
                 self.k,
@@ -211,7 +237,7 @@ impl Generator<'_> {
             entries - total
         ));
         counts.push(entries - total);
-        counts
+        Ok(counts)
     }
 
     /// Mark the unvisited neighbors of the frontier (code 1) entries in
@@ -227,7 +253,7 @@ impl Generator<'_> {
                 let bit = u64::from(frontier.trailing_zeros());
                 frontier ^= frontier.isolate_lowest_one();
                 let cube = decode_index(self.corners, self.k, w * 32 + bit / 2);
-                for mv in 0..18 {
+                for mv in Move::ALL {
                     let neighbor = cube.apply_move(mv);
                     self.for_each_index(neighbor, |i| mark_new(words, i));
                 }
@@ -246,7 +272,7 @@ impl Generator<'_> {
         let flush = |pending: &[u64], neighbors: &mut [[u64; 18]; BATCH]| {
             for (p, &index) in pending.iter().enumerate() {
                 let cube = decode_index(self.corners, self.k, index);
-                for (mv, slot) in neighbors[p].iter_mut().enumerate() {
+                for (&mv, slot) in Move::ALL.iter().zip(neighbors[p].iter_mut()) {
                     let i = self.index(cube.apply_move(mv));
                     *slot = i;
                     let (w, _) = entry_position(i);
@@ -305,14 +331,14 @@ impl Generator<'_> {
                     let bit = u64::from(new.trailing_zeros());
                     new ^= new.isolate_lowest_one();
                     let index = w * 32 + bit / 2;
-                    for (last, (meta, memory)) in last.iter_mut().zip(&self.derived) {
+                    for (last, (meta, derived_words)) in last.iter_mut().zip(&self.derived) {
                         let j = reduce_index(index, self.k, meta.k);
                         if j == *last {
                             continue;
                         }
                         *last = j;
                         let code = depth.saturating_sub(u64::from(meta.base)).min(3);
-                        lower_derived(memory.words(), j, code, depth);
+                        lower_derived(derived_words, j, code, depth);
                     }
                 }
             }
@@ -328,8 +354,8 @@ impl Generator<'_> {
 }
 
 /// Number of `u64` words of an hk table.
-fn table_words(k: u32) -> usize {
-    usize::try_from(h48_bytes(k) / 8).expect("64-bit usize")
+fn table_words(k: u32) -> Result<usize, TableError> {
+    usize::try_from(h48_bytes(k) / 8).map_err(|_| TableError::TooLarge(k))
 }
 
 /// Map an index of the hk table to the index of the h`dk` table (dk <= k).

@@ -3,10 +3,20 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 cargo fmt --all --check
-cargo clippy --release --all-targets -- -D warnings
 # A private log, so concurrent runs (several worktrees) never read each other's output.
 log=$(mktemp -t cube-test.XXXXXX.log)
 trap 'rm -f "$log"' EXIT
+# No intentional panics in shipped code (user request): no assert!,
+# assert_eq!, assert_ne!, panic!, unreachable!, todo!, unimplemented!,
+# .unwrap() or .expect( outside test and compile-time code. Clippy's
+# restriction lints (denied at each crate root) have no lint for asserts:
+# this scan covers all of them (how it works: tests/no_runtime_panics.rs).
+if ! cargo test --release --test no_runtime_panics > "$log" 2>&1; then
+    grep -vE "^\s+(Compiling|Finished|Running)" "$log" | tail -40 >&2
+    echo "check: panicking calls in shipped code (see above)" >&2
+    exit 1
+fi
+cargo clippy --release --all-targets -- -D warnings
 # The last test run's log shows no failure. (Called as `no_failure || exit 1`:
 # `set -e` ignores a failing `! grep`.)
 no_failure() { ! grep -qE "FAILED|panicked" "$log"; }

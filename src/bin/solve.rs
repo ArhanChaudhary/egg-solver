@@ -32,6 +32,21 @@
 //! `solve --shm-load TABLE` loads a table into a shared memory segment that
 //! later runs attach at once (`--shm`; README.md "Shared memory"), `solve
 //! --shm-remove TABLE` removes it.
+
+// No intentional panics in shipped code (user request; asserts, which no
+// lint covers, are checked by tests/no_runtime_panics.rs).
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::panic,
+        clippy::unreachable,
+        clippy::todo,
+        clippy::unimplemented
+    )
+)]
+
 use anyhow::Context as _;
 use clap::Parser;
 use cubeopt::cli::{self, BadInput, LoadArgs, Verbosity};
@@ -44,7 +59,7 @@ use std::io::{BufRead, Write};
 use std::path::Path;
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::Mutex;
+use std::sync::{Mutex, PoisonError};
 use std::time::Instant;
 
 // `share::Worker::rounds`'s section starts on a page boundary, `SHARE_LINE`
@@ -73,15 +88,36 @@ fn solve_all_pinned(
     threads: usize,
     lanes: usize,
     max_active: usize,
-    done: &(dyn Fn(usize, Vec<u8>, Stats, f64) + Sync),
-) {
+    done: &(dyn Fn(usize, Option<Vec<u8>>, Stats, f64) + Sync),
+) -> anyhow::Result<()> {
     let pool = Pool::new(cubes, max_active, threads);
     let stop = AtomicBool::new(false);
     std::thread::scope(|scope| {
+        let mut spawned = Vec::with_capacity(threads.max(1));
+        let mut result = Ok(());
         for _ in 0..threads.max(1) {
-            scope.spawn(|| pool.run_pinned(solver, lanes, &stop, done));
+            let thread = std::thread::Builder::new()
+                .spawn_scoped(scope, || pool.run_pinned(solver, lanes, &stop, done));
+            match thread {
+                Ok(thread) => spawned.push(thread),
+                Err(error) => {
+                    stop.store(true, Ordering::Relaxed);
+                    result = Err(anyhow::Error::from(error).context("cannot start a thread"));
+                    break;
+                }
+            }
         }
-    });
+        let mut all_ok = true;
+        for thread in spawned {
+            if thread.join().is_err() {
+                stop.store(true, Ordering::Relaxed);
+                all_ok = false;
+            }
+        }
+        result?;
+        anyhow::ensure!(all_ok, "a thread panicked");
+        Ok(())
+    })
 }
 
 /// Solve Rubik's cube scrambles from stdin optimally (fewest moves, any
@@ -260,9 +296,10 @@ fn read_scrambles(count: usize) -> anyhow::Result<Vec<CubieCube>> {
         if cubes.len() >= count {
             break;
         }
-        let moves = parse_moves(&line)
+        let cube = parse_moves(&line)
+            .and_then(|moves| CubieCube::SOLVED.apply_moves(&moves))
             .ok_or_else(|| BadInput(format!("line {}: cannot parse {line:?}", n + 1)))?;
-        cubes.push(CubieCube::SOLVED.apply_moves(&moves));
+        cubes.push(cube);
     }
     Ok(cubes)
 }
@@ -273,7 +310,7 @@ fn run(args: &Args) -> anyhow::Result<ExitCode> {
         .or(args.table_flag.as_deref())
         .context("no table")?;
     let cubes = read_scrambles(args.count.unwrap_or(usize::MAX))?;
-    let corners = Cocsep::generate();
+    let corners = Cocsep::generate()?;
     let table = args.load.open(path)?;
     let threads = args.threads;
     let lanes = cli::lanes(args.lanes, path, table.meta.k, threads);
@@ -294,11 +331,16 @@ fn run(args: &Args) -> anyhow::Result<ExitCode> {
     let nodes = AtomicU64::new(0);
     let bad = AtomicBool::new(false);
     let n_done = AtomicUsize::new(0);
-    let done = |i: usize, solution: Vec<u8>, stats: Stats, seconds: f64| {
-        let ok = cubes[i].apply_moves(&solution) == CubieCube::SOLVED;
+    let done = |i: usize, solution: Option<Vec<u8>>, stats: Stats, seconds: f64| {
+        // (No solution, or one that does not solve the cube: BAD.)
+        let solves_cube = |moves: &[u8]| {
+            cubes.get(i).and_then(|cube| cube.apply_moves(moves)) == Some(CubieCube::SOLVED)
+        };
+        let ok = solution.as_deref().is_some_and(solves_cube);
+        let solution = solution.unwrap_or_default();
         nodes.fetch_add(stats.nodes, Ordering::Relaxed);
         n_done.fetch_add(1, Ordering::Relaxed);
-        let mut out = stdout.lock().unwrap();
+        let mut out = stdout.lock().unwrap_or_else(PoisonError::into_inner);
         if !ok {
             bad.store(true, Ordering::Relaxed);
         }
@@ -329,7 +371,7 @@ fn run(args: &Args) -> anyhow::Result<ExitCode> {
         let _ = out.flush();
     };
     let start = Instant::now();
-    solve_all_pinned(&solver, &get, threads, lanes, max_active, &done);
+    solve_all_pinned(&solver, &get, threads, lanes, max_active, &done)?;
     let wall = start.elapsed().as_secs_f64();
     let n = cubes.len();
     let reported = n_done.load(Ordering::Relaxed);
@@ -380,7 +422,7 @@ fn random_scramble(rng: &mut Rng, length: usize) -> String {
     // (Opposite faces have the same index mod 3: U D, R L, F B.)
     const FACES: [char; 6] = ['U', 'R', 'F', 'D', 'L', 'B'];
     const SUFFIXES: [&str; 3] = ["", "2", "'"];
-    let below = |rng: &mut Rng, n: u64| usize::try_from(rng.below(n)).expect("below 6");
+    let below = |rng: &mut Rng, n: usize| rng.below_usize(n);
     let (mut previous, mut before) = (None, None);
     let mut moves = Vec::with_capacity(length);
     for _ in 0..length {
@@ -449,7 +491,7 @@ fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
     };
     let parse = |text: &str| {
         parse_moves(text)
-            .map(|moves| CubieCube::SOLVED.apply_moves(&moves))
+            .and_then(|moves| CubieCube::SOLVED.apply_moves(&moves))
             .ok_or_else(|| BadInput(format!("cannot parse {text:?}")))
     };
     let mut cubes = Vec::new();
@@ -464,22 +506,30 @@ fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
         println!("threads  {threads} (all on this one cube)");
         println!("scramble {scramble}");
     }
-    let corners = Cocsep::generate();
+    let corners = Cocsep::generate()?;
     let table = args.load.open(&path)?;
     let lanes = cli::lanes(args.lanes, &path, table.meta.k, threads);
     let solver = Solver::new(&corners, &table);
     let get = |i: usize| cubes.get(i).copied();
-    let last = cubes.len() - 1;
+    // (The scramble, after the warm-up cube if any.)
+    let (last, &cube) = cubes
+        .iter()
+        .enumerate()
+        .next_back()
+        .context("no scramble")?;
     let result = Mutex::new(None);
-    let done = |i: usize, solution: Vec<u8>, stats: Stats, seconds: f64| {
+    let done = |i: usize, solution: Option<Vec<u8>>, stats: Stats, seconds: f64| {
         if i == last {
-            *result.lock().unwrap() = Some((solution, stats, seconds));
+            *result.lock().unwrap_or_else(PoisonError::into_inner) =
+                Some((solution, stats, seconds));
         }
     };
-    solve_all_pinned(&solver, &get, threads, lanes, 1, &done);
-    let (solution, stats, seconds) = (result.into_inner().unwrap()).context("not solved")?;
+    solve_all_pinned(&solver, &get, threads, lanes, 1, &done)?;
+    let result = result.into_inner().unwrap_or_else(PoisonError::into_inner);
+    let (solution, stats, seconds) = result.context("not solved")?;
+    let solution = solution.context("no solution within 20 moves: is the table damaged?")?;
     anyhow::ensure!(
-        cubes[last].apply_moves(&solution) == CubieCube::SOLVED,
+        cube.apply_moves(&solution) == Some(CubieCube::SOLVED),
         "BAD: {} does not solve the scramble",
         format_moves(&solution)
     );

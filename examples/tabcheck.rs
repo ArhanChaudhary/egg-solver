@@ -16,7 +16,7 @@
 //! tabcheck <table> <samples> <seed> [threads]
 //! ```
 use cubeopt::coord::{cube_from_edge_key, split_index, N_SLOTS};
-use cubeopt::cubie::Rng;
+use cubeopt::cubie::{Move, Rng};
 use cubeopt::tables::{entry_class, entry_sym_to_rep, h48_rows, Cocsep, H48Table};
 use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
 
@@ -38,7 +38,7 @@ fn main() {
     let samples: u64 = args[2].parse().unwrap();
     let seed: u64 = args[3].parse().unwrap();
     let threads: u64 = args.get(4).map_or(8, |x| x.parse().unwrap());
-    let corners = Cocsep::generate();
+    let corners = Cocsep::generate().unwrap();
     let table = H48Table::open(&args[1]).expect("open table");
     let k = table.meta.k;
     assert!(
@@ -94,14 +94,14 @@ fn main() {
                         }
                     }
                     let mut has_lower = false;
-                    for m in 0..18 {
+                    for m in Move::ALL {
                         let neighbor_code = table.get(corners.index(cube.apply_move(m), k)).0;
                         if neighbor_code + 1 < code {
                             counts.too_low_neighbor.fetch_add(1, Relaxed);
                             report(
                                 "too low neighbor",
                                 index,
-                                format!("code {code} move {m} code {neighbor_code}"),
+                                format!("code {code} move {} code {neighbor_code}", m.index()),
                             );
                         }
                         if neighbor_code > code + 1 && code < 3 {
@@ -109,7 +109,7 @@ fn main() {
                             report(
                                 "too high neighbor",
                                 index,
-                                format!("code {code} move {m} code {neighbor_code}"),
+                                format!("code {code} move {} code {neighbor_code}", m.index()),
                             );
                         }
                         has_lower |= neighbor_code + 1 == code;

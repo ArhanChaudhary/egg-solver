@@ -36,15 +36,18 @@
 //! (`Lane::start_iteration`), and full-length job roots branch on the
 //! normal side.
 
-use crate::cubie::{inverse_move, CubieCube};
+use crate::cubie::{inverse_move, CubieCube, Move};
 use crate::simd::{Cube, HOT_TABLES};
-use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES, QUARTER_TURNS};
+use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES, MAX_TARGET, QUARTER_TURNS};
 use crate::symstart::SymFilter;
 
 pub mod share;
 
 /// Stack depth limit (nodes per lane): searches go below 21 moves.
 const MAXD: usize = 26;
+// (Targets are at most `MAX_TARGET`, and the stack depth stays below the
+// target: the stack's unchecked indices are in range, whatever the table.)
+const _: () = assert!((MAX_TARGET as usize) < MAXD);
 
 /// Job length at which jobs stop being extended (`Solver::job_len`).
 const MAX_JOB_LEN: usize = 4;
@@ -528,6 +531,19 @@ enum Step {
     Found,
     /// The job is finished (only for `Lane::shared` lanes).
     JobDone,
+    /// No solution within `MAX_TARGET` moves: the lane gave the cube up
+    /// (only for stream lanes; an unsolvable cube, or a wrong table).
+    Unsolved,
+}
+
+/// How `Lane::start` left a lane.
+enum Start {
+    /// Searching: its first run is set up.
+    Searching,
+    /// The cube is solved already.
+    Solved,
+    /// Given up at once (see `Step::Unsolved`).
+    Unsolved,
 }
 
 impl Lane {
@@ -600,14 +616,14 @@ impl Lane {
         (cube, inverse)
     }
 
-    /// Start solving a cube. Returns true if it is already solved.
-    fn start(&mut self, solver: &Solver, cube: &CubieCube, index: usize) -> bool {
+    /// Start solving a cube.
+    fn start(&mut self, solver: &Solver, cube: &CubieCube, index: usize) -> Start {
         self.cube_index = index;
         self.stats = Stats::default();
         self.solution.clear();
         let root = Cube::from_cubie(cube);
         if root.is_solved() {
-            return true;
+            return Start::Solved;
         }
         self.root = root;
         self.root_inverse = root.inverse();
@@ -624,13 +640,15 @@ impl Lane {
         });
         self.target = normal_bound.max(inverse_bound).max(1);
         self.run_state.full = false;
-        self.start_iteration(solver);
-        false
+        if self.start_iteration(solver) {
+            Start::Searching
+        } else {
+            Start::Unsolved
+        }
     }
 
     /// Extend every job by one move (children in move order), with their
     /// bounds.
-    #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
     fn extend_jobs(&mut self, solver: &Solver) {
         // Bounds of the new jobs: lookups are prefetched and resolved LAG
         // lookups later (`pending` is a ring of (bound slot, index, corner
@@ -667,8 +685,7 @@ impl Lane {
             } else {
                 ALLOWED_AFTER[(job.moves[job.len as usize - 1] / 3) as usize]
             };
-            while todo != 0 {
-                let mv = todo.trailing_zeros() as usize;
+            while let Some(mv) = Move::lowest(todo) {
                 todo ^= todo.isolate_lowest_one();
                 let mut child = *job;
                 child.moves[child.len as usize] = mv as u8;
@@ -682,7 +699,7 @@ impl Lane {
                 solver.prefetch(index);
                 pending[head % 64] = (2 * position, index, corner_bound);
                 head += 1;
-                if mv.is_multiple_of(3) || filtered {
+                if mv.index().is_multiple_of(3) || filtered {
                     let (index, corner_bound) = solver.index(inverse.premove_inverse(mv));
                     solver.prefetch(index);
                     pending[head % 64] = (2 * position + 1, index, corner_bound);
@@ -706,22 +723,18 @@ impl Lane {
             }
         }
         if filtered {
-            let root = self.root;
             filter.dedup(
                 &mut extended,
                 |job| &job.moves[..usize::from(job.len)],
-                |job| {
-                    job.moves[..usize::from(job.len)]
-                        .iter()
-                        .fold(root, |cube, &mv| cube.apply_move(usize::from(mv)))
-                },
+                |job| self.job_cubes(job).0,
             );
         }
         self.jobs_tmp = std::mem::replace(&mut self.jobs, extended);
     }
 
     /// Start the iteration with target `self.target` (or a later one, if
-    /// it has no runs).
+    /// it has no runs). Returns false if that would be above `MAX_TARGET`:
+    /// the lane gives the cube up.
     ///
     /// An iteration on the jobs of the previous one (they have their full
     /// length; with h11, T >= 18: the likely last iterations, and every one
@@ -733,11 +746,14 @@ impl Lane {
     /// iterations run whole jobs by decreasing statistic, as `solver` does.
     /// (This split ordering: -6..-8% nodes, +4.4% at 1T, +0.5% at 48T when
     /// merged, c7-childsplit.)
-    fn start_iteration(&mut self, solver: &Solver) {
+    fn start_iteration(&mut self, solver: &Solver) -> bool {
         loop {
             // The stack depth stays below the target (relied on by the
-            // unchecked indexing in `advance`); 20 moves always suffice.
-            assert!((self.target as usize) < MAXD);
+            // unchecked indexing in `advance`): at most `MAX_TARGET`, below
+            // `MAXD`.
+            if self.target > MAX_TARGET {
+                return false;
+            }
             let job_len = solver.job_len(self.target);
             let mut extended = false;
             // SAFETY: a lane always has jobs (the root job, or at least one
@@ -767,7 +783,7 @@ impl Lane {
                 self.job_pos = 0;
             }
             if self.setup_run() {
-                return;
+                return true;
             }
             debug_assert!(self.iteration_covered());
             self.target += 1;
@@ -1040,20 +1056,22 @@ impl Lane {
     }
 
     /// The run finished: record it and set up the next one (of the next
-    /// iteration if this one is exhausted). Out of line and cold, to keep
-    /// the search loop's registers (part of c7; not measured separately).
+    /// iteration if this one is exhausted). Returns false if the lane gave
+    /// the cube up (`start_iteration`). Out of line and cold, to keep the
+    /// search loop's registers (part of c7; not measured separately).
     #[cold]
     #[inline(never)]
-    fn next_run(&mut self, solver: &Solver) {
+    fn next_run(&mut self, solver: &Solver) -> bool {
         self.finish_run();
         if self.run_state.part == 0 {
             self.job_pos += 1;
         }
-        if !self.setup_run() {
-            debug_assert!(self.iteration_covered());
-            self.target += 1;
-            self.start_iteration(solver);
+        if self.setup_run() {
+            return true;
         }
+        debug_assert!(self.iteration_covered());
+        self.target += 1;
+        self.start_iteration(solver)
     }
 
     /// Set up the root node of the next run of this iteration. Returns
@@ -1313,7 +1331,9 @@ impl Lane {
                         self.stats.nodes += nodes;
                         return Step::JobDone;
                     }
-                    self.next_run(solver);
+                    if !self.next_run(solver) {
+                        return Step::Unsolved;
+                    }
                     depth = self.depth;
                     let top = unsafe { self.stack.get_unchecked(depth) };
                     (todo, lower_bound, remaining_depth) =
@@ -1931,49 +1951,57 @@ unsafe fn sort_runs(runs: &mut Vec<u32>, unsorted: &[u32], counts: &mut [u32; 25
 
 /// Solve cubes `cubes(i)` for i taken from the shared counter `next`, with
 /// `n_lanes` interleaved lanes on this thread. Calls `done(index, solution,
-/// stats, seconds)` for every solved cube. Stops when `cubes` returns None
-/// for all lanes or when `stop` is set.
+/// stats, seconds)` for every cube: its solution, or `None` if it has none
+/// within `MAX_TARGET` moves (an unsolvable cube, or a table whose bounds
+/// are too high). Stops when `cubes` returns None for all lanes or when
+/// `stop` is set.
 pub fn run_lanes(
     solver: &Solver,
     cubes: &(dyn Fn(usize) -> Option<CubieCube> + Sync),
     next: &std::sync::atomic::AtomicUsize,
     stop: &std::sync::atomic::AtomicBool,
     n_lanes: usize,
-    mut done: impl FnMut(usize, Vec<u8>, Stats, f64),
+    mut done: impl FnMut(usize, Option<Vec<u8>>, Stats, f64),
 ) {
     use std::sync::atomic::Ordering::Relaxed;
     use std::time::Instant;
     let mut lanes: Vec<Lane> = (0..n_lanes).map(|_| Lane::new()).collect();
     // Give `lane` a new cube; returns false if there are none left.
-    let fetch = |lane: &mut Lane, done: &mut dyn FnMut(usize, Vec<u8>, Stats, f64)| -> bool {
-        loop {
-            let i = next.fetch_add(1, Relaxed);
-            let Some(cube) = cubes(i) else {
-                return false;
-            };
-            lane.started = Instant::now();
-            if lane.start(solver, &cube, i) {
-                done(i, vec![], Stats::default(), 0.0);
-                continue;
+    let fetch =
+        |lane: &mut Lane, done: &mut dyn FnMut(usize, Option<Vec<u8>>, Stats, f64)| -> bool {
+            loop {
+                let i = next.fetch_add(1, Relaxed);
+                let Some(cube) = cubes(i) else {
+                    return false;
+                };
+                lane.started = Instant::now();
+                match lane.start(solver, &cube, i) {
+                    Start::Searching => return true,
+                    Start::Solved => done(i, Some(vec![]), Stats::default(), 0.0),
+                    Start::Unsolved => {
+                        let seconds = lane.started.elapsed().as_secs_f64();
+                        done(i, None, lane.stats, seconds);
+                    }
+                }
             }
-            return true;
-        }
-    };
+        };
     // Give `lane` a new cube and advance it to its first lookup (past
     // solutions found on the way); returns false if there are no cubes left.
-    let refill = |lane: &mut Lane, done: &mut dyn FnMut(usize, Vec<u8>, Stats, f64)| -> bool {
-        loop {
-            if !fetch(lane, done) {
-                return false;
+    let refill =
+        |lane: &mut Lane, done: &mut dyn FnMut(usize, Option<Vec<u8>>, Stats, f64)| -> bool {
+            loop {
+                if !fetch(lane, done) {
+                    return false;
+                }
+                let solution = match lane.advance_cold(solver) {
+                    Step::Pending => return true,
+                    Step::Unsolved => None,
+                    Step::Found | Step::JobDone => Some(lane.reconstruct()),
+                };
+                let seconds = lane.started.elapsed().as_secs_f64();
+                done(lane.cube_index, solution, lane.stats, seconds);
             }
-            if let Step::Pending = lane.advance_cold(solver) {
-                return true;
-            }
-            let solution = lane.reconstruct();
-            let seconds = lane.started.elapsed().as_secs_f64();
-            done(lane.cube_index, solution, lane.stats, seconds);
-        }
-    };
+        };
     // The active lanes are `lanes[..n_active]` (no per-visit activity test:
     // +1.9% when added, part of m4-micro's +7.7% at 48T).
     let mut n_active = 0;
@@ -2006,8 +2034,8 @@ pub fn run_lanes(
                 }
                 Phase::WaitMoved => lane.resolve_moved(value, solver),
             };
-            if let Step::Found = outcome {
-                let solution = lane.reconstruct();
+            if let Step::Found | Step::Unsolved = outcome {
+                let solution = matches!(outcome, Step::Found).then(|| lane.reconstruct());
                 let seconds = lane.started.elapsed().as_secs_f64();
                 done(lane.cube_index, solution, lane.stats, seconds);
                 if !refill(lane, &mut done) {
