@@ -180,6 +180,16 @@ fn share_thread(
 
 // `stream_thread`'s section: it starts at a fixed offset of a 64-byte line
 // in every build (see `cubeopt::hot`).
+// Match the measured stream function's page offset (0xa90 with pad 16).
+// Together with cold completion reporting: +0.83% 1T h8 throughput when
+// added; 48T neutral (+0.19% median, five pairs).
+#[cfg(all(target_arch = "x86_64", target_os = "linux"))]
+core::arch::global_asm!(
+    ".pushsection .text.hot_stream,\"ax\",@progbits",
+    ".p2align 12",
+    ".skip 0xa80, 0xcc",
+    ".popsection",
+);
 cubeopt::hot_section!(".text.hot_stream", cubeopt::hot::STREAM_PAD);
 
 /// A thread of a stream-mode run (`run_lanes`).

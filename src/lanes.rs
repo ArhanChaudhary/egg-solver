@@ -524,6 +524,7 @@ pub struct Lane {
 }
 
 /// Where `advance` stopped.
+#[derive(Clone, Copy)]
 enum Step {
     /// A lookup was issued (prefetched); resolve it on the next visit.
     Pending,
@@ -614,6 +615,21 @@ impl Lane {
             }
         }
         (cube, inverse)
+    }
+
+    /// Report a completed stream cube outside the lookup loop.
+    /// With the bench page placement: +0.83% 1T h8 throughput when added;
+    /// 48T was neutral (+0.19% median over five paired runs).
+    #[cold]
+    #[inline(never)]
+    fn report_stream(
+        &self,
+        outcome: Step,
+        done: &mut impl FnMut(usize, Option<Vec<u8>>, Stats, f64),
+    ) {
+        let solution = matches!(outcome, Step::Found).then(|| self.reconstruct());
+        let seconds = self.started.elapsed().as_secs_f64();
+        done(self.cube_index, solution, self.stats, seconds);
     }
 
     /// Start solving a cube.
@@ -2035,9 +2051,7 @@ pub fn run_lanes(
                 Phase::WaitMoved => lane.resolve_moved(value, solver),
             };
             if let Step::Found | Step::Unsolved = outcome {
-                let solution = matches!(outcome, Step::Found).then(|| lane.reconstruct());
-                let seconds = lane.started.elapsed().as_secs_f64();
-                done(lane.cube_index, solution, lane.stats, seconds);
+                lane.report_stream(outcome, &mut done);
                 if !refill(lane, &mut done) {
                     // (The rest of the round waits for the next one.)
                     gone = Some(lane);
