@@ -4,7 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 cargo fmt --all --check
 # A private log, so concurrent runs (several worktrees) never read each other's output.
-log=$(mktemp -t cube-test.XXXXXX.log)
+log=$(mktemp -t egg-solver-test.XXXXXX.log)
 trap 'rm -f "$log"' EXIT
 # No intentional panics in shipped code (user request): no assert!,
 # assert_eq!, assert_ne!, panic!, unreachable!, todo!, unimplemented!,
@@ -42,7 +42,7 @@ if [ "${CHECK_BACKENDS:-1}" != 0 ]; then
             cargo clippy --release --all-targets --target $target -- -D warnings
         fi
         if [[ $target == wasm32-wasip1* ]] && grep -qx "$target" <<< "$installed"; then
-            cargo clippy --release -p cubeopt-wasm --target $target -- -D warnings
+            cargo clippy --release -p egg-solver-wasm --target $target -- -D warnings
         fi
     done
     if grep -qx wasm32-wasip1-threads <<< "$installed"; then

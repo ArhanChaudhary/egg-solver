@@ -15,7 +15,7 @@ const SCRAMBLES: &str = "R U R' U'\n\nF2 D L2 B' U\nR1 U2 F3 D1 L2 B1 R3\nU R2 F
 fn scratch() -> &'static Path {
     static DIR: OnceLock<PathBuf> = OnceLock::new();
     DIR.get_or_init(|| {
-        let dir = std::env::temp_dir().join(format!("cubeopt-cli-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("egg-solver-cli-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     })
@@ -64,7 +64,7 @@ fn shm_key(n: u32) -> String {
 }
 
 /// Run `binary` with `args`, `stdin` and the environment variables `env`
-/// (the binaries' own variables are unset otherwise, and `CUBEOPT_SHM_KEY`
+/// (the binaries' own variables are unset otherwise, and `EGG_SOLVER_SHM_KEY`
 /// is `shm_key(0)` but with `--completions`).
 fn run_env(binary: &str, args: &[&str], stdin: &str, env: &[(&str, &str)]) -> Output {
     let mut command = Command::new(binary);
@@ -74,14 +74,14 @@ fn run_env(binary: &str, args: &[&str], stdin: &str, env: &[(&str, &str)]) -> Ou
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     for variable in [
-        "CUBEOPT_LOAD",
-        "CUBEOPT_PREFAULT",
-        "CUBEOPT_SHM_DENY_HUGE",
-        "CUBEOPT_SHM_KEY",
-        "CUBEOPT_SHM_PAGES",
-        "CUBEOPT_TABLE",
-        "CUBEOPT_THREADS",
-        "CUBEOPT_PREFLIGHT_LIMIT",
+        "EGG_SOLVER_LOAD",
+        "EGG_SOLVER_PREFAULT",
+        "EGG_SOLVER_SHM_DENY_HUGE",
+        "EGG_SOLVER_SHM_KEY",
+        "EGG_SOLVER_SHM_PAGES",
+        "EGG_SOLVER_TABLE",
+        "EGG_SOLVER_THREADS",
+        "EGG_SOLVER_PREFLIGHT_LIMIT",
         "RUST_LOG",
     ] {
         command.env_remove(variable);
@@ -89,7 +89,13 @@ fn run_env(binary: &str, args: &[&str], stdin: &str, env: &[(&str, &str)]) -> Ou
     // (`--completions` is exclusive, and clap counts a variable's value as
     // given.)
     if !args.contains(&"--completions") {
-        command.env("CUBEOPT_SHM_KEY", shm_key(0));
+        command.env("EGG_SOLVER_SHM_KEY", shm_key(0));
+    }
+    for &(modern, previous) in egg_solver::env::ALIASES {
+        if modern != "EGG_SOLVER_SHM_KEY" || args.contains(&"--completions") {
+            command.env_remove(modern);
+        }
+        command.env_remove(previous);
     }
     command.envs(env.iter().copied());
     let mut child = command.spawn().unwrap();
@@ -188,9 +194,9 @@ fn solve_legacy_forms() {
     check_solve_output(&ok(&out), 3, "2", "40", "1");
     let out = run(solve, &[table, "-t", "2", "-l", "4", "-c", "0"], SCRAMBLES);
     check_solve_output(&ok(&out), 4, "2", "4", "0");
-    // runtest.sh sets CUBEOPT_LOAD.
+    // runtest.sh sets EGG_SOLVER_LOAD.
     for load in ["copy", "map", "auto", ""] {
-        let env = [("CUBEOPT_LOAD", load)];
+        let env = [("EGG_SOLVER_LOAD", load)];
         let out = run_env(solve, &[table, "-t", "2", "-c", "1"], SCRAMBLES, &env);
         check_solve_output(&ok(&out), 4, "2", "40", "1");
     }
@@ -259,7 +265,7 @@ fn solve_fast() {
 
 #[test]
 fn solve_json_env_and_logging() {
-    let env = [("CUBEOPT_TABLE", h0()), ("CUBEOPT_PREFAULT", "0")];
+    let env = [("EGG_SOLVER_TABLE", h0()), ("EGG_SOLVER_PREFAULT", "0")];
     let args = ["--json", "-t", "2", "-v"];
     let out = run_env(env!("CARGO_BIN_EXE_solve"), &args, SCRAMBLES, &env);
     let stdout = ok(&out);
@@ -310,8 +316,8 @@ fn solve_shared_memory() {
     let solve = env!("CARGO_BIN_EXE_solve");
     let key = shm_key(1);
     let env = [
-        ("CUBEOPT_SHM_KEY", key.as_str()),
-        ("CUBEOPT_SHM_PAGES", "2m,4k"),
+        ("EGG_SOLVER_SHM_KEY", key.as_str()),
+        ("EGG_SOLVER_SHM_PAGES", "2m,4k"),
     ];
     let segment = Segment(&env);
     // (One left by a crashed earlier run of this process id.)
@@ -350,8 +356,8 @@ fn solve_shared_memory() {
     }
     // With the segment there, no memory is needed (no copy).
     let low = [
-        ("CUBEOPT_SHM_KEY", key.as_str()),
-        ("CUBEOPT_PREFLIGHT_LIMIT", "1000000"),
+        ("EGG_SOLVER_SHM_KEY", key.as_str()),
+        ("EGG_SOLVER_PREFLIGHT_LIMIT", "1000000"),
     ];
     let out = run_env(solve, &[table, "-t", "2", "-c", "1"], SCRAMBLES, &low);
     check_solve_output(&ok(&out), 4, "2", "40", "1");
@@ -380,14 +386,14 @@ fn solve_shared_memory_fallbacks() {
     let table = h0();
     let solve = env!("CARGO_BIN_EXE_solve");
     let key = shm_key(2);
-    let env = [("CUBEOPT_SHM_KEY", key.as_str())];
+    let env = [("EGG_SOLVER_SHM_KEY", key.as_str())];
     let segment = Segment(&env);
     // A new segment on 4 KiB pages without the memory for it: refused
     // before anything is made (exit 2), as a copy would be.
     let low = [
-        ("CUBEOPT_SHM_KEY", key.as_str()),
-        ("CUBEOPT_SHM_PAGES", "4k"),
-        ("CUBEOPT_PREFLIGHT_LIMIT", "1000000"),
+        ("EGG_SOLVER_SHM_KEY", key.as_str()),
+        ("EGG_SOLVER_SHM_PAGES", "4k"),
+        ("EGG_SOLVER_PREFLIGHT_LIMIT", "1000000"),
     ];
     let refused = run_env(solve, &["--shm-load", table], "", &low);
     let log = text(&refused.stderr);
@@ -402,9 +408,9 @@ fn solve_shared_memory_fallbacks() {
     // asked), 1 GiB and then 2 MiB pages are skipped with how to get it,
     // and the segment gets 4 KiB pages, with a warning.
     let denied = [
-        ("CUBEOPT_SHM_KEY", key.as_str()),
-        ("CUBEOPT_SHM_DENY_HUGE", "1"),
-        ("CUBEOPT_SHM_PAGES", "1g,2m,4k"),
+        ("EGG_SOLVER_SHM_KEY", key.as_str()),
+        ("EGG_SOLVER_SHM_DENY_HUGE", "1"),
+        ("EGG_SOLVER_SHM_PAGES", "1g,2m,4k"),
     ];
     let made = run_env(solve, &["--shm-load", table], "", &denied);
     assert!(ok(&made).contains(" 0.03 GiB on 4 KiB pages, made from "));
@@ -528,9 +534,9 @@ fn bench_subcommands_match_legacy() {
 }
 
 #[test]
-fn cubeopt_legacy_form() {
+fn egg_solver_legacy_form() {
     let out = run(
-        env!("CARGO_BIN_EXE_cubeopt"),
+        env!("CARGO_BIN_EXE_egg-solver"),
         &[h0()],
         "R U R' U'\nnonsense\n",
     );
@@ -552,7 +558,7 @@ fn gen_legacy_forms() {
     let auto = scratch_file("h0-auto");
     let out = run(gen, &["0", "auto", &auto, "-t", "4"], "");
     ok(&out);
-    let auto_base = cubeopt::tables::default_base(0);
+    let auto_base = egg_solver::tables::default_base(0);
     let log = text(&out.stderr);
     let head = format!("[gen] h0 base {auto_base}: 0.03 GiB, 4 threads\n");
     assert!(log.starts_with(&head), "{log}");
@@ -605,13 +611,13 @@ fn gen_legacy_forms() {
 }
 
 /// The checks before a run (disk, memory), with every measured amount cut
-/// to 1 MB (`CUBEOPT_PREFLIGHT_LIMIT`, for tests): exit 2 with the numbers
+/// to 1 MB (`EGG_SOLVER_PREFLIGHT_LIMIT`, for tests): exit 2 with the numbers
 /// before any work, nothing written; `--force` skips them.
 #[test]
 fn preflight_failures() {
     let table = h0();
     let gen = env!("CARGO_BIN_EXE_gen");
-    let limit = [("CUBEOPT_PREFLIGHT_LIMIT", "1000000")];
+    let limit = [("EGG_SOLVER_PREFLIGHT_LIMIT", "1000000")];
     let out = scratch_file("h0-preflight");
     let failed = run_env(gen, &["0", "8", &out, "-t", "2"], "", &limit);
     assert_eq!(failed.status.code(), Some(2));
@@ -658,7 +664,7 @@ fn help_version_and_completions() {
         env!("CARGO_BIN_EXE_solve"),
         env!("CARGO_BIN_EXE_bench"),
         env!("CARGO_BIN_EXE_gen"),
-        env!("CARGO_BIN_EXE_cubeopt"),
+        env!("CARGO_BIN_EXE_egg-solver"),
     ] {
         let help = ok(&run(binary, &["--help"], ""));
         assert!(help.contains("Usage:"), "{help}");
@@ -693,7 +699,7 @@ fn exit_statuses() {
     assert_eq!(status(solve, &[table, "-t", "0"], ""), Some(2));
     assert_eq!(status(solve, &[table], "R U X\n"), Some(2));
     assert_eq!(status(solve, &[&missing], "R U\n"), Some(2));
-    let bad_load = run_env(solve, &[table], "R U\n", &[("CUBEOPT_LOAD", "fast")]);
+    let bad_load = run_env(solve, &[table], "R U\n", &[("EGG_SOLVER_LOAD", "fast")]);
     assert_eq!(bad_load.status.code(), Some(2));
     assert_eq!(status(bench, &[table, "random:x"], ""), Some(2));
     assert_eq!(status(bench, &[table, "stream", "x"], ""), Some(2));
@@ -712,4 +718,28 @@ fn exit_statuses() {
     // Other errors and failed checks: 1.
     assert_eq!(status(gen, &["check", &missing], ""), Some(1));
     assert_eq!(status(bench, &[table, &missing], ""), Some(1));
+}
+
+/// Existing settings work, and modern settings take precedence.
+#[test]
+fn previous_environment_names_remain_fallbacks() {
+    let legacy = run_env(
+        env!("CARGO_BIN_EXE_solve"),
+        &["-c", "1"],
+        "R U\n",
+        &[("CUBEOPT_TABLE", h0()), ("CUBEOPT_THREADS", "2")],
+    );
+    assert!(ok(&legacy).contains("threads 2"));
+    let modern = run_env(
+        env!("CARGO_BIN_EXE_solve"),
+        &["-c", "1"],
+        "R U\n",
+        &[
+            ("CUBEOPT_TABLE", "missing"),
+            ("CUBEOPT_THREADS", "invalid"),
+            ("EGG_SOLVER_TABLE", h0()),
+            ("EGG_SOLVER_THREADS", "1"),
+        ],
+    );
+    assert!(ok(&modern).contains("threads 1"));
 }

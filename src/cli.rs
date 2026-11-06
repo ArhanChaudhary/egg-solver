@@ -1,4 +1,4 @@
-//! What the binaries (`solve`, `bench`, `gen`, `cubeopt`) share, with the
+//! What the binaries (`solve`, `bench`, `gen`, `egg-solver`) share, with the
 //! `cli` feature: logging (`-v`, `RUST_LOG`), how a table is loaded
 //! (`--load`, `--prefault`, `--shm`) and what it got (page sizes), shell
 //! completions and exit statuses. All of it runs before or after a search,
@@ -69,7 +69,7 @@ pub struct LoadArgs {
     #[arg(
         long,
         value_name = "auto|map|copy|shm",
-        env = "CUBEOPT_LOAD",
+        env = crate::env::name("EGG_SOLVER_LOAD"),
         default_value = "auto",
         value_parser = parse_load_mode,
         display_order = 90
@@ -83,7 +83,7 @@ pub struct LoadArgs {
     #[arg(
         long,
         value_name = "0|1",
-        env = "CUBEOPT_PREFAULT",
+        env = crate::env::name("EGG_SOLVER_PREFAULT"),
         default_value = "1",
         value_parser = parse_prefault,
         action = clap::ArgAction::Set,
@@ -95,7 +95,7 @@ pub struct LoadArgs {
     #[arg(
         long,
         value_name = "LIST",
-        env = "CUBEOPT_SHM_PAGES",
+        env = crate::env::name("EGG_SOLVER_SHM_PAGES"),
         default_value = "1g,2m,4k",
         value_parser = parse_shm_pages,
         display_order = 93
@@ -106,14 +106,14 @@ pub struct LoadArgs {
     #[arg(
         long,
         value_name = "KEY",
-        env = "CUBEOPT_SHM_KEY",
+        env = crate::env::name("EGG_SOLVER_SHM_KEY"),
         value_parser = parse_shm_key,
         display_order = 94
     )]
     pub shm_key: Option<u32>,
 }
 
-/// `--load` (an empty `CUBEOPT_LOAD` is `auto`, as before clap).
+/// `--load` (an empty `EGG_SOLVER_LOAD` is `auto`, as before clap).
 fn parse_load_mode(text: &str) -> Result<LoadMode, String> {
     match text {
         "auto" | "" => Ok(LoadMode::Auto),
@@ -134,7 +134,7 @@ fn parse_shm_key(text: &str) -> Result<u32, String> {
     shm::parse_key(text).ok_or_else(|| "expected a key other than 0, e.g. 0x636f0709".to_string())
 }
 
-/// `--prefault` (an empty `CUBEOPT_PREFAULT` is 1, as before clap).
+/// `--prefault` (an empty `EGG_SOLVER_PREFAULT` is 1, as before clap).
 fn parse_prefault(text: &str) -> Result<bool, String> {
     match text {
         "1" | "" => Ok(true),

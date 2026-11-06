@@ -7,7 +7,7 @@
 // Options:
 //   --table <file>    a table file (`gen <k> auto <file>`); or
 //   --gen <k>[:base]  generate hk in memory first (h0..h4: seconds to minutes)
-//   --threads <n>     use dist/cubeopt-threads.wasm with n threads
+//   --threads <n>     use dist/egg-solver-threads.wasm with n threads
 //   --lanes <n>       lanes per thread (default 16)
 //   --batch           solve all cubes together (throughput: each lane its own
 //                     cube) instead of one at a time (latency)
@@ -15,12 +15,12 @@
 //                     stream W S`): random cubes for S seconds after W
 //   --seed <n>        the stream's seed (default 2026)
 //   --verify          check the table's checksum when loading
-//   --wasm <file>     the module (default: dist/cubeopt.wasm, or
-//                     dist/cubeopt-threads.wasm with --threads)
+//   --wasm <file>     the module (default: dist/egg-solver.wasm, or
+//                     dist/egg-solver-threads.wasm with --threads)
 //
 // Prints one line per cube (length, time, nodes, solution), then totals.
 
-import { Cubeopt } from './cubeopt.mjs';
+import { EggSolver } from './egg-solver.mjs';
 
 const args = process.argv.slice(2);
 const option = (name) => {
@@ -30,10 +30,10 @@ const option = (name) => {
 const threads = option('--threads') ? Number(option('--threads')) : undefined;
 const lanes = Number(option('--lanes') ?? 0);
 const dist = new URL('./dist/', import.meta.url);
-const wasm = option('--wasm') ?? new URL(threads ? 'cubeopt-threads.wasm' : 'cubeopt.wasm', dist);
+const wasm = option('--wasm') ?? new URL(threads ? 'egg-solver-threads.wasm' : 'egg-solver.wasm', dist);
 
 let start = performance.now();
-const solver = await Cubeopt.create({ wasm, threads });
+const solver = await EggSolver.create({ wasm, threads });
 console.error(`module ready in ${((performance.now() - start) / 1000).toFixed(2)} s, ${solver.threads} thread(s)`);
 
 start = performance.now();

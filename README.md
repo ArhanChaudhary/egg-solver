@@ -1,4 +1,4 @@
-# cubeopt
+# egg-solver
 
 An optimal 3x3x3 Rubik's cube solver: IDA* with an H48 pruning table
 (`hK`, K = 0..11: the larger K, the faster the solves and the more memory),
@@ -87,7 +87,7 @@ Every binary has `--help` and `--version`. `--json` prints JSON lines
 (`solve`: one per cube, then the total; `bench`; `gen check`). `-v` logs to
 stderr how the table was loaded (map or copy, page sizes) and the threads
 and lanes (`RUST_LOG=debug` for more). The table can also come from
-`CUBEOPT_TABLE`, the threads from `CUBEOPT_THREADS`. `bench` has
+`EGG_SOLVER_TABLE`, the threads from `EGG_SOLVER_THREADS`. `bench` has
 subcommands (`bench stream|batch|tune <table> ...`, see `bench --help`); its
 positional form (`bench <table> stream 20 30 48`) still works. Shell
 completions: e.g. `solve --completions bash` (or zsh, fish, elvish,
@@ -99,11 +99,11 @@ builds without it (`default-features = false`).
 A table file holds the table data, then a 4 KiB trailer (k, base,
 distribution, checksum): `gen check <table>` verifies a table against it.
 Tables are the same on every machine and backend: you can generate one on a
-big machine and copy it. `--load map|copy|shm` (or `CUBEOPT_LOAD`) sets how
+big machine and copy it. `--load map|copy|shm` (or `EGG_SOLVER_LOAD`) sets how
 a table is loaded (map the file, copy it into memory with transparent huge
 pages, or attach its shared memory segment, below; the default is the
 table's segment if there is one, else copy on Linux, map elsewhere), and
-`--prefault 0` (or `CUBEOPT_PREFAULT=0`; with map and shm) reads pages on
+`--prefault 0` (or `EGG_SOLVER_PREFAULT=0`; with map and shm) reads pages on
 first use instead of the whole table at start.
 
 ### Shared memory
@@ -122,12 +122,12 @@ solve --shm tables/h8 < scrambles    # the same; makes the segment first if ther
 solve --shm-remove tables/h8         # remove it (as ipcrm -M KEY)
 ```
 
-`--shm` (the same as `--load shm`, or `CUBEOPT_LOAD=shm`) also works with
-`bench` and `cubeopt`; `--load map` and `--load copy` never use a segment.
+`--shm` (the same as `--load shm`, or `EGG_SOLVER_LOAD=shm`) also works with
+`bench` and `egg-solver`; `--load map` and `--load copy` never use a segment.
 
 - **Keys:** ASCII "co" (`0x636f`), then the table's k and base, a byte each:
   `ipcs -m` lists h7 base 9 as `0x636f0709`, h11 base 10 as `0x636f0b0a`.
-  `--shm-key` (or `CUBEOPT_SHM_KEY`) sets another, e.g. for two tables of the
+  `--shm-key` (or `EGG_SOLVER_SHM_KEY`) sets another, e.g. for two tables of the
   same k and base.
 - **Checked on every attach:** a segment holds the file's bytes, and in its
   last 4 KiB the file's trailer (k, base, size, distribution, checksum),
@@ -140,7 +140,7 @@ solve --shm-remove tables/h8         # remove it (as ipcrm -M KEY)
   checksum in its trailer (`gen stamp` adds one). A loaded segment is
   read-only: `ipcs -m` shows perms `400` (`600` while loading).
 - **Pages:** a new segment gets 1 GiB pages, else 2 MiB, else 4 KiB pages
-  (`--shm-pages 1g,2m,4k`, or `CUBEOPT_SHM_PAGES`); `-v` logs which, and why
+  (`--shm-pages 1g,2m,4k`, or `EGG_SOLVER_SHM_PAGES`); `-v` logs which, and why
   larger ones could not be had. On 4 KiB pages the search is much slower
   (h7: 27% fewer solves/s at 1 thread, 32% at 48 threads, than on 1 GiB
   pages; attaching maps 0.95 million pages, 0.6 s), and every run warns. Huge-page segments need, once (root):
@@ -215,15 +215,15 @@ rustup target add wasm32-wasip1 wasm32-wasip1-threads
 wasm/build.sh
 ```
 
-This makes `wasm/dist/cubeopt.wasm` (one thread; runs anywhere) and
-`wasm/dist/cubeopt-threads.wasm` (threads, see below), ~380 KB each. Both
-are WASI modules with a small C ABI (`wasm/src/lib.rs`); `wasm/cubeopt.mjs`
+This makes `wasm/dist/egg-solver.wasm` (one thread; runs anywhere) and
+`wasm/dist/egg-solver-threads.wasm` (threads, see below), ~380 KB each. Both
+are WASI modules with a small C ABI (`wasm/src/lib.rs`); `wasm/egg-solver.mjs`
 wraps them for JavaScript and provides the few WASI functions they import,
 so neither a WASI runtime nor wasm-bindgen is needed.
 
 ```js
-import { Cubeopt } from './wasm/cubeopt.mjs';
-const solver = await Cubeopt.create({ wasm: 'wasm/dist/cubeopt.wasm' });
+import { EggSolver } from './wasm/egg-solver.mjs';
+const solver = await EggSolver.create({ wasm: 'wasm/dist/egg-solver.wasm' });
 await solver.loadTable('h6');             // a path (Bun), URL, File or bytes
 // or: await solver.generateTable(4, 8);   // h4 base 8, made in the module
 solver.solve("R U R' U' F2 D L2");         // { moves, length, nodes, lookups, seconds }
@@ -237,7 +237,7 @@ the top, D with F at the top, the others with U at the top), any six
 symbols for the colors (as in Kociemba's solvers). `solve` puts all lanes
 (and threads) on one cube; `solveMany` gives each lane its own cube.
 
-`cubeopt.mjs` uses web APIs only (Worker, fetch, Blob, Atomics), plus Bun's
+`egg-solver.mjs` uses web APIs only (Worker, fetch, Blob, Atomics), plus Bun's
 `Bun.file` for local paths, so the same file serves browsers and Bun.
 
 ### Bun
@@ -258,7 +258,7 @@ bun wasm/serve.mjs --tables ~/cube-tables    # then open http://localhost:8000/
 `wasm/index.html` generates h0..h4 in the page or loads a table file (file
 picker, or a URL such as `/tables/h6`), and solves scrambles, facelet
 strings or random states, in plain web JavaScript (`demo-worker.mjs`,
-`cubeopt.mjs`). Any static server works for one thread; `serve.mjs` (a
+`egg-solver.mjs`). Any static server works for one thread; `serve.mjs` (a
 `Bun.serve` server) also sends the headers the threads build needs.
 
 ### Tables
@@ -286,11 +286,11 @@ which this build does not use.
 
 ### Threads
 
-`cubeopt-threads.wasm` is built for `wasm32-wasip1-threads` (stable Rust):
+`egg-solver-threads.wasm` is built for `wasm32-wasip1-threads` (stable Rust):
 std threads work through wasi-threads, so the work-sharing mode (`solve`,
 all threads on one cube) and the stream mode (`solveMany`) run as natively.
-`cubeopt.mjs` implements wasi-threads' `thread-spawn` with a pool of
-workers (`cubeopt-thread.mjs`, Web Workers in browsers and in Bun) that
+`egg-solver.mjs` implements wasi-threads' `thread-spawn` with a pool of
+workers (`egg-solver-thread.mjs`, Web Workers in browsers and in Bun) that
 share the module's memory. That needs `SharedArrayBuffer`:
 
 - In browsers, a cross-origin isolated page, served with the headers
@@ -301,10 +301,10 @@ share the module's memory. That needs `SharedArrayBuffer`:
   `index.html` runs it in `demo-worker.mjs`.
 - Bun needs nothing special (its main thread may wait).
 
-`Cubeopt.create({ wasm, threads })` starts the pool once (threads + 1
+`EggSolver.create({ wasm, threads })` starts the pool once (threads + 1
 workers); a call then uses all of them. Other hosts must call the module's
 `_initialize` export once, on the main thread, before anything else (as
-`cubeopt.mjs` does): it sets up wasi-libc's record of the main thread,
+`egg-solver.mjs` does): it sets up wasi-libc's record of the main thread,
 without which threads end up waiting forever.
 
 ### Speed
@@ -335,7 +335,7 @@ things matter for wasm speed, both handled:
   moves a running loop to optimized code: in Bun the warm-up is skipped
   (126.5 and 127.2 s without it, 127.0 and 127.9 s with it).
 
-With 8 threads (`cubeopt-threads.wasm`, one L3 domain), one cube at a time
+With 8 threads (`egg-solver-threads.wasm`, one L3 domain), one cube at a time
 gets 7.2-7.8 times the one-thread speed (h6: 88.6 Mnodes/s in V8, 90.7 in
 Bun; in headless Chromium 0.63-0.66 s instead of 5.15 s for the same cube),
 and generating h4 base 8 takes 13 s instead of 75 s.
@@ -347,3 +347,10 @@ later versions dropped wasi-threads; `WASMTIME=path`) and `wasm/test.mjs`
 (both modules in Bun), when installed. The node counts match native ones
 (h5, 20 random states: identical nodes, lookups and lengths in x86,
 scalar, wasmtime and V8; h6, 100 depth-17 cubes: the same in Bun).
+
+
+### Compatibility with existing installations
+
+Settings use `EGG_SOLVER_*`; the corresponding `CUBEOPT_*` names remain fallback aliases.
+An explicitly set modern name takes precedence. Existing table files and shared-memory
+segments remain readable, and pruning-table data does not need to be regenerated.

@@ -3,12 +3,12 @@
 //! optimal lengths and an independent plain IDA*. The tables here are h0
 //! tables generated in memory (no table file needed).
 
-use cubeopt::coord::cocsep;
-use cubeopt::coord::N_SLOTS;
-use cubeopt::cubie::{conjugate, parse_moves, symmetries, CubieCube, Move, Rng};
-use cubeopt::simd::Cube;
-use cubeopt::solver::Solver;
-use cubeopt::tables::{
+use egg_solver::coord::cocsep;
+use egg_solver::coord::N_SLOTS;
+use egg_solver::cubie::{conjugate, parse_moves, symmetries, CubieCube, Move, Rng};
+use egg_solver::simd::Cube;
+use egg_solver::solver::Solver;
+use egg_solver::tables::{
     entry_depth, h48_bytes, h48_rows, Cocsep, H48Meta, H48Table, Memory, ROW_BYTES,
 };
 use std::collections::HashMap;
@@ -24,7 +24,7 @@ fn corners() -> &'static Cocsep {
 fn h0() -> &'static H48Table {
     static TABLE: OnceLock<H48Table> = OnceLock::new();
     TABLE.get_or_init(|| {
-        cubeopt::generate(corners(), 0, 8, None, &[], cubeopt::thread_count())
+        egg_solver::generate(corners(), 0, 8, None, &[], egg_solver::thread_count())
             .unwrap()
             .0
     })
@@ -51,7 +51,7 @@ fn par_solve(cubes: &[CubieCube], table: &H48Table) -> Vec<Vec<u8>> {
     let out = std::sync::Mutex::new(vec![vec![]; cubes.len()]);
     let next = std::sync::atomic::AtomicUsize::new(0);
     std::thread::scope(|s| {
-        for _ in 0..cubeopt::thread_count() {
+        for _ in 0..egg_solver::thread_count() {
             s.spawn(|| loop {
                 let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 if i >= cubes.len() {
@@ -93,7 +93,7 @@ fn h0_table_matches_brute_force() {
     let corners = corners();
     let base = 3u8;
     let (table, _) =
-        cubeopt::generate(corners, 0, base, None, &[], cubeopt::thread_count()).unwrap();
+        egg_solver::generate(corners, 0, base, None, &[], egg_solver::thread_count()).unwrap();
     // The distance of each table entry: the least over the cubes it covers.
     let mut best: HashMap<u64, u8> = HashMap::new();
     for &(cube, distance) in ball(5).values() {
@@ -222,9 +222,16 @@ fn lanes_solve(cubes: &[CubieCube], table: &H48Table, nlanes: usize) -> Vec<Vec<
     std::thread::scope(|s| {
         for _ in 0..4 {
             s.spawn(|| {
-                cubeopt::lanes::run_lanes(&solver, &get, &next, &stop, nlanes, |i, sol, _, _| {
-                    out.lock().unwrap()[i] = sol.unwrap();
-                });
+                egg_solver::lanes::run_lanes(
+                    &solver,
+                    &get,
+                    &next,
+                    &stop,
+                    nlanes,
+                    |i, sol, _, _| {
+                        out.lock().unwrap()[i] = sol.unwrap();
+                    },
+                );
             });
         }
     });
@@ -274,7 +281,7 @@ fn share_solve(
     let solver = Solver::new(corners(), table);
     let out = std::sync::Mutex::new(vec![None; cubes.len()]);
     let get = |i: usize| cubes.get(i).copied();
-    let pool = cubeopt::lanes::share::Pool::new(&get, max_active, threads);
+    let pool = egg_solver::lanes::share::Pool::new(&get, max_active, threads);
     let stop = std::sync::atomic::AtomicBool::new(false);
     std::thread::scope(|s| {
         for _ in 0..threads {
@@ -497,14 +504,14 @@ fn conjugates_have_equal_lengths_in_all_modes() {
 /// hk generated depth-first (`gen::dfs`) with base 3 and a BFS prefix of
 /// `prefix_depth`, in `parts` row ranges (each in its own memory).
 fn dfs_table_in_parts(k: u32, prefix_depth: u8, parts: u64) -> H48Table {
-    let settings = cubeopt::gen::dfs::Settings {
+    let settings = egg_solver::gen::dfs::Settings {
         k,
         base: 3,
-        threads: cubeopt::thread_count(),
+        threads: egg_solver::thread_count(),
         prefix_depth,
         verbose: false,
     };
-    let generator = cubeopt::gen::dfs::Generator::new(corners(), settings).unwrap();
+    let generator = egg_solver::gen::dfs::Generator::new(corners(), settings).unwrap();
     let memory = Memory::anonymous(usize::try_from(h48_bytes(k)).unwrap()).unwrap();
     let rows = h48_rows(k);
     let per = rows.div_ceil(parts);
@@ -513,7 +520,7 @@ fn dfs_table_in_parts(k: u32, prefix_depth: u8, parts: u64) -> H48Table {
         let part_mem =
             Memory::anonymous(usize::try_from((range.end - range.start) * ROW_BYTES).unwrap())
                 .unwrap();
-        let part = cubeopt::gen::dfs::Part {
+        let part = egg_solver::gen::dfs::Part {
             words: part_mem.words().unwrap(),
             first_slot: range.start * N_SLOTS as u64,
             end_slot: range.end * N_SLOTS as u64,
@@ -547,7 +554,7 @@ fn dfs_generator_matches_bfs_and_brute_force() {
     let cs = corners();
     let base = 3u8;
     let len = usize::try_from(h48_bytes(0)).unwrap();
-    let bfs = cubeopt::generate(cs, 0, base, None, &[], cubeopt::thread_count())
+    let bfs = egg_solver::generate(cs, 0, base, None, &[], egg_solver::thread_count())
         .unwrap()
         .0;
     for prefix_depth in [1, 2, 5] {
@@ -593,15 +600,15 @@ fn dfs_generator_matches_bfs_and_brute_force() {
             "h3 in {parts} parts"
         );
     }
-    let threads = cubeopt::thread_count();
+    let threads = egg_solver::thread_count();
     for (small, want) in [(&t, 2), (&bfs, 0)] {
-        let derived = cubeopt::gen::collapse::derive(&t3, want, threads).unwrap();
+        let derived = egg_solver::gen::collapse::derive(&t3, want, threads).unwrap();
         let n = usize::try_from(h48_bytes(want)).unwrap();
         assert!(
             derived.memory.bytes().unwrap()[..n] == small.memory.bytes().unwrap()[..n],
             "h3 -> h{want}"
         );
-        let diff = cubeopt::gen::collapse::compare(small, &t3, threads).unwrap();
+        let diff = egg_solver::gen::collapse::compare(small, &t3, threads).unwrap();
         assert_eq!((diff.codes, diff.group_minima), (0, 0), "{diff:?}");
     }
 }
@@ -679,7 +686,7 @@ fn lanes_lengths_and_nodes(solver: &Solver, cubes: &[CubieCube]) -> Vec<(usize, 
     std::thread::scope(|scope| {
         for _ in 0..3 {
             scope.spawn(|| {
-                cubeopt::lanes::run_lanes(solver, &get, &next, &stop, 5, |i, sol, stats, _| {
+                egg_solver::lanes::run_lanes(solver, &get, &next, &stop, 5, |i, sol, stats, _| {
                     let sol = sol.unwrap();
                     assert_eq!(cubes[i].apply_moves(&sol), Some(CubieCube::SOLVED));
                     out.lock().unwrap()[i] = (sol.len(), stats.nodes);
@@ -699,7 +706,7 @@ fn share_lengths_and_nodes(
 ) -> (Vec<(usize, u64)>, String) {
     let get = |i: usize| cubes.get(i).copied();
     let stop = std::sync::atomic::AtomicBool::new(false);
-    let pool = cubeopt::lanes::share::Pool::new(&get, max_active, 3);
+    let pool = egg_solver::lanes::share::Pool::new(&get, max_active, 3);
     let out = std::sync::Mutex::new(vec![(0, 0); cubes.len()]);
     std::thread::scope(|scope| {
         for _ in 0..3 {
@@ -720,7 +727,7 @@ fn share_lengths_and_nodes(
 /// and searches fewer nodes; random states are not filtered (same nodes).
 #[test]
 fn symmetric_start_keeps_optimal_lengths() {
-    use cubeopt::symstart::SymFilter;
+    use egg_solver::symstart::SymFilter;
     let cubes: Vec<CubieCube> = SYMMETRIC_CASES
         .iter()
         .map(|(scramble, _)| {

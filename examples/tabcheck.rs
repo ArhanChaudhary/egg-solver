@@ -15,9 +15,9 @@
 //! ```text
 //! tabcheck <table> <samples> <seed> [threads]
 //! ```
-use cubeopt::coord::{cube_from_edge_key, split_index, N_SLOTS};
-use cubeopt::cubie::{Move, Rng};
-use cubeopt::tables::{entry_class, entry_sym_to_rep, h48_rows, Cocsep, H48Table};
+use egg_solver::coord::{cube_from_edge_key, split_index, N_SLOTS};
+use egg_solver::cubie::{Move, Rng};
+use egg_solver::tables::{entry_class, entry_sym_to_rep, h48_rows, Cocsep, H48Table};
 use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
 
 /// Violations found, by kind.
@@ -81,7 +81,7 @@ fn main() {
                         let s = sym.trailing_zeros() as usize;
                         sym ^= sym.isolate_lowest_one();
                         let variant = cube.transform(s);
-                        let entry = corners.entries[cubeopt::coord::cocsep(variant)];
+                        let entry = corners.entries[egg_solver::coord::cocsep(variant)];
                         debug_assert_eq!(entry_class(entry), class);
                         let variant_index = corners.index(variant, k);
                         if table.get(variant_index).0 != code {

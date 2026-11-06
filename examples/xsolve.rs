@@ -13,13 +13,13 @@
 //! Output: `<index> <length> <solution> | <scramble>` per cube in index
 //! order, then a `lengths ...` summary. Every solution is checked: the exit
 //! status is 1 if one is wrong, 2 if a cube is not reported (or twice).
-use cubeopt::coord::cocsep;
-use cubeopt::cubie::{
+use egg_solver::coord::cocsep;
+use egg_solver::cubie::{
     conjugate, format_moves, inverse_move, parse_moves, symmetries, CubieCube, Move, Rng,
 };
-use cubeopt::simd::Cube;
-use cubeopt::solver::{Solver, Stats};
-use cubeopt::tables::{entry_depth, h48_slots, Cocsep, H48Table};
+use egg_solver::simd::Cube;
+use egg_solver::solver::{Solver, Stats};
+use egg_solver::tables::{entry_depth, h48_slots, Cocsep, H48Table};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering::Relaxed};
 use std::sync::Mutex;
 
@@ -158,7 +158,7 @@ fn solve_all(
             0 => usize::MAX,
             c => c,
         };
-        let pool = cubeopt::lanes::share::Pool::new(&get, max_active, threads);
+        let pool = egg_solver::lanes::share::Pool::new(&get, max_active, threads);
         std::thread::scope(|s| {
             for _ in 0..threads {
                 s.spawn(|| pool.run(solver, lanes, &stop, record));
@@ -170,7 +170,7 @@ fn solve_all(
     std::thread::scope(|s| {
         for _ in 0..threads {
             s.spawn(|| match mode {
-                "stream" => cubeopt::lanes::run_lanes(solver, &get, &next, &stop, lanes, record),
+                "stream" => egg_solver::lanes::run_lanes(solver, &get, &next, &stop, lanes, record),
                 "rec" | "ref" => loop {
                     let i = next.fetch_add(1, Relaxed);
                     let Some(cube) = get(i) else { break };

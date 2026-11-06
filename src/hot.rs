@@ -15,7 +15,7 @@
 //! every build.
 //!
 //! A change to the hot code can change the best pad: re-sweep it with the
-//! build variables `CUBEOPT_STREAM_PAD` and `CUBEOPT_SHARE_PAD` (0, 16, 32
+//! build variables `EGG_SOLVER_STREAM_PAD` and `EGG_SOLVER_SHARE_PAD` (0, 16, 32
 //! or 48), and use the same pads on both sides of an A/B.
 
 /// Offset of `bench::stream_thread` in its 64-byte line: 16, where 735dd25
@@ -23,9 +23,15 @@
 /// the best pad for m8's loop on def2cd0 (1T against main at 16, 2 pairs
 /// per pad: 0 -0.3 +0.6%, 16 +4.0 +0.5%, 32 -0.1 +1.2%, 48 +2.4 +1.3%).
 pub const STREAM_PAD: usize = {
-    let pad = pad(option_env!("CUBEOPT_STREAM_PAD"), 16);
+    let pad = pad(
+        crate::env::build_var(
+            option_env!("EGG_SOLVER_STREAM_PAD"),
+            option_env!("CUBEOPT_STREAM_PAD"),
+        ),
+        16,
+    );
     // (A compile-time check: a build with another value fails.)
-    assert!(is_pad(pad), "CUBEOPT_STREAM_PAD is 0, 16, 32 or 48");
+    assert!(is_pad(pad), "EGG_SOLVER_STREAM_PAD is 0, 16, 32 or 48");
     pad
 };
 
@@ -36,8 +42,14 @@ pub const STREAM_PAD: usize = {
 /// four pads were within the noise, +-0.3%; at 1T share, 0 against 48:
 /// +1.7 +0.1 +0.0%.)
 pub const SHARE_PAD: usize = {
-    let pad = pad(option_env!("CUBEOPT_SHARE_PAD"), 16);
-    assert!(is_pad(pad), "CUBEOPT_SHARE_PAD is 0, 16, 32 or 48");
+    let pad = pad(
+        crate::env::build_var(
+            option_env!("EGG_SOLVER_SHARE_PAD"),
+            option_env!("CUBEOPT_SHARE_PAD"),
+        ),
+        16,
+    );
+    assert!(is_pad(pad), "EGG_SOLVER_SHARE_PAD is 0, 16, 32 or 48");
     pad
 };
 

@@ -23,7 +23,8 @@ pub const TRAILER_BYTES: u64 = 4096;
 /// `TRAILER_BYTES` as a length.
 const TRAILER_LEN: usize = 4096;
 const _: () = assert!(TRAILER_LEN as u64 == TRAILER_BYTES);
-const MAGIC: &str = "cubeopt h48 table v1\n";
+const MAGIC: &str = "egg-solver h48 table v1\n";
+const LEGACY_MAGIC: &str = "cubeopt h48 table v1\n";
 /// The index layout of the tables this code reads and writes.
 pub const LAYOUT: &str = "h48";
 
@@ -222,7 +223,10 @@ impl Trailer {
     /// `MalformedTrailer` if the magic line is there but the rest is
     /// malformed.
     pub fn parse(bytes: &[u8]) -> Result<Option<Trailer>, TableError> {
-        let Some(rest) = bytes.strip_prefix(MAGIC.as_bytes()) else {
+        let Some(rest) = bytes
+            .strip_prefix(MAGIC.as_bytes())
+            .or_else(|| bytes.strip_prefix(LEGACY_MAGIC.as_bytes()))
+        else {
             return Ok(None);
         };
         let end = rest.iter().position(|&b| b == 0).unwrap_or(rest.len());
@@ -534,9 +538,9 @@ impl Default for LoadOptions {
 }
 
 impl LoadOptions {
-    /// Options from the environment: `CUBEOPT_LOAD` = `auto` | `map` |
-    /// `copy` | `shm`, `CUBEOPT_PREFAULT` = `1` | `0`, `CUBEOPT_SHM_PAGES`
-    /// (`ShmPages::parse`) and `CUBEOPT_SHM_KEY` (`shm::parse_key`).
+    /// Options from the environment: `EGG_SOLVER_LOAD` = `auto` | `map` |
+    /// `copy` | `shm`, `EGG_SOLVER_PREFAULT` = `1` | `0`, `EGG_SOLVER_SHM_PAGES`
+    /// (`ShmPages::parse`) and `EGG_SOLVER_SHM_KEY` (`shm::parse_key`).
     ///
     /// # Errors
     /// If a variable is set to another value.
@@ -547,32 +551,32 @@ impl LoadOptions {
             value,
             expected,
         };
-        if let Ok(v) = std::env::var("CUBEOPT_LOAD") {
+        if let Ok(v) = crate::env::var("EGG_SOLVER_LOAD") {
             o.mode = match v.as_str() {
                 "auto" | "" => LoadMode::Auto,
                 "map" => LoadMode::Map,
                 "copy" => LoadMode::Copy,
                 "shm" => LoadMode::Shm,
-                _ => return Err(bad("CUBEOPT_LOAD", v, "auto, map, copy or shm")),
+                _ => return Err(bad("EGG_SOLVER_LOAD", v, "auto, map, copy or shm")),
             };
         }
-        if let Ok(v) = std::env::var("CUBEOPT_SHM_PAGES") {
+        if let Ok(v) = crate::env::var("EGG_SOLVER_SHM_PAGES") {
             o.shm_pages = match ShmPages::parse(&v) {
                 Some(pages) => pages,
-                None => return Err(bad("CUBEOPT_SHM_PAGES", v, "e.g. 1g,2m,4k")),
+                None => return Err(bad("EGG_SOLVER_SHM_PAGES", v, "e.g. 1g,2m,4k")),
             };
         }
-        if let Ok(v) = std::env::var("CUBEOPT_SHM_KEY") {
+        if let Ok(v) = crate::env::var("EGG_SOLVER_SHM_KEY") {
             o.shm_key = match super::shm::parse_key(&v) {
                 Some(key) => Some(key),
-                None => return Err(bad("CUBEOPT_SHM_KEY", v, "e.g. 0x636f0709")),
+                None => return Err(bad("EGG_SOLVER_SHM_KEY", v, "e.g. 0x636f0709")),
             };
         }
-        if let Ok(v) = std::env::var("CUBEOPT_PREFAULT") {
+        if let Ok(v) = crate::env::var("EGG_SOLVER_PREFAULT") {
             o.prefault = match v.as_str() {
                 "1" | "" => true,
                 "0" => false,
-                _ => return Err(bad("CUBEOPT_PREFAULT", v, "0 or 1")),
+                _ => return Err(bad("EGG_SOLVER_PREFAULT", v, "0 or 1")),
             };
         }
         Ok(o)
@@ -656,6 +660,23 @@ pub fn default_lanes(path: &str, k: u32) -> impl Fn(usize) -> usize {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn previous_table_magic_is_accepted() {
+        let trailer = super::Trailer {
+            k: 0,
+            base: 8,
+            data_bytes: crate::tables::h48_bytes(0),
+            distribution: None,
+            checksum: Some(123),
+        };
+        let modern = trailer.to_bytes();
+        let mut previous = super::LEGACY_MAGIC.as_bytes().to_vec();
+        previous.extend_from_slice(modern.strip_prefix(super::MAGIC.as_bytes()).unwrap());
+        previous.resize(super::TRAILER_LEN, 0);
+        assert_eq!(super::Trailer::parse(&previous).unwrap(), Some(trailer));
+        assert_eq!(super::Trailer::parse(&modern).unwrap(), Some(trailer));
+    }
+
     use super::*;
 
     #[test]

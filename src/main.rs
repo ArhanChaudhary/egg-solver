@@ -2,7 +2,7 @@
 //! (`solver::Solver`), and print each solution, its length, time and nodes.
 //! For speed use `solve` (the `lanes` search) instead.
 //!
-//! Usage: cubeopt <table path>
+//! Usage: egg-solver <table path>
 
 // No intentional panics in shipped code (user request; asserts, which no
 // lint covers, are checked by tests/no_runtime_panics.rs).
@@ -20,20 +20,20 @@
 
 use anyhow::Context as _;
 use clap::Parser;
-use cubeopt::cli::{self, LoadArgs, Verbosity};
-use cubeopt::cubie::{format_moves, parse_moves, CubieCube};
-use cubeopt::solver::Solver;
-use cubeopt::tables::Cocsep;
+use egg_solver::cli::{self, LoadArgs, Verbosity};
+use egg_solver::cubie::{format_moves, parse_moves, CubieCube};
+use egg_solver::solver::Solver;
+use egg_solver::tables::Cocsep;
 use std::io::BufRead;
 use std::process::ExitCode;
 
 /// Solve scrambles from stdin, one per line, with the plain recursive
 /// solver (the reference search; `solve` is much faster).
 #[derive(Parser, Debug)]
-#[command(name = "cubeopt", version)]
+#[command(name = "egg-solver", version)]
 struct Args {
     /// The table file (made by `gen`).
-    #[arg(env = "CUBEOPT_TABLE", required_unless_present = "completions")]
+    #[arg(env = egg_solver::env::name("EGG_SOLVER_TABLE"), required_unless_present = "completions")]
     table: Option<String>,
     #[command(flatten)]
     load: LoadArgs,
@@ -51,7 +51,7 @@ fn main() -> ExitCode {
         return ExitCode::SUCCESS;
     }
     args.verbosity.init_logging();
-    cli::exit_status("cubeopt", run(&args))
+    cli::exit_status("egg-solver", run(&args))
 }
 
 fn run(args: &Args) -> anyhow::Result<ExitCode> {

@@ -1,12 +1,12 @@
-//! cubeopt as a WebAssembly module: a plain C ABI of a few functions, which
-//! `cubeopt.mjs` wraps for JavaScript (Bun and browsers).
+//! egg-solver as a WebAssembly module: a plain C ABI of a few functions, which
+//! `egg-solver.mjs` wraps for JavaScript (Bun and browsers).
 //!
 //! Strings go in as (pointer, length) of UTF-8 in buffers from
-//! `cubeopt_alloc`. Results come out as text in an output buffer
-//! (`cubeopt_output`, `cubeopt_output_len`): JSON after a call that returns 0,
+//! `egg_solver_alloc`. Results come out as text in an output buffer
+//! (`egg_solver_output`, `egg_solver_output_len`): JSON after a call that returns 0,
 //! an error message after one that returns -1. A table file is copied by the
-//! caller straight into a buffer from `cubeopt_table_buffer`, then checked
-//! and installed by `cubeopt_table_load`.
+//! caller straight into a buffer from `egg_solver_table_buffer`, then checked
+//! and installed by `egg_solver_table_load`.
 //!
 //! Built for `wasm32-wasip1` (one thread) or `wasm32-wasip1-threads` (std
 //! threads through wasi-threads: the share and stream modes run on several
@@ -26,10 +26,10 @@
     )
 )]
 
-use cubeopt::cubie::{format_moves, parse_moves, CubieCube, Rng};
-use cubeopt::lanes::share::Pool;
-use cubeopt::solver::{Solver, Stats};
-use cubeopt::tables::{default_base, h48_bytes, Cocsep, H48Table, Memory};
+use egg_solver::cubie::{format_moves, parse_moves, CubieCube, Rng};
+use egg_solver::lanes::share::Pool;
+use egg_solver::solver::{Solver, Stats};
+use egg_solver::tables::{default_base, h48_bytes, Cocsep, H48Table, Memory};
 use std::fmt::Write as _;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Mutex, MutexGuard, PoisonError};
@@ -42,7 +42,7 @@ const THREADS: bool = cfg!(wasm_threads);
 
 /// The WASI reactor initializer, which a Rust cdylib does not get from
 /// wasi-libc (its `crt1-reactor`): the host calls it once, on the main
-/// thread, before any other export (`cubeopt.mjs` does). In the threads
+/// thread, before any other export (`egg-solver.mjs` does). In the threads
 /// build it first sets up the main thread's pthread record. Without that,
 /// wasi-libc's thread list grew from a zeroed record and came apart: an
 /// exiting thread could find itself alone in the list and call `exit(0)`
@@ -67,7 +67,7 @@ pub extern "C" fn _initialize() {
         __wasm_call_ctors();
     }
     #[cfg(wasm_threads)]
-    let _ = cubeopt::parallel::set_runner(threads::run);
+    let _ = egg_solver::parallel::set_runner(threads::run);
 }
 
 /// The module's state between calls.
@@ -75,7 +75,7 @@ struct State {
     /// The cocsep table, made on first use (`corners`).
     corners: Option<Cocsep>,
     table: Option<H48Table>,
-    /// A table file being copied in by the caller (`cubeopt_table_buffer`).
+    /// A table file being copied in by the caller (`egg_solver_table_buffer`).
     incoming: Option<Memory>,
     /// The last call's result (JSON) or error message.
     output: String,
@@ -170,15 +170,15 @@ fn threads_for(asked: u32) -> usize {
         return 1;
     }
     match asked {
-        0 => cubeopt::thread_count(),
+        0 => egg_solver::thread_count(),
         n => n as usize,
     }
 }
 
 /// Allocate `len` bytes for the caller (strings passed in); 0 if out of
-/// memory. Free with `cubeopt_free`.
+/// memory. Free with `egg_solver_free`.
 #[unsafe(no_mangle)]
-pub extern "C" fn cubeopt_alloc(len: usize) -> *mut u8 {
+pub extern "C" fn egg_solver_alloc(len: usize) -> *mut u8 {
     let Ok(layout) = std::alloc::Layout::from_size_align(len.max(1), 1) else {
         return std::ptr::null_mut();
     };
@@ -186,12 +186,12 @@ pub extern "C" fn cubeopt_alloc(len: usize) -> *mut u8 {
     unsafe { std::alloc::alloc(layout) }
 }
 
-/// Free a buffer from `cubeopt_alloc`.
+/// Free a buffer from `egg_solver_alloc`.
 ///
 /// # Safety
-/// `ptr` and `len` are those of a `cubeopt_alloc` buffer not yet freed.
+/// `ptr` and `len` are those of a `egg_solver_alloc` buffer not yet freed.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn cubeopt_free(ptr: *mut u8, len: usize) {
+pub unsafe extern "C" fn egg_solver_free(ptr: *mut u8, len: usize) {
     if let Ok(layout) = std::alloc::Layout::from_size_align(len.max(1), 1) {
         // SAFETY: as the caller promises.
         unsafe { std::alloc::dealloc(ptr, layout) };
@@ -200,27 +200,27 @@ pub unsafe extern "C" fn cubeopt_free(ptr: *mut u8, len: usize) {
 
 /// The output of the last call: JSON or an error message (UTF-8).
 #[unsafe(no_mangle)]
-pub extern "C" fn cubeopt_output() -> *const u8 {
+pub extern "C" fn egg_solver_output() -> *const u8 {
     state().output.as_ptr()
 }
 
-/// The length in bytes of `cubeopt_output`.
+/// The length in bytes of `egg_solver_output`.
 #[unsafe(no_mangle)]
-pub extern "C" fn cubeopt_output_len() -> usize {
+pub extern "C" fn egg_solver_output_len() -> usize {
     state().output.len()
 }
 
 /// 1 in the threads build, else 0.
 #[unsafe(no_mangle)]
-pub extern "C" fn cubeopt_has_threads() -> u32 {
+pub extern "C" fn egg_solver_has_threads() -> u32 {
     u32::from(THREADS)
 }
 
 /// A buffer of `len` bytes for a whole table file (data and trailer), which
-/// the caller fills before `cubeopt_table_load`. Drops the current table
+/// the caller fills before `egg_solver_table_load`. Drops the current table
 /// first (wasm32 has room for one). Returns 0 if out of memory.
 #[unsafe(no_mangle)]
-pub extern "C" fn cubeopt_table_buffer(len: usize) -> *mut u8 {
+pub extern "C" fn egg_solver_table_buffer(len: usize) -> *mut u8 {
     let mut state = state();
     state.table = None;
     state.incoming = None;
@@ -231,16 +231,16 @@ pub extern "C" fn cubeopt_table_buffer(len: usize) -> *mut u8 {
         .map_or(std::ptr::null_mut(), Memory::ptr)
 }
 
-/// Install the table file copied into the `cubeopt_table_buffer`: checks
+/// Install the table file copied into the `egg_solver_table_buffer`: checks
 /// its trailer and size, and if `verify` is not 0 its checksum. Output: the
 /// table's `{"k":..,"base":..,"bytes":..}`.
 #[unsafe(no_mangle)]
-pub extern "C" fn cubeopt_table_load(verify: u32) -> i32 {
+pub extern "C" fn egg_solver_table_load(verify: u32) -> i32 {
     with_state(|state| {
         let memory = state
             .incoming
             .take()
-            .ok_or("no table buffer (cubeopt_table_buffer)")?;
+            .ok_or("no table buffer (egg_solver_table_buffer)")?;
         let table = H48Table::from_file_memory(memory, verify != 0, threads_for(0))
             .map_err(|e| e.to_string())?;
         let info = table_json(&table);
@@ -261,9 +261,9 @@ fn table_json(table: &H48Table) -> String {
 
 /// Generate table hk (k = 0..6) in memory (`base` 0: the default for `k`)
 /// on `threads` threads (0: all), replacing the current table. Output: as
-/// `cubeopt_table_load`.
+/// `egg_solver_table_load`.
 #[unsafe(no_mangle)]
-pub extern "C" fn cubeopt_generate(k: u32, base: u32, threads: u32) -> i32 {
+pub extern "C" fn egg_solver_generate(k: u32, base: u32, threads: u32) -> i32 {
     with_state(|state| {
         // (h7 fits in wasm32's 4 GiB, but not with the generator's own
         // memory: make it with the native `gen` and load the file.)
@@ -286,7 +286,7 @@ pub extern "C" fn cubeopt_generate(k: u32, base: u32, threads: u32) -> i32 {
         let bytes = usize::try_from(h48_bytes(k)).map_err(|_| format!("h{k} is too big"))?;
         drop(Memory::try_anonymous(bytes).ok_or(format!("no room for h{k} ({bytes} bytes)"))?);
         let corners = corners(&mut state.corners)?;
-        let table = cubeopt::generate_table(corners, k, base, threads_for(threads), false)
+        let table = egg_solver::generate_table(corners, k, base, threads_for(threads), false)
             .map_err(|e| e.to_string())?;
         let info = table_json(&table);
         state.table = Some(table);
@@ -303,7 +303,7 @@ pub extern "C" fn cubeopt_generate(k: u32, base: u32, threads: u32) -> i32 {
 /// # Safety
 /// `text` points to `len` readable bytes.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn cubeopt_solve(
+pub unsafe extern "C" fn egg_solver_solve(
     text: *const u8,
     len: usize,
     lanes: u32,
@@ -328,7 +328,7 @@ pub unsafe extern "C" fn cubeopt_solve(
         // threads build, this thread alone in the other.)
         let pool = Pool::new(&get, 1, threads);
         let stop = AtomicBool::new(false);
-        cubeopt::parallel::on_threads(threads, |_| {
+        egg_solver::parallel::on_threads(threads, |_| {
             pool.run(&solver, lanes, &stop, |i, solution, stats, seconds| {
                 done(i, solution, stats, seconds);
             });
@@ -343,12 +343,12 @@ pub unsafe extern "C" fn cubeopt_solve(
 
 /// Solve many cubes, one per line, for throughput: the stream mode (each
 /// lane solves its own cube) on `threads` threads of `lanes` lanes. Output:
-/// a JSON array of the results (as `cubeopt_solve`) in input order.
+/// a JSON array of the results (as `egg_solver_solve`) in input order.
 ///
 /// # Safety
 /// `text` points to `len` readable bytes.
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn cubeopt_solve_batch(
+pub unsafe extern "C" fn egg_solver_solve_batch(
     text: *const u8,
     len: usize,
     lanes: u32,
@@ -395,7 +395,7 @@ pub unsafe extern "C" fn cubeopt_solve_batch(
 /// "nodes_per_cube":..,"lookups_per_cube":..,"cubes":..,"threads":..,
 /// "lanes":..}`.
 #[unsafe(no_mangle)]
-pub extern "C" fn cubeopt_bench(
+pub extern "C" fn egg_solver_bench(
     seed: u32,
     warmup: f64,
     window: f64,
@@ -448,7 +448,7 @@ pub extern "C" fn cubeopt_bench(
 /// `threads` threads, until `cubes` has no more or `stop` is set. Every
 /// export runs this one compiled copy of the search: V8 (browsers, Node)
 /// first runs code with its baseline compiler and gives a function its
-/// optimized code from its next call on, so `cubeopt.mjs`'s warm-up, which
+/// optimized code from its next call on, so `egg-solver.mjs`'s warm-up, which
 /// solves a few cubes, gets the optimized search for all later calls.
 #[inline(never)]
 fn stream(
@@ -460,8 +460,8 @@ fn stream(
     done: &(dyn Fn(usize, Option<Vec<u8>>, Stats, f64) + Sync),
 ) -> Result<(), String> {
     let next = AtomicUsize::new(0);
-    cubeopt::parallel::on_threads(threads, |_| {
-        cubeopt::lanes::run_lanes(solver, cubes, &next, stop, lanes, done);
+    egg_solver::parallel::on_threads(threads, |_| {
+        egg_solver::lanes::run_lanes(solver, cubes, &next, stop, lanes, done);
     })
     .map_err(|e| e.to_string())?;
     Ok(())
@@ -483,7 +483,7 @@ fn lanes_for(asked: u32) -> usize {
 /// native `bench <table> random:<count>:<seed>`), as facelet strings.
 /// Output: a JSON array of strings.
 #[unsafe(no_mangle)]
-pub extern "C" fn cubeopt_random(seed: u32, count: u32) -> i32 {
+pub extern "C" fn egg_solver_random(seed: u32, count: u32) -> i32 {
     with_state(|_| {
         let mut rng = Rng(u64::from(seed));
         let mut json = String::from("[");
