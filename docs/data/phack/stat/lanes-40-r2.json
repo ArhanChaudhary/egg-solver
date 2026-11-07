@@ -1,0 +1,84 @@
+{
+  "name": "lanes-40-r2",
+  "config": {
+    "cpus": [
+      1
+    ],
+    "threads": 1,
+    "memory_policy": "local"
+  },
+  "lanes": 40,
+  "page_request": "thp",
+  "mode": "stream",
+  "aux": null,
+  "isolated_event": false,
+  "command": [
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/numactl",
+    "--physcpubind=1",
+    "--membind=1",
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/perf",
+    "stat",
+    "--no-big-num",
+    "-x",
+    ";",
+    "--delay=-1",
+    "--control=fifo:/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/.ctl-lanes-40-r2,/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/.ack-lanes-40-r2",
+    "-o",
+    "/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/stat/lanes-40-r2.csv",
+    "-e",
+    "{cycles:u,instructions:u}",
+    "--",
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/bench",
+    "stream",
+    "/home/arhan/tmp/egg-solver-perf-work/tables/h6",
+    "--warmup",
+    "8.0",
+    "--window",
+    "20.0",
+    "--threads",
+    "1",
+    "--lanes",
+    "40",
+    "--seed",
+    "2026",
+    "--load",
+    "copy",
+    "--json"
+  ],
+  "exit_code": 0,
+  "valid": true,
+  "wall_seconds": 34.6285297870636,
+  "counted_window_seconds": 20.000171227,
+  "benchmark": {
+    "type": "stream",
+    "threads": 1,
+    "lanes": 40,
+    "window": 20.0,
+    "share": null,
+    "cubes": 4,
+    "throughput": 0.2,
+    "nodes_per_cube": 3084279.0,
+    "lookups_per_cube": 2589459.0,
+    "lengths": {
+      "16": 1,
+      "17": 3
+    }
+  },
+  "counters": [
+    {
+      "event": "cycles:u",
+      "count": 60689389308.0,
+      "unit": "",
+      "counter_runtime_ns": 19993587313.0,
+      "running_percent": 100.0
+    },
+    {
+      "event": "instructions:u",
+      "count": 99075216429.0,
+      "unit": "",
+      "counter_runtime_ns": 19993587313.0,
+      "running_percent": 100.0
+    }
+  ],
+  "record": false
+}

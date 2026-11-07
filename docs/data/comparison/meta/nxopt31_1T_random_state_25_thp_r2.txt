@@ -1,0 +1,15 @@
+status 0
+run nxopt31 1 random_state 25 thp shipped 2
+pagemode thp arena 0 only -
+start 2026-11-05 07:52:40
+wall_s 369.27
+cpu_s 352.23 0.34
+maxrss_kb 2547908
+gate_wait_s 0
+ext_cores 0.0
+pages 2548488 2548488 2544716 2541568 0 1338147 nxopt31
+free_1g_pages 0 0
+memfree_gib_at_start 10.4
+thpwarm_pct 100.0
+table /data/competitors/nxopt/nxopth31b.dat 2603089924
+thp always [madvise] never defrag always defer defer+madvise [madvise] never

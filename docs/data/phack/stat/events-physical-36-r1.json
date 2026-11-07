@@ -1,0 +1,102 @@
+{
+  "name": "events-physical-36-r1",
+  "config": {
+    "cpus": [
+      1,
+      3,
+      5,
+      7,
+      9,
+      11,
+      0,
+      2,
+      4,
+      6,
+      8,
+      10
+    ],
+    "threads": 12,
+    "memory_policy": "interleave"
+  },
+  "lanes": 24,
+  "page_request": "thp",
+  "mode": "stream",
+  "aux": "DTLB_LOAD_MISSES.ANY",
+  "isolated_event": false,
+  "command": [
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/numactl",
+    "--physcpubind=1,3,5,7,9,11,0,2,4,6,8,10",
+    "--interleave=0,1",
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/perf",
+    "stat",
+    "--no-big-num",
+    "-x",
+    ";",
+    "--delay=-1",
+    "--control=fifo:/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/.ctl-events-physical-36-r1,/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/.ack-events-physical-36-r1",
+    "-o",
+    "/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/stat/events-physical-36-r1.csv",
+    "-e",
+    "{cycles:u,instructions:u,cpu/config=0x108,name=egp_dtlb_load_misses_any/u}",
+    "--",
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/bench",
+    "stream",
+    "/home/arhan/tmp/egg-solver-perf-work/tables/h6",
+    "--warmup",
+    "8.0",
+    "--window",
+    "20.0",
+    "--threads",
+    "12",
+    "--lanes",
+    "24",
+    "--seed",
+    "2026",
+    "--load",
+    "copy",
+    "--json"
+  ],
+  "exit_code": 0,
+  "valid": true,
+  "wall_seconds": 35.467276562936604,
+  "counted_window_seconds": 20.000203788,
+  "benchmark": {
+    "type": "stream",
+    "threads": 12,
+    "lanes": 24,
+    "window": 20.0,
+    "share": null,
+    "cubes": 29,
+    "throughput": 1.45,
+    "nodes_per_cube": 4180933.206896552,
+    "lookups_per_cube": 3544984.379310345,
+    "lengths": {
+      "16": 3,
+      "17": 26
+    }
+  },
+  "counters": [
+    {
+      "event": "cycles:u",
+      "count": 581491783328.0,
+      "unit": "",
+      "counter_runtime_ns": 239966860918.0,
+      "running_percent": 100.0
+    },
+    {
+      "event": "instructions:u",
+      "count": 1025467455317.0,
+      "unit": "",
+      "counter_runtime_ns": 239966860918.0,
+      "running_percent": 100.0
+    },
+    {
+      "event": "egp_dtlb_load_misses_any",
+      "count": 2225709502.0,
+      "unit": "",
+      "counter_runtime_ns": 239966860918.0,
+      "running_percent": 100.0
+    }
+  ],
+  "record": false
+}

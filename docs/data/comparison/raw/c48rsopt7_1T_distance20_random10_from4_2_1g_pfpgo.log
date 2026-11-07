@@ -1,0 +1,4 @@
+Native SIMD: avx2
+Opt7: table validation reused (unchanged file)
+{"id":"0","solution":"F B2 L2 F U' F' R' U' L' B R2 F' R D2 U2 L R' U2 R' D'","length":20,"seconds":153.264283101,"completed_depth":19,"cancelled":false,"contexts":8,"threads":1,"batch_threads":1,"nodes":2857931124,"probes":3443472309,"inverse_probes":2662677660,"cache_reuses":195247941,"splits":959,"face_prunes":620761759,"face_siblings_removed":653056768}
+{"id":"1","solution":"L F' U' B D' F L U2 B2 U' D R U2 B2 U2 L2 D' R' U B'","length":20,"seconds":146.261004777,"completed_depth":19,"cancelled":false,"contexts":8,"threads":1,"batch_threads":1,"nodes":2741951907,"probes":3288887301,"inverse_probes":2561176195,"cache_reuses":180769455,"splits":764,"face_prunes":603415557,"face_siblings_removed":633419220}

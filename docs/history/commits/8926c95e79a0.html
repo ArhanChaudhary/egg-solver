@@ -1,0 +1,80 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>share: job and build buffers touched when allocated (no page faults while a pool warms up) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="8926c95e79a0.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="share-job-and-build-buffers-touched-when-allocated-no-page-faults-while-a-pool-warms-up">share: job and build buffers touched when allocated (no page faults while a pool warms up)</h1>
+<p>Commit <code>8926c95e79a016d5de2579f592ce042951f9606c</code> · 2026-11-04T17:59:21+00:00</p>
+<p>This commit is reachable from the released main history. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: Historical ancestor; no current branch tip</p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>share: job and build buffers touched when allocated (no page faults while a pool warms up)</p>
+<p>Share mode's builds were meant to touch no fresh pages (l6-share-a), but
+they still did while a pool warmed up. Job buffers change hands: the serial
+extension of a cube's first build swaps the builder's own buffer into the
+cube, and builds swap the cube's buffer with pooled ones. A vector that was
+only reserved keeps the pages of its unused tail fresh. With CUBE_TRACE=1,
+solve -c 1 at 48T, the mean parallel extension to 4-move jobs (T = 17, 43254
+children) took 0.20-0.26 ms instead of 0.04 in the first 50 cubes (11 ms
+instead of 0.7 ms of task time), and ~0.1 ms up to cube ~150. On
+random_move_17f (200 cubes), the mean T = 17 build by groups of 50 cubes was
+0.308, 0.188, 0.209 and 0.120 ms.</p>
+<ul>
+<li><code>touched</code>: a vector reserved at full size, written once, then cleared.
+It is used for the job and sort buffers of staged builds (<code>Bufs::sized</code>,
+<code>Pool::bufs</code>), and for an iteration's job and statistics buffers
+(<code>Inner::touched</code>, also when <code>fresh</code> finds no spare one).</li>
+<li><code>WARM_BUFFERS</code> = 3: the first three threads of a pool each put a touched
+<code>Inner</code> into <code>spare</code> and a touched <code>Bufs</code> into <code>bufs</code>, so the first cubes
+find them.</li>
+<li>A worker's own buffers (<code>Bufs::own</code>): the job buffer (it changes hands)
+and the 43 KB key buckets are touched; the serial sort keys grow on
+demand. Touching only the job buffer left the early extensions as slow
+(0.18-0.26 ms). strace shows why: glibc had raised its mmap threshold
+after a 4.9 MB block was freed at startup, so the big buffers come from
+the threads' malloc arenas. Those then grew page by page (mprotect)
+during the first builds. With GLIBC_TUNABLES glibc.malloc.top_pad=4 MB
+and no extra touch, the extension took 0.04 ms. Writing the 43 KB grows
+each arena when its thread starts. Touching all sort buffers as well
+works too, but costs 0.73 ms of pool start instead of 0.42.</li>
+</ul>
+<p>After the change, the mean T = 17 build on random_move_17f is 0.145, 0.116,
+0.118 and 0.120 ms per 50 cubes (extension 0.046 ms, then 0.037).</p>
+<p>Costs: a 48-thread pool takes 0.42 ms longer to start (solve -t 48 -c 1 -n 1
+on a 1-move scramble, 8 runs each: 2.42 vs 1.99 ms). It keeps ~0.6 MB per
+thread plus 3 x 2 MB more resident. Sets solved in the first pass (T &lt;= 16:
+15/16-move scrambles, depth-15/16 states, 200 cubes) pay that once:
++0.5..+3.4% per cube.</p>
+<p>Lengths are identical cube for cube to fe926ed on the check sets (short
+1000, random_move_15f 200, random_state_depth15 200, random_state 500,
+depth18 3000; -c 1 and -c 0). check.sh passes (fmt, clippy -D warnings,
+tests, other backends). One exception: the aarch64 tests under qemu fail
+about 1 run in 4-6, on fe926ed as well (a debug_assert in <code>release</code> in
+share_protocol_with_tiny_search, or a QEMU internal SIGSEGV).</p>
+<p>48 threads (c10's conf48: 7 exclusive holds, order rotating; solve -c 1 and
+-c 0 -n 500 on random_state, bench share random:1000:2026, and in the first
+3 holds solve -c 1 -n 200 on the short sets; ms/cube, bench share
+solves/s):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>test</th><th>fe926ed runs</th><th>touch runs</th><th>fe926ed median</th><th>touch median</th><th>change (median of pairs) [min, max]</th><th>nodes/cube fe926ed -&gt; touch</th></tr>
+</thead>
+<tbody>
+<tr><td>c1-rs</td><td>1.652 1.618 1.645 1.646 1.654 1.824 1.658</td><td>1.654 1.663 1.612 1.653 1.623 1.662 1.646</td><td>1.652</td><td>1.653</td><td>-0.7% [-8.9, +2.8]</td><td>3.706M -&gt; 3.711M</td></tr>
+<tr><td>c0-rs</td><td>1.051 1.055 1.049 1.059 1.053 1.051 1.049</td><td>1.047 1.039 1.054 1.055 1.053 1.053 1.045</td><td>1.051</td><td>1.053</td><td>-0.4% [-1.5, +0.5]</td><td>3.326M -&gt; 3.315M</td></tr>
+<tr><td>bshare/s</td><td>977.6 951.6 968.2 949.7 985.3 976.2 951.1</td><td>973.2 967.8 975.9 968.0 977.0 972.9 974.1</td><td>968.2</td><td>973.2</td><td>+0.8% [-0.8, +2.4]</td><td>3.307M -&gt; 3.301M</td></tr>
+<tr><td>c1-random_move_15f</td><td>0.147 0.146 0.147</td><td>0.143 0.156 0.152</td><td>0.147</td><td>0.152</td><td>+3.4% [-2.7, +6.8]</td><td>0.103M -&gt; 0.101M</td></tr>
+<tr><td>c1-random_move_16f</td><td>0.224 0.211 0.208</td><td>0.214 0.225 0.211</td><td>0.211</td><td>0.214</td><td>+1.4% [-4.5, +6.6]</td><td>0.147M -&gt; 0.147M</td></tr>
+<tr><td>c1-random_move_17f</td><td>0.604 0.604 0.600</td><td>0.554 0.555 0.555</td><td>0.604</td><td>0.555</td><td>-8.1% [-8.3, -7.5]</td><td>0.643M -&gt; 0.649M</td></tr>
+<tr><td>c1-random_state_depth15</td><td>0.129 0.117 0.122</td><td>0.131 0.126 0.126</td><td>0.122</td><td>0.126</td><td>+3.3% [+1.6, +7.7]</td><td>0.085M -&gt; 0.093M</td></tr>
+<tr><td>c1-random_state_depth16</td><td>0.188 0.191 0.190</td><td>0.187 0.192 0.193</td><td>0.190</td><td>0.192</td><td>+0.5% [-0.5, +1.6]</td><td>0.129M -&gt; 0.128M</td></tr>
+<tr><td>c1-random_state_depth17</td><td>0.698 0.698 0.683</td><td>0.622 0.631 0.630</td><td>0.698</td><td>0.630</td><td>-9.6% [-10.9, -7.8]</td><td>0.779M -&gt; 0.778M</td></tr>
+</tbody>
+</table></div>
+<p>1 thread (6 paired runs, solve -t 1 on random_state; Worker::rounds is
+pinned, so no layout averaging), ms/cube fe926ed -&gt; this:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>test (1T, ms/cube)</th><th>fe926ed runs</th><th>touch runs</th><th>fe926ed median</th><th>touch median</th><th>change (median of pairs) [min, max]</th></tr>
+</thead>
+<tbody>
+<tr><td>solve -c 0 -n 100</td><td>44.01 44.00 43.94 43.97 44.16 43.53</td><td>43.93 44.07 44.00 43.92 43.95 43.70</td><td>43.98</td><td>43.94</td><td>+0.02% [-0.46, +0.40]</td></tr>
+<tr><td>solve -c 1 -n 10</td><td>33.42 33.79 34.00 33.84 33.88 33.87</td><td>33.93 33.91 33.96 33.93 33.94 34.09</td><td>33.86</td><td>33.94</td><td>+0.31% [-0.12, +1.54]</td></tr>
+</tbody>
+</table></div>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

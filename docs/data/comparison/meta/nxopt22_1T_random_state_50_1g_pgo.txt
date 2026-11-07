@@ -1,0 +1,15 @@
+status 0
+run nxopt22 1 random_state 50 1g pgo 1
+pagemode hugetlb arena 8589934592 only nxopt22,nxopt22-pgo
+start 2026-11-05 09:58:30
+wall_s 346.29
+cpu_s 288.08 0.93
+maxrss_kb 7224
+gate_wait_s 0
+ext_cores 0.0
+pages 8393064 4456 692 0 8388608 2038587 nxopt22-pgo
+free_1g_pages 12 12
+memfree_gib_at_start 8.8
+thpwarm_pct -
+table /data/competitors/nxopt/nxopth22b.dat 7809269764
+thp always [madvise] never defrag always defer defer+madvise [madvise] never

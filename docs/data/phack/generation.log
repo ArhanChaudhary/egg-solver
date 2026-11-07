@@ -1,0 +1,34 @@
+[gen] h6 base 9: 1.81 GiB, 24 threads
+[gen] prefix depth 1: 1 h11 entries
+[gen] prefix depth 2: 4 h11 entries
+[gen] prefix depth 3: 34 h11 entries
+[gen] prefix depth 4: 333 h11 entries
+[gen] prefix depth 5: 3815 h11 entries
+[gen] prefix depth 6: 45382 h11 entries
+[gen] prefix depth 7: 548562 h11 entries
+[gen] prefix depth 8: 6839723 h11 entries
+[gen h6] prefix in 2.0s
+[gen h6] rows 0..15200640: depth 9 in 1.9s (2.6s for these rows)
+[gen h6] depth 10: 80.2% after 10s, ~2s to go
+[gen h6] rows 0..15200640: depth 10 in 12.9s (15.5s for these rows)
+[gen h6] depth 11: 7.4% after 10s, ~125s to go
+[gen h6] depth 11: 13.0% after 20s, ~134s to go
+[gen h6] depth 11: 18.8% after 30s, ~129s to go
+[gen h6] depth 11: 24.6% after 40s, ~122s to go
+[gen h6] depth 11: 30.4% after 50s, ~114s to go
+[gen h6] depth 11: 35.8% after 60s, ~108s to go
+[gen h6] depth 11: 41.4% after 70s, ~99s to go
+[gen h6] depth 11: 46.8% after 80s, ~91s to go
+[gen h6] depth 11: 52.0% after 90s, ~83s to go
+[gen h6] depth 11: 57.2% after 100s, ~75s to go
+[gen h6] depth 11: 62.9% after 110s, ~65s to go
+[gen h6] depth 11: 68.8% after 120s, ~54s to go
+[gen h6] depth 11: 74.2% after 130s, ~45s to go
+[gen h6] depth 11: 79.4% after 140s, ~36s to go
+[gen h6] depth 11: 84.7% after 150s, ~27s to go
+[gen h6] depth 11: 90.0% after 160s, ~18s to go
+[gen h6] depth 11: 95.4% after 170s, ~8s to go
+[gen h6] rows 0..15200640: depth 11 in 178.5s (194.0s for these rows)
+[gen h6] rows 0..15200640 written in 37.4s
+generated in 234.0s, peak memory 2.17 GiB
+h6 base 9 distribution [85941105, 804753057, 4077248291, 2556374347]

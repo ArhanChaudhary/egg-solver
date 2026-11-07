@@ -1,0 +1,36 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>m4: exhaustion test on live instead of the remaining todo (negative, neutral) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="0b26189f3e6b.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="m4-exhaustion-test-on-live-instead-of-the-remaining-todo-negative-neutral">m4: exhaustion test on live instead of the remaining todo (negative, neutral)</h1>
+<p>Commit <code>0b26189f3e6b2a844ed23cd20b1a24f140cb6c29</code> · 2026-11-03T17:25:34+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>neg/m4-live-on-stack</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>m4: exhaustion test on live instead of the remaining todo (negative, neutral)</p>
+<p>On the m4 stack: advance tests <code>live == 0</code> (todo minus the pending
+skipped X' moves) instead of <code>node.todo == 0</code> after the skipped moves are
+counted. The outcome is the same, and live is known a few cycles
+earlier.</p>
+<p>Why: this branch mispredicts at every pop and waits for the value just
+noted; resolving it earlier makes its mispredicts cheaper (see
+neg/m4-diag-brL-incl-c6).</p>
+<p>48 threads (bench /mnt/huge/h11 stream 20 30 48 20, capped, interleaved,
+3 runs, solves/s; measured as c9l against c9, the agent's build of the
+near-final m4 stack):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>build</th><th>run 1</th><th>run 2</th><th>run 3</th><th>median</th></tr>
+</thead>
+<tbody>
+<tr><td>c9 (m4 stack)</td><td>892.3</td><td>889.0</td><td>940.1</td><td>892.3</td></tr>
+<tr><td>c9 + live test</td><td>891.8</td><td>897.6</td><td>942.1</td><td>897.6</td></tr>
+</tbody>
+</table></div>
+<p>Change: -0.1, +1.0, +0.2% per run: within noise. Run 3 is a machine-wide
+state shift for both builds. 1-thread solves/s: not recorded.</p>
+<p>Conclusion: neutral. The pop branch still waits on the store-to-load
+forwarded node fields. p5 later got it to resolve earlier by keeping the
+depth and the top node's todo/lb/r in registers (regs, +2.7%, merged in
+9caf0e2).</p>
+<p>Source: scratchpad m4/neg-live-on-stack.patch, made on m4's stack commit
+3b4fb2a (lanes.rs identical to 35c608c's); committed on 35c608c, applies
+cleanly.
+Numbers are the agent's own (not re-measured for this record). Not merged; recorded per the rule that every candidate gets a branch.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

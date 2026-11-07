@@ -1,0 +1,28 @@
+   Compiling egg-solver-ub-audit-probes v0.0.0 (/data/agents/ub-audit/probes)
+    Finished `release` profile [optimized] target(s) in 0.09s
+     Running `/home/super/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/bin/cargo-miri runner /data/agents/ub-audit/target/miri/x86_64-unknown-linux-gnu/release/malformed_coordinate`
+warning: Miri does not support optimizations: the opt-level is ignored. The only effect of selecting a Cargo profile that enables optimizations (such as --release) is to apply its remaining settings, such as whether debug assertions and overflow checks are enabled.
+
+error: Undefined Behavior: `assume` called with `false`
+   --> /data/agents/ub-audit/source/src/coord.rs:387:14
+    |
+387 |               *tabs
+    |  ______________^
+388 | |                 .rank8
+389 | |                 .get_unchecked(_pext_u64(s_mask, u64::from(non_e)) as usize),
+    | |____________________________________________________________________________^ Undefined Behavior occurred here
+    |
+    = help: this indicates a bug in the program: it performed an invalid operation, and caused Undefined Behavior
+    = help: see https://doc.rust-lang.org/nightly/reference/behavior-considered-undefined.html for further information
+    = note: stack backtrace:
+            0: egg_solver::coord::edge_parts_sym_raw
+                at /data/agents/ub-audit/source/src/coord.rs:387:14: 389:77
+            1: egg_solver::coord::edge_parts_sym
+                at /data/agents/ub-audit/source/src/coord.rs:336:36: 336:65
+            2: main
+                at src/bin/malformed_coordinate.rs:2:88: 2:117
+
+note: some details are omitted, run with `MIRIFLAGS=-Zmiri-backtrace=full` for a verbose backtrace
+
+error: aborting due to 1 previous error; 1 warning emitted
+

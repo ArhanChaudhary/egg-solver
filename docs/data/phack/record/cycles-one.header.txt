@@ -1,0 +1,35 @@
+Invalid HEADER_EVENT_DESC: nre=2 sz=144 (min 64)
+# ========
+# captured on    : Fri Nov  6 17:05:46 2026
+# header version : 1
+# data offset    : 808
+# data size      : 33637448
+# feat offset    : 33638256
+# hostname : phack.sh
+# os release : 5.14.0-687.52.1.el9_8.x86_64
+# perf version : 7.0.14
+# arch : x86_64
+# nrcpus online : 24
+# nrcpus avail : 24
+# cpudesc : Intel(R) Xeon(R) CPU X5650 @ 2.67GHz
+# cpuid : GenuineIntel,6,44,2
+# total memory : 32632064 kB
+# cmdline : /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/runtime/ld-linux-x86-64.so.2 
+# event desc: not available or unable to read
+# CPU_TOPOLOGY info available, use -I to display
+# NUMA_TOPOLOGY info available, use -I to display
+# pmu mappings: cpu = 4, breakpoint = 5, cstate_core = 12, cstate_pkg = 13, hwmon_coretemp = 4294901760, hwmon_coretemp = 4294901761, kprobe = 8, msr = 10, software = 1, tool = 4294967294, tracepoint = 2, uncore = 11, uprobe = 9
+# CACHE info available, use -I to display
+# time of first sample : 3129042.492748
+# time of last sample : 3129062.491150
+# sample duration :  19998.402 ms
+# MEM_TOPOLOGY info available, use -I to display
+# bpf_prog_info empty
+# btf info empty
+# cpu pmu capabilities: branches=16, max_precise=2, pmu_name=westmere
+# CPU_DOMAIN_INFO info available, use -I to display
+# e_machine : 62
+#   e_flags : 0
+# missing features: TRACING_DATA BUILD_ID BRANCH_STACK GROUP_DESC AUXTRACE STAT CLOCKID DIR_FORMAT COMPRESSED CLOCK_DATA HYBRID_TOPOLOGY 
+# ========
+#

@@ -1,0 +1,38 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>neg: page-pin the hot code and stack of both binaries (stream loop, its helpers, share) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="5855122021bf.md">Markdown source</a> · Offline document</p><h1 id="neg-page-pin-the-hot-code-and-stack-of-both-binaries-stream-loop-its-helpers-share">neg: page-pin the hot code and stack of both binaries (stream loop, its helpers, share)</h1>
+<p>Commit <code>5855122021bfacfb663bc6b8c483317b23fb3608</code> · 2026-11-05T07:40:56+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>neg/s9-full-pin</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>neg: page-pin the hot code and stack of both binaries (stream loop, its helpers, share)</p>
+<p>This variant pins, at fixed page offsets:</p>
+<ul>
+<li>the stream loop: STREAM_LINE, build variable CUBEOPT_STREAM_LINE;</li>
+<li>its five out-of-line helpers, at 7608a28's <code>bench</code> offsets;</li>
+<li>the round loop;</li>
+<li>the share worker's stack: Worker at 0x040, <code>rounds</code> entered at 0xe38.
+The stream thread's stack is not pinned: pinning it cost about 0.5%.</li>
+</ul>
+<p>It gains share mode but loses stream against main, so it is not merged as
+is. Alternating pairs, 1T stream 10 60 1 24 (ratio variant/main):</p>
+<ul>
+<li>vs 7608a28: +0.3 -1.0 +1.15%;</li>
+<li>vs 585b3b6: -0.7% (1 pair).</li>
+<li>With the stream stack pinned as well (sl640, vs 7608a28): -0.2 -0.5 -0.7%.</li>
+<li>Screening 10 page offsets of the stream loop (0x180..0x3c0, 2 pairs
+each, A-first): -0.1 .. -1.4%, best 0x280/0x2c0 at -0.5%.</li>
+<li>With the helpers at main's page offsets (v2a) instead: 1T -1.5 -1.1%,
+48T -1.4 -2.1%.</li>
+<li>Same binary, stream frame base moved: +0.6 -0.1 +0.8%. A/A control of
+ab1t pairs: +0.6 +0.1 +0.1 +0.5% bias toward the second-launched run.</li>
+</ul>
+<p>Share mode gains:</p>
+<ul>
+<li>bench share at 48T: +1.8% / +3.5% (2 holds vs 585b3b6);</li>
+<li>bench share at 1T: +2.2% (1 pair), and +2.3 / +1.5% for v2a.
+-c 1 at 48T: noisy, within the noise.</li>
+</ul>
+<p>Conclusion: main's stream layout is a good one, and fixing page offsets
+alone does not reproduce it. The relative distances between the stream
+loop and its helpers also differ. s9-pin-v2 instead pins only <code>solve</code> and
+leaves <code>bench</code> byte-identical.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

@@ -1,0 +1,328 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>symstart.rs — source evidence</title><style>body{font:15px system-ui;margin:2rem}pre{font:13px/1.6 monospace;overflow:auto}.line:target{background:#fff0a0}a{color:#42617a;text-decoration:none}</style><h1>symstart.rs</h1><p>Source evidence snapshot. Original file SHA-256: <code>caa6fbc9a0c8ddf2aec40005f41ef5139e1fe77160658828d04f58ec8df26dc3</code>. <a href="symstart.rs">Raw source</a></p><pre><span class="line" id="L1"><a href="#L1">    1</a> //! Symmetric-start filtering: for a cube with a symmetry, search one job of</span>
+<span class="line" id="L2"><a href="#L2">    2</a> //! each class of equivalent job prefixes (nissy&#x27;s task filter, nxopt&#x27;s `-s`,</span>
+<span class="line" id="L3"><a href="#L3">    3</a> //! Rokicki&#x27;s &quot;drop symmetry duplicates in the first levels&quot;).</span>
+<span class="line" id="L4"><a href="#L4">    4</a> //!</span>
+<span class="line" id="L5"><a href="#L5">    5</a> //! Gains (x-h48&#x27;s 14 symmetric and antisymmetric test positions, `solve -c</span>
+<span class="line" id="L6"><a href="#L6">    6</a> //! 1`, on main fe926ed): 22.8x at 1T (9.75 -&gt; 0.43 s) and 7.9x at 48T</span>
+<span class="line" id="L7"><a href="#L7">    7</a> //! (267 -&gt; 34 ms), nearly all of it the superflip&#x27;s (71x at 1T, 21x at</span>
+<span class="line" id="L8"><a href="#L8">    8</a> //! 48T); the 7 positions with only a symmetry 1.87x at 1T (-47% nodes) and</span>
+<span class="line" id="L9"><a href="#L9">    9</a> //! 1.30x at 48T. Stream mode (8 threads, on f8a4919): 28.9x solves/s,</span>
+<span class="line" id="L10"><a href="#L10">   10</a> //! -96.6% nodes.</span>
+<span class="line" id="L11"><a href="#L11">   11</a> //!</span>
+<span class="line" id="L12"><a href="#L12">   12</a> //! A job is a canonical move prefix `p` of the solution, searched from</span>
+<span class="line" id="L13"><a href="#L13">   13</a> //! `X·p`. A job is dropped if a lexicographically smaller job `q` (move</span>
+<span class="line" id="L14"><a href="#L14">   14</a> //! indices; same length) reaches an equivalent position: `X·q` is a</span>
+<span class="line" id="L15"><a href="#L15">   15</a> //! conjugate of `X·p` or of its inverse (one of 96), so both are equally far</span>
+<span class="line" id="L16"><a href="#L16">   16</a> //! from solved. Two rules find such a `q`:</span>
+<span class="line" id="L17"><a href="#L17">   17</a> //!</span>
+<span class="line" id="L18"><a href="#L18">   18</a> //! * `keep`: for each symmetry `t` of `X` (`t X t⁻¹ = X`), `q = canon(t(p))`</span>
+<span class="line" id="L19"><a href="#L19">   19</a> //!   (`X·t(p) = t (X·p) t⁻¹`; `canon` puts adjacent opposite-face moves in</span>
+<span class="line" id="L20"><a href="#L20">   20</a> //!   the canonical order, U before D). Cheap: no cube is touched.</span>
+<span class="line" id="L21"><a href="#L21">   21</a> //! * `dedup`: exact classes (the least of the 96 conjugates as a key) of a</span>
+<span class="line" id="L22"><a href="#L22">   22</a> //!   whole level of jobs; keeps the smallest job of each class. This finds</span>
+<span class="line" id="L23"><a href="#L23">   23</a> //!   the equivalences that come from an antisymmetry (`t X t⁻¹ = X⁻¹`) of a</span>
+<span class="line" id="L24"><a href="#L24">   24</a> //!   cube that also has symmetries (the superflip, which commutes with every</span>
+<span class="line" id="L25"><a href="#L25">   25</a> //!   move: `X·p` and `X·p⁻¹`), and accidental ones.</span>
+<span class="line" id="L26"><a href="#L26">   26</a> //!</span>
+<span class="line" id="L27"><a href="#L27">   27</a> //! Which cubes: `keep` runs for every cube with a symmetry, `dedup` only if</span>
+<span class="line" id="L28"><a href="#L28">   28</a> //! it also has an antisymmetry. On x-h48&#x27;s symmetric timing set, `dedup` of</span>
+<span class="line" id="L29"><a href="#L29">   29</a> //! the 7 cubes with only a symmetry dropped nothing beyond `keep` (1656 of</span>
+<span class="line" id="L30"><a href="#L30">   30</a> //! 3240 3-move jobs kept either way) and took ~0.4 ms per cube at 1T; for</span>
+<span class="line" id="L31"><a href="#L31">   31</a> //! the 6 with only an antisymmetry neither rule drops anything (it relates</span>
+<span class="line" id="L32"><a href="#L32">   32</a> //! `X·p` to positions with `p` on the inverse side, which are not jobs), so</span>
+<span class="line" id="L33"><a href="#L33">   33</a> //! they are not filtered (filtered by `dedup`: ~0.75 ms per cube at 1T, and</span>
+<span class="line" id="L34"><a href="#L34">   34</a> //! 1.5-3.2x their time at 48T `-c 1` in one screening run). For the</span>
+<span class="line" id="L35"><a href="#L35">   35</a> //! superflip, `dedup` takes the 3-move jobs from 60 to 44 and the 4-move</span>
+<span class="line" id="L36"><a href="#L36">   36</a> //! ones from 553 to 380.</span>
+<span class="line" id="L37"><a href="#L37">   37</a> //!</span>
+<span class="line" id="L38"><a href="#L38">   38</a> //! Why one optimal solution is still found: let `g` be the smallest job of</span>
+<span class="line" id="L39"><a href="#L39">   39</a> //! its length that is the prefix of a canonical optimal solution. If `g` was</span>
+<span class="line" id="L40"><a href="#L40">   40</a> //! dropped for `q &lt; g`, then `q` followed by an optimal solution of `X·q` is</span>
+<span class="line" id="L41"><a href="#L41">   41</a> //! optimal, and its canonical form starts with `q` or with `q`&#x27;s last move</span>
+<span class="line" id="L42"><a href="#L42">   42</a> //! swapped for an earlier opposite-face one: a smaller prefix of an optimal</span>
+<span class="line" id="L43"><a href="#L43">   43</a> //! solution, a contradiction. Each prefix of `g` is the smallest of its own</span>
+<span class="line" id="L44"><a href="#L44">   44</a> //! length (a smaller one would extend to a smaller `g`), so filtering every</span>
+<span class="line" id="L45"><a href="#L45">   45</a> //! extension level never drops it either. The search inside a job (both</span>
+<span class="line" id="L46"><a href="#L46">   46</a> //! sides, premoves) is unchanged.</span>
+<span class="line" id="L47"><a href="#L47">   47</a> //!</span>
+<span class="line" id="L48"><a href="#L48">   48</a> //! Random states never have a symmetry: none of 7M positions (2000 random</span>
+<span class="line" id="L49"><a href="#L49">   49</a> //! states and their prefixes up to 3 moves deep). The check at a cube&#x27;s start</span>
+<span class="line" id="L50"><a href="#L50">   50</a> //! costs 95 conjugations (~0.3 µs), and nothing else happens unless the cube</span>
+<span class="line" id="L51"><a href="#L51">   51</a> //! has a symmetry.</span>
+<span class="line" id="L52"><a href="#L52">   52</a> </span>
+<span class="line" id="L53"><a href="#L53">   53</a> use crate::simd::Cube;</span>
+<span class="line" id="L54"><a href="#L54">   54</a> use std::collections::HashMap;</span>
+<span class="line" id="L55"><a href="#L55">   55</a> </span>
+<span class="line" id="L56"><a href="#L56">   56</a> /// Exact classes are computed for levels of at most this many jobs (after</span>
+<span class="line" id="L57"><a href="#L57">   57</a> /// `keep`): ~0.2 µs per job at 1T (3240 jobs in ~0.7 ms).</span>
+<span class="line" id="L58"><a href="#L58">   58</a> const DEDUP_MAX_JOBS: usize = 8192;</span>
+<span class="line" id="L59"><a href="#L59">   59</a> </span>
+<span class="line" id="L60"><a href="#L60">   60</a> /// The jobs to keep for one cube (see the module docs).</span>
+<span class="line" id="L61"><a href="#L61">   61</a> #[derive(Clone, Copy)]</span>
+<span class="line" id="L62"><a href="#L62">   62</a> pub struct SymFilter {</span>
+<span class="line" id="L63"><a href="#L63">   63</a>     /// The cube&#x27;s symmetries other than the identity: the first</span>
+<span class="line" id="L64"><a href="#L64">   64</a>     /// `n_symmetries` of `symmetries` (none: every job is kept and nothing</span>
+<span class="line" id="L65"><a href="#L65">   65</a>     /// else is read).</span>
+<span class="line" id="L66"><a href="#L66">   66</a>     n_symmetries: u8,</span>
+<span class="line" id="L67"><a href="#L67">   67</a>     symmetries: [u8; 47],</span>
+<span class="line" id="L68"><a href="#L68">   68</a>     /// The cube also has an antisymmetry: `dedup` runs.</span>
+<span class="line" id="L69"><a href="#L69">   69</a>     antisymmetric: bool,</span>
+<span class="line" id="L70"><a href="#L70">   70</a> }</span>
+<span class="line" id="L71"><a href="#L71">   71</a> </span>
+<span class="line" id="L72"><a href="#L72">   72</a> impl SymFilter {</span>
+<span class="line" id="L73"><a href="#L73">   73</a>     /// Keeps every job.</span>
+<span class="line" id="L74"><a href="#L74">   74</a>     pub const NONE: SymFilter = SymFilter {</span>
+<span class="line" id="L75"><a href="#L75">   75</a>         n_symmetries: 0,</span>
+<span class="line" id="L76"><a href="#L76">   76</a>         symmetries: [0; 47],</span>
+<span class="line" id="L77"><a href="#L77">   77</a>         antisymmetric: false,</span>
+<span class="line" id="L78"><a href="#L78">   78</a>     };</span>
+<span class="line" id="L79"><a href="#L79">   79</a> </span>
+<span class="line" id="L80"><a href="#L80">   80</a>     /// The filter of `cube` (with inverse `inverse`).</span>
+<span class="line" id="L81"><a href="#L81">   81</a>     #[must_use]</span>
+<span class="line" id="L82"><a href="#L82">   82</a>     pub fn new(cube: Cube, inverse: Cube) -&gt; SymFilter {</span>
+<span class="line" id="L83"><a href="#L83">   83</a>         let mut filter = SymFilter::NONE;</span>
+<span class="line" id="L84"><a href="#L84">   84</a>         let mut antisymmetric = false;</span>
+<span class="line" id="L85"><a href="#L85">   85</a>         for sym in 0..48u8 {</span>
+<span class="line" id="L86"><a href="#L86">   86</a>             let conjugate = cube.transform(usize::from(sym));</span>
+<span class="line" id="L87"><a href="#L87">   87</a>             if sym &gt; 0 &amp;&amp; conjugate.equals(cube) {</span>
+<span class="line" id="L88"><a href="#L88">   88</a>                 filter.symmetries[usize::from(filter.n_symmetries)] = sym;</span>
+<span class="line" id="L89"><a href="#L89">   89</a>                 filter.n_symmetries += 1;</span>
+<span class="line" id="L90"><a href="#L90">   90</a>             }</span>
+<span class="line" id="L91"><a href="#L91">   91</a>             antisymmetric |= conjugate.equals(inverse);</span>
+<span class="line" id="L92"><a href="#L92">   92</a>         }</span>
+<span class="line" id="L93"><a href="#L93">   93</a>         filter.antisymmetric = antisymmetric;</span>
+<span class="line" id="L94"><a href="#L94">   94</a>         filter</span>
+<span class="line" id="L95"><a href="#L95">   95</a>     }</span>
+<span class="line" id="L96"><a href="#L96">   96</a> </span>
+<span class="line" id="L97"><a href="#L97">   97</a>     /// Whether the filter drops anything (the cube has a symmetry).</span>
+<span class="line" id="L98"><a href="#L98">   98</a>     #[must_use]</span>
+<span class="line" id="L99"><a href="#L99">   99</a>     pub fn is_active(&amp;self) -&gt; bool {</span>
+<span class="line" id="L100"><a href="#L100">  100</a>         self.n_symmetries &gt; 0</span>
+<span class="line" id="L101"><a href="#L101">  101</a>     }</span>
+<span class="line" id="L102"><a href="#L102">  102</a> </span>
+<span class="line" id="L103"><a href="#L103">  103</a>     /// Whether `dedup` runs (the cube also has an antisymmetry). Without it,</span>
+<span class="line" id="L104"><a href="#L104">  104</a>     /// whether a job is kept depends on its moves alone (`keep`).</span>
+<span class="line" id="L105"><a href="#L105">  105</a>     #[must_use]</span>
+<span class="line" id="L106"><a href="#L106">  106</a>     pub fn dedups(&amp;self) -&gt; bool {</span>
+<span class="line" id="L107"><a href="#L107">  107</a>         self.is_active() &amp;&amp; self.antisymmetric</span>
+<span class="line" id="L108"><a href="#L108">  108</a>     }</span>
+<span class="line" id="L109"><a href="#L109">  109</a> </span>
+<span class="line" id="L110"><a href="#L110">  110</a>     /// Whether to keep the job with move prefix `moves` (nonempty,</span>
+<span class="line" id="L111"><a href="#L111">  111</a>     /// canonical, at most 4 moves): false if a symmetry of the cube maps it</span>
+<span class="line" id="L112"><a href="#L112">  112</a>     /// to a smaller one.</span>
+<span class="line" id="L113"><a href="#L113">  113</a>     #[must_use]</span>
+<span class="line" id="L114"><a href="#L114">  114</a>     pub fn keep(&amp;self, moves: &amp;[u8]) -&gt; bool {</span>
+<span class="line" id="L115"><a href="#L115">  115</a>         if !self.is_active() {</span>
+<span class="line" id="L116"><a href="#L116">  116</a>             return true;</span>
+<span class="line" id="L117"><a href="#L117">  117</a>         }</span>
+<span class="line" id="L118"><a href="#L118">  118</a>         let conjugates = move_conjugates();</span>
+<span class="line" id="L119"><a href="#L119">  119</a>         for &amp;sym in &amp;self.symmetries[..usize::from(self.n_symmetries)] {</span>
+<span class="line" id="L120"><a href="#L120">  120</a>             let mut image = [0u8; 4];</span>
+<span class="line" id="L121"><a href="#L121">  121</a>             for (image_move, &amp;mv) in image.iter_mut().zip(moves) {</span>
+<span class="line" id="L122"><a href="#L122">  122</a>                 *image_move = conjugates[usize::from(sym)][usize::from(mv)];</span>
+<span class="line" id="L123"><a href="#L123">  123</a>             }</span>
+<span class="line" id="L124"><a href="#L124">  124</a>             let image = &amp;mut image[..moves.len()];</span>
+<span class="line" id="L125"><a href="#L125">  125</a>             // Canonical order of opposite-face pairs (no three consecutive</span>
+<span class="line" id="L126"><a href="#L126">  126</a>             // moves share an axis in a canonical sequence, so pairs are</span>
+<span class="line" id="L127"><a href="#L127">  127</a>             // disjoint: one pass).</span>
+<span class="line" id="L128"><a href="#L128">  128</a>             for i in 1..image.len() {</span>
+<span class="line" id="L129"><a href="#L129">  129</a>                 let (first_face, second_face) = (image[i - 1] / 3, image[i] / 3);</span>
+<span class="line" id="L130"><a href="#L130">  130</a>                 if first_face / 2 == second_face / 2 &amp;&amp; first_face &gt; second_face {</span>
+<span class="line" id="L131"><a href="#L131">  131</a>                     image.swap(i - 1, i);</span>
+<span class="line" id="L132"><a href="#L132">  132</a>                 }</span>
+<span class="line" id="L133"><a href="#L133">  133</a>             }</span>
+<span class="line" id="L134"><a href="#L134">  134</a>             if *image &lt; *moves {</span>
+<span class="line" id="L135"><a href="#L135">  135</a>                 return false;</span>
+<span class="line" id="L136"><a href="#L136">  136</a>             }</span>
+<span class="line" id="L137"><a href="#L137">  137</a>         }</span>
+<span class="line" id="L138"><a href="#L138">  138</a>         true</span>
+<span class="line" id="L139"><a href="#L139">  139</a>     }</span>
+<span class="line" id="L140"><a href="#L140">  140</a> </span>
+<span class="line" id="L141"><a href="#L141">  141</a>     /// Keep only the smallest job (by `moves`) of each class of equivalent</span>
+<span class="line" id="L142"><a href="#L142">  142</a>     /// positions (`position`) among `jobs`, a whole level (same length), in</span>
+<span class="line" id="L143"><a href="#L143">  143</a>     /// order. Does nothing unless the cube has a symmetry and an</span>
+<span class="line" id="L144"><a href="#L144">  144</a>     /// antisymmetry (`dedups`), or above `DEDUP_MAX_JOBS` jobs.</span>
+<span class="line" id="L145"><a href="#L145">  145</a>     pub fn dedup&lt;T&gt;(</span>
+<span class="line" id="L146"><a href="#L146">  146</a>         &amp;self,</span>
+<span class="line" id="L147"><a href="#L147">  147</a>         jobs: &amp;mut Vec&lt;T&gt;,</span>
+<span class="line" id="L148"><a href="#L148">  148</a>         moves: impl Fn(&amp;T) -&gt; &amp;[u8],</span>
+<span class="line" id="L149"><a href="#L149">  149</a>         position: impl Fn(&amp;T) -&gt; Cube,</span>
+<span class="line" id="L150"><a href="#L150">  150</a>     ) {</span>
+<span class="line" id="L151"><a href="#L151">  151</a>         if !self.dedups() || jobs.len() &gt; DEDUP_MAX_JOBS {</span>
+<span class="line" id="L152"><a href="#L152">  152</a>             return;</span>
+<span class="line" id="L153"><a href="#L153">  153</a>         }</span>
+<span class="line" id="L154"><a href="#L154">  154</a>         let keys: Vec&lt;(u64, u128)&gt; = jobs.iter().map(|job| class_key(position(job))).collect();</span>
+<span class="line" id="L155"><a href="#L155">  155</a>         // The smallest job of each class.</span>
+<span class="line" id="L156"><a href="#L156">  156</a>         let mut smallest: HashMap&lt;(u64, u128), usize&gt; = HashMap::with_capacity(jobs.len());</span>
+<span class="line" id="L157"><a href="#L157">  157</a>         for (i, key) in keys.iter().enumerate() {</span>
+<span class="line" id="L158"><a href="#L158">  158</a>             smallest</span>
+<span class="line" id="L159"><a href="#L159">  159</a>                 .entry(*key)</span>
+<span class="line" id="L160"><a href="#L160">  160</a>                 .and_modify(|best| {</span>
+<span class="line" id="L161"><a href="#L161">  161</a>                     if moves(&amp;jobs[i]) &lt; moves(&amp;jobs[*best]) {</span>
+<span class="line" id="L162"><a href="#L162">  162</a>                         *best = i;</span>
+<span class="line" id="L163"><a href="#L163">  163</a>                     }</span>
+<span class="line" id="L164"><a href="#L164">  164</a>                 })</span>
+<span class="line" id="L165"><a href="#L165">  165</a>                 .or_insert(i);</span>
+<span class="line" id="L166"><a href="#L166">  166</a>         }</span>
+<span class="line" id="L167"><a href="#L167">  167</a>         let mut i = 0;</span>
+<span class="line" id="L168"><a href="#L168">  168</a>         jobs.retain(|_| {</span>
+<span class="line" id="L169"><a href="#L169">  169</a>             let keep = smallest[&amp;keys[i]] == i;</span>
+<span class="line" id="L170"><a href="#L170">  170</a>             i += 1;</span>
+<span class="line" id="L171"><a href="#L171">  171</a>             keep</span>
+<span class="line" id="L172"><a href="#L172">  172</a>         });</span>
+<span class="line" id="L173"><a href="#L173">  173</a>     }</span>
+<span class="line" id="L174"><a href="#L174">  174</a> }</span>
+<span class="line" id="L175"><a href="#L175">  175</a> </span>
+<span class="line" id="L176"><a href="#L176">  176</a> /// `conjugates[t][m]`: the move `t m t⁻¹` (`Cube::transform` by `t` of</span>
+<span class="line" id="L177"><a href="#L177">  177</a> /// move `m`): each symmetry&#x27;s move map, from build.rs.</span>
+<span class="line" id="L178"><a href="#L178">  178</a> fn move_conjugates() -&gt; &amp;&#x27;static [[u8; 18]; 48] {</span>
+<span class="line" id="L179"><a href="#L179">  179</a>     &amp;crate::simd::SYM_MOVE_MAP</span>
+<span class="line" id="L180"><a href="#L180">  180</a> }</span>
+<span class="line" id="L181"><a href="#L181">  181</a> </span>
+<span class="line" id="L182"><a href="#L182">  182</a> /// The corner and edge bytes of a cube.</span>
+<span class="line" id="L183"><a href="#L183">  183</a> fn position_key(cube: Cube) -&gt; (u64, u128) {</span>
+<span class="line" id="L184"><a href="#L184">  184</a>     let bytes = cube.to_bytes();</span>
+<span class="line" id="L185"><a href="#L185">  185</a>     let mut corners = [0u8; 8];</span>
+<span class="line" id="L186"><a href="#L186">  186</a>     for (x, &amp;byte) in corners.iter_mut().zip(&amp;bytes) {</span>
+<span class="line" id="L187"><a href="#L187">  187</a>         *x = byte;</span>
+<span class="line" id="L188"><a href="#L188">  188</a>     }</span>
+<span class="line" id="L189"><a href="#L189">  189</a>     let mut edges = [0u8; 16];</span>
+<span class="line" id="L190"><a href="#L190">  190</a>     for (x, &amp;byte) in edges.iter_mut().zip(bytes.iter().skip(16).take(12)) {</span>
+<span class="line" id="L191"><a href="#L191">  191</a>         *x = byte;</span>
+<span class="line" id="L192"><a href="#L192">  192</a>     }</span>
+<span class="line" id="L193"><a href="#L193">  193</a>     (u64::from_le_bytes(corners), u128::from_le_bytes(edges))</span>
+<span class="line" id="L194"><a href="#L194">  194</a> }</span>
+<span class="line" id="L195"><a href="#L195">  195</a> </span>
+<span class="line" id="L196"><a href="#L196">  196</a> /// The same key for all cubes equivalent to `cube`: the least over its 48</span>
+<span class="line" id="L197"><a href="#L197">  197</a> /// conjugates and those of its inverse.</span>
+<span class="line" id="L198"><a href="#L198">  198</a> fn class_key(cube: Cube) -&gt; (u64, u128) {</span>
+<span class="line" id="L199"><a href="#L199">  199</a>     let inverse = cube.inverse();</span>
+<span class="line" id="L200"><a href="#L200">  200</a>     (0..48)</span>
+<span class="line" id="L201"><a href="#L201">  201</a>         .flat_map(|sym| {</span>
+<span class="line" id="L202"><a href="#L202">  202</a>             [</span>
+<span class="line" id="L203"><a href="#L203">  203</a>                 position_key(cube.transform(sym)),</span>
+<span class="line" id="L204"><a href="#L204">  204</a>                 position_key(inverse.transform(sym)),</span>
+<span class="line" id="L205"><a href="#L205">  205</a>             ]</span>
+<span class="line" id="L206"><a href="#L206">  206</a>         })</span>
+<span class="line" id="L207"><a href="#L207">  207</a>         .fold((u64::MAX, u128::MAX), std::cmp::min)</span>
+<span class="line" id="L208"><a href="#L208">  208</a> }</span>
+<span class="line" id="L209"><a href="#L209">  209</a> </span>
+<span class="line" id="L210"><a href="#L210">  210</a> #[cfg(test)]</span>
+<span class="line" id="L211"><a href="#L211">  211</a> mod tests {</span>
+<span class="line" id="L212"><a href="#L212">  212</a>     use super::*;</span>
+<span class="line" id="L213"><a href="#L213">  213</a>     use crate::cubie::{parse_moves, CubieCube, Move, Rng};</span>
+<span class="line" id="L214"><a href="#L214">  214</a> </span>
+<span class="line" id="L215"><a href="#L215">  215</a>     fn cube(moves: &amp;str) -&gt; Cube {</span>
+<span class="line" id="L216"><a href="#L216">  216</a>         Cube::from_cubie(</span>
+<span class="line" id="L217"><a href="#L217">  217</a>             &amp;CubieCube::SOLVED</span>
+<span class="line" id="L218"><a href="#L218">  218</a>                 .apply_moves(&amp;parse_moves(moves).unwrap())</span>
+<span class="line" id="L219"><a href="#L219">  219</a>                 .unwrap(),</span>
+<span class="line" id="L220"><a href="#L220">  220</a>         )</span>
+<span class="line" id="L221"><a href="#L221">  221</a>     }</span>
+<span class="line" id="L222"><a href="#L222">  222</a> </span>
+<span class="line" id="L223"><a href="#L223">  223</a>     /// Conjugation is a homomorphism:</span>
+<span class="line" id="L224"><a href="#L224">  224</a>     /// `t (X·m) t⁻¹ = (t X t⁻¹)·conjugates[t][m]`.</span>
+<span class="line" id="L225"><a href="#L225">  225</a>     #[test]</span>
+<span class="line" id="L226"><a href="#L226">  226</a>     fn move_conjugates_compose() {</span>
+<span class="line" id="L227"><a href="#L227">  227</a>         let conjugates = move_conjugates();</span>
+<span class="line" id="L228"><a href="#L228">  228</a>         let mut rng = Rng(5);</span>
+<span class="line" id="L229"><a href="#L229">  229</a>         for _ in 0..if cfg!(miri) { 2 } else { 50 } {</span>
+<span class="line" id="L230"><a href="#L230">  230</a>             let x = Cube::from_cubie(&amp;CubieCube::random(&amp;mut rng));</span>
+<span class="line" id="L231"><a href="#L231">  231</a>             for (sym, row) in conjugates.iter().enumerate() {</span>
+<span class="line" id="L232"><a href="#L232">  232</a>                 for (mv, &amp;image_move) in row.iter().enumerate() {</span>
+<span class="line" id="L233"><a href="#L233">  233</a>                     let lhs = x.apply_move(Move::ALL[mv]).transform(sym);</span>
+<span class="line" id="L234"><a href="#L234">  234</a>                     let rhs = x</span>
+<span class="line" id="L235"><a href="#L235">  235</a>                         .transform(sym)</span>
+<span class="line" id="L236"><a href="#L236">  236</a>                         .apply_move(Move::ALL[usize::from(image_move)]);</span>
+<span class="line" id="L237"><a href="#L237">  237</a>                     assert!(lhs.equals(rhs), &quot;sym {sym} move {mv}&quot;);</span>
+<span class="line" id="L238"><a href="#L238">  238</a>                 }</span>
+<span class="line" id="L239"><a href="#L239">  239</a>             }</span>
+<span class="line" id="L240"><a href="#L240">  240</a>         }</span>
+<span class="line" id="L241"><a href="#L241">  241</a>     }</span>
+<span class="line" id="L242"><a href="#L242">  242</a> </span>
+<span class="line" id="L243"><a href="#L243">  243</a>     #[test]</span>
+<span class="line" id="L244"><a href="#L244">  244</a>     fn random_cubes_are_not_filtered() {</span>
+<span class="line" id="L245"><a href="#L245">  245</a>         let mut rng = Rng(9);</span>
+<span class="line" id="L246"><a href="#L246">  246</a>         for _ in 0..if cfg!(miri) { 2 } else { 200 } {</span>
+<span class="line" id="L247"><a href="#L247">  247</a>             let cube = Cube::from_cubie(&amp;CubieCube::random(&amp;mut rng));</span>
+<span class="line" id="L248"><a href="#L248">  248</a>             assert!(!SymFilter::new(cube, cube.inverse()).is_active());</span>
+<span class="line" id="L249"><a href="#L249">  249</a>         }</span>
+<span class="line" id="L250"><a href="#L250">  250</a>     }</span>
+<span class="line" id="L251"><a href="#L251">  251</a> </span>
+<span class="line" id="L252"><a href="#L252">  252</a>     /// Jobs kept per length (1..=4) for cube `x`, extending level by level</span>
+<span class="line" id="L253"><a href="#L253">  253</a>     /// as the solvers do.</span>
+<span class="line" id="L254"><a href="#L254">  254</a>     fn kept_per_level(x: Cube) -&gt; [usize; 5] {</span>
+<span class="line" id="L255"><a href="#L255">  255</a>         let filter = SymFilter::new(x, x.inverse());</span>
+<span class="line" id="L256"><a href="#L256">  256</a>         let mut kept = [0usize; 5];</span>
+<span class="line" id="L257"><a href="#L257">  257</a>         let mut level: Vec&lt;Vec&lt;u8&gt;&gt; = vec![vec![]];</span>
+<span class="line" id="L258"><a href="#L258">  258</a>         for kept_of_length in kept.iter_mut().skip(1) {</span>
+<span class="line" id="L259"><a href="#L259">  259</a>             let mut next = Vec::new();</span>
+<span class="line" id="L260"><a href="#L260">  260</a>             for prefix in &amp;level {</span>
+<span class="line" id="L261"><a href="#L261">  261</a>                 for mv in 0..18u8 {</span>
+<span class="line" id="L262"><a href="#L262">  262</a>                     if let Some(&amp;last) = prefix.last() {</span>
+<span class="line" id="L263"><a href="#L263">  263</a>                         let (last_face, face) = (last / 3, mv / 3);</span>
+<span class="line" id="L264"><a href="#L264">  264</a>                         if last_face == face || (last_face % 2 == 1 &amp;&amp; face == last_face - 1) {</span>
+<span class="line" id="L265"><a href="#L265">  265</a>                             continue;</span>
+<span class="line" id="L266"><a href="#L266">  266</a>                         }</span>
+<span class="line" id="L267"><a href="#L267">  267</a>                     }</span>
+<span class="line" id="L268"><a href="#L268">  268</a>                     let mut child = prefix.clone();</span>
+<span class="line" id="L269"><a href="#L269">  269</a>                     child.push(mv);</span>
+<span class="line" id="L270"><a href="#L270">  270</a>                     if filter.keep(&amp;child) {</span>
+<span class="line" id="L271"><a href="#L271">  271</a>                         next.push(child);</span>
+<span class="line" id="L272"><a href="#L272">  272</a>                     }</span>
+<span class="line" id="L273"><a href="#L273">  273</a>                 }</span>
+<span class="line" id="L274"><a href="#L274">  274</a>             }</span>
+<span class="line" id="L275"><a href="#L275">  275</a>             filter.dedup(</span>
+<span class="line" id="L276"><a href="#L276">  276</a>                 &amp;mut next,</span>
+<span class="line" id="L277"><a href="#L277">  277</a>                 |prefix| prefix,</span>
+<span class="line" id="L278"><a href="#L278">  278</a>                 |prefix| {</span>
+<span class="line" id="L279"><a href="#L279">  279</a>                     prefix</span>
+<span class="line" id="L280"><a href="#L280">  280</a>                         .iter()</span>
+<span class="line" id="L281"><a href="#L281">  281</a>                         .fold(x, |cube, &amp;mv| cube.apply_move(Move::ALL[usize::from(mv)]))</span>
+<span class="line" id="L282"><a href="#L282">  282</a>                 },</span>
+<span class="line" id="L283"><a href="#L283">  283</a>             );</span>
+<span class="line" id="L284"><a href="#L284">  284</a>             *kept_of_length = next.len();</span>
+<span class="line" id="L285"><a href="#L285">  285</a>             level = next;</span>
+<span class="line" id="L286"><a href="#L286">  286</a>         }</span>
+<span class="line" id="L287"><a href="#L287">  287</a>         kept</span>
+<span class="line" id="L288"><a href="#L288">  288</a>     }</span>
+<span class="line" id="L289"><a href="#L289">  289</a> </span>
+<span class="line" id="L290"><a href="#L290">  290</a>     /// The superflip has all 48 symmetries and is its own inverse (and</span>
+<span class="line" id="L291"><a href="#L291">  291</a>     /// commutes with every move): one quarter turn and one half turn are</span>
+<span class="line" id="L292"><a href="#L292">  292</a>     /// left as first moves, and far fewer than nissy&#x27;s 1038 of the 43254</span>
+<span class="line" id="L293"><a href="#L293">  293</a>     /// 4-move prefixes.</span>
+<span class="line" id="L294"><a href="#L294">  294</a>     #[test]</span>
+<span class="line" id="L295"><a href="#L295">  295</a>     fn superflip_jobs() {</span>
+<span class="line" id="L296"><a href="#L296">  296</a>         let x = cube(&quot;U R2 F B R B2 R U2 L B2 R U&#x27; D&#x27; R2 F R&#x27; L B2 U2 F2&quot;);</span>
+<span class="line" id="L297"><a href="#L297">  297</a>         let filter = SymFilter::new(x, x.inverse());</span>
+<span class="line" id="L298"><a href="#L298">  298</a>         assert!(filter.dedups() &amp;&amp; filter.n_symmetries == 47);</span>
+<span class="line" id="L299"><a href="#L299">  299</a>         let kept = kept_per_level(x);</span>
+<span class="line" id="L300"><a href="#L300">  300</a>         assert_eq!(kept[1], 2, &quot;{kept:?}&quot;);</span>
+<span class="line" id="L301"><a href="#L301">  301</a>         assert!(kept[4] &lt;= 1038, &quot;{kept:?}&quot;);</span>
+<span class="line" id="L302"><a href="#L302">  302</a>     }</span>
+<span class="line" id="L303"><a href="#L303">  303</a> </span>
+<span class="line" id="L304"><a href="#L304">  304</a>     /// Only an antisymmetry: no filter (no symmetry for `keep`, and `dedup`</span>
+<span class="line" id="L305"><a href="#L305">  305</a>     /// would find nothing: see the module docs).</span>
+<span class="line" id="L306"><a href="#L306">  306</a>     #[test]</span>
+<span class="line" id="L307"><a href="#L307">  307</a>     fn antisymmetric_cube() {</span>
+<span class="line" id="L308"><a href="#L308">  308</a>         // A · t(A)⁻¹ is antisymmetric for an involution t (here y2).</span>
+<span class="line" id="L309"><a href="#L309">  309</a>         let a = cube(&quot;R U2 F&#x27; L D B2 R&#x27;&quot;);</span>
+<span class="line" id="L310"><a href="#L310">  310</a>         let sym = (0..48)</span>
+<span class="line" id="L311"><a href="#L311">  311</a>             .find(|&amp;sym| {</span>
+<span class="line" id="L312"><a href="#L312">  312</a>                 let u = Cube::solved().apply_move(Move::U);</span>
+<span class="line" id="L313"><a href="#L313">  313</a>                 u.transform(sym).equals(u)</span>
+<span class="line" id="L314"><a href="#L314">  314</a>                     &amp;&amp; Cube::solved()</span>
+<span class="line" id="L315"><a href="#L315">  315</a>                         .apply_move(Move::R)</span>
+<span class="line" id="L316"><a href="#L316">  316</a>                         .transform(sym)</span>
+<span class="line" id="L317"><a href="#L317">  317</a>                         .equals(Cube::solved().apply_move(Move::L))</span>
+<span class="line" id="L318"><a href="#L318">  318</a>             })</span>
+<span class="line" id="L319"><a href="#L319">  319</a>             .unwrap();</span>
+<span class="line" id="L320"><a href="#L320">  320</a>         let x = a.compose(a.transform(sym).inverse());</span>
+<span class="line" id="L321"><a href="#L321">  321</a>         assert!(x.transform(sym).equals(x.inverse()));</span>
+<span class="line" id="L322"><a href="#L322">  322</a>         let filter = SymFilter::new(x, x.inverse());</span>
+<span class="line" id="L323"><a href="#L323">  323</a>         assert!(filter.antisymmetric &amp;&amp; filter.n_symmetries == 0);</span>
+<span class="line" id="L324"><a href="#L324">  324</a>         assert!(!filter.is_active() &amp;&amp; !filter.dedups());</span>
+<span class="line" id="L325"><a href="#L325">  325</a>         assert!(filter.keep(&amp;[3, 6, 0]));</span>
+<span class="line" id="L326"><a href="#L326">  326</a>         assert_eq!(kept_per_level(x), [0, 18, 243, 3240, 43254]);</span>
+<span class="line" id="L327"><a href="#L327">  327</a>     }</span>
+<span class="line" id="L328"><a href="#L328">  328</a> }</span></pre></html>

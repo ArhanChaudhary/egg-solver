@@ -1,0 +1,13 @@
+Miri logs: /data/agents/codex-resume/miri-current
+Toolchain: nightly
+RUSTFLAGS: -C target-cpu=x86-64-v3
+MIRIFLAGS: -Zmiri-strict-provenance -Zmiri-symbolic-alignment-check -Zmiri-num-cpus=4 
+Scheduler seeds: 0..16
+miri 0.1.0 (1c3a650696 2026-11-02)
+rustc 1.101.0-nightly (1c3a65069 2026-11-02)
+binary: rustc
+commit-hash: 1c3a6506966e21845b31de0b075d2527660db132
+commit-date: 2026-11-02
+host: x86_64-unknown-linux-gnu
+release: 1.101.0-nightly
+LLVM version: 23.1.5

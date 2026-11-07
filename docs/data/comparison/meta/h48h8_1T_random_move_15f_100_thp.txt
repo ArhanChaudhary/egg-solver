@@ -1,0 +1,15 @@
+status 0
+run h48h8 1 random_move_15f 100 thp shipped 1
+pagemode thp arena 0 only -
+start 2026-11-05 12:51:41
+wall_s 59.58
+cpu_s 3.31 1.20
+maxrss_kb 7423548
+gate_wait_s 0
+ext_cores 0.1
+pages 7423948 7423948 7416988 7407616 0 2734075 python3
+free_1g_pages 0 0
+memfree_gib_at_start 15.6
+thpwarm_pct 100.0
+table /data2/competitors/h48/h48h8 7585624040
+thp always [madvise] never defrag always defer defer+madvise [madvise] never

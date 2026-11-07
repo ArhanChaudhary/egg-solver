@@ -1,0 +1,38 @@
+use sse, bmi2
+use huge page
+uniq_sym_states = 139, co_base=9930
+read pruning table from file nxprun30.dat
+ 0           62
+ 1          124
+ 2          866
+ 3         5551
+ 4        43504
+ 5       336948
+ 6      2699480
+ 7     20163087
+ 8    118276987
+ 9    241467406
+10   2878994435
+11   6272091236
+12    532557114
+Avg: 10.674, 10066636800 entry
+F2 L2 F2 U' B2 U2 F2 R' D' L  F' U' L  B  D' L  F  L' F' L2 
+Cube1 finished in 20, 3174071630/375535 node(s), tt=9873.416 ms, 3.11ns/node, 1.41ns/probe, 0.615 inv/node, 2.209 probe/node 375253 split(s)
+L2 D2 L  D2 R' F2 R2 B2 U  F' D  L' B' R  D  R  F' U2 R  U' 
+Cube2 finished in 20, 3580730133/380244 node(s), tt=10931.549 ms, 3.05ns/node, 1.39ns/probe, 0.614 inv/node, 2.197 probe/node 363468 split(s)
+D' L2 F2 L  R2 U  B  U' R' D' F  B' D2 R' D2 R  U2 R  F2 U2 
+Cube3 finished in 20, 3069142787/411654 node(s), tt=9251.103 ms, 3.01ns/node, 1.35ns/probe, 0.634 inv/node, 2.235 probe/node 423742 split(s)
+B2 U2 B2 L  D2 U2 L2 B  L' B2 D' F  D' L  U  L2 B2 D  B' R' 
+Cube4 finished in 20, 3017233586/398346 node(s), tt=9083.393 ms, 3.01ns/node, 1.35ns/probe, 0.626 inv/node, 2.225 probe/node 422039 split(s)
+L  F  R  U' D  L' F  D' F  L2 F  D  R2 B2 D2 F  U2 D2 F' U2 
+Cube5 finished in 20, 3328690398/397380 node(s), tt=10182.263 ms, 3.06ns/node, 1.37ns/probe, 0.632 inv/node, 2.226 probe/node 370351 split(s)
+R2 B  U2 B' U2 L2 F  B2 L' B  D' B  U  B2 D2 B' R' F' D  L  
+Cube6 finished in 20, 2831351519/392864 node(s), tt=8689.837 ms, 3.07ns/node, 1.38ns/probe, 0.625 inv/node, 2.229 probe/node 426902 split(s)
+L  D2 F' L2 B  D' U  L2 U  L  U' R' U  F' L2 U2 B  U2 L2 U2 
+Cube7 finished in 20, 3154227133/389381 node(s), tt=9571.030 ms, 3.03ns/node, 1.37ns/probe, 0.619 inv/node, 2.213 probe/node 383216 split(s)
+U  L  U' R' F  L  U  B  D' R2 B2 R  F  B2 D' B2 L2 D2 R2 D' 
+Cube8 finished in 20, 3214980681/400393 node(s), tt=10099.471 ms, 3.14ns/node, 1.42ns/probe, 0.618 inv/node, 2.208 probe/node 387901 split(s)
+B' L2 U  R2 L' F2 B  U' R  D' B  L  U' B  D2 B' L2 B2 R2 F2 
+Cube9 finished in 20, 3375437014/388360 node(s), tt=10399.818 ms, 3.08ns/node, 1.38ns/probe, 0.636 inv/node, 2.234 probe/node 365835 split(s)
+U2 F2 L2 U' F2 U  R2 U2 F2 L' U2 B' D' L2 U  L  U2 F' R  B  
+Cube10 finished in 20, 3176740862/400273 node(s), tt=9746.634 ms, 3.07ns/node, 1.38ns/probe, 0.622 inv/node, 2.218 probe/node 388069 split(s)

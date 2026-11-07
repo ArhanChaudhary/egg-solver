@@ -1,0 +1,58 @@
+# Keep stream completion reporting cold and restore its measured page offset
+
+Commit `a1fce13a2ee591ee4d31a763a27f7ef132d5a86b` · 2026-11-06T02:31:35+00:00
+
+This commit is reachable from the released main history. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.
+
+References: `opt/stream-completion`
+
+## Original experiment record
+
+Keep stream completion reporting cold and restore its measured page offset
+
+Move reconstruction, elapsed-time reads and completion callbacks out of the
+per-lookup loop. Pin bench stream to page offset 0xa90 with the selected pad 16.
+The four-pad screen favored 16; the five-case rotated-L3 screen favored the
+combined cold-report/page-placement stack. No search order or result change.
+
+h8, 40 lanes, 1 GiB pages; 1T warm 10/window 60. Five simultaneous cases on
+separate L3 domains, rotated through all five slots. All results retained.
+
+|1T round|measured229b99f|no-panic before|selected after|after/before change|
+|---|---:|---:|---:|---:|
+|1|3.883|3.833|3.883|+1.304%|
+|2|4.133|4.117|4.117|+0.000%|
+|3|4.150|4.150|4.150|+0.000%|
+|4|4.150|4.083|4.117|+0.833%|
+|5|4.150|4.083|4.133|+1.225%|
+
+Median paired after/before: +0.8327%. Selected/measured median: -0.3871%.
+This is a small, layout-sensitive gain with a code mechanism; it is not a
+claim that every individual pair is faster.
+
+48T, warm 20/window 30, five interleaved pairs on explicit CPUs 0-47.
+Outside load 0.0-0.1 cores. The earlier partial eight-CPU-affinity run was
+rejected and archived separately; none of its timings is used here.
+
+|48T pair|no-panic before|selected after|after/before change|
+|---|---:|---:|---:|
+|1|156.200|153.367|-1.814%|
+|2|150.767|148.133|-1.747%|
+|3|153.667|157.100|+2.234%|
+|4|157.433|157.733|+0.191%|
+|5|157.800|159.233|+0.908%|
+
+Median paired 48T gain +0.1906%: neutral within normal 48T noise.
+Do not interpret this as a confirmed 48T speedup.
+
+Validation: exact selected source passed full check.sh (native/scalar,
+ARM/NEON under QEMU, WASI/wasmtime, Bun threaded/single WASM). The imported
+tree matches the fully checked variant except these measured-gain comments.
+h8 stream identity: random 1000 nodes 22986834/lookups 19752820 and expected
+15:1 16:35 17:270 18:662 19:32 lengths; depth18 nodes 24443014/lookups 21056962,
+18:100. solve rounds instructions/page0x310/frame 0x98 and actual thread
+frame 0x1000 are unchanged, so the completed six-hold latency comparison
+remains applicable. bench stream frame remains 0xfc0; its body changes and
+page offset moves0x10->0xa90. bench share-round instructions are unchanged
+but move 0xc90->0x590; the published latency/batch rows use solve, not bench share.
+Final h11 comparison against 229b99f remains queued after table restoration.

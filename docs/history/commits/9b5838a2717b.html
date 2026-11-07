@@ -1,0 +1,39 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEGATIVE c11: sort-chunk (not merged), plus the order-replay diagnostics — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="9b5838a2717b.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="negative-c11-sort-chunk-not-merged-plus-the-order-replay-diagnostics">NEGATIVE c11: sort-chunk (not merged), plus the order-replay diagnostics</h1>
+<p>Commit <code>9b5838a2717bc9a016b78a0a66750dc59c9c151b</code> · 2026-11-04T18:23:45+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>neg/c11-sort-chunk</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>NEGATIVE c11: sort-chunk (not merged), plus the order-replay diagnostics</p>
+<p>NEGATIVE c11: smaller sort chunks and more buckets in staged builds (no faster)</p>
+<p>Hypothesis: the staged sort's ST_KEYS stage (~37 us of each T = 17 / T = 18
+build at 48T) is bound by its 22 tasks of 2048 jobs, and ST_BUCKETS by 64
+tasks over 48 threads. So SORT_CHUNK 2048 -&gt; 1024 (43 tasks) and NBUCKETS
+64 -&gt; 96 should shorten the builds.</p>
+<p>Measured (CUBE_TRACE=1, solve -c 1 -n 400 random_state at 48T, the mean per
+build in ms, on fe926ed plus the touch patch):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>build</th><th>total</th><th>ext</th><th>keys</th><th>scatter</th><th>buckets</th><th>publish</th></tr>
+</thead>
+<tbody>
+<tr><td>T17 main</td><td>0.1536</td><td>0.0665</td><td>0.0359</td><td>0.0139</td><td>0.0283</td><td>0.0089</td></tr>
+<tr><td>T17 this</td><td>0.1500</td><td>0.0646</td><td>0.0371</td><td>0.0147</td><td>0.0254</td><td>0.0083</td></tr>
+<tr><td>T18 main</td><td>0.0906</td><td>0.0051</td><td>0.0381</td><td>0.0127</td><td>0.0274</td><td>0.0073</td></tr>
+<tr><td>T18 this</td><td>0.0915</td><td>0.0052</td><td>0.0396</td><td>0.0154</td><td>0.0236</td><td>0.0077</td></tr>
+</tbody>
+</table></div>
+<p>The keys stage did not shrink: it is not bound by the work per task.
+<code>sort_setup</code> (serial: sampling 1024 keys with prefetch, sorting the sample)
+and the stage hand-offs dominate. Buckets gained 3-4 us, and scatter lost
+about as much. Not pursued. A cheaper <code>sort_setup</code> (fewer samples, or the
+splitters of the last iteration) is the lever left there.</p>
+<p>--- a/src/lanes/share.rs	2026-11-04 16:01:03.000000000 +0000
++++ b/src/lanes/share.rs	2026-11-04 16:10:38.855814138 +0000
+@@ -1346,8 +1346,8 @@
+const ST_BUCKETS: usize = 4;
+/// Parallel sort: jobs per chunk, buckets (between splitters taken from a
+/// sample of <code>SAMPLE</code> keys per bucket).
+-const SORT_CHUNK: usize = 2048;</p>
+<p>negatives/diag-replay.patch: share diag (CUBE_DIAG=<file>) and the
+offline order replay used to measure the top-1 split's headroom.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

@@ -1,0 +1,35 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEGATIVE x-vc: p18bc-variants (not merged) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="1dad831878a4.md">Markdown source</a> · Offline document</p><h1 id="negative-x-vc-p18bc-variants-not-merged">NEGATIVE x-vc: p18bc-variants (not merged)</h1>
+<p>Commit <code>1dad831878a4f0fd4d1495c5f78459566f09aa74</code> · 2026-11-04T15:35:15+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>neg/xvc-p18bc-variants</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>NEGATIVE x-vc: p18bc-variants (not merged)</p>
+<p>From 66a80018509685e68b9bd73249ba520fcebe1217 Mon Sep 17 00:00:00 2001
+From: Ubuntu
+<a href="mailto:super@claude-cube.usubflgyqkfexnnpr2q2liw1rb.bx.internal.cloudapp.net">super@claude-cube.usubflgyqkfexnnpr2q2liw1rb.bx.internal.cloudapp.net</a>
+Date: Wed, 4 Nov 2026 10:51:27 +0000
+Subject: [PATCH] NEUTRAL (x-vc): 18-bit cocsep entries, variants p18b and p18c
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit</p>
+<p>Applies on top of p18 (commit 71eadca on main 55e048e: 18-bit packed cocsep entries, corner depth by class: +1.59%
+median at 1T layout-averaged on 55e048e), two variants that shorten its
+index chain, both worse than p18:</p>
+<ul>
+<li>p18b: rows of 70 tetrad separations padded to 72 entries (162 bytes per
+corner-orientation row, 354 KB instead of 336 KB), so that an entry's
+byte offset in its row and its bit shift come from the tetrad mask
+alone (two small parallel table loads): no <code>shr</code>/<code>and</code> on the chain.</li>
+<li>p18c: p18b, with the entry read from the byte before it and shifted 3
+bits less, so that <code>v &amp; 0x1F8</code> is the symmetry index times 8, a scaled
+index of the 64-byte <code>sym_edge</code> rows: no <code>shl</code>. Its index path is 1 µop
+above main's.</li>
+</ul>
+<p>The index paths are as intended, but register allocation in the stream
+loop gets worse elsewhere (p18b: the table base is rematerialized 4 times
+in the index path; p18c: 25 <code>lea</code> of the table base in the loop vs 17 in
+p18).</p>
+<p>Search unchanged (count.sh random:1000:2026 and depth18 identical to
+main). 1 thread, layout-averaged (abl1t.sh 2 main X 24: 4 lld-shuffled
+layouts x 2 paired runs, bench stream 10 60 1 24, solves/s, base main</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

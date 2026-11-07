@@ -1816,12 +1816,13 @@ impl Lane {
                     && reference.other == child.other
                     && reference.normal == child.normal
             );
-            debug_assert!(
+            debug_assert_eq!(
                 (
                     reference.other_side_bound,
                     reference.other_moves,
                     reference.todo
-                ) == (child.other_side_bound, child.other_moves, child.todo)
+                ),
+                (child.other_side_bound, child.other_moves, child.todo)
             );
         }
         child

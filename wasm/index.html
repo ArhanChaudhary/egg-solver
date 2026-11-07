@@ -111,7 +111,7 @@ const tableLoaded = (t) => {
 
 $('isolation').textContent = crossOriginIsolated
   ? `threads available (${navigator.hardwareConcurrency} cores)`
-  : 'one thread only: the page is not cross-origin isolated (serve it with wasm/serve.mjs)';
+  : 'one thread available on this host';
 if (crossOriginIsolated) $('threads').value = navigator.hardwareConcurrency;
 else $('threads').disabled = true;
 

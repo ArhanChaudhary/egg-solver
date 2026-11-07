@@ -1,0 +1,97 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Per-child job ordering, paid only in iterations on unchanged jobs (c4) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="11e1de09204b.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="per-child-job-ordering-paid-only-in-iterations-on-unchanged-jobs-c4">Per-child job ordering, paid only in iterations on unchanged jobs (c4)</h1>
+<p>Commit <code>11e1de09204b0a6d4f0fd2204b3917d3d6b6d769</code> · 2026-11-03T12:43:25+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>neg/c4-childorder</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>Per-child job ordering, paid only in iterations on unchanged jobs (c4)</p>
+<p>Follow-up of opt/childorder (per-child statistics, two-part iterations;
+-4..6% nodes but neutral throughput), reworked so that the node reduction
+turns into throughput:</p>
+<ul>
+<li>Each job keeps an 8-bit statistic per root child (<code>Job::ck</code>, quantized
+sum of the lookup terms of the child's subtree in the last iteration,
++1 step for children on faces 1, 3, 5, as solver's face weight: -0.3%).
+Job roots always branch on the normal side, so the statistics refer to
+the normal side's children for every job (free side choice with
+whole-job ranking of inverse-side jobs: -4.2% nodes instead of -5.7%;
+nodes/s are the same either way).</li>
+<li>An iteration right after the jobs were extended runs whole jobs by
+decreasing inherited statistic (each new job's is its parent's child's).
+The entries are prepared in <code>extend_jobs</code> when a job's bounds resolve
+(its line is still cached); no sort pass over the jobs.</li>
+<li>An iteration on the same jobs as the previous one (with h11: T &gt;= 18, the
+likely last ones; every such iteration but the last is exhaustive, where
+order does not matter) is split: first one entry per candidate child (ck
+above a sampled threshold, ~3 per job), built branch-free with an
+AVX-512 compress and counting-sorted by ck; a run's group (the job's
+not-yet-run candidates at most one octave below) is formed only when its
+entry is reached (most entries are never reached in the last iteration);
+then each job's remaining children, job by job.</li>
+<li>Job bookkeeping kept cheap: the current job is copied into the lane at
+setup and written back with one 32-byte store at the end of the run
+(piecewise stores followed by a 32-byte load stalled on store
+forwarding); X values (<code>Job::tw</code>) packed with pdep/pext; runs over all
+of a job's children skip the X'-needs-X and face-pruning bookkeeping;
+prefetch of the jobs of the next entry and of one 4 ahead.</li>
+<li>The job-end path (<code>next_run</code>: finish, set up the next run or iteration)
+is out of line and #[cold]: inlined, or merely out of line, the search
+loop got extra spills (2-3% fewer nodes/s on ff2b7a4).</li>
+</ul>
+<p>Soundness: in every iteration, every (job, normal-side child) runs exactly
+once, except children whose root an earlier run of the job proved (lb) or
+whose face it pruned (both imply no solution of the remaining length
+through them); targets rise one at a time, so the first solution found is
+optimal. An X' child runs with its X sibling or with X's other-side value
+recorded in the job (position-only, valid across iterations), and is in
+<code>skip</code> iff that value prunes it. Covered by a unit test that drives the run
+machinery over random jobs with simulated outcomes for several iterations,
+and by a debug assertion at the end of every iteration.</p>
+<p>Nodes/cube (bench random:N:SEED N 48 20; search identical on ff2b7a4 and
+35c608c):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>set</th><th>main</th><th>c4</th><th>change</th><th>lookups main -&gt; c4</th></tr>
+</thead>
+<tbody>
+<tr><td>random:1000:2026</td><td>3295521</td><td>3123776</td><td>-5.21%</td><td>2785769 -&gt; 2642646 (-5.1%)</td></tr>
+<tr><td>random:3000:777</td><td>3249811</td><td>3057611</td><td>-5.91%</td><td>2748179 -&gt; 2587793 (-5.8%)</td></tr>
+<tr><td>depth18 (100)</td><td>3607979</td><td>3697923</td><td>+2.5%</td><td>lengths 18:100</td></tr>
+</tbody>
+</table></div>
+<p>Throughput, 48 threads (bench stream 20 30 48 20, interleaved, solves/s):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>build</th><th>run 1</th><th>run 2</th><th>run 3</th><th>run 4</th><th>run 5</th><th>median</th></tr>
+</thead>
+<tbody>
+<tr><td>main 35c608c</td><td>920.6</td><td>944.4</td><td>926.7</td><td>898.5</td><td>902.1</td><td>920.6</td></tr>
+<tr><td>c4</td><td>948.2</td><td>938.2</td><td>907.5</td><td>893.3</td><td>889.1</td><td>907.5</td></tr>
+</tbody>
+</table></div>
+<p>Median -1.4%; per-run ratios +3.0, -0.7, -2.1, -0.6, -1.4% (mean -0.4%).
+Four further paired stream runs: 899.2/897.6, 893.7/890.9, 902.0/893.3,
+902.3/904.2. On 35c608c this is neutral: the stream needs 6.6% fewer
+nodes, but nodes/s are 6.9% lower (2764/2743/2748/2784 M vs main's
+2964/2942/2971/2969 M): job bookkeeping outside the search loop is 6.3%
+of samples (setup_job 2.5, start_iteration 2.75, next_run 1.1) vs ~3.9%
+for main, and the search loop itself costs ~4% more per node. (On
+ff2b7a4 the same code measured +1.6..+3.4% in paired runs, the search
+loop then matching an earlier variant's; the M4 loop is faster, so the
+fixed costs weigh more.)</p>
+<p>Throughput, 1 thread (bench stream 10 60 1 20, interleaved, solves/s):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>build</th><th>run 1</th><th>run 2</th><th>run 3</th><th>median</th></tr>
+</thead>
+<tbody>
+<tr><td>main 35c608c</td><td>20.083</td><td>19.867</td><td>20.067</td><td>20.067</td></tr>
+<tr><td>c4</td><td>20.000</td><td>20.300</td><td>20.250</td><td>20.250</td></tr>
+</tbody>
+</table></div>
+<p>Median +0.9% (per run -0.4, +2.2, +0.9%).</p>
+<p>Memory: peak RSS 2.76 GB (random:3000 batch; 3.03 GB on a stream run)
+vs 1.08 / 1.50 GB for main: 32-byte jobs (1.4 MB per lane at 43K jobs)
+plus u32 run entries (~0.5-0.7 MB, and as much scratch).</p>
+<p>Verified: check.sh; lengths 18:100 on depth18; 400 random cubes with
+debug assertions (including the end-of-iteration coverage check).</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

@@ -1,0 +1,102 @@
+{
+  "name": "events-physical-22-r1",
+  "config": {
+    "cpus": [
+      1,
+      3,
+      5,
+      7,
+      9,
+      11,
+      0,
+      2,
+      4,
+      6,
+      8,
+      10
+    ],
+    "threads": 12,
+    "memory_policy": "interleave"
+  },
+  "lanes": 24,
+  "page_request": "thp",
+  "mode": "stream",
+  "aux": "MEM_INST_RETIRED.STORES",
+  "isolated_event": false,
+  "command": [
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/numactl",
+    "--physcpubind=1,3,5,7,9,11,0,2,4,6,8,10",
+    "--interleave=0,1",
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/perf",
+    "stat",
+    "--no-big-num",
+    "-x",
+    ";",
+    "--delay=-1",
+    "--control=fifo:/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/.ctl-events-physical-22-r1,/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/.ack-events-physical-22-r1",
+    "-o",
+    "/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/stat/events-physical-22-r1.csv",
+    "-e",
+    "{cycles:u,instructions:u,cpu/config=0x20b,name=egp_mem_inst_retired_stores/u}",
+    "--",
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/bench",
+    "stream",
+    "/home/arhan/tmp/egg-solver-perf-work/tables/h6",
+    "--warmup",
+    "8.0",
+    "--window",
+    "20.0",
+    "--threads",
+    "12",
+    "--lanes",
+    "24",
+    "--seed",
+    "2026",
+    "--load",
+    "copy",
+    "--json"
+  ],
+  "exit_code": 0,
+  "valid": true,
+  "wall_seconds": 35.166242285165936,
+  "counted_window_seconds": 20.000259897,
+  "benchmark": {
+    "type": "stream",
+    "threads": 12,
+    "lanes": 24,
+    "window": 20.0,
+    "share": null,
+    "cubes": 31,
+    "throughput": 1.55,
+    "nodes_per_cube": 4358657.870967742,
+    "lookups_per_cube": 3701089.580645161,
+    "lengths": {
+      "16": 3,
+      "17": 28
+    }
+  },
+  "counters": [
+    {
+      "event": "cycles:u",
+      "count": 581118849892.0,
+      "unit": "",
+      "counter_runtime_ns": 239969088661.0,
+      "running_percent": 100.0
+    },
+    {
+      "event": "instructions:u",
+      "count": 1027021998911.0,
+      "unit": "",
+      "counter_runtime_ns": 239969088661.0,
+      "running_percent": 100.0
+    },
+    {
+      "event": "egp_mem_inst_retired_stores",
+      "count": 83545168777.0,
+      "unit": "",
+      "counter_runtime_ns": 239969088661.0,
+      "running_percent": 100.0
+    }
+  ],
+  "record": false
+}

@@ -1,0 +1,9 @@
+**Result: different tables.** Apart from the benign unread nibbles there are also real differences, so cube48opt10's file is neither our h10 nor a reordering of it.
+- **Bytes:** 29,791,179,308 of 31,130,910,720 bytes (95.7%) differ for real. 172,108,390 differences (8.8% of the 1,945,681,920 groups) are the benign kind: an unread minimum nibble, 15 in theirs and 11 (157,973,301) or 12 (14,135,089) in ours.
+- **First real difference:** offset 0, the minimum byte of group 0. Ours is 06; theirs is 00, the solved state at index 0. Group 0 then holds mostly codes 1/2 in ours and codes 0/1 in theirs.
+- **Entries** (`gen compare`, both read as h10 base 10): 69,126,743,843 of 120,389,068,800 entry codes differ (57.4%). 913,531,947 group minima ≤ base differ, plus 856,376,982 unread ones.
+- **Not a permutation:**
+  - The code histograms are close but not equal. Ours: 0: 1,133,240,200, 1: 11,196,287,163, 2: 64,164,706,157, 3: 44,138,045,520. Theirs: 1,134,918,810 / 11,222,950,329 / 64,306,616,699 / 43,967,793,202.
+  - Ours has 170.3M more entries at code 3 (≥ 13) and 0.15-0.24% fewer at codes 0-2, so ours is slightly higher (stronger) on average. Theirs matches cube48opt10's own generation printout exactly: 11: 11,222,950,329, 12: 64,306,616,699.
+  - This fits a different index mapping (coset numbering or which EO bit is dropped from h11), not a different file format: size, base, the 2-bit codes and the group-minimum slot agree, as n1 found.
+- **What it means for the comparison:** node counts and timings are unaffected, since each solver reads its own table. For cube48opt-rust, the file cannot be swapped with ours.

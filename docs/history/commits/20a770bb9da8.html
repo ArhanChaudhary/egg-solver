@@ -1,0 +1,102 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>lanes: order root children across jobs in the iterations on unchanged jobs (c7) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="20a770bb9da8.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="lanes-order-root-children-across-jobs-in-the-iterations-on-unchanged-jobs-c7">lanes: order root children across jobs in the iterations on unchanged jobs (c7)</h1>
+<p>Commit <code>20a770bb9da8e71bc87079f50a8e4f64af6e67d7</code> · 2026-11-03T20:40:56+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>archive/c7-childsplit</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>lanes: order root children across jobs in the iterations on unchanged jobs (c7)</p>
+<p>In stream mode ~45% of a cube's nodes are in the last iteration, which
+finds its solution after ~6% of its tree, and ~51% in the exhaustive one
+before. Jobs (4-move prefixes) were run whole in the order of one
+statistic each. This patch orders (job, root child) pairs across all jobs
+in the iterations whose jobs are those of the previous iteration (the
+jobs have their full length; with h11 T &gt;= 18: the likely last ones,
+every one but the last exhaustive, where order does not matter).</p>
+<ul>
+<li>Statistic per root child: the lookup terms (8^(16-h)) of a run are
+summed per root child in <code>Lane::cheur[stack[1].m]</code> (at the root, the
+pending child: <code>advance</code> writes its move to <code>stack[sp + 1].m</code> when it
+generates it, branch-free). At the end of a run of a full-length job the
+sums become 8-bit codes (4 steps per octave, +1 step for faces 1, 3, 5:
+12 instead of 15 continuations; -0.6% nodes) in <code>JobX::ck</code>, a 32-byte
+record per job beside <code>jobs</code>, with the root's X values (<code>tw</code>) and the
+children run in this iteration (<code>done</code>, tagged with the target).</li>
+<li>Full-length job roots branch on the normal side (ck refers to its
+moves). Costs +1.3% nodes in T=17 alone; better than keeping the free
+side choice and running inverse-side jobs whole (-5.1% instead of
+-5.7% combined over the two tuning sets in an earlier configuration).</li>
+<li>Split iteration: first part = the root children with the best codes,
+about FIRST = 20% of all of them (threshold from a sample of 1/8 of the
+jobs), counting-sorted by decreasing code across jobs; reaching an entry
+runs its child with the job's other not-yet-run candidates at most one
+octave lower (MERGE). Then the rest (built only if the first part is
+exhausted): one run per job with children left, by decreasing best
+remaining code. Every (job, child) runs exactly once; at T &gt;= 18 no root
+pruning interacts across runs (child bounds &lt;= 13 &lt; r); an X' child run
+without its X sibling takes X's other-side value from <code>JobX::tw</code>
+(position-only), else X runs too.</li>
+<li>The job-end path is out of line and cold (<code>next_run</code>: record the run,
+set up the next, or the next iteration); the run state is boxed
+(<code>RunState</code>) to keep it off the lane's hot lines; a whole run's
+<code>JobX</code> entry is written without reading it (it is not cached; reading
+it cost 2-3% of samples) and prefetched for writing at setup; the sums
+use a tree reduction (a sequential f32 sum was 2% of samples).</li>
+<li>Share mode keeps its ordering (whole jobs by statistic); its job
+statistic is now the sum of <code>cheur</code> at <code>JobDone</code> (share.rs: two resets).</li>
+</ul>
+<p>Tuned on random:1000:2026 and random:3000:777 (FIRST 0.03..0.3, MERGE
+2..12 steps, face bias 0..2 steps, rest order, side handling); checked on
+random:2000:31337. Unit test <code>split_runs_cover_each_child_once</code> drives
+the run machinery with simulated outcomes over random jobs and checks
+coverage, side and X' values; debug assertion at every split iteration's
+end.</p>
+<p>Nodes/cube (count.sh, deterministic; lengths identical to main on all):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>set</th><th>main</th><th>c7</th><th>change</th><th>lookups main -&gt; c7</th></tr>
+</thead>
+<tbody>
+<tr><td>random:1000:2026</td><td>3295521</td><td>3089312</td><td>-6.26%</td><td>2785769 -&gt; 2616086 (-6.09%)</td></tr>
+<tr><td>random:3000:777</td><td>3249811</td><td>3015162</td><td>-7.22%</td><td>2748179 -&gt; 2554521 (-7.05%)</td></tr>
+<tr><td>random:2000:31337</td><td>3290082</td><td>3063050</td><td>-6.90%</td><td>2780457 -&gt; 2593492 (-6.72%)</td></tr>
+<tr><td>depth18 (100)</td><td>3607979</td><td>3990866</td><td>+10.6%</td><td>3053364 -&gt; 3378144, 18:100</td></tr>
+</tbody>
+</table></div>
+<p>(depth18 = 18-move scrambles, not random states: their last iteration is
+worse in a per-child order; c4's order had +2.5% there.)</p>
+<p>Throughput, 1 thread (ab1t.sh, bench stream 10 60 1 20, paired, solves/s):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>build</th><th>run 1</th><th>run 2</th><th>run 3</th><th>median</th></tr>
+</thead>
+<tbody>
+<tr><td>main</td><td>20.667</td><td>20.500</td><td>20.617</td><td>20.617</td></tr>
+<tr><td>c7</td><td>21.217</td><td>21.183</td><td>21.100</td><td>21.183</td></tr>
+</tbody>
+</table></div>
+<p>Median +2.7% (per run +2.7, +3.3, +2.3%).</p>
+<p>Throughput, 48 threads (ab48.sh, bench stream 20 30 48 20, interleaved):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>build</th><th>run 1</th><th>run 2</th><th>run 3</th><th>median</th></tr>
+</thead>
+<tbody>
+<tr><td>main</td><td>930.5</td><td>942.5</td><td>932.9</td><td>932.9</td></tr>
+<tr><td>c7</td><td>955.9</td><td>959.8</td><td>935.7</td><td>955.9</td></tr>
+</tbody>
+</table></div>
+<p>Median +2.5% (per run +2.7, +1.8, +0.3%; mean +1.6%).</p>
+<p>Per node the stream costs ~4% more than main (1T perf, stream window:
+69.9M vs 73.1M nodes/s): job bookkeeping outside the loop 3.3% of
+samples (next_run, setup_run, start_iteration) vs main's inlined
+setup_job, and ~1% in the loop (the per-child slot; 0.5% for the
+store-based slot vs 0.8% for a select on sp).</p>
+<p>Share mode: solve -c 0 and -c 1 on testdata/random_state.txt (8 threads):
+500 solved, no BAD, per-cube lengths identical to main. Share batch
+(random:1000:2026 1000 8 20 share, two CCD slots, paired, solves/s):
+main 151.5 151.4 153.9 150.6 155.2 154.0 151.9, c7 147.7 146.6 152.9
+152.8 152.8 154.6 154.1: per run -2.5 -3.2 -0.6 +1.5 -1.5 +0.4 +1.5%
+(median -0.6%, within this run-to-run noise).</p>
+<p>Memory: +1.4 MB per lane (43239 x 32-byte JobX) and run entries
+(~0.45 MB, as much scratch).</p>
+<p>Verified: check.sh; lengths above; depth18 18:100.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

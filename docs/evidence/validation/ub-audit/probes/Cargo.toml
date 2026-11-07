@@ -1,0 +1,6 @@
+[package]
+name="egg-solver-ub-audit-probes"
+version="0.0.0"
+edition="2021"
+[dependencies]
+egg-solver={path="../source",default-features=false}

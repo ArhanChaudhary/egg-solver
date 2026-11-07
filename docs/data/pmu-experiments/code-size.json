@@ -1,0 +1,55 @@
+[
+  {
+    "variant": "base",
+    "path": "/data/agents/pmu-opt/bin/base-p16-bench",
+    "symbols": [
+      {
+        "address": "0000000000041a90",
+        "bytes": 6863,
+        "symbol": "bench::stream_thread::<bench::run::{closure#1}::{closure#0}::{closure#0}>"
+      },
+      {
+        "address": "00000000000d2870",
+        "bytes": 1600,
+        "symbol": "<egg_solver::lanes::Lane>::advance_cold"
+      }
+    ]
+  },
+  {
+    "variant": "bytes",
+    "path": "/data/agents/pmu-opt/bin/bytes-p16-bench",
+    "symbols": [
+      {
+        "address": "0000000000041a90",
+        "bytes": 6879,
+        "symbol": "bench::stream_thread::<bench::run::{closure#1}::{closure#0}::{closure#0}>"
+      },
+      {
+        "address": "00000000000d28b0",
+        "bytes": 1600,
+        "symbol": "<egg_solver::lanes::Lane>::advance_cold"
+      }
+    ]
+  },
+  {
+    "variant": "outline",
+    "path": "/data/agents/pmu-opt/bin/outline-p16-bench",
+    "symbols": [
+      {
+        "address": "0000000000041a90",
+        "bytes": 4159,
+        "symbol": "bench::stream_thread::<bench::run::{closure#1}::{closure#0}::{closure#0}>"
+      },
+      {
+        "address": "00000000000d11c0",
+        "bytes": 5,
+        "symbol": "<egg_solver::lanes::Lane>::advance_cold"
+      },
+      {
+        "address": "00000000000d11d0",
+        "bytes": 1600,
+        "symbol": "<egg_solver::lanes::Lane>::advance"
+      }
+    ]
+  }
+]

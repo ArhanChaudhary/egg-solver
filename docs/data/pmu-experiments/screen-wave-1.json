@@ -1,0 +1,28 @@
+{
+  "wave": 1,
+  "repeat": 1,
+  "pad": 16,
+  "records": [
+    {
+      "variant": "bytes",
+      "pad": 16,
+      "slot": 2,
+      "throughput": 4.133,
+      "log": "/data/agents/pmu-opt/logs/screen-w1-bytes.log"
+    },
+    {
+      "variant": "outline",
+      "pad": 16,
+      "slot": 3,
+      "throughput": 3.867,
+      "log": "/data/agents/pmu-opt/logs/screen-w1-outline.log"
+    },
+    {
+      "variant": "base",
+      "pad": 16,
+      "slot": 4,
+      "throughput": 4.167,
+      "log": "/data/agents/pmu-opt/logs/screen-w1-base.log"
+    }
+  ]
+}

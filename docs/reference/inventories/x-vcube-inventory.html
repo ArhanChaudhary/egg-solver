@@ -1,0 +1,207 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>vcube technique inventory (x-vc) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../../history/index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="x-vcube-inventory.md">Markdown source</a> · Offline document</p><details><summary>On this page</summary><ul><li><a href="#a-cube-representation-and-simd-operations">A. Cube representation and SIMD operations</a></li><li><a href="#b-coordinates-table-index-and-table-entry">B. Coordinates, table index and table entry</a></li><li><a href="#c-search-loop">C. Search loop</a></li><li><a href="#d-memory-threads-system">D. Memory, threads, system</a></li><li><a href="#e-per-operation-cost-vcube-vs-ours-microbenchmark">E. Per-operation cost: vcube vs ours (microbenchmark)</a></li><li><a href="#f-index-chain-study-b6-footprint-idea-7-4-ranking-chain-latency">F. Index chain study (B6 footprint, idea 7.4 ranking, chain latency)</a></li><li><a href="#g-hot-working-set-audit-l1-l2-by-structure">G. Hot working-set audit (L1/L2 by structure)</a></li></ul></details><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="vcube-technique-inventory-x-vc">vcube technique inventory (x-vc)</h1>
+<p>Source read in full: <code>~/ref/vcube/src/*</code> (avx2_cube.h, sse_cube.h, types.h, cube.h/.cpp,
+cube6.h, nxprune.h/.cpp, nxprune_generator.h, nxsolve.h/.cpp, vc-optimal.cpp, alloc.h/.cpp,
+util.h/.cpp, const-cubes.h, gen-const-cubes.cpp), README.md, doc/speffz.md, CMakeLists.txt, tests/.
+Ours = main 55e048e (<code>~/cube-opt</code>; the file:line references and names are from 55e048e, before s8's renames). vcube paths are relative to <code>~/ref/vcube/src/</code>.</p>
+<p>Verdicts: <strong>done</strong> (we have it, or a stronger form), <strong>n/a</strong> (does not apply to an H48 h11
+48-symmetric single-coset table, or not on a throughput path), <strong>gap</strong> (applies, we lack it).</p>
+<p>STATUS: complete (main f8a4919). No patch delivered: the cocsep compaction is neutral (gain within code/data placement effects). Negatives and diagnostics with numbers: $P/x-vc/neg-*.patch.</p>
+<p><strong>Summary.</strong> About 50 vcube techniques. Nearly all are done in our solver (often in a stronger form)
+or do not apply to a 48-symmetric single-coset H48 table (the cube6 axis lookups and their
+&quot;+1 if all equal&quot; / axis-tight rules have single-coset analogs we already use: NO_HALF, X2/X' twins).
+Per-op costs are equal (move, premove) or lower (child cubes 12.5 vs 53.8 Ir, index 45 vs 69 Ir).
+Gaps: C12 (15 duplicate depth-4 jobs, 0.035%) and C13 (prefix-cube table, &lt;= 0.4% Ir) are too small
+to pay. B6 (vcube's compact corner sym table) does not carry over as such, but its point does: the
+cocsep table's L2 footprint costs ~1.6% per +33% (s4); 18-bit packed entries (p18) gained +1.6% at 1T
+layout-averaged on 55e048e but nothing in its dense form on later code; the row-padded form read 4 bits
+up (p18d) gained +1.2% at 1T on m7's WIP placement but -0.7% (stream) and -1.5% (share) at 1T on main
+f8a4919 with the same stream-loop code at the same pinned offset, and is neutral at 48T: not merged
+(section F). Mechanism: ~-30% cocsep L2 misses (cache model) = ~+1%, paid back in 1-2 µops and ~1 cycle.
+Calibrations: ~0.15-0.2% per cycle of index-chain latency; ~12 cycles (1% per 140K
+per cube) per extra cocsep L2 miss. Working-set audit (section G): the table lines insert 78% of the L2
+lines and the cocsep entries are their victim; all other structures together insert 5.6%.</p>
+<h2 id="a-cube-representation-and-simd-operations">A. Cube representation and SIMD operations</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>where in vcube</th><th>what it does</th><th>ours</th><th>applicable / why</th><th>expected gain</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>A1</td><td>Whole cube in one 256-bit register</td><td>cube.h:353-376</td><td>Edges in bytes 0..11 (<code>---OEEEE</code>), corners in bytes 16..23 (<code>--OO-CCC</code>); one register per cube</td><td>simd.rs:1-6,114-116 (corners bytes 0..7 <code>piece | co&lt;&lt;5</code>, edges 16..27 <code>piece | eo&lt;&lt;4</code>)</td><td>yes</td><td>—</td><td>done</td></tr>
+<tr><td>A2</td><td>Unused bytes hold identity values</td><td>avx2_cube.h:39-49</td><td>Bytes 12..15 / 24..31 = identity, so composes keep them valid and full-width compares need no mask</td><td>simd.rs:186-190, 256-262 (garbage bytes, <code>USED</code> mask in <code>vptest</code>)</td><td>alternative</td><td>ours is 2 ops (xor+vptest) vs vcube 3 (cmpeq+movemask+cmp); no gain</td><td>done (better)</td></tr>
+<tr><td>A3</td><td>Compose = 1 <code>vpshufb</code> + orientation add + mod-3 via <code>min(x, x - carry)</code></td><td>avx2_cube.h:78-99</td><td>Permutation by shuffle, twist add, carry fix-up with unsigned min</td><td>simd.rs:180-192</td><td>yes</td><td>—</td><td>done</td></tr>
+<tr><td>A4</td><td>Move = compose with a constant move cube</td><td>cube.h:443-445</td><td><code>c.move(m) = compose(moves[m])</code>: shuffle, and, add, sub, min</td><td>simd.rs:194-203 (<code>apply_move</code>: orientation term precomputed in <code>MOVES_ORI</code>, no AND)</td><td>yes</td><td>Ir per move: ours 4.56, vcube 4.44 (vcube's AND constant-folded in the unrolled bench loop; with a variable move it is 1 more); ns/move 0.35 both (microbench below)</td><td>done (ours ≤)</td></tr>
+<tr><td>A5</td><td>Premove = compose with the move on the left</td><td>cube.h:447-449</td><td><code>moves[m].compose(c)</code></td><td>simd.rs:205-209 (<code>premove_inv</code>, inverse moves table <code>INV_MOVES</code>)</td><td>yes</td><td>Ir 5.78 both; 0.35 ns both</td><td>done</td></tr>
+<tr><td>A6</td><td>Mirror compose (subtract twists) for reflections</td><td>avx2_cube.h:87-96, cube.h:51-60</td><td><code>%</code> operator: corner twist subtracted for S_LR2-mirrored left operand</td><td>simd.rs:269-280 (<code>transform</code> + <code>invert_co</code> for mirrors)</td><td>only in table/cocsep generation</td><td>none (not on the search path)</td><td>n/a</td></tr>
+<tr><td>A7</td><td>Inverse by the addition chain c^27719 (19 <code>vpshufb</code>)</td><td>avx2_cube.h:118-174</td><td>LCM of cycle lengths is 27720; measured 9-10% faster than a 12-step brute force</td><td>simd.rs:223-254 (same chain)</td><td>yes, but only at cube start</td><td>—</td><td>done</td></tr>
+<tr><td>A8</td><td>Bit-plane extraction <code>movemask(slli(v, 7-b))</code></td><td>avx2_cube.h:51-53, sse_cube.h:295-297</td><td>Bit b of every byte as a mask in 2 ops (E-slice/D-layer/eo bits are bits of the piece number)</td><td>coord.rs:222-230, 274-288 (same; <code>vpmovmskb</code> via asm to avoid <code>vptestmb+kmovd</code>)</td><td>yes</td><td>—</td><td>done</td></tr>
+<tr><td>A9</td><td>Piece numbering so that class membership is a bit of the piece index</td><td>cube.h:353-375, nxprune.h:94-97</td><td>E-slice edges have bit 3 set, D-layer bit 2: masks by one shift+movemask</td><td>coord.rs:221-230, build.rs (SYM_EDGE classifies pieces into bits 7/6)</td><td>yes</td><td>—</td><td>done</td></tr>
+<tr><td>A10</td><td><code>edgecube</code>: 128-bit edges-only cube for coordinate work</td><td>cube.h:455-509, sse_cube.h:317-321</td><td>Edge-only compose (shuffle, and, xor: no mod-3) for symmetry conjugation</td><td>coord.rs:245-297 (<code>edge_parts_sym</code>: classify pieces, then one permuting shuffle; no full conjugation)</td><td>the idea (edges-only work) yes; 128 vs 256 bits no (Zen 5 runs 256-bit ops at full rate)</td><td>ours does less work than an edge conjugation</td><td>done (better)</td></tr>
+<tr><td>A11</td><td>Corner-orientation rank via <code>pmaddwd</code> dot product</td><td>sse_cube.h:333-347</td><td>co coordinate from the 0x30 bits by madd with powers of 3 and a horizontal sum</td><td>coord.rs:156-219 (2 <code>pext</code> + 3 LUT loads, pre-multiplied by 70 and by 3)</td><td>yes</td><td>ours shorter (no horizontal sum)</td><td>done (better)</td></tr>
+<tr><td>A12</td><td>Ordering <code>less_than</code> from two movemasks</td><td>avx2_cube.h:59-76</td><td><code>gt &lt; lt</code> of the two compare masks = lexicographic order</td><td>—</td><td>only for std::set (table gen, depth-4 dedup)</td><td>none</td><td>n/a</td></tr>
+<tr><td>A13</td><td>SIMD parity, corner-orientation unrank, <code>xor_edge_orient</code></td><td>avx2_cube.h:101-116, 188-254</td><td>Input validation and table generation helpers</td><td>cubie.rs (scalar)</td><td>not on a hot path</td><td>none</td><td>n/a</td></tr>
+<tr><td>A14</td><td>Nibble-list factorial rank/unrank with <code>bextr</code> (<code>table -= 0x1111.. &lt;&lt; shift</code>)</td><td>cube.h:241-321</td><td>Lehmer code without a loop over remaining elements</td><td>—</td><td>we never rank full permutations</td><td>none</td><td>n/a</td></tr>
+<tr><td>A15</td><td><code>pdep</code> construction of representative cubes from combination ranks</td><td>cube.cpp:244-300</td><td>Builds a cube for a 8C4 / 12C4 rank with two <code>pdep</code></td><td>coord.rs:345-372 (<code>cube_from_edge_key</code>, loop)</td><td>table generation only</td><td>none</td><td>n/a</td></tr>
+<tr><td>A16</td><td>Constants generated as code (<code>gen-const-cubes</code> -&gt; const-cubes.h)</td><td>gen-const-cubes.cpp</td><td>Moves, symmetries, inverse map, move_sym6 as constexpr</td><td>build.rs (MOVES, MOVES_ORI, INV_MOVES, SYM_T/TINV, SYM_EDGE)</td><td>yes</td><td>—</td><td>done</td></tr>
+</tbody>
+</table></div>
+<h2 id="b-coordinates-table-index-and-table-entry">B. Coordinates, table index and table entry</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>where in vcube</th><th>what it does</th><th>ours</th><th>applicable / why</th><th>expected gain</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>B1</td><td>2-bit entries with a base, 4-bit minimum per 16-byte group of 64 entries (&quot;stripe-min&quot;), 2 entries per group reserved</td><td>nxprune.h:105-109, 354-363; nxprune_generator.h:256-283</td><td><code>val ? BASE+val : stripe[0] &amp; 0xf</code></td><td>solver.rs:122-137 (same layout; code 0 -&gt; <code>max(group min, corner depth)</code>)</td><td>yes</td><td>—</td><td>done (ours adds the corner depth)</td></tr>
+<tr><td>B2</td><td>Reserved slots made by arithmetic: <code>ecomb += (ecomb+63)*33/2048*2</code></td><td>nxprune.h:105-109</td><td>Gaps for the group minimum computed per lookup (33/2048 ~ 1/62)</td><td>coord.rs:58-79 (gaps baked into the <code>ESLOT</code> table)</td><td>yes</td><td>ours saves ~5 ops per index</td><td>done (better)</td></tr>
+<tr><td>B3</td><td>nCk ranks by LUT (<code>rank_12C4</code> 4096 x u16, <code>rank_8C4</code> 256 x u8)</td><td>util.h:29-105</td><td>Combination rank from a bit mask in one load</td><td>coord.rs:58-131 (<code>ESLOT</code>/<code>eslot_c</code>, <code>RANK8</code>)</td><td>yes</td><td>—</td><td>done</td></tr>
+<tr><td>B4</td><td><code>pext</code> to compress a mask relative to another (D-layer among non-E positions)</td><td>nxprune.h:99, cube.h:130-135</td><td>8C4 rank of the U/D split</td><td>coord.rs:238-239, 293 (msplit = <code>RANK8[pext(S, ~E)]</code>)</td><td>yes</td><td>—</td><td>done</td></tr>
+<tr><td>B5</td><td>Odd-even bit order 4! rank from movemask bits</td><td>util.h:67-88, cube.h:121-128</td><td>E-slice permutation rank without unpacking</td><td>—</td><td>h11 has no E-slice permutation</td><td>none</td><td>n/a</td></tr>
+<tr><td>B6</td><td>Corner sym-coordinate by two small tables: <code>index[co] = {base, os*, prune*}</code>, <code>os[c4comb] = {offset, sym}</code>, 139 deduplicated <code>os</code> rows</td><td>nxprune.h:288-348, nxprune.cpp:29-81</td><td>9930 sym classes of (co, 8C4) under 16 symmetries from ~72 KB of tables instead of a 153090-entry table</td><td>tables.rs:20-24, 165-178 + solver.rs:113-120 (one packed 3-byte entry per cocsep coordinate, 448 KB of lines, on a THP)</td><td>vcube's factoring needs a product action of the symmetries on (co, sep); under H48's 48 symmetries URF3 changes co depending on sep (measured: every sep sees all 48 ttreps; the 70 seps form 8 orbits), so the 2-level form would put a corner conjugation on the index chain. <strong>But the footprint matters:</strong> 4-byte stride of the same data (612 KB) = -1.6% median over 8 layout pairs (all 8 negative); the access histogram is flat (top 45% of coordinates = 50% of accesses), so only true compaction helps.</td><td>see section F (p18: 18-bit entries + per-class depth, 336 KB; p18b: rows padded to 72, 354 KB)</td><td>gap -&gt; prototyped; neutral (placement-dependent: +1.2% / -0.7% at 1T, 48T 0, share -1.5%; F)</td></tr>
+<tr><td>B7</td><td>Per-corner-orient precomputed table row pointer (<code>idx.prune = table + base*stride</code>)</td><td>nxprune.cpp:77-81, nxprune.h:369</td><td>No class multiply at lookup</td><td>coord.rs:303-309 (<code>row * row_mul</code>, off the critical path: class is known before msplit)</td><td>yes</td><td>none: the multiply overlaps the edge chain</td><td>done (equivalent)</td></tr>
+<tr><td>B8</td><td>Edge coordinate after symmetry conjugation: 2 edge composes, then 3-5 bit planes</td><td>nxprune.h:89-141</td><td><code>ec.symConjugate(sym)</code> then movemasks</td><td>coord.rs:245-309 (one classify shuffle + one permute shuffle with per-symmetry 64-byte line, no orientation fix-up)</td><td>yes</td><td>index Ir: ours 45, vcube 69 (microbench)</td><td>done (better)</td></tr>
+<tr><td>B9</td><td>Prefetch hint T0</td><td>nxprune.h:370</td><td><code>_mm_prefetch(stripe, _MM_HINT_T0)</code></td><td>solver.rs:139-147 (NTA)</td><td>yes</td><td>T0 measured -1.0% 1T (neg/m6-prefetch-t0-t1)</td><td>done (NTA better)</td></tr>
+<tr><td>B10</td><td>All of a node's lookups prefetched before the first is read (MLP 5-6 per node)</td><td>nxprune.h:382-390</td><td>6 index computations + prefetches, then reads in order</td><td>lanes.rs:1-30, 1408-1500 (24 lanes, one miss each, round robin)</td><td>yes</td><td>ours has 24 misses in flight per thread</td><td>done (better)</td></tr>
+<tr><td>B11</td><td>Lookups of the 3 axis conjugates (cube6) on each side</td><td>cube6.h:327-390, nxprune.h:382-464</td><td>A 16-symmetric (U/D axis) table looked up after conjugating by URF3 and URF3^2</td><td>—</td><td>H48's coset is 48-symmetric: the conjugates have the same value</td><td>none</td><td>n/a</td></tr>
+<tr><td>B12</td><td>&quot;+1 when all three axis values are equal&quot; (`prune_cmp</td><td>= blsi &lt;&lt; 1`, then highest bit)</td><td>nxprune.h:420-425, 448-453</td><td>The last move lies in one axis' subgroup, so length &gt;= min over axes + 1</td><td>solver.rs:256-262, lanes.rs:1243-1248 (single-coset analog: half turns are in H, so a tight bound on one side removes the other side's half turns)</td><td>the multi-axis form needs &gt;= 2 different cosets; H48 has one</td><td>none beyond the NO_HALF masks we have</td></tr>
+<tr><td>B13</td><td>Inherited value of the unchanged axis (<code>skip</code>/<code>val</code>)</td><td>nxprune.h:382-394, nxsolve.h:142-144, 168-170</td><td>A move on axis a leaves the other side's axis-a coset unchanged: reuse its value</td><td>lanes.rs:1040-1053, 1116-1131 (X2 keeps the other side's value; X' reuses its X sibling's <code>tw</code>)</td><td>yes</td><td>—</td><td>done (ours covers X2 and X')</td></tr>
+<tr><td>B14</td><td>Tight axis -&gt; drop all that axis' moves on the other side (<code>axis_mask_expand</code>)</td><td>nxsolve.h:60-63, 119-120, nxprune.h:455-461</td><td>The nxopt subgroup contains the axis' quarter turns too</td><td>lanes.rs:1243-1248, solver.rs:256-262 (<code>NO_HALF</code> when the other side's bound is tight)</td><td>H contains only half turns for H48</td><td>—</td><td>done (H48 form)</td></tr>
+<tr><td>B15</td><td>Early exit per value, ordered: forward axes first</td><td>nxprune.h:396-444</td><td>Stop reading values once one prunes</td><td>lanes.rs:1040-1053 (other side first: inverse-first; prunes 87% at tight bounds)</td><td>yes</td><td>—</td><td>done (better order)</td></tr>
+</tbody>
+</table></div>
+<h2 id="c-search-loop">C. Search loop</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>where in vcube</th><th>what it does</th><th>ours</th><th>applicable / why</th><th>expected gain</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>C1</td><td>IDA* from the root's lookup bound</td><td>nxsolve.h:75-96, nxprune.h:466-470</td><td><code>initial_depth</code> then increasing depth</td><td>lanes.rs:451-475 (<code>max(ln, li, 1)</code>)</td><td>yes</td><td>—</td><td>done</td></tr>
+<tr><td>C2</td><td>Bidirectional search: each node branches on the side (moves vs premoves) with fewer allowed moves</td><td>nxsolve.h:119-133</td><td>popcount of the two move masks</td><td>lanes.rs:1250-1260 (<code>child_node</code>), 1322-1350 (<code>make_node</code>)</td><td>yes</td><td>—</td><td>done</td></tr>
+<tr><td>C3</td><td>Side tie-break: larger sum of pruning values</td><td>nxsolve.h:124-131</td><td>Ties of the branching factor go to the side with the larger sum</td><td>lanes.rs:1255, 1335 (ties to the normal side)</td><td>yes</td><td>tested: neg/a2-side-tiebreak (by bound) -0.07% nodes, no throughput effect</td><td>done (negative)</td></tr>
+<tr><td>C4</td><td>Canonical sequences: no same face twice, opposite faces in one order</td><td>nxsolve.h:65-68</td><td><code>last_face_mask</code></td><td>solver.rs:12-27 (<code>ALLOWED_AFTER</code>)</td><td>yes</td><td>—</td><td>done</td></tr>
+<tr><td>C5</td><td>Sibling-face pruning: a child value 2 over the limit drops its face</td><td>nxsolve.h:147-153, 172-179</td><td><code>mask &amp;= ~7 &lt;&lt; 3*face</code></td><td>lanes.rs:983, 1081-1095 (eager, branch-free <code>face_keep</code>)</td><td>yes</td><td>—</td><td>done</td></tr>
+<tr><td>C6</td><td>Bidirectional pathmax (BPMX): return <code>child - 1</code> when it exceeds the limit</td><td>nxsolve.h:23-27, 146-149</td><td>Back-jump from a child's learned bound</td><td>lanes.rs:955-990, 1315-1320 (<code>lb</code>, <code>max_dec</code>, pops when <code>lb &gt; r</code>)</td><td>yes</td><td>—</td><td>done</td></tr>
+<tr><td>C7</td><td>Leaf: solved test without a lookup at depth 0</td><td>nxsolve.h:105-107</td><td><code>c6 != cube()</code></td><td>lanes.rs:1006-1017 (r1 == 0: move and test, no lookup; r == 1 nodes use the moves allowed on both sides)</td><td>yes</td><td>—</td><td>done (better)</td></tr>
+<tr><td>C8</td><td>Lookups at every depth</td><td>nxsolve.h:109-114</td><td>Also when the limit exceeds BASE+3</td><td>lanes.rs:1006-1031 (no lookup when r1 &gt; base+3: no value can prune)</td><td>—</td><td>—</td><td>done (better)</td></tr>
+<tr><td>C9</td><td>Depth-4 job queue for deep iterations</td><td>nxsolve.h:190-257, nxsolve.cpp:23-46</td><td>Above BASE+4, search each depth-4 position as a job</td><td>solver.rs:155-163, lanes.rs:478-551 (jobs extended to 4 moves above base+3)</td><td>yes</td><td>—</td><td>done</td></tr>
+<tr><td>C10</td><td>Jobs ordered by the previous iteration's cost, face-weighted by sqrt(3):sqrt(2) (58206:47525)</td><td>nxsolve.h:229-239</td><td>Densest subtrees first in the next iteration</td><td>lanes.rs:93-106 (same weights) + per-child statistic (c7/c8)</td><td>yes</td><td>ours: steeper lookup statistic (aa43192) and child-level order (-6..-8% nodes)</td><td>done (better)</td></tr>
+<tr><td>C11</td><td>2-pass LSD radix sort on a 16-bit float key</td><td>nxsolve.h:211-253</td><td>Sort 43K jobs cheaply</td><td>lanes.rs:108-145 (3-pass 32-bit radix, skips constant digits); runs counting sort</td><td>yes</td><td>one 43K sort per cube (~0.3% of cycles); a 16-bit key would change ties (search)</td><td>done</td></tr>
+<tr><td>C12</td><td>Depth-4 jobs deduplicated by position (43,239 unique)</td><td>nxsolve.cpp:301-320</td><td>std::set of cubes: the 15 duplicate canonical 4-move sequences (all half turns, e.g. R2 F2 D2 U2 = U2 F2 D2 R2) are searched once</td><td>lanes.rs:478-551 (43,254 canonical sequences)</td><td>yes</td><td>measured: 15 of 43,254 jobs (0.035%); half-turn-only prefixes keep the root's H48 coset, so their subtrees are mostly pruned early: &lt; 0.035% nodes</td><td>gap (negligible; not worth code)</td></tr>
+<tr><td>C13</td><td>Job roots by composing precomputed depth-4 cube6 with the input (one compose per cube)</td><td>nxsolve.h:190-195, cube6.h:348-357</td><td><code>c6 * q.c6</code> instead of replaying moves</td><td>lanes.rs:438-449 (<code>job_cubes</code>: 4 moves + 4 premoves per job setup)</td><td>yes</td><td>measured: 50,140 <code>job_cubes</code> calls per cube (random:1000:2026) x ~53 Ir = 2.7M Ir vs ~450M Ir per cube (0.6%); a shared 2.8 MB prefix table would save at most ~0.4% Ir and adds L3 traffic. A per-lane cache variant was negative (neg/c7-jobcache).</td><td>n/a (bounded below noise)</td></tr>
+<tr><td>C14</td><td>Face from move index by <code>popcnt(011111 &lt;&lt; m &gt;&gt; 15)</code></td><td>nxsolve.h:139, 165</td><td>Division-free m/3</td><td>lanes.rs:998-1000 (<code>m / 3</code> as imul+shift; <code>kind = m - 3*face</code>)</td><td>yes</td><td>asm (stream loop): <code>imul ecx, r14d, 0x56; shr ecx, 8</code> = 2 µops, 4 cycles; vcube's <code>shlx; shr; popcnt</code> = 3 µops, 3 cycles: one µop more for one cycle less on a chain off the value path</td><td>n/a (no net gain; kernel micro, m7's area)</td></tr>
+<tr><td>C15</td><td>Moves of both directions in one array with a 0x80 flag</td><td>nxsolve.h:155-157, 181-183, 259-271</td><td>Rebuild the solution at the end</td><td>lanes.rs:1291-1307 (<code>m_normal</code> per node)</td><td>yes</td><td>—</td><td>done</td></tr>
+<tr><td>C16</td><td>Recursive DFS, cube6 by const reference, 6 composes per child</td><td>nxsolve.h:104-188</td><td></td><td>lanes.rs (explicit stack, 2 composes per child, lanes)</td><td>—</td><td>ours: 12.5 Ir per child's cubes vs 53.8</td><td>done (better)</td></tr>
+</tbody>
+</table></div>
+<h2 id="d-memory-threads-system">D. Memory, threads, system</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>where in vcube</th><th>what it does</th><th>ours</th><th>applicable / why</th><th>expected gain</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>D1</td><td>Huge pages: 1 GB, else 2 MB, else 4 KB (<code>MAP_HUGETLB</code> with size bits)</td><td>alloc.cpp:31-58</td><td></td><td>tables.rs:234-290 (hugetlbfs file: 1 GB pages) + THP for the cocsep table (tables.rs:209-232)</td><td>yes</td><td>—</td><td>done</td></tr>
+<tr><td>D2</td><td>Table kept in SysV shared memory with <code>SHM_HUGETLB</code> across runs</td><td>alloc.cpp:60-90, nxprune.cpp:130-162</td><td>Fast startup</td><td>tables.rs:503-548 (table file on /mnt/huge hugetlbfs, mapped read-only)</td><td>yes</td><td>—</td><td>done (equivalent)</td></tr>
+<tr><td>D3</td><td>One solver per thread, whole cubes per thread, mutex-protected input</td><td>vc-optimal.cpp:364-422</td><td>Cube-level parallelism</td><td>lanes.rs:1408-1500 (stream: atomic counter) + lanes/share.rs (work sharing)</td><td>yes</td><td>—</td><td>done</td></tr>
+<tr><td>D4</td><td>clang instead of GCC; <code>-mavx2 -mbmi -mbmi2 -mlzcnt</code></td><td>CMakeLists.txt:22-28</td><td></td><td>.cargo/config.toml (target-cpu=native), Cargo.toml (fat LTO, cgu 1, panic=abort)</td><td>yes</td><td>a7: all toolchain variants neutral/negative</td><td>done</td></tr>
+<tr><td>D5</td><td><code>nopti</code> (no Meltdown page-table isolation): README says +35% on i7-7700K</td><td>README.md</td><td>kernel parameter</td><td>—</td><td>this Zen 5 is not affected by Meltdown (<code>/sys/.../vulnerabilities/meltdown</code>: Not affected), so there is no PTI to remove; the hot loop makes no syscalls</td><td>none</td><td>n/a</td></tr>
+<tr><td>D6</td><td>Faster memory (XMP, timings)</td><td>README.md</td><td></td><td>—</td><td>hardware (Azure VM)</td><td>—</td><td>n/a</td></tr>
+<tr><td>D7</td><td>Atomic table save (write <code>.tmp</code>, rename)</td><td>nxprune.cpp:83-100</td><td></td><td>tables.rs:557-562</td><td>robustness, not speed</td><td>—</td><td>n/a</td></tr>
+<tr><td>D8</td><td>Table generation: corner-class neighbour pairs, mod-3 frontier codes, stripe-min, <code>zero_visited</code>, <code>pext</code> frontier scan, dirty filter</td><td>nxprune_generator.h</td><td></td><td>gen.rs (2-bit BFS on h11, frontier relabel pass, group minima)</td><td>generation is offline (table exists)</td><td>—</td><td>n/a</td></tr>
+</tbody>
+</table></div>
+<h2 id="e-per-operation-cost-vcube-vs-ours-microbenchmark">E. Per-operation cost: vcube vs ours (microbenchmark)</h2>
+<p><code>/data/agents/x-vc/vcube/opbench.cpp</code> (vcube's own headers, clang 18 -O3, coord 308 = EP3/EO8 index)
+vs <code>/data/agents/x-vc/cube-opt/examples/opbench.rs</code> (branch x-vc-diag). 4096 random cubes, 1 thread on a
+bench slot. Ir from callgrind on x86-64-v3 builds (<code>/data/agents/x-vc/bin/fnsum.py</code>), ns native.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>operation</th><th>vcube Ir</th><th>ours Ir</th><th>vcube ns (native / Haswell flags)</th><th>ours ns (native)</th></tr>
+</thead>
+<tbody>
+<tr><td>move (forward side)</td><td>4.44</td><td>4.56</td><td>0.36 / 0.28</td><td>0.35</td></tr>
+<tr><td>premove (other side)</td><td>5.78</td><td>5.78</td><td>0.36 / 0.34</td><td>0.35</td></tr>
+<tr><td>child cubes (vcube: cube6, 6 composes; ours: 2)</td><td>53.8</td><td>12.5</td><td>1.87-1.93 / 2.21</td><td>0.65</td></tr>
+<tr><td>table index of one cube (no prefetch)</td><td>69.0</td><td>45.0</td><td>4.8-5.0</td><td>2.75-2.81</td></tr>
+<tr><td>move, dependent chain (latency)</td><td>—</td><td>—</td><td>1.86-1.91</td><td>1.83-1.86</td></tr>
+<tr><td>index, dependent chain incl. a <code>% n</code> (latency)</td><td>76.0</td><td>52.0</td><td>21.5-22.5</td><td>15.2-15.5</td></tr>
+</tbody>
+</table></div>
+<p>Per expanded node vcube computes 6 cubes per child and up to 6 indices; we compute 2 cubes and 1-2 indices.</p>
+<h2 id="f-index-chain-study-b6-footprint-idea-7-4-ranking-chain-latency">F. Index chain study (B6 footprint, idea 7.4 ranking, chain latency)</h2>
+<p>Layout-averaged 1T A/B (<code>abl1t.sh 2 A B 24</code>: 4 lld-shuffled layouts x 2 paired runs = 8 pairs; B/A).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>experiment</th><th>what changes</th><th>result</th></tr>
+</thead>
+<tbody>
+<tr><td>s4 (diagnostic)</td><td>packed cocsep entries at a 4-byte stride (612 KB), same data, same code</td><td><strong>-1.6% median, 8/8 pairs negative</strong> (-1.95 -2.14 -0.82 -0.20 -2.96 -2.11 -1.48 -1.34)</td></tr>
+<tr><td>dlat vs dnolat (diagnostic)</td><td>3 dependent <code>imul x,x,1</code> (+9 cycles) on the packed entry (delays ttrep, class, corner depth) vs the same imuls off the chain</td><td>-1.70% median over 4 pairs (-2.41 +0.69 -1.41 -1.70): about <strong>0.15-0.2% per cycle</strong> of index-chain latency (m7's value chain: 0.35%/cycle). $P/x-vc/neg-diag-index-chain-latency.patch</td></tr>
+<tr><td>access histogram (diag)</td><td>per-coordinate counts of indexed cocsep coordinates, random:400:2026</td><td>flat: top 45% of coordinates = 50% of accesses, 88% = 90%; frequency-sorted layout needs 393 KB of lines for 90% vs 398 KB now -&gt; reordering is useless, only compaction helps</td></tr>
+<tr><td>ck2 (idea 7.4: half-split tables)</td><td><code>3*cocsep</code> = <code>lo[key &amp; 0xFFF] + hi[key &gt;&gt; 12]</code> with key = one <code>pext</code> of the corners (tetrad bit + 2 co bits per corner): colex rank is additive over the halves because the low half's popcount is 4 minus the high half's</td><td>index 45 -&gt; 43 Ir (v3), microbench throughput 2.75 -&gt; 2.6 ns; +10.5 KB of L1 tables. <strong>-0.27% median, -1.21% mean</strong> over 8 pairs (min -6.78%): the L1 tables cost more than the 2 µops. NEGATIVE ($P/x-vc/neg-ck2-halfsplit.patch)</td></tr>
+<tr><td>p18</td><td>18-bit entries <code>class &lt;&lt; 6 | ttrep</code> at bit 18i (336 KB), corner depth from a 3.4 KB per-class table (depth is a class invariant: checked for all 153090 coordinates)</td><td>asm: +4 µops (<code>mov; shr; and; shrx mem</code>, <code>and; shl</code> for ttrep*64, depth load), ~+3 cycles. <strong>+1.59% median, +1.76% mean</strong> over 8 pairs on 55e048e, 7/8 positive (min -0.13%, max +4.00%; stream_thread start offset equal to main's in every layout). Ported to 735dd25 (s8 sweep): <strong>-1.51% median, -1.46% mean</strong> (min -6.31%, max +2.74%), offsets matched in 2 of 4 layouts; on m7's stack with pinned pads: best pad ~+0.2%. NEGATIVE in this form ($P/x-vc/neg-p18-dense.patch); see p18d</td></tr>
+<tr><td>p18b</td><td>p18 with rows of 70 separations padded to 72 entries (162 bytes, 354 KB): the entry's byte in the row and its bit shift come from the tetrad mask alone (parallel loads), no <code>shr</code>/<code>and</code> on the chain</td><td>~+3 µops, ~+2 cycles; but register allocation in the stream loop lost the TABS base register (4 <code>lea rip</code> rematerializations in the index path). <strong>+0.47% median, +0.58% mean</strong> over 8 pairs (min -0.79%)</td></tr>
+<tr><td>p18c</td><td>p18b, entry read from the byte before it and shifted 3 bits less: <code>v &amp; 0x1F8</code> = ttrep * 8, a scaled index of the 64-byte <code>sym_edge</code> rows (no <code>shl</code>)</td><td>asm: index path +1 µop vs main (shift-table load, <code>shrx</code> with memory source, depth load; no <code>and</code>/<code>shl</code>), ~+1 cycle; register allocation elsewhere in the stream loop got worse (25 TABS <code>lea</code> rematerializations vs 17 in p18). <strong>-0.07% median, -0.20% mean</strong> over 8 pairs: neutral</td></tr>
+<tr><td>p18 on m7's WIP stack (48d9d27, pinned pads)</td><td>p18 at stream pads 0/16/32/48 vs that stack at its pad 16, 2 paired runs each</td><td>pad 0 +0.73 -0.26, pad 16 -0.59 -1.39, pad 32 -1.13 -2.40, pad 48 -1.39 -0.82: best pad ~+0.2%, i.e. no gain</td></tr>
+<tr><td><strong>p18d</strong> (on m7's stack 48d9d27, then main f8a4919; pinned pads)</td><td>18-bit entries in rows of 72 (354 KB), read from the byte before and 4 bits up: class and symmetry where the 3-byte entries had them (<code>bextr 0xc0a</code>, <code>and 0x3f0</code> scale 8 unchanged); shift from a tetrad-mask table; depth by class</td><td>index path ~1-2 µops above main's. 1T pad screen vs base pad 16: pad 0 +0.54 +0.78, <strong>16 +0.56 +1.66</strong>, 32 -0.07 -0.27, 48 -0.61 +0.07; pad 16 vs 16, 6 pairs: <strong>+1.20%</strong> (medians 25.067 -&gt; 25.367, 6/6 positive). 48T pad 16 vs 16, 5 runs: medians 1070.97 -&gt; 1070.57 (-0.04%; pairs +0.20 +0.44 +1.34 -2.17 -0.04): neutral. Rebased on main f8a4919 (stream loop byte-identical to the WIP's, same pad; other code and HOT_TABLES placed differently): stream 1T pad 16 vs 16, 4 pairs: 0.00 +0.07 -1.12 -1.06 (medians -0.73%); share 1T 3 pairs: -1.29 -1.82 -1.46. NEUTRAL, not merged: $P/x-vc/neg-cocsep-18bit-p18d.patch</td></tr>
+<tr><td>move with both mod-3 candidates in parallel (derived from vcube's compose)</td><td><code>apply_move</code>: <code>min(shuffle + ori, shuffle + (ori - carry))</code> with a second precomputed table (<code>MOVES_ORI - CARRY</code>) instead of <code>min(t, t - carry)</code>: same µops, one step less latency</td><td>move-chain microbench 1.50 vs 1.96 ns per move (3 pairs, consistent); only on the X2/X' moved-side index chain. Forwarded to m7 (owner of that code); branch x-vc-lat</td></tr>
+</tbody>
+</table></div>
+<p>Placement note: with the stream loop pinned (m7), p18d's stream-loop code was byte-identical (addresses
+aside) on the WIP stack and on f8a4919, at the same pad, for both sides; yet 1T went from +1.2% (6/6 pairs)
+to -0.7%. What differs is the placement of the other code and of the static tables (HOT_TABLES at 3584/3584
+mod 4 KiB on the WIP builds, 896 vs 768 on f8a4919: different L1 set mapping). Pinning HOT_TABLES to a
+4 KiB boundary (and the cold functions' order) might remove another +-1% confounder from kernel A/Bs.</p>
+<p>Idea 7.4 mapped onto our index: the h11 index has no permutation ranks (only base-3 co digits, C(8,4)
+and C(12,4) combination ranks and eo bits), so popcount Lehmer and Myrvold-Ruskey have nothing to
+apply to; digit-parallel ranking is what the pext + LUT code already does; the half-split applies to
+cocsep (ck2). The eslot C(12,4) rank cannot be half-split cheaply: the fixed slot numbering has gaps
+(slot = r + 2 + 2*floor(r/62)), which would cost an imul + shift instead of one 8 KB LUT load.</p>
+<h2 id="g-hot-working-set-audit-l1-l2-by-structure">G. Hot working-set audit (L1/L2 by structure)</h2>
+<p>Method: cachegrind with a cache model of one Zen 5 core (<code>--D1=49152,12,64 --LL=1048576,16,64</code>: the
+&quot;LL&quot; is the 1 MB L2), main 735dd25 built for x86-64-v3 with scalar stand-ins for the AVX-512 helpers
+(branch x-vc-cg), <code>bench random:40:2026 40 1 24</code> (1 thread, 24 lanes). Misses are attributed to source
+lines (<code>/data/agents/x-vc/bin/cgsim.py</code>). Cachegrind ignores prefetches, so a prefetched line is
+counted at its first load; the lines brought into L2 (= L2 misses) are the same. No L3 is modelled.</p>
+<p>L2 misses per cube (each one also inserts a line, i.e. may evict another):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>structure</th><th>where</th><th>L2 misses / cube</th><th>share</th><th>L1 misses / cube</th><th>L1 miss rate</th></tr>
+</thead>
+<tbody>
+<tr><td>h11 table lines</td><td><code>Solver::value</code></td><td>2,354K</td><td>77.6%</td><td>2,431K</td><td>97%</td></tr>
+<tr><td>packed cocsep entries (448 KB)</td><td><code>Solver::index</code></td><td>509K</td><td>16.8%</td><td>2,106K</td><td>84%</td></tr>
+<tr><td>run lists: <code>start_iteration</code> (build_first/build_rest/sort_runs writes)</td><td>lanes.rs</td><td>40K</td><td>1.3%</td><td>60K</td><td></td></tr>
+<tr><td><code>extend_jobs</code> (job vectors, X' fix-up pass)</td><td>lanes.rs</td><td>27K</td><td>0.9%</td><td></td><td></td></tr>
+<tr><td>ChildOrder (JobX, 32 B x 43K per lane): write at run end / read at run start / scans (build_first <code>codes_above</code>, <code>choose_theta</code>)</td><td>lanes.rs:806 / 866 / 257, 640</td><td>19K / 9K / 24K</td><td>1.7%</td><td>35K / 10K / 24K</td><td>8% / 35% / 3%</td></tr>
+<tr><td>job list reads (<code>setup_job</code>, <code>moves_after</code>)</td><td>lanes.rs:926, 1574</td><td>15K</td><td>0.5%</td><td></td><td></td></tr>
+<tr><td>memset / memmove (Vec resizes, copies)</td><td>libc</td><td>17K</td><td>0.5%</td><td></td><td></td></tr>
+<tr><td>node stacks (24 lanes x 26 x 128 B)</td><td>lanes.rs</td><td>~3K</td><td>0.1%</td><td>~250K</td><td>1-8%</td></tr>
+<tr><td>hot tables (<code>HOT_TABLES</code>: moves, sym_edges, eslot, rank8, stats)</td><td>coord.rs, simd.rs</td><td>~2K</td><td>0.1%</td><td>420K (eslot 319K, sym_edges 94K)</td><td>eslot 12.8%</td></tr>
+<tr><td>all</td><td></td><td>3,034K</td><td>100%</td><td>5,860K</td><td></td></tr>
+</tbody>
+</table></div>
+<p>Ranking and what shrinking each could give:</p>
+<ol>
+<li><strong>The h11 table lines</strong> are the dominant inserter (one dead line per lookup; inherent). They are what
+evicts the cocsep entries. Keeping them out of L2 would help most, but the only tool, CLFLUSHOPT after
+use, costs -30% (neg-clflushopt-table-lines). NTA is already the hint (T0/T1 measured worse, m6).</li>
+<li><strong>The cocsep entries</strong> are the victim: 20% of their reads miss the modelled L2 (84% miss L1).
+Measured: +33% footprint (s4) = -1.6% at 1T; 18-bit entries in rows of 72 (p18d, -21%): +1.2% / -0.7%
+at 1T depending on placement, share -1.5%, 48T neutral: the ~+1% footprint gain is paid back in µops.</li>
+<li><strong>Everything else together inserts 5.6%</strong> of the L2 lines. Even removing all of it would cut the cocsep
+misses by at most ~6% (~30K of 509K per cube), i.e. ~0.1-0.2% at the measured cost of a cocsep miss.
+A smaller ChildOrder does not help per run (each run touches one 64-byte line whatever the size);
+it would only halve the per-iteration scans (24K misses per cube). Not worth a patch.</li>
+<li>L1: after the table and cocsep, the 8 KB <code>eslot_complement</code> table is the largest L1 miss source
+(12.8% of its reads; 495 valid entries over 99 of its 128 lines). Shrinking it needs a 2-level rank
+(two 64-entry half tables + a 495-entry rank-&gt;slot table: +5 µops and a dependent load), which costs
+more than its L2-hit latency (mostly off the critical msplit path). Not pursued.</li>
+</ol>
+<p>Calibration (cache model, same instruction count): s4 adds 226K cocsep L2 misses per cube (hit rate 80% -&gt;
+71%) and measured -1.6% at 1T: about 1% per 140K misses per cube (~12 cycles per extra miss). p18 removes
+183K per cube (hit rate 87%) for +0.46% Ir (v3 build): the model predicts about +1%.</p>
+<p>48 threads: L2 is per core, so the per-core picture is the same. The cocsep table is one shared copy in
+the CCD's L3 (a cocsep L2 miss is an L3 hit at 1T and 48T), but at 48T eight cores churn the L3 with table
+lines (~8 x 55M lines/s per CCD), so an L3 hit is slower under load and a cocsep L2 miss costs more: the
+footprint gain of p18 should be at least as large at 48T. The per-lane job state (24 lanes x ~2 MB per
+core, ~380 MB per CCD) cannot stay in L3 at 48T; each run start then reads its job and ChildOrder lines
+from DRAM (prefetched one run ahead in <code>setup_run</code>), ~50K runs per cube: small next to 2.4M table misses.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

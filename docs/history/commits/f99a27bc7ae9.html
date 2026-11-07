@@ -1,0 +1,40 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>check.sh: under qemu, the /proc/self/maps test runs alone; failed greps stop the script — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="f99a27bc7ae9.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="check-sh-under-qemu-the-proc-self-maps-test-runs-alone-failed-greps-stop-the-script">check.sh: under qemu, the /proc/self/maps test runs alone; failed greps stop the script</h1>
+<p>Commit <code>f99a27bc7ae95287d205b712e63482249612a2d6</code> · 2026-11-05T04:43:41+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>work/r8</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>check.sh: under qemu, the /proc/self/maps test runs alone; failed greps stop the script</p>
+<p>qemu-aarch64 8.2 (Ubuntu 1:8.2.2) crashed now and then in the NEON library
+tests with &quot;qemu-aarch64: QEMU internal SIGSEGV {code=MAPERR, addr=0x20}&quot;.
+qemu prints that when the faulting code is its own, not the guest's (outside
+its generated-code buffer). It is a qemu bug: its emulation of
+/proc/self/maps, read by <code>tables::tests::opened_table_file_is_read_only</code>,
+races with other guest threads that map or unmap memory.</p>
+<p>NEON library test runs under qemu (debug, CPUs 0-7 shared with builds):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>run</th><th>qemu crashes</th></tr>
+</thead>
+<tbody>
+<tr><td>all tests</td><td>8/40, 11/40, 20/100</td></tr>
+<tr><td>one test thread</td><td>0/30</td></tr>
+<tr><td>without the share tests</td><td>2/30</td></tr>
+<tr><td>only the share tests</td><td>0/110</td></tr>
+<tr><td>without opened_table_file_is_read_only</td><td>0/40, 0/40, 0/40</td></tr>
+<tr><td>without table_meta_and_size_are_checked</td><td>8/40</td></tr>
+<tr><td>opened_table_file_is_read_only alone</td><td>0/40</td></tr>
+</tbody>
+</table></div>
+<p>In each of the 12 crashes looked at, that test had not finished. A 25-line
+safe Rust program for aarch64 that reads /proc/self/maps 2000 times while 7
+threads allocate and free 1-8 MB vectors crashes qemu the same way in 2 of
+10 runs.</p>
+<p>check.sh now runs the NEON tests without that test, then the test alone, and
+checks that it ran. If qemu itself still crashes (that message, and no test
+failed), the step runs once more; a test failure is never retried.</p>
+<p>Also: <code>! grep -qE &quot;FAILED|panicked&quot; &quot;$log&quot;</code> never stopped the script (<code>set -e</code> ignores negated commands), so those checks are now <code>no_failure || exit 1</code>. (Failed tests were still caught by cargo's exit status through
+<code>pipefail</code>.)</p>
+<p>With the series, check.sh passed 5 runs in a row on 3a9a50a (wasm steps
+included, no qemu retry needed), and 5 in a row on each of 857a0c6, 8977134
+and 7608a28. NEON library runs without that test: 0 qemu crashes in 120.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

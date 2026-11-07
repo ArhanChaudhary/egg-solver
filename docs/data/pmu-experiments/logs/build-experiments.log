@@ -1,0 +1,18 @@
+2026-11-07 00:10:42 UTC Checking base before performance screening
+2026-11-07 00:10:42 UTC Building base at stream pad 0
+2026-11-07 00:11:09 UTC Building base at stream pad 16
+2026-11-07 00:11:26 UTC Building base at stream pad 32
+2026-11-07 00:11:54 UTC Building base at stream pad 48
+2026-11-07 00:12:09 UTC Checking bytes before performance screening
+2026-11-07 00:16:34 UTC Strict-provenance Miri on the exhaustive byte decoder test: x86
+2026-11-07 00:18:55 UTC Strict-provenance Miri on the exhaustive byte decoder test: portable
+2026-11-07 00:21:25 UTC Building bytes at stream pad 0
+2026-11-07 00:22:33 UTC Building bytes at stream pad 16
+2026-11-07 00:23:35 UTC Building bytes at stream pad 32
+2026-11-07 00:25:05 UTC Building bytes at stream pad 48
+2026-11-07 00:25:59 UTC Checking outline before performance screening
+2026-11-07 00:28:47 UTC Building outline at stream pad 0
+2026-11-07 00:29:32 UTC Building outline at stream pad 16
+2026-11-07 00:30:17 UTC Building outline at stream pad 32
+2026-11-07 00:30:56 UTC Building outline at stream pad 48
+2026-11-07 00:31:34 UTC BUILD CHECKS PASSED: two independent candidates, four stream pads each; no main source changes

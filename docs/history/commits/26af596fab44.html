@@ -1,0 +1,63 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Merge opt/c7-childsplit: root children ordered across jobs (-6..-8% nodes, +4.4% 1T) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="26af596fab44.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="merge-opt-c7-childsplit-root-children-ordered-across-jobs-6-8-nodes-4-4-1t">Merge opt/c7-childsplit: root children ordered across jobs (-6..-8% nodes, +4.4% 1T)</h1>
+<p>Commit <code>26af596fab44a97106b6ddf3b8db7c758f984e45</code> · 2026-11-04T03:22:23+00:00</p>
+<p>This commit is reachable from the released main history. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: Historical ancestor; no current branch tip</p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>Merge opt/c7-childsplit: root children ordered across jobs (-6..-8% nodes, +4.4% 1T)</p>
+<p>In the iterations whose jobs are those of the previous one (the likely
+last ones), (job, root child) pairs run in the order of a per-child
+statistic from the previous iteration, across all jobs, instead of
+whole jobs in job order. Details are in the branch commit (21e3ca9).
+Share mode keeps whole-job ordering; its job statistic now reads the
+per-child sums (2-line merge resolution in share.rs: heur -&gt; cheur).</p>
+<p>Search: node counts (count.sh, deterministic), lengths identical on
+every set:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>set</th><th>main f0efcde</th><th>c7</th><th>change</th></tr>
+</thead>
+<tbody>
+<tr><td>random:1000:2026</td><td>3295521</td><td>3089312</td><td>-6.3%</td></tr>
+<tr><td>random:3000:777</td><td>3249811</td><td>3015162</td><td>-7.2%</td></tr>
+<tr><td>random:2000:31337</td><td>3290082</td><td>3063050</td><td>-6.9%</td></tr>
+<tr><td>random_state_depth18, all 33468</td><td>3688560</td><td>3382838</td><td>-8.3%</td></tr>
+<tr><td>random_state_depth18, 3000</td><td></td><td></td><td>-8.6%</td></tr>
+<tr><td>depth 17 / 19 / 16 samples</td><td></td><td></td><td>-0.1% / -2.6% / 0.0%</td></tr>
+</tbody>
+</table></div>
+<p>(testdata/depth18.txt, the first 100 lines of the same depth-18 file,
+shows +10.6%: small-sample noise, as the full file shows.)</p>
+<p>Stream, 1 thread, paired (bench stream 10 60 1 20, ab1t.sh), solves/s:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>build</th><th>runs</th><th>median</th></tr>
+</thead>
+<tbody>
+<tr><td>main f0efcde</td><td>21.650 21.550 21.583 21.633 21.767</td><td>21.633</td></tr>
+<tr><td>c7</td><td>22.650 22.550 22.567 22.583 22.633</td><td>22.583</td></tr>
+</tbody>
+</table></div>
+<p>+4.4% (every pair +4.0..+4.7%).</p>
+<p>Stream, 48 threads, 5 interleaved rounds on a quiet machine (bench
+stream 20 30 48 20, ab48.sh; outside load &lt;= 0.2 cores in every run),
+solves/s:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>build</th><th>runs</th><th>median</th></tr>
+</thead>
+<tbody>
+<tr><td>main f0efcde</td><td>988.2 993.5 1007.9 1008.0 1007.4</td><td>1007.4</td></tr>
+<tr><td>c7</td><td>1008.4 1011.4 1015.3 1012.0 1019.0</td><td>1012.0</td></tr>
+</tbody>
+</table></div>
+<p>+0.5% median; per round +2.0 +1.8 +0.7 +0.4 +1.2% (mean +1.2%).
+Smaller than at 1 thread: the run bookkeeping (JobX records, run
+entries) costs relatively more when 48 threads share the memory system.
+With 24 lanes (next commit) the same build gives 1034.4 (+2.2% over 20
+lanes, +2.7% over main at 20). The c7 agent measured +2.5% on the
+previous base (cb8cb70: 987.1 -&gt; 1011.9, 3 runs).</p>
+<p>Share mode (bench random:1000:2026 1000 48 20 share, 1 pair, during a
+window with outside load, so only indicative): 711.2 -&gt; 855.7 solves/s,
+lengths identical.</p>
+<p>check.sh passes on the merged tree.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

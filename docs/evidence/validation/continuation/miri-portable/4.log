@@ -1,0 +1,18 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+    Finished `test` profile [optimized + debuginfo] target(s) in 1.12s
+     Running unittests src/lib.rs (/data2/build/egg-solver-target/miri-current-miri-portable/miri/x86_64-unknown-linux-gnu/debug/build/egg-solver/46faae831e71f596/out/egg_solver-46faae831e71f596)
+warning: Miri does not support optimizations: the opt-level is ignored. The only effect of selecting a Cargo profile that enables optimizations (such as --release) is to apply its remaining settings, such as whether debug assertions and overflow checks are enabled.
+
+
+running 3 tests
+test lanes::tests::quantize18_codes_unseen_children ... ok
+test lanes::tests::sort_jobs_matches_stable_sort ... ok
+test lanes::tests::split_runs_cover_each_child_once ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 47 filtered out; finished in 86907.08s
+
+warning: 1 warning emitted
+

@@ -1,0 +1,64 @@
+{
+  "base": "93867a4597ab821b4064a0d407d3c89e133c9013",
+  "table": "/mnt/huge/h8",
+  "threads": 48,
+  "lanes": 24,
+  "seed": 2026,
+  "warmup": 20,
+  "window": 30,
+  "pads": {
+    "base": 0,
+    "bytes": 0,
+    "outline": 16
+  },
+  "binaries": {
+    "base": "/data/agents/pmu-opt/bin/base-p0-bench",
+    "bytes": "/data/agents/pmu-opt/bin/bytes-p0-bench",
+    "outline": "/data/agents/pmu-opt/bin/outline-p16-bench"
+  },
+  "sha256": {
+    "base": "8dadabae98f69673be8f1f800c59cde5435fdf16edb1ff2c67159db02c5dd3b8",
+    "bytes": "639ad2ad0700638e48e46ec3785395edab44254b14fe8a3d01431805a6c25bf0",
+    "outline": "241411822b759f29ba5b80e2dbc97397538f48cd6bf61e37cd491e60a8989f69"
+  },
+  "orders": [
+    [
+      "base",
+      "bytes",
+      "outline"
+    ],
+    [
+      "bytes",
+      "outline",
+      "base"
+    ],
+    [
+      "outline",
+      "base",
+      "bytes"
+    ],
+    [
+      "outline",
+      "bytes",
+      "base"
+    ],
+    [
+      "bytes",
+      "base",
+      "outline"
+    ]
+  ],
+  "paired_rounds": 5,
+  "shared_baseline": true,
+  "holds": [
+    [
+      0,
+      3
+    ],
+    [
+      3,
+      5
+    ]
+  ],
+  "fairness_gap_seconds": 90
+}

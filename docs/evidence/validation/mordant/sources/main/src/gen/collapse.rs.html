@@ -1,0 +1,204 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>collapse.rs — source evidence</title><style>body{font:15px system-ui;margin:2rem}pre{font:13px/1.6 monospace;overflow:auto}.line:target{background:#fff0a0}a{color:#42617a;text-decoration:none}</style><h1>collapse.rs</h1><p>Source evidence snapshot. Original file SHA-256: <code>ed9dee0f62ca17f855dccd7e4a3b1c4432dcd67731509b43dc47f166f6b91bc3</code>. <a href="collapse.rs">Raw source</a></p><pre><span class="line" id="L1"><a href="#L1">    1</a> //! hk tables from tables of a larger k with the same base, and table</span>
+<span class="line" id="L2"><a href="#L2">    2</a> //! comparison.</span>
+<span class="line" id="L3"><a href="#L3">    3</a> //!</span>
+<span class="line" id="L4"><a href="#L4">    4</a> //! An hk entry is the minimum over the hK entries (K &gt; k) that differ only in</span>
+<span class="line" id="L5"><a href="#L5">    5</a> //! the eo bits hk drops, i.e. over the 2^(K - k) rows `r &lt;&lt; (K - k) ..` of</span>
+<span class="line" id="L6"><a href="#L6">    6</a> //! hK at the same slot; a group minimum is the minimum of those groups&#x27;</span>
+<span class="line" id="L7"><a href="#L7">    7</a> //! minima. With the same base the 2-bit codes collapse the same way</span>
+<span class="line" id="L8"><a href="#L8">    8</a> //! (`min(code)` is the code of the minimum), so for example h7..h10 of base</span>
+<span class="line" id="L9"><a href="#L9">    9</a> //! 10 follow from h11, and this checks directly generated tables.</span>
+<span class="line" id="L10"><a href="#L10">   10</a> </span>
+<span class="line" id="L11"><a href="#L11">   11</a> use crate::parallel::WorkerPanicked;</span>
+<span class="line" id="L12"><a href="#L12">   12</a> use crate::tables::{</span>
+<span class="line" id="L13"><a href="#L13">   13</a>     entry_low_bits, h48_bytes, h48_rows, H48Meta, H48Table, Memory, TableError, WORDS_PER_ROW,</span>
+<span class="line" id="L14"><a href="#L14">   14</a> };</span>
+<span class="line" id="L15"><a href="#L15">   15</a> use std::sync::atomic::{AtomicU64, Ordering::Relaxed};</span>
+<span class="line" id="L16"><a href="#L16">   16</a> </span>
+<span class="line" id="L17"><a href="#L17">   17</a> /// Per 2-bit field minimum of two words of codes.</span>
+<span class="line" id="L18"><a href="#L18">   18</a> #[inline(always)]</span>
+<span class="line" id="L19"><a href="#L19">   19</a> fn min_codes(x: u64, y: u64) -&gt; u64 {</span>
+<span class="line" id="L20"><a href="#L20">   20</a>     const LO: u64 = 0x5555_5555_5555_5555;</span>
+<span class="line" id="L21"><a href="#L21">   21</a>     let (x0, x1) = (x &amp; LO, (x &gt;&gt; 1) &amp; LO);</span>
+<span class="line" id="L22"><a href="#L22">   22</a>     let (y0, y1) = (y &amp; LO, (y &gt;&gt; 1) &amp; LO);</span>
+<span class="line" id="L23"><a href="#L23">   23</a>     let hi = x1 &amp; y1;</span>
+<span class="line" id="L24"><a href="#L24">   24</a>     // Equal high bits: the low bits&#x27; AND; else the low bit of the one with</span>
+<span class="line" id="L25"><a href="#L25">   25</a>     // high bit 0.</span>
+<span class="line" id="L26"><a href="#L26">   26</a>     let lo = ((!(x1 ^ y1)) &amp; x0 &amp; y0) | (x1 &amp; !y1 &amp; y0) | (!x1 &amp; y1 &amp; x0);</span>
+<span class="line" id="L27"><a href="#L27">   27</a>     (hi &lt;&lt; 1) | (lo &amp; LO)</span>
+<span class="line" id="L28"><a href="#L28">   28</a> }</span>
+<span class="line" id="L29"><a href="#L29">   29</a> </span>
+<span class="line" id="L30"><a href="#L30">   30</a> /// The word `w` (of a row) of the collapse of `rows` (`16 * n` words, n</span>
+<span class="line" id="L31"><a href="#L31">   31</a> /// rows of the larger table).</span>
+<span class="line" id="L32"><a href="#L32">   32</a> #[inline(always)]</span>
+<span class="line" id="L33"><a href="#L33">   33</a> fn collapsed_word(rows: &amp;[AtomicU64], w: usize) -&gt; u64 {</span>
+<span class="line" id="L34"><a href="#L34">   34</a>     let mut out = u64::MAX;</span>
+<span class="line" id="L35"><a href="#L35">   35</a>     let mut min = 15;</span>
+<span class="line" id="L36"><a href="#L36">   36</a>     for r in rows.as_chunks::&lt;WORDS_PER_ROW&gt;().0 {</span>
+<span class="line" id="L37"><a href="#L37">   37</a>         let x = r[w].load(Relaxed);</span>
+<span class="line" id="L38"><a href="#L38">   38</a>         out = min_codes(out, x);</span>
+<span class="line" id="L39"><a href="#L39">   39</a>         min = min.min(x &amp; 15);</span>
+<span class="line" id="L40"><a href="#L40">   40</a>     }</span>
+<span class="line" id="L41"><a href="#L41">   41</a>     if w.is_multiple_of(2) {</span>
+<span class="line" id="L42"><a href="#L42">   42</a>         (out &amp; !15) | min</span>
+<span class="line" id="L43"><a href="#L43">   43</a>     } else {</span>
+<span class="line" id="L44"><a href="#L44">   44</a>         out</span>
+<span class="line" id="L45"><a href="#L45">   45</a>     }</span>
+<span class="line" id="L46"><a href="#L46">   46</a> }</span>
+<span class="line" id="L47"><a href="#L47">   47</a> </span>
+<span class="line" id="L48"><a href="#L48">   48</a> /// The rows of hk and the number of rows of h`larger_k` (`k &lt;= larger_k`)</span>
+<span class="line" id="L49"><a href="#L49">   49</a> /// that collapse into each, if `larger_words` holds them all.</span>
+<span class="line" id="L50"><a href="#L50">   50</a> fn collapse_shape(</span>
+<span class="line" id="L51"><a href="#L51">   51</a>     k: u32,</span>
+<span class="line" id="L52"><a href="#L52">   52</a>     larger_k: u32,</span>
+<span class="line" id="L53"><a href="#L53">   53</a>     larger_words: usize,</span>
+<span class="line" id="L54"><a href="#L54">   54</a> ) -&gt; Result&lt;(usize, usize), TableError&gt; {</span>
+<span class="line" id="L55"><a href="#L55">   55</a>     let shift = larger_k</span>
+<span class="line" id="L56"><a href="#L56">   56</a>         .checked_sub(k)</span>
+<span class="line" id="L57"><a href="#L57">   57</a>         .ok_or_else(|| TableError::Generate(format!(&quot;h{k} is not a collapse of h{larger_k}&quot;)))?;</span>
+<span class="line" id="L58"><a href="#L58">   58</a>     let rows = usize::try_from(h48_rows(k)).map_err(|_| TableError::TooLarge(k))?;</span>
+<span class="line" id="L59"><a href="#L59">   59</a>     let factor = 1usize.checked_shl(shift).unwrap_or(0);</span>
+<span class="line" id="L60"><a href="#L60">   60</a>     // (Then every slice of rows below is within the larger table.)</span>
+<span class="line" id="L61"><a href="#L61">   61</a>     match factor</span>
+<span class="line" id="L62"><a href="#L62">   62</a>         .checked_mul(WORDS_PER_ROW)</span>
+<span class="line" id="L63"><a href="#L63">   63</a>         .and_then(|x| x.checked_mul(rows))</span>
+<span class="line" id="L64"><a href="#L64">   64</a>     {</span>
+<span class="line" id="L65"><a href="#L65">   65</a>         Some(words) if factor &gt; 0 &amp;&amp; words &lt;= larger_words =&gt; Ok((rows, factor)),</span>
+<span class="line" id="L66"><a href="#L66">   66</a>         _ =&gt; Err(TableError::TooLarge(larger_k)),</span>
+<span class="line" id="L67"><a href="#L67">   67</a>     }</span>
+<span class="line" id="L68"><a href="#L68">   68</a> }</span>
+<span class="line" id="L69"><a href="#L69">   69</a> </span>
+<span class="line" id="L70"><a href="#L70">   70</a> /// hk of the same base from `src` (k &lt;= src&#x27;s k), in anonymous memory.</span>
+<span class="line" id="L71"><a href="#L71">   71</a> ///</span>
+<span class="line" id="L72"><a href="#L72">   72</a> /// # Errors</span>
+<span class="line" id="L73"><a href="#L73">   73</a> /// If `k` is above `src`&#x27;s, the memory cannot be allocated, a table is larger</span>
+<span class="line" id="L74"><a href="#L74">   74</a> /// than its memory or a slice can be, or a thread panicked.</span>
+<span class="line" id="L75"><a href="#L75">   75</a> pub fn derive(source: &amp;H48Table, k: u32, threads: usize) -&gt; Result&lt;H48Table, TableError&gt; {</span>
+<span class="line" id="L76"><a href="#L76">   76</a>     let source_words = source.memory.words()?;</span>
+<span class="line" id="L77"><a href="#L77">   77</a>     let (rows, factor) = collapse_shape(k, source.meta.k, source_words.len())?;</span>
+<span class="line" id="L78"><a href="#L78">   78</a>     let memory =</span>
+<span class="line" id="L79"><a href="#L79">   79</a>         Memory::anonymous(usize::try_from(h48_bytes(k)).map_err(|_| TableError::TooLarge(k))?)?;</span>
+<span class="line" id="L80"><a href="#L80">   80</a>     let words = memory.words()?;</span>
+<span class="line" id="L81"><a href="#L81">   81</a>     par_rows(rows, threads, |row| {</span>
+<span class="line" id="L82"><a href="#L82">   82</a>         let covered = &amp;source_words[row * factor * 16..(row + 1) * factor * 16];</span>
+<span class="line" id="L83"><a href="#L83">   83</a>         for w in 0..16 {</span>
+<span class="line" id="L84"><a href="#L84">   84</a>             words[row * 16 + w].store(collapsed_word(covered, w), Relaxed);</span>
+<span class="line" id="L85"><a href="#L85">   85</a>         }</span>
+<span class="line" id="L86"><a href="#L86">   86</a>     })?;</span>
+<span class="line" id="L87"><a href="#L87">   87</a>     Ok(H48Table {</span>
+<span class="line" id="L88"><a href="#L88">   88</a>         memory,</span>
+<span class="line" id="L89"><a href="#L89">   89</a>         meta: H48Meta {</span>
+<span class="line" id="L90"><a href="#L90">   90</a>             k,</span>
+<span class="line" id="L91"><a href="#L91">   91</a>             base: source.meta.base,</span>
+<span class="line" id="L92"><a href="#L92">   92</a>         },</span>
+<span class="line" id="L93"><a href="#L93">   93</a>     })</span>
+<span class="line" id="L94"><a href="#L94">   94</a> }</span>
+<span class="line" id="L95"><a href="#L95">   95</a> </span>
+<span class="line" id="L96"><a href="#L96">   96</a> /// Differences found by `compare`.</span>
+<span class="line" id="L97"><a href="#L97">   97</a> #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]</span>
+<span class="line" id="L98"><a href="#L98">   98</a> pub struct Diff {</span>
+<span class="line" id="L99"><a href="#L99">   99</a>     /// Real entries compared, and those whose codes differ.</span>
+<span class="line" id="L100"><a href="#L100">  100</a>     pub entries: u64,</span>
+<span class="line" id="L101"><a href="#L101">  101</a>     pub codes: u64,</span>
+<span class="line" id="L102"><a href="#L102">  102</a>     /// Group minima that differ, among those that matter (at most the base</span>
+<span class="line" id="L103"><a href="#L103">  103</a>     /// on either side; larger ones are never read: a group minimum is used</span>
+<span class="line" id="L104"><a href="#L104">  104</a>     /// only for a code-0 entry, whose depth is at most the base).</span>
+<span class="line" id="L105"><a href="#L105">  105</a>     pub group_minima: u64,</span>
+<span class="line" id="L106"><a href="#L106">  106</a>     /// Group minima above the base that differ (harmless).</span>
+<span class="line" id="L107"><a href="#L107">  107</a>     pub unread_group_minima: u64,</span>
+<span class="line" id="L108"><a href="#L108">  108</a> }</span>
+<span class="line" id="L109"><a href="#L109">  109</a> </span>
+<span class="line" id="L110"><a href="#L110">  110</a> /// Compare `table` with the collapse of `larger` to `table`&#x27;s k (the same</span>
+<span class="line" id="L111"><a href="#L111">  111</a> /// table if the ks are equal).</span>
+<span class="line" id="L112"><a href="#L112">  112</a> ///</span>
+<span class="line" id="L113"><a href="#L113">  113</a> /// # Errors</span>
+<span class="line" id="L114"><a href="#L114">  114</a> /// If the bases differ, `table`&#x27;s k is above `larger`&#x27;s, a table is larger</span>
+<span class="line" id="L115"><a href="#L115">  115</a> /// than its memory or a slice can be, or a thread panicked.</span>
+<span class="line" id="L116"><a href="#L116">  116</a> pub fn compare(table: &amp;H48Table, larger: &amp;H48Table, threads: usize) -&gt; Result&lt;Diff, TableError&gt; {</span>
+<span class="line" id="L117"><a href="#L117">  117</a>     if table.meta.base != larger.meta.base {</span>
+<span class="line" id="L118"><a href="#L118">  118</a>         return Err(TableError::Generate(format!(</span>
+<span class="line" id="L119"><a href="#L119">  119</a>             &quot;tables of different bases ({} and {})&quot;,</span>
+<span class="line" id="L120"><a href="#L120">  120</a>             table.meta.base, larger.meta.base</span>
+<span class="line" id="L121"><a href="#L121">  121</a>         )));</span>
+<span class="line" id="L122"><a href="#L122">  122</a>     }</span>
+<span class="line" id="L123"><a href="#L123">  123</a>     let base = u64::from(table.meta.base);</span>
+<span class="line" id="L124"><a href="#L124">  124</a>     let (words, larger_words) = (table.memory.words()?, larger.memory.words()?);</span>
+<span class="line" id="L125"><a href="#L125">  125</a>     let (rows, factor) = collapse_shape(table.meta.k, larger.meta.k, larger_words.len())?;</span>
+<span class="line" id="L126"><a href="#L126">  126</a>     if words.len() &lt; rows * WORDS_PER_ROW {</span>
+<span class="line" id="L127"><a href="#L127">  127</a>         return Err(TableError::TooLarge(table.meta.k));</span>
+<span class="line" id="L128"><a href="#L128">  128</a>     }</span>
+<span class="line" id="L129"><a href="#L129">  129</a>     let total = [(); 4].map(|()| AtomicU64::new(0));</span>
+<span class="line" id="L130"><a href="#L130">  130</a>     par_rows_chunked(rows, threads, |first, end| {</span>
+<span class="line" id="L131"><a href="#L131">  131</a>         let mut counts = [0u64; 4];</span>
+<span class="line" id="L132"><a href="#L132">  132</a>         for row in first..end {</span>
+<span class="line" id="L133"><a href="#L133">  133</a>             let collapsed = &amp;larger_words[row * factor * 16..(row + 1) * factor * 16];</span>
+<span class="line" id="L134"><a href="#L134">  134</a>             for w in 0..16 {</span>
+<span class="line" id="L135"><a href="#L135">  135</a>                 let x = words[row * 16 + w].load(Relaxed);</span>
+<span class="line" id="L136"><a href="#L136">  136</a>                 let y = if factor == 1 {</span>
+<span class="line" id="L137"><a href="#L137">  137</a>                     collapsed[w].load(Relaxed)</span>
+<span class="line" id="L138"><a href="#L138">  138</a>                 } else {</span>
+<span class="line" id="L139"><a href="#L139">  139</a>                     collapsed_word(collapsed, w)</span>
+<span class="line" id="L140"><a href="#L140">  140</a>                 };</span>
+<span class="line" id="L141"><a href="#L141">  141</a>                 let mask = entry_low_bits(w as u64);</span>
+<span class="line" id="L142"><a href="#L142">  142</a>                 counts[0] += u64::from(mask.count_ones());</span>
+<span class="line" id="L143"><a href="#L143">  143</a>                 let differ = (x ^ y) | ((x ^ y) &gt;&gt; 1);</span>
+<span class="line" id="L144"><a href="#L144">  144</a>                 counts[1] += u64::from((differ &amp; mask).count_ones());</span>
+<span class="line" id="L145"><a href="#L145">  145</a>                 if w.is_multiple_of(2) &amp;&amp; (x &amp; 15) != (y &amp; 15) {</span>
+<span class="line" id="L146"><a href="#L146">  146</a>                     if (x &amp; 15).min(y &amp; 15) &lt;= base {</span>
+<span class="line" id="L147"><a href="#L147">  147</a>                         counts[2] += 1;</span>
+<span class="line" id="L148"><a href="#L148">  148</a>                     } else {</span>
+<span class="line" id="L149"><a href="#L149">  149</a>                         counts[3] += 1;</span>
+<span class="line" id="L150"><a href="#L150">  150</a>                     }</span>
+<span class="line" id="L151"><a href="#L151">  151</a>                 }</span>
+<span class="line" id="L152"><a href="#L152">  152</a>             }</span>
+<span class="line" id="L153"><a href="#L153">  153</a>         }</span>
+<span class="line" id="L154"><a href="#L154">  154</a>         for (sum, count) in total.iter().zip(counts) {</span>
+<span class="line" id="L155"><a href="#L155">  155</a>             sum.fetch_add(count, Relaxed);</span>
+<span class="line" id="L156"><a href="#L156">  156</a>         }</span>
+<span class="line" id="L157"><a href="#L157">  157</a>     })?;</span>
+<span class="line" id="L158"><a href="#L158">  158</a>     let [entries, codes, group_minima, unread_group_minima] = total.map(AtomicU64::into_inner);</span>
+<span class="line" id="L159"><a href="#L159">  159</a>     Ok(Diff {</span>
+<span class="line" id="L160"><a href="#L160">  160</a>         entries,</span>
+<span class="line" id="L161"><a href="#L161">  161</a>         codes,</span>
+<span class="line" id="L162"><a href="#L162">  162</a>         group_minima,</span>
+<span class="line" id="L163"><a href="#L163">  163</a>         unread_group_minima,</span>
+<span class="line" id="L164"><a href="#L164">  164</a>     })</span>
+<span class="line" id="L165"><a href="#L165">  165</a> }</span>
+<span class="line" id="L166"><a href="#L166">  166</a> </span>
+<span class="line" id="L167"><a href="#L167">  167</a> fn par_rows(rows: usize, threads: usize, f: impl Fn(usize) + Sync) -&gt; Result&lt;(), WorkerPanicked&gt; {</span>
+<span class="line" id="L168"><a href="#L168">  168</a>     par_rows_chunked(rows, threads, |a, b| (a..b).for_each(&amp;f))</span>
+<span class="line" id="L169"><a href="#L169">  169</a> }</span>
+<span class="line" id="L170"><a href="#L170">  170</a> </span>
+<span class="line" id="L171"><a href="#L171">  171</a> fn par_rows_chunked(</span>
+<span class="line" id="L172"><a href="#L172">  172</a>     rows: usize,</span>
+<span class="line" id="L173"><a href="#L173">  173</a>     threads: usize,</span>
+<span class="line" id="L174"><a href="#L174">  174</a>     f: impl Fn(usize, usize) + Sync,</span>
+<span class="line" id="L175"><a href="#L175">  175</a> ) -&gt; Result&lt;(), WorkerPanicked&gt; {</span>
+<span class="line" id="L176"><a href="#L176">  176</a>     let chunk = 1 &lt;&lt; 12;</span>
+<span class="line" id="L177"><a href="#L177">  177</a>     let next = std::sync::atomic::AtomicUsize::new(0);</span>
+<span class="line" id="L178"><a href="#L178">  178</a>     crate::parallel::on_threads(threads, |_| loop {</span>
+<span class="line" id="L179"><a href="#L179">  179</a>         let a = next.fetch_add(chunk, Relaxed);</span>
+<span class="line" id="L180"><a href="#L180">  180</a>         if a &gt;= rows {</span>
+<span class="line" id="L181"><a href="#L181">  181</a>             break;</span>
+<span class="line" id="L182"><a href="#L182">  182</a>         }</span>
+<span class="line" id="L183"><a href="#L183">  183</a>         f(a, (a + chunk).min(rows));</span>
+<span class="line" id="L184"><a href="#L184">  184</a>     })?;</span>
+<span class="line" id="L185"><a href="#L185">  185</a>     Ok(())</span>
+<span class="line" id="L186"><a href="#L186">  186</a> }</span>
+<span class="line" id="L187"><a href="#L187">  187</a> </span>
+<span class="line" id="L188"><a href="#L188">  188</a> #[cfg(test)]</span>
+<span class="line" id="L189"><a href="#L189">  189</a> mod tests {</span>
+<span class="line" id="L190"><a href="#L190">  190</a>     use super::*;</span>
+<span class="line" id="L191"><a href="#L191">  191</a> </span>
+<span class="line" id="L192"><a href="#L192">  192</a>     #[test]</span>
+<span class="line" id="L193"><a href="#L193">  193</a>     fn min_codes_is_fieldwise_min() {</span>
+<span class="line" id="L194"><a href="#L194">  194</a>         for x in 0..256u64 {</span>
+<span class="line" id="L195"><a href="#L195">  195</a>             for y in 0..256u64 {</span>
+<span class="line" id="L196"><a href="#L196">  196</a>                 let m = min_codes(x, y);</span>
+<span class="line" id="L197"><a href="#L197">  197</a>                 for f in 0..4 {</span>
+<span class="line" id="L198"><a href="#L198">  198</a>                     let (a, b) = ((x &gt;&gt; (2 * f)) &amp; 3, (y &gt;&gt; (2 * f)) &amp; 3);</span>
+<span class="line" id="L199"><a href="#L199">  199</a>                     assert_eq!((m &gt;&gt; (2 * f)) &amp; 3, a.min(b), &quot;{x:#x} {y:#x} field {f}&quot;);</span>
+<span class="line" id="L200"><a href="#L200">  200</a>                 }</span>
+<span class="line" id="L201"><a href="#L201">  201</a>             }</span>
+<span class="line" id="L202"><a href="#L202">  202</a>         }</span>
+<span class="line" id="L203"><a href="#L203">  203</a>     }</span>
+<span class="line" id="L204"><a href="#L204">  204</a> }</span></pre></html>

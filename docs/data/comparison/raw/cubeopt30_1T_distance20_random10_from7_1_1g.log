@@ -1,0 +1,20 @@
+use sse, bmi2
+use huge page
+uniq_sym_states = 139, co_base=9930
+read pruning table from file nxprun30.dat
+ 0           62
+ 1          124
+ 2          866
+ 3         5551
+ 4        43504
+ 5       336948
+ 6      2699480
+ 7     20163087
+ 8    118276987
+ 9    241467406
+10   2878994435
+11   6272091236
+12    532557114
+Avg: 10.674, 10066636800 entry
+U2 L' U2 F2 L' R  D2 L2 B' D2 L  F' R' U' L  U2 F' D' R  B  
+Cube1 finished in 20, 3419901748/286 node(s), tt=337550.422 ms, 98.70ns/node, 44.29ns/probe, 0.636 inv/node, 2.228 probe/node 502 split(s)

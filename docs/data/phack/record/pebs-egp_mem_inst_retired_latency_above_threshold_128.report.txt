@@ -1,0 +1,20 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 41  of event 'egp_mem_inst_retired_latency_above_threshold_128'
+# Event count (approx.): 82123
+#
+# Overhead  Symbol                                                                              IPC   [IPC Coverage]
+# ........  ..................................................................................  ....................
+#
+    78.05%  [.] cubeopt::lanes::run_lanes::<bench::run::{closure#1}::{closure#0}::{closure#0}>  -      -            
+    17.07%  [.] <cubeopt::lanes::Lane>::setup_run                                               -      -            
+     2.44%  [.] <cubeopt::lanes::Lane>::start_iteration                                         -      -            
+     2.44%  [.] 0x00000000000bab57                                                              -      -            
+
+
+#
+# (Tip: To separate samples by time use perf report --sort time,overhead,sym)
+#

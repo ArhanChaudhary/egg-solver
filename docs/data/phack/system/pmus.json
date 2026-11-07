@@ -1,0 +1,115 @@
+{
+  "/sys/bus/event_source/devices/software": {
+    "type": "1",
+    "format": {},
+    "events": {}
+  },
+  "/sys/bus/event_source/devices/uncore": {
+    "type": "11",
+    "format": {
+      "event": "config:0-7",
+      "edge": "config:18",
+      "inv": "config:23",
+      "umask": "config:8-15",
+      "cmask": "config:24-31"
+    },
+    "events": {
+      "qhl_request_local_reads": "event=0x20,umask=0x10",
+      "qmc_normal_reads_any": "event=0x2c,umask=0x0f",
+      "qhl_request_local_writes": "event=0x20,umask=0x20",
+      "clockticks": "event=0xff,umask=0x00",
+      "qhl_request_ioh_writes": "event=0x20,umask=0x02",
+      "qhl_request_ioh_reads": "event=0x20,umask=0x01",
+      "qhl_request_remote_writes": "event=0x20,umask=0x08",
+      "qhl_request_remote_reads": "event=0x20,umask=0x04",
+      "qmc_writes_full_any": "event=0x2f,umask=0x0f"
+    }
+  },
+  "/sys/bus/event_source/devices/uprobe": {
+    "type": "9",
+    "format": {
+      "ref_ctr_offset": "config:32-63",
+      "retprobe": "config:0"
+    },
+    "events": {}
+  },
+  "/sys/bus/event_source/devices/cpu": {
+    "type": "4",
+    "format": {
+      "event": "config:0-7",
+      "pc": "config:19",
+      "edge": "config:18",
+      "any": "config:21",
+      "offcore_rsp": "config1:0-63",
+      "ldlat": "config1:0-15",
+      "inv": "config:23",
+      "umask": "config:8-15",
+      "cmask": "config:24-31"
+    },
+    "events": {
+      "cache-misses": "event=0x2e,umask=0x41",
+      "cpu-cycles": "event=0x3c",
+      "stalled-cycles-frontend": "event=0x0e,umask=0x01,inv,cmask=0x01",
+      "ref-cycles": "event=0x00,umask=0x03",
+      "branch-misses": "event=0xc5",
+      "instructions": "event=0xc0",
+      "cache-references": "event=0x2e,umask=0x4f",
+      "branch-instructions": "event=0xc4",
+      "stalled-cycles-backend": "event=0xb1,umask=0x3f,inv,cmask=0x01",
+      "mem-loads": "event=0x0b,umask=0x10,ldlat=3"
+    }
+  },
+  "/sys/bus/event_source/devices/cstate_core": {
+    "type": "12",
+    "format": {
+      "event": "config:0-63"
+    },
+    "events": {
+      "c3-residency": "event=0x01",
+      "c6-residency": "event=0x02"
+    }
+  },
+  "/sys/bus/event_source/devices/breakpoint": {
+    "type": "5",
+    "format": {},
+    "events": {}
+  },
+  "/sys/bus/event_source/devices/tracepoint": {
+    "type": "2",
+    "format": {},
+    "events": {}
+  },
+  "/sys/bus/event_source/devices/cstate_pkg": {
+    "type": "13",
+    "format": {
+      "event": "config:0-63"
+    },
+    "events": {
+      "c3-residency": "event=0x01",
+      "c6-residency": "event=0x02",
+      "c7-residency": "event=0x03"
+    }
+  },
+  "/sys/bus/event_source/devices/kprobe": {
+    "type": "8",
+    "format": {
+      "retprobe": "config:0"
+    },
+    "events": {}
+  },
+  "/sys/bus/event_source/devices/msr": {
+    "type": "10",
+    "format": {
+      "event": "config:0-63"
+    },
+    "events": {
+      "smi": "event=0x04",
+      "cpu_thermal_margin.snapshot": "1",
+      "cpu_thermal_margin": "event=0x07",
+      "cpu_thermal_margin.unit": "C",
+      "tsc": "event=0x00",
+      "aperf": "event=0x01",
+      "mperf": "event=0x02"
+    }
+  }
+}

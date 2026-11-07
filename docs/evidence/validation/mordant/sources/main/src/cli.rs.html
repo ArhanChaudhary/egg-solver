@@ -1,0 +1,498 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>cli.rs — source evidence</title><style>body{font:15px system-ui;margin:2rem}pre{font:13px/1.6 monospace;overflow:auto}.line:target{background:#fff0a0}a{color:#42617a;text-decoration:none}</style><h1>cli.rs</h1><p>Source evidence snapshot. Original file SHA-256: <code>fa8c410e57324a6d666c0cfc3313de2a9366121cff62a8cd11b5d8409f80b69f</code>. <a href="cli.rs">Raw source</a></p><pre><span class="line" id="L1"><a href="#L1">    1</a> //! What the binaries (`solve`, `bench`, `gen`, `egg-solver`) share, with the</span>
+<span class="line" id="L2"><a href="#L2">    2</a> //! `cli` feature: logging (`-v`, `RUST_LOG`), how a table is loaded</span>
+<span class="line" id="L3"><a href="#L3">    3</a> //! (`--load`, `--prefault`, `--shm`) and what it got (page sizes), shell</span>
+<span class="line" id="L4"><a href="#L4">    4</a> //! completions and exit statuses. All of it runs before or after a search,</span>
+<span class="line" id="L5"><a href="#L5">    5</a> //! never during one. (JSON is printed by the binaries: `serde_json`&#x27;s</span>
+<span class="line" id="L6"><a href="#L6">    6</a> //! `PartialEq` impls would break type inference in the library&#x27;s tests.)</span>
+<span class="line" id="L7"><a href="#L7">    7</a> </span>
+<span class="line" id="L8"><a href="#L8">    8</a> pub mod preflight;</span>
+<span class="line" id="L9"><a href="#L9">    9</a> </span>
+<span class="line" id="L10"><a href="#L10">   10</a> use crate::tables::file::{LoadMode, LoadOptions, ShmPages};</span>
+<span class="line" id="L11"><a href="#L11">   11</a> use crate::tables::shm::{self, Segment};</span>
+<span class="line" id="L12"><a href="#L12">   12</a> use crate::tables::{h48_bytes, H48Table, LoadReport, TableError};</span>
+<span class="line" id="L13"><a href="#L13">   13</a> use std::io::Write as _;</span>
+<span class="line" id="L14"><a href="#L14">   14</a> use std::process::ExitCode;</span>
+<span class="line" id="L15"><a href="#L15">   15</a> use std::time::Instant;</span>
+<span class="line" id="L16"><a href="#L16">   16</a> </span>
+<span class="line" id="L17"><a href="#L17">   17</a> /// `-v`: diagnostics on stderr.</span>
+<span class="line" id="L18"><a href="#L18">   18</a> #[derive(clap::Args, Clone, Copy, Debug)]</span>
+<span class="line" id="L19"><a href="#L19">   19</a> pub struct Verbosity {</span>
+<span class="line" id="L20"><a href="#L20">   20</a>     /// Log diagnostics to stderr (table loading and pages, threads, lanes);</span>
+<span class="line" id="L21"><a href="#L21">   21</a>     /// -vv for more. `RUST_LOG` (e.g. `debug`) overrides it.</span>
+<span class="line" id="L22"><a href="#L22">   22</a>     #[arg(short, long, action = clap::ArgAction::Count, global = true, display_order = 101)]</span>
+<span class="line" id="L23"><a href="#L23">   23</a>     pub verbose: u8,</span>
+<span class="line" id="L24"><a href="#L24">   24</a> }</span>
+<span class="line" id="L25"><a href="#L25">   25</a> </span>
+<span class="line" id="L26"><a href="#L26">   26</a> impl Verbosity {</span>
+<span class="line" id="L27"><a href="#L27">   27</a>     /// Start logging to stderr: warnings only by default (nothing in normal</span>
+<span class="line" id="L28"><a href="#L28">   28</a>     /// runs, so that stderr is as before), more with each `-v`.</span>
+<span class="line" id="L29"><a href="#L29">   29</a>     pub fn init_logging(self) {</span>
+<span class="line" id="L30"><a href="#L30">   30</a>         let level = match self.verbose {</span>
+<span class="line" id="L31"><a href="#L31">   31</a>             0 =&gt; log::LevelFilter::Warn,</span>
+<span class="line" id="L32"><a href="#L32">   32</a>             1 =&gt; log::LevelFilter::Info,</span>
+<span class="line" id="L33"><a href="#L33">   33</a>             2 =&gt; log::LevelFilter::Debug,</span>
+<span class="line" id="L34"><a href="#L34">   34</a>             _ =&gt; log::LevelFilter::Trace,</span>
+<span class="line" id="L35"><a href="#L35">   35</a>         };</span>
+<span class="line" id="L36"><a href="#L36">   36</a>         let start = Instant::now();</span>
+<span class="line" id="L37"><a href="#L37">   37</a>         env_logger::Builder::new()</span>
+<span class="line" id="L38"><a href="#L38">   38</a>             .filter_level(level)</span>
+<span class="line" id="L39"><a href="#L39">   39</a>             .parse_default_env()</span>
+<span class="line" id="L40"><a href="#L40">   40</a>             .format(move |out, record| {</span>
+<span class="line" id="L41"><a href="#L41">   41</a>                 writeln!(</span>
+<span class="line" id="L42"><a href="#L42">   42</a>                     out,</span>
+<span class="line" id="L43"><a href="#L43">   43</a>                     &quot;[{:8.3}s {} {}] {}&quot;,</span>
+<span class="line" id="L44"><a href="#L44">   44</a>                     start.elapsed().as_secs_f64(),</span>
+<span class="line" id="L45"><a href="#L45">   45</a>                     record.level(),</span>
+<span class="line" id="L46"><a href="#L46">   46</a>                     record.target(),</span>
+<span class="line" id="L47"><a href="#L47">   47</a>                     record.args()</span>
+<span class="line" id="L48"><a href="#L48">   48</a>                 )</span>
+<span class="line" id="L49"><a href="#L49">   49</a>             })</span>
+<span class="line" id="L50"><a href="#L50">   50</a>             .init();</span>
+<span class="line" id="L51"><a href="#L51">   51</a>     }</span>
+<span class="line" id="L52"><a href="#L52">   52</a> }</span>
+<span class="line" id="L53"><a href="#L53">   53</a> </span>
+<span class="line" id="L54"><a href="#L54">   54</a> /// The value parser of a count of at least 1 (threads, lanes).</span>
+<span class="line" id="L55"><a href="#L55">   55</a> #[must_use]</span>
+<span class="line" id="L56"><a href="#L56">   56</a> pub fn positive() -&gt; clap::builder::RangedU64ValueParser&lt;usize&gt; {</span>
+<span class="line" id="L57"><a href="#L57">   57</a>     clap::builder::RangedU64ValueParser::new().range(1..)</span>
+<span class="line" id="L58"><a href="#L58">   58</a> }</span>
+<span class="line" id="L59"><a href="#L59">   59</a> </span>
+<span class="line" id="L60"><a href="#L60">   60</a> /// How a table file is brought into memory.</span>
+<span class="line" id="L61"><a href="#L61">   61</a> #[derive(clap::Args, Clone, Copy, Debug)]</span>
+<span class="line" id="L62"><a href="#L62">   62</a> pub struct LoadArgs {</span>
+<span class="line" id="L63"><a href="#L63">   63</a>     /// How to load the table: `map` the file, `copy` it into memory (with</span>
+<span class="line" id="L64"><a href="#L64">   64</a>     /// transparent huge pages), `shm`: attach its shared memory segment,</span>
+<span class="line" id="L65"><a href="#L65">   65</a>     /// made from the file first if there is none (Linux; the segment stays</span>
+<span class="line" id="L66"><a href="#L66">   66</a>     /// until reboot or `solve --shm-remove`, see README.md &quot;Shared memory&quot;),</span>
+<span class="line" id="L67"><a href="#L67">   67</a>     /// or `auto`: the table&#x27;s segment if one is there, else map on</span>
+<span class="line" id="L68"><a href="#L68">   68</a>     /// hugetlbfs, /dev/shm and other systems than Linux, else copy.</span>
+<span class="line" id="L69"><a href="#L69">   69</a>     #[arg(</span>
+<span class="line" id="L70"><a href="#L70">   70</a>         long,</span>
+<span class="line" id="L71"><a href="#L71">   71</a>         value_name = &quot;auto|map|copy|shm&quot;,</span>
+<span class="line" id="L72"><a href="#L72">   72</a>         env = crate::env::name(&quot;EGG_SOLVER_LOAD&quot;),</span>
+<span class="line" id="L73"><a href="#L73">   73</a>         default_value = &quot;auto&quot;,</span>
+<span class="line" id="L74"><a href="#L74">   74</a>         value_parser = parse_load_mode,</span>
+<span class="line" id="L75"><a href="#L75">   75</a>         display_order = 90</span>
+<span class="line" id="L76"><a href="#L76">   76</a>     )]</span>
+<span class="line" id="L77"><a href="#L77">   77</a>     pub load: LoadMode,</span>
+<span class="line" id="L78"><a href="#L78">   78</a>     /// The same as `--load shm` (and overrides it).</span>
+<span class="line" id="L79"><a href="#L79">   79</a>     #[arg(long, display_order = 91)]</span>
+<span class="line" id="L80"><a href="#L80">   80</a>     pub shm: bool,</span>
+<span class="line" id="L81"><a href="#L81">   81</a>     /// With `map` and `shm`: read (map) the whole table at start (1), or each</span>
+<span class="line" id="L82"><a href="#L82">   82</a>     /// page on first use (0).</span>
+<span class="line" id="L83"><a href="#L83">   83</a>     #[arg(</span>
+<span class="line" id="L84"><a href="#L84">   84</a>         long,</span>
+<span class="line" id="L85"><a href="#L85">   85</a>         value_name = &quot;0|1&quot;,</span>
+<span class="line" id="L86"><a href="#L86">   86</a>         env = crate::env::name(&quot;EGG_SOLVER_PREFAULT&quot;),</span>
+<span class="line" id="L87"><a href="#L87">   87</a>         default_value = &quot;1&quot;,</span>
+<span class="line" id="L88"><a href="#L88">   88</a>         value_parser = parse_prefault,</span>
+<span class="line" id="L89"><a href="#L89">   89</a>         action = clap::ArgAction::Set,</span>
+<span class="line" id="L90"><a href="#L90">   90</a>         display_order = 92</span>
+<span class="line" id="L91"><a href="#L91">   91</a>     )]</span>
+<span class="line" id="L92"><a href="#L92">   92</a>     pub prefault: bool,</span>
+<span class="line" id="L93"><a href="#L93">   93</a>     /// With `shm`: the page sizes a new segment may get, tried largest first</span>
+<span class="line" id="L94"><a href="#L94">   94</a>     /// (1g and 2m pages come from the kernel&#x27;s hugetlb pool).</span>
+<span class="line" id="L95"><a href="#L95">   95</a>     #[arg(</span>
+<span class="line" id="L96"><a href="#L96">   96</a>         long,</span>
+<span class="line" id="L97"><a href="#L97">   97</a>         value_name = &quot;LIST&quot;,</span>
+<span class="line" id="L98"><a href="#L98">   98</a>         env = crate::env::name(&quot;EGG_SOLVER_SHM_PAGES&quot;),</span>
+<span class="line" id="L99"><a href="#L99">   99</a>         default_value = &quot;1g,2m,4k&quot;,</span>
+<span class="line" id="L100"><a href="#L100">  100</a>         value_parser = parse_shm_pages,</span>
+<span class="line" id="L101"><a href="#L101">  101</a>         display_order = 93</span>
+<span class="line" id="L102"><a href="#L102">  102</a>     )]</span>
+<span class="line" id="L103"><a href="#L103">  103</a>     pub shm_pages: ShmPages,</span>
+<span class="line" id="L104"><a href="#L104">  104</a>     /// The shared memory segment&#x27;s key [default: 0x636f (ASCII &quot;co&quot;), then</span>
+<span class="line" id="L105"><a href="#L105">  105</a>     /// the table&#x27;s k and base, a byte each: 0x636f0709 for h7 base 9].</span>
+<span class="line" id="L106"><a href="#L106">  106</a>     #[arg(</span>
+<span class="line" id="L107"><a href="#L107">  107</a>         long,</span>
+<span class="line" id="L108"><a href="#L108">  108</a>         value_name = &quot;KEY&quot;,</span>
+<span class="line" id="L109"><a href="#L109">  109</a>         env = crate::env::name(&quot;EGG_SOLVER_SHM_KEY&quot;),</span>
+<span class="line" id="L110"><a href="#L110">  110</a>         value_parser = parse_shm_key,</span>
+<span class="line" id="L111"><a href="#L111">  111</a>         display_order = 94</span>
+<span class="line" id="L112"><a href="#L112">  112</a>     )]</span>
+<span class="line" id="L113"><a href="#L113">  113</a>     pub shm_key: Option&lt;u32&gt;,</span>
+<span class="line" id="L114"><a href="#L114">  114</a> }</span>
+<span class="line" id="L115"><a href="#L115">  115</a> </span>
+<span class="line" id="L116"><a href="#L116">  116</a> /// `--load` (an empty `EGG_SOLVER_LOAD` is `auto`, as before clap).</span>
+<span class="line" id="L117"><a href="#L117">  117</a> fn parse_load_mode(text: &amp;str) -&gt; Result&lt;LoadMode, String&gt; {</span>
+<span class="line" id="L118"><a href="#L118">  118</a>     match text {</span>
+<span class="line" id="L119"><a href="#L119">  119</a>         &quot;auto&quot; | &quot;&quot; =&gt; Ok(LoadMode::Auto),</span>
+<span class="line" id="L120"><a href="#L120">  120</a>         &quot;map&quot; =&gt; Ok(LoadMode::Map),</span>
+<span class="line" id="L121"><a href="#L121">  121</a>         &quot;copy&quot; =&gt; Ok(LoadMode::Copy),</span>
+<span class="line" id="L122"><a href="#L122">  122</a>         &quot;shm&quot; =&gt; Ok(LoadMode::Shm),</span>
+<span class="line" id="L123"><a href="#L123">  123</a>         _ =&gt; Err(&quot;expected auto, map, copy or shm&quot;.to_string()),</span>
+<span class="line" id="L124"><a href="#L124">  124</a>     }</span>
+<span class="line" id="L125"><a href="#L125">  125</a> }</span>
+<span class="line" id="L126"><a href="#L126">  126</a> </span>
+<span class="line" id="L127"><a href="#L127">  127</a> /// `--shm-pages`.</span>
+<span class="line" id="L128"><a href="#L128">  128</a> fn parse_shm_pages(text: &amp;str) -&gt; Result&lt;ShmPages, String&gt; {</span>
+<span class="line" id="L129"><a href="#L129">  129</a>     ShmPages::parse(text).ok_or_else(|| &quot;expected a list of 1g, 2m and 4k, e.g. 2m,4k&quot;.to_string())</span>
+<span class="line" id="L130"><a href="#L130">  130</a> }</span>
+<span class="line" id="L131"><a href="#L131">  131</a> </span>
+<span class="line" id="L132"><a href="#L132">  132</a> /// `--shm-key`.</span>
+<span class="line" id="L133"><a href="#L133">  133</a> fn parse_shm_key(text: &amp;str) -&gt; Result&lt;u32, String&gt; {</span>
+<span class="line" id="L134"><a href="#L134">  134</a>     shm::parse_key(text).ok_or_else(|| &quot;expected a key other than 0, e.g. 0x636f0709&quot;.to_string())</span>
+<span class="line" id="L135"><a href="#L135">  135</a> }</span>
+<span class="line" id="L136"><a href="#L136">  136</a> </span>
+<span class="line" id="L137"><a href="#L137">  137</a> /// `--prefault` (an empty `EGG_SOLVER_PREFAULT` is 1, as before clap).</span>
+<span class="line" id="L138"><a href="#L138">  138</a> fn parse_prefault(text: &amp;str) -&gt; Result&lt;bool, String&gt; {</span>
+<span class="line" id="L139"><a href="#L139">  139</a>     match text {</span>
+<span class="line" id="L140"><a href="#L140">  140</a>         &quot;1&quot; | &quot;&quot; =&gt; Ok(true),</span>
+<span class="line" id="L141"><a href="#L141">  141</a>         &quot;0&quot; =&gt; Ok(false),</span>
+<span class="line" id="L142"><a href="#L142">  142</a>         _ =&gt; Err(&quot;expected 0 or 1&quot;.to_string()),</span>
+<span class="line" id="L143"><a href="#L143">  143</a>     }</span>
+<span class="line" id="L144"><a href="#L144">  144</a> }</span>
+<span class="line" id="L145"><a href="#L145">  145</a> </span>
+<span class="line" id="L146"><a href="#L146">  146</a> impl LoadArgs {</span>
+<span class="line" id="L147"><a href="#L147">  147</a>     /// The options for `H48Table::open_with`.</span>
+<span class="line" id="L148"><a href="#L148">  148</a>     #[must_use]</span>
+<span class="line" id="L149"><a href="#L149">  149</a>     pub fn options(self) -&gt; LoadOptions {</span>
+<span class="line" id="L150"><a href="#L150">  150</a>         LoadOptions {</span>
+<span class="line" id="L151"><a href="#L151">  151</a>             mode: if self.shm { LoadMode::Shm } else { self.load },</span>
+<span class="line" id="L152"><a href="#L152">  152</a>             prefault: self.prefault,</span>
+<span class="line" id="L153"><a href="#L153">  153</a>             shm_pages: self.shm_pages,</span>
+<span class="line" id="L154"><a href="#L154">  154</a>             shm_key: self.shm_key,</span>
+<span class="line" id="L155"><a href="#L155">  155</a>         }</span>
+<span class="line" id="L156"><a href="#L156">  156</a>     }</span>
+<span class="line" id="L157"><a href="#L157">  157</a> </span>
+<span class="line" id="L158"><a href="#L158">  158</a>     /// Open the table at `path`, logging how it is loaded and what pages it</span>
+<span class="line" id="L159"><a href="#L159">  159</a>     /// got.</span>
+<span class="line" id="L160"><a href="#L160">  160</a>     ///</span>
+<span class="line" id="L161"><a href="#L161">  161</a>     /// # Errors</span>
+<span class="line" id="L162"><a href="#L162">  162</a>     /// As `H48Table::open_with`, as a `BadInput` (exit status 2, as `solve`</span>
+<span class="line" id="L163"><a href="#L163">  163</a>     /// gave before).</span>
+<span class="line" id="L164"><a href="#L164">  164</a>     pub fn open(self, path: &amp;str) -&gt; anyhow::Result&lt;H48Table&gt; {</span>
+<span class="line" id="L165"><a href="#L165">  165</a>         self.open_reported(path).map(|(table, _)| table)</span>
+<span class="line" id="L166"><a href="#L166">  166</a>     }</span>
+<span class="line" id="L167"><a href="#L167">  167</a> </span>
+<span class="line" id="L168"><a href="#L168">  168</a>     /// `open`, and how the table was loaded.</span>
+<span class="line" id="L169"><a href="#L169">  169</a>     ///</span>
+<span class="line" id="L170"><a href="#L170">  170</a>     /// # Errors</span>
+<span class="line" id="L171"><a href="#L171">  171</a>     /// As `open`.</span>
+<span class="line" id="L172"><a href="#L172">  172</a>     pub fn open_reported(self, path: &amp;str) -&gt; anyhow::Result&lt;(H48Table, LoadReport)&gt; {</span>
+<span class="line" id="L173"><a href="#L173">  173</a>         self.preflight(path)?;</span>
+<span class="line" id="L174"><a href="#L174">  174</a>         self.open_logged(path).map_err(|error| {</span>
+<span class="line" id="L175"><a href="#L175">  175</a>             // (Most messages name the file already.)</span>
+<span class="line" id="L176"><a href="#L176">  176</a>             let what = if error.to_string().contains(path) {</span>
+<span class="line" id="L177"><a href="#L177">  177</a>                 &quot;cannot open table&quot;.to_string()</span>
+<span class="line" id="L178"><a href="#L178">  178</a>             } else {</span>
+<span class="line" id="L179"><a href="#L179">  179</a>                 format!(&quot;cannot open table {path}&quot;)</span>
+<span class="line" id="L180"><a href="#L180">  180</a>             };</span>
+<span class="line" id="L181"><a href="#L181">  181</a>             anyhow::Error::new(error).context(BadInput(what))</span>
+<span class="line" id="L182"><a href="#L182">  182</a>         })</span>
+<span class="line" id="L183"><a href="#L183">  183</a>     }</span>
+<span class="line" id="L184"><a href="#L184">  184</a> </span>
+<span class="line" id="L185"><a href="#L185">  185</a>     /// Before the table is loaded: that the memory for it is there</span>
+<span class="line" id="L186"><a href="#L186">  186</a>     /// (`preflight`), for a copy (`--load copy`, or `auto` off hugetlbfs and</span>
+<span class="line" id="L187"><a href="#L187">  187</a>     /// /dev/shm on Linux) and for a new shared memory segment that only 4</span>
+<span class="line" id="L188"><a href="#L188">  188</a>     /// KiB pages are left for. Nothing is needed when `auto` or `--shm`</span>
+<span class="line" id="L189"><a href="#L189">  189</a>     /// attaches the table&#x27;s segment, or for a segment on huge pages (pool</span>
+<span class="line" id="L190"><a href="#L190">  190</a>     /// pages, which `tables::shm` checks itself).</span>
+<span class="line" id="L191"><a href="#L191">  191</a>     fn preflight(self, path: &amp;str) -&gt; anyhow::Result&lt;()&gt; {</span>
+<span class="line" id="L192"><a href="#L192">  192</a>         let options = self.options();</span>
+<span class="line" id="L193"><a href="#L193">  193</a>         let mode = options.mode_for(path);</span>
+<span class="line" id="L194"><a href="#L194">  194</a>         if !matches!(mode, LoadMode::Copy | LoadMode::Shm) {</span>
+<span class="line" id="L195"><a href="#L195">  195</a>             return Ok(());</span>
+<span class="line" id="L196"><a href="#L196">  196</a>         }</span>
+<span class="line" id="L197"><a href="#L197">  197</a>         // (A table that does not open fails in `open_logged`.)</span>
+<span class="line" id="L198"><a href="#L198">  198</a>         let Ok(meta) = crate::tables::read_meta(path) else {</span>
+<span class="line" id="L199"><a href="#L199">  199</a>             return Ok(());</span>
+<span class="line" id="L200"><a href="#L200">  200</a>         };</span>
+<span class="line" id="L201"><a href="#L201">  201</a>         if matches!(options.mode, LoadMode::Auto | LoadMode::Shm) &amp;&amp; shm::loaded(path, &amp;options) {</span>
+<span class="line" id="L202"><a href="#L202">  202</a>             return Ok(());</span>
+<span class="line" id="L203"><a href="#L203">  203</a>         }</span>
+<span class="line" id="L204"><a href="#L204">  204</a>         if mode == LoadMode::Copy {</span>
+<span class="line" id="L205"><a href="#L205">  205</a>             return preflight::memory(</span>
+<span class="line" id="L206"><a href="#L206">  206</a>                 &amp;format!(&quot;copying table {path} (h{}) into memory&quot;, meta.k),</span>
+<span class="line" id="L207"><a href="#L207">  207</a>                 h48_bytes(meta.k),</span>
+<span class="line" id="L208"><a href="#L208">  208</a>                 &quot;use a copy on hugetlbfs (mapped, not copied: --load map) or a smaller table&quot;,</span>
+<span class="line" id="L209"><a href="#L209">  209</a>             );</span>
+<span class="line" id="L210"><a href="#L210">  210</a>         }</span>
+<span class="line" id="L211"><a href="#L211">  211</a>         if shm::new_segment_page(path, &amp;options) == Some(shm::NORMAL_PAGE) {</span>
+<span class="line" id="L212"><a href="#L212">  212</a>             preflight::memory(</span>
+<span class="line" id="L213"><a href="#L213">  213</a>                 &amp;format!(</span>
+<span class="line" id="L214"><a href="#L214">  214</a>                     &quot;a shared memory segment of table {path} (h{}) on 4 KiB pages&quot;,</span>
+<span class="line" id="L215"><a href="#L215">  215</a>                     meta.k</span>
+<span class="line" id="L216"><a href="#L216">  216</a>                 ),</span>
+<span class="line" id="L217"><a href="#L217">  217</a>                 shm::segment_bytes(h48_bytes(meta.k), shm::NORMAL_PAGE),</span>
+<span class="line" id="L218"><a href="#L218">  218</a>                 &quot;allow huge pages (README.md \&quot;Shared memory\&quot;) or use a smaller table&quot;,</span>
+<span class="line" id="L219"><a href="#L219">  219</a>             )?;</span>
+<span class="line" id="L220"><a href="#L220">  220</a>         }</span>
+<span class="line" id="L221"><a href="#L221">  221</a>         Ok(())</span>
+<span class="line" id="L222"><a href="#L222">  222</a>     }</span>
+<span class="line" id="L223"><a href="#L223">  223</a> </span>
+<span class="line" id="L224"><a href="#L224">  224</a>     /// `open_reported`, with the table&#x27;s own error.</span>
+<span class="line" id="L225"><a href="#L225">  225</a>     fn open_logged(self, path: &amp;str) -&gt; Result&lt;(H48Table, LoadReport), TableError&gt; {</span>
+<span class="line" id="L226"><a href="#L226">  226</a>         let options = self.options();</span>
+<span class="line" id="L227"><a href="#L227">  227</a>         let mode = options.mode_for(path);</span>
+<span class="line" id="L228"><a href="#L228">  228</a>         log::info!(</span>
+<span class="line" id="L229"><a href="#L229">  229</a>             &quot;table {path}: {mode:?}{}{}&quot;,</span>
+<span class="line" id="L230"><a href="#L230">  230</a>             if options.mode == LoadMode::Auto &amp;&amp; cfg!(target_os = &quot;linux&quot;) {</span>
+<span class="line" id="L231"><a href="#L231">  231</a>                 &quot; (or the table&#x27;s shared memory segment, if there)&quot;</span>
+<span class="line" id="L232"><a href="#L232">  232</a>             } else {</span>
+<span class="line" id="L233"><a href="#L233">  233</a>                 &quot;&quot;</span>
+<span class="line" id="L234"><a href="#L234">  234</a>             },</span>
+<span class="line" id="L235"><a href="#L235">  235</a>             if matches!(mode, LoadMode::Map | LoadMode::Shm) &amp;&amp; !options.prefault {</span>
+<span class="line" id="L236"><a href="#L236">  236</a>                 &quot;, pages read on first use&quot;</span>
+<span class="line" id="L237"><a href="#L237">  237</a>             } else {</span>
+<span class="line" id="L238"><a href="#L238">  238</a>                 &quot;&quot;</span>
+<span class="line" id="L239"><a href="#L239">  239</a>             }</span>
+<span class="line" id="L240"><a href="#L240">  240</a>         );</span>
+<span class="line" id="L241"><a href="#L241">  241</a>         let start = Instant::now();</span>
+<span class="line" id="L242"><a href="#L242">  242</a>         let mut waiting = false;</span>
+<span class="line" id="L243"><a href="#L243">  243</a>         let (table, report) = loop {</span>
+<span class="line" id="L244"><a href="#L244">  244</a>             match H48Table::open_reporting(path, &amp;options) {</span>
+<span class="line" id="L245"><a href="#L245">  245</a>                 // (Another process is filling the segment: wait for it.)</span>
+<span class="line" id="L246"><a href="#L246">  246</a>                 Err(TableError::ShmLoading { key, pid }) =&gt; {</span>
+<span class="line" id="L247"><a href="#L247">  247</a>                     if !waiting {</span>
+<span class="line" id="L248"><a href="#L248">  248</a>                         log::warn!(</span>
+<span class="line" id="L249"><a href="#L249">  249</a>                             &quot;table {path}: shared memory segment {key:#010x} is being loaded by \</span>
+<span class="line" id="L250"><a href="#L250">  250</a>                              process {pid}: waiting for it&quot;</span>
+<span class="line" id="L251"><a href="#L251">  251</a>                         );</span>
+<span class="line" id="L252"><a href="#L252">  252</a>                         waiting = true;</span>
+<span class="line" id="L253"><a href="#L253">  253</a>                     }</span>
+<span class="line" id="L254"><a href="#L254">  254</a>                     std::thread::sleep(std::time::Duration::from_millis(100));</span>
+<span class="line" id="L255"><a href="#L255">  255</a>                 }</span>
+<span class="line" id="L256"><a href="#L256">  256</a>                 result =&gt; break result?,</span>
+<span class="line" id="L257"><a href="#L257">  257</a>             }</span>
+<span class="line" id="L258"><a href="#L258">  258</a>         };</span>
+<span class="line" id="L259"><a href="#L259">  259</a>         for note in &amp;report.notes {</span>
+<span class="line" id="L260"><a href="#L260">  260</a>             log::info!(&quot;table {path}: {note}&quot;);</span>
+<span class="line" id="L261"><a href="#L261">  261</a>         }</span>
+<span class="line" id="L262"><a href="#L262">  262</a>         let len = usize::try_from(h48_bytes(table.meta.k)).unwrap_or(usize::MAX);</span>
+<span class="line" id="L263"><a href="#L263">  263</a>         log::info!(</span>
+<span class="line" id="L264"><a href="#L264">  264</a>             &quot;table {path}: h{} base {}, {:.2} GiB, {:?}, loaded in {:.2}s&quot;,</span>
+<span class="line" id="L265"><a href="#L265">  265</a>             table.meta.k,</span>
+<span class="line" id="L266"><a href="#L266">  266</a>             table.meta.base,</span>
+<span class="line" id="L267"><a href="#L267">  267</a>             gib(len),</span>
+<span class="line" id="L268"><a href="#L268">  268</a>             report.mode,</span>
+<span class="line" id="L269"><a href="#L269">  269</a>             start.elapsed().as_secs_f64()</span>
+<span class="line" id="L270"><a href="#L270">  270</a>         );</span>
+<span class="line" id="L271"><a href="#L271">  271</a>         if let Some(segment) = &amp;report.segment {</span>
+<span class="line" id="L272"><a href="#L272">  272</a>             log_segment(path, segment, &amp;report.notes, options.shm_pages);</span>
+<span class="line" id="L273"><a href="#L273">  273</a>         }</span>
+<span class="line" id="L274"><a href="#L274">  274</a>         if log::log_enabled!(log::Level::Info) {</span>
+<span class="line" id="L275"><a href="#L275">  275</a>             log::info!(</span>
+<span class="line" id="L276"><a href="#L276">  276</a>                 &quot;table {path}: {}&quot;,</span>
+<span class="line" id="L277"><a href="#L277">  277</a>                 page_report(table.memory.ptr().addr(), len)</span>
+<span class="line" id="L278"><a href="#L278">  278</a>             );</span>
+<span class="line" id="L279"><a href="#L279">  279</a>         }</span>
+<span class="line" id="L280"><a href="#L280">  280</a>         Ok((table, report))</span>
+<span class="line" id="L281"><a href="#L281">  281</a>     }</span>
+<span class="line" id="L282"><a href="#L282">  282</a> </span>
+<span class="line" id="L283"><a href="#L283">  283</a>     /// `solve --shm-load`: make the table&#x27;s shared memory segment from the</span>
+<span class="line" id="L284"><a href="#L284">  284</a>     /// file (or check the one there) and print it, without solving.</span>
+<span class="line" id="L285"><a href="#L285">  285</a>     ///</span>
+<span class="line" id="L286"><a href="#L286">  286</a>     /// # Errors</span>
+<span class="line" id="L287"><a href="#L287">  287</a>     /// As `open` with `--load shm`.</span>
+<span class="line" id="L288"><a href="#L288">  288</a>     pub fn shm_load(self, path: &amp;str) -&gt; anyhow::Result&lt;ExitCode&gt; {</span>
+<span class="line" id="L289"><a href="#L289">  289</a>         let args = LoadArgs { shm: true, ..self };</span>
+<span class="line" id="L290"><a href="#L290">  290</a>         let start = Instant::now();</span>
+<span class="line" id="L291"><a href="#L291">  291</a>         let (table, report) = args.open_reported(path)?;</span>
+<span class="line" id="L292"><a href="#L292">  292</a>         let seconds = start.elapsed().as_secs_f64();</span>
+<span class="line" id="L293"><a href="#L293">  293</a>         let segment = report</span>
+<span class="line" id="L294"><a href="#L294">  294</a>             .segment</span>
+<span class="line" id="L295"><a href="#L295">  295</a>             .ok_or_else(|| anyhow::anyhow!(&quot;no segment&quot;))?;</span>
+<span class="line" id="L296"><a href="#L296">  296</a>         let how = if segment.created {</span>
+<span class="line" id="L297"><a href="#L297">  297</a>             format!(&quot;made from {path} in {seconds:.2}s&quot;)</span>
+<span class="line" id="L298"><a href="#L298">  298</a>         } else {</span>
+<span class="line" id="L299"><a href="#L299">  299</a>             format!(</span>
+<span class="line" id="L300"><a href="#L300">  300</a>                 &quot;already loaded (from {} by process {})&quot;,</span>
+<span class="line" id="L301"><a href="#L301">  301</a>                 segment.source, segment.creator</span>
+<span class="line" id="L302"><a href="#L302">  302</a>             )</span>
+<span class="line" id="L303"><a href="#L303">  303</a>         };</span>
+<span class="line" id="L304"><a href="#L304">  304</a>         println!(</span>
+<span class="line" id="L305"><a href="#L305">  305</a>             &quot;segment {:#010x} shmid {}: h{} base {}, {:.2} GiB on {} pages, {how}&quot;,</span>
+<span class="line" id="L306"><a href="#L306">  306</a>             segment.key,</span>
+<span class="line" id="L307"><a href="#L307">  307</a>             segment.id,</span>
+<span class="line" id="L308"><a href="#L308">  308</a>             table.meta.k,</span>
+<span class="line" id="L309"><a href="#L309">  309</a>             table.meta.base,</span>
+<span class="line" id="L310"><a href="#L310">  310</a>             gib(usize::try_from(segment.bytes).unwrap_or(usize::MAX)),</span>
+<span class="line" id="L311"><a href="#L311">  311</a>             shm::page_name(segment.page_bytes),</span>
+<span class="line" id="L312"><a href="#L312">  312</a>         );</span>
+<span class="line" id="L313"><a href="#L313">  313</a>         Ok(ExitCode::SUCCESS)</span>
+<span class="line" id="L314"><a href="#L314">  314</a>     }</span>
+<span class="line" id="L315"><a href="#L315">  315</a> </span>
+<span class="line" id="L316"><a href="#L316">  316</a>     /// `solve --shm-remove`: remove the table&#x27;s shared memory segment (as</span>
+<span class="line" id="L317"><a href="#L317">  317</a>     /// `ipcrm -M KEY`; the key from the table&#x27;s k and base, or `--shm-key`).</span>
+<span class="line" id="L318"><a href="#L318">  318</a>     ///</span>
+<span class="line" id="L319"><a href="#L319">  319</a>     /// # Errors</span>
+<span class="line" id="L320"><a href="#L320">  320</a>     /// If the table&#x27;s k and base cannot be read, or the segment cannot be</span>
+<span class="line" id="L321"><a href="#L321">  321</a>     /// removed (another user&#x27;s).</span>
+<span class="line" id="L322"><a href="#L322">  322</a>     pub fn shm_remove(self, path: &amp;str) -&gt; anyhow::Result&lt;ExitCode&gt; {</span>
+<span class="line" id="L323"><a href="#L323">  323</a>         let key = if let Some(key) = self.shm_key {</span>
+<span class="line" id="L324"><a href="#L324">  324</a>             key</span>
+<span class="line" id="L325"><a href="#L325">  325</a>         } else {</span>
+<span class="line" id="L326"><a href="#L326">  326</a>             let meta = crate::tables::read_meta(path).map_err(|error| {</span>
+<span class="line" id="L327"><a href="#L327">  327</a>                 anyhow::Error::new(error).context(BadInput(format!(&quot;cannot read table {path}&quot;)))</span>
+<span class="line" id="L328"><a href="#L328">  328</a>             })?;</span>
+<span class="line" id="L329"><a href="#L329">  329</a>             shm::key(meta.k, meta.base)</span>
+<span class="line" id="L330"><a href="#L330">  330</a>         };</span>
+<span class="line" id="L331"><a href="#L331">  331</a>         match shm::remove(key)? {</span>
+<span class="line" id="L332"><a href="#L332">  332</a>             Some(removed) =&gt; {</span>
+<span class="line" id="L333"><a href="#L333">  333</a>                 let still = match removed.attached {</span>
+<span class="line" id="L334"><a href="#L334">  334</a>                     0 =&gt; String::new(),</span>
+<span class="line" id="L335"><a href="#L335">  335</a>                     n =&gt; format!(&quot; (attached by {n} processes: freed when they detach)&quot;),</span>
+<span class="line" id="L336"><a href="#L336">  336</a>                 };</span>
+<span class="line" id="L337"><a href="#L337">  337</a>                 println!(</span>
+<span class="line" id="L338"><a href="#L338">  338</a>                     &quot;removed segment {key:#010x} shmid {}: {}, {:.2} GiB{still}&quot;,</span>
+<span class="line" id="L339"><a href="#L339">  339</a>                     removed.id,</span>
+<span class="line" id="L340"><a href="#L340">  340</a>                     removed.held,</span>
+<span class="line" id="L341"><a href="#L341">  341</a>                     gib(usize::try_from(removed.bytes).unwrap_or(usize::MAX))</span>
+<span class="line" id="L342"><a href="#L342">  342</a>                 );</span>
+<span class="line" id="L343"><a href="#L343">  343</a>             }</span>
+<span class="line" id="L344"><a href="#L344">  344</a>             None =&gt; println!(&quot;no segment {key:#010x} for {path}&quot;),</span>
+<span class="line" id="L345"><a href="#L345">  345</a>         }</span>
+<span class="line" id="L346"><a href="#L346">  346</a>         Ok(ExitCode::SUCCESS)</span>
+<span class="line" id="L347"><a href="#L347">  347</a>     }</span>
+<span class="line" id="L348"><a href="#L348">  348</a> }</span>
+<span class="line" id="L349"><a href="#L349">  349</a> </span>
+<span class="line" id="L350"><a href="#L350">  350</a> /// Log the table&#x27;s shared memory segment: its page size, and whether it was</span>
+<span class="line" id="L351"><a href="#L351">  351</a> /// made or found; warn if it is on 4 KiB pages although huge pages were</span>
+<span class="line" id="L352"><a href="#L352">  352</a> /// allowed (much slower).</span>
+<span class="line" id="L353"><a href="#L353">  353</a> fn log_segment(path: &amp;str, segment: &amp;Segment, notes: &amp;[String], allowed: ShmPages) {</span>
+<span class="line" id="L354"><a href="#L354">  354</a>     let key = segment.key;</span>
+<span class="line" id="L355"><a href="#L355">  355</a>     let how = if segment.created {</span>
+<span class="line" id="L356"><a href="#L356">  356</a>         &quot;made from the file&quot;.to_string()</span>
+<span class="line" id="L357"><a href="#L357">  357</a>     } else {</span>
+<span class="line" id="L358"><a href="#L358">  358</a>         format!(</span>
+<span class="line" id="L359"><a href="#L359">  359</a>             &quot;attached (made by process {} from {})&quot;,</span>
+<span class="line" id="L360"><a href="#L360">  360</a>             segment.creator, segment.source</span>
+<span class="line" id="L361"><a href="#L361">  361</a>         )</span>
+<span class="line" id="L362"><a href="#L362">  362</a>     };</span>
+<span class="line" id="L363"><a href="#L363">  363</a>     log::info!(</span>
+<span class="line" id="L364"><a href="#L364">  364</a>         &quot;table {path}: shared memory segment {key:#010x} (shmid {}), {:.2} GiB on {} pages: {how}&quot;,</span>
+<span class="line" id="L365"><a href="#L365">  365</a>         segment.id,</span>
+<span class="line" id="L366"><a href="#L366">  366</a>         gib(usize::try_from(segment.bytes).unwrap_or(usize::MAX)),</span>
+<span class="line" id="L367"><a href="#L367">  367</a>         shm::page_name(segment.page_bytes)</span>
+<span class="line" id="L368"><a href="#L368">  368</a>     );</span>
+<span class="line" id="L369"><a href="#L369">  369</a>     if segment.page_bytes == shm::NORMAL_PAGE &amp;&amp; allowed.sizes().any(|page| page &gt; shm::NORMAL_PAGE)</span>
+<span class="line" id="L370"><a href="#L370">  370</a>     {</span>
+<span class="line" id="L371"><a href="#L371">  371</a>         let fix = if segment.created {</span>
+<span class="line" id="L372"><a href="#L372">  372</a>             notes.join(&quot;; &quot;)</span>
+<span class="line" id="L373"><a href="#L373">  373</a>         } else {</span>
+<span class="line" id="L374"><a href="#L374">  374</a>             format!(</span>
+<span class="line" id="L375"><a href="#L375">  375</a>                 &quot;to move it to huge pages, remove it (`solve --shm-remove {path}`) and load it \</span>
+<span class="line" id="L376"><a href="#L376">  376</a>                  again once they can be had&quot;</span>
+<span class="line" id="L377"><a href="#L377">  377</a>             )</span>
+<span class="line" id="L378"><a href="#L378">  378</a>         };</span>
+<span class="line" id="L379"><a href="#L379">  379</a>         log::warn!(</span>
+<span class="line" id="L380"><a href="#L380">  380</a>             &quot;table {path}: shared memory segment {key:#010x} is on 4 KiB pages, much slower \</span>
+<span class="line" id="L381"><a href="#L381">  381</a>              than huge pages (h7: 27% fewer solves/s at 1 thread, 32% at 48, than on 1 GiB \</span>
+<span class="line" id="L382"><a href="#L382">  382</a>              pages; README.md \&quot;Shared memory\&quot;); {fix}&quot;</span>
+<span class="line" id="L383"><a href="#L383">  383</a>         );</span>
+<span class="line" id="L384"><a href="#L384">  384</a>     }</span>
+<span class="line" id="L385"><a href="#L385">  385</a> }</span>
+<span class="line" id="L386"><a href="#L386">  386</a> </span>
+<span class="line" id="L387"><a href="#L387">  387</a> /// Bytes in GiB, for messages.</span>
+<span class="line" id="L388"><a href="#L388">  388</a> #[must_use]</span>
+<span class="line" id="L389"><a href="#L389">  389</a> pub fn gib(bytes: usize) -&gt; f64 {</span>
+<span class="line" id="L390"><a href="#L390">  390</a>     #[expect(clippy::cast_precision_loss, reason = &quot;a report&quot;)]</span>
+<span class="line" id="L391"><a href="#L391">  391</a>     let gib = bytes as f64 / f64::from(1u32 &lt;&lt; 30);</span>
+<span class="line" id="L392"><a href="#L392">  392</a>     gib</span>
+<span class="line" id="L393"><a href="#L393">  393</a> }</span>
+<span class="line" id="L394"><a href="#L394">  394</a> </span>
+<span class="line" id="L395"><a href="#L395">  395</a> /// The page sizes of the memory at `start..start + len` (from</span>
+<span class="line" id="L396"><a href="#L396">  396</a> /// `/proc/self/smaps`): 1 GiB or 2 MiB pages (hugetlbfs), else how much of</span>
+<span class="line" id="L397"><a href="#L397">  397</a> /// it is in transparent huge pages.</span>
+<span class="line" id="L398"><a href="#L398">  398</a> #[cfg(target_os = &quot;linux&quot;)]</span>
+<span class="line" id="L399"><a href="#L399">  399</a> fn page_report(start: usize, len: usize) -&gt; String {</span>
+<span class="line" id="L400"><a href="#L400">  400</a>     let Ok(smaps) = std::fs::read_to_string(&quot;/proc/self/smaps&quot;) else {</span>
+<span class="line" id="L401"><a href="#L401">  401</a>         return &quot;page sizes unknown (no /proc/self/smaps)&quot;.to_string();</span>
+<span class="line" id="L402"><a href="#L402">  402</a>     };</span>
+<span class="line" id="L403"><a href="#L403">  403</a>     let end = start.saturating_add(len);</span>
+<span class="line" id="L404"><a href="#L404">  404</a>     // (KiB, as smaps gives them.)</span>
+<span class="line" id="L405"><a href="#L405">  405</a>     let (mut page, mut resident, mut huge) = (0u64, 0u64, 0u64);</span>
+<span class="line" id="L406"><a href="#L406">  406</a>     let mut inside = false;</span>
+<span class="line" id="L407"><a href="#L407">  407</a>     for line in smaps.lines() {</span>
+<span class="line" id="L408"><a href="#L408">  408</a>         let mut words = line.split_whitespace();</span>
+<span class="line" id="L409"><a href="#L409">  409</a>         let first = words.next().unwrap_or(&quot;&quot;);</span>
+<span class="line" id="L410"><a href="#L410">  410</a>         // A mapping&#x27;s header line starts with its address range.</span>
+<span class="line" id="L411"><a href="#L411">  411</a>         let range = first.split_once(&#x27;-&#x27;).and_then(|(a, b)| {</span>
+<span class="line" id="L412"><a href="#L412">  412</a>             Some((</span>
+<span class="line" id="L413"><a href="#L413">  413</a>                 usize::from_str_radix(a, 16).ok()?,</span>
+<span class="line" id="L414"><a href="#L414">  414</a>                 usize::from_str_radix(b, 16).ok()?,</span>
+<span class="line" id="L415"><a href="#L415">  415</a>             ))</span>
+<span class="line" id="L416"><a href="#L416">  416</a>         });</span>
+<span class="line" id="L417"><a href="#L417">  417</a>         if let Some((a, b)) = range {</span>
+<span class="line" id="L418"><a href="#L418">  418</a>             inside = a &lt; end &amp;&amp; b &gt; start;</span>
+<span class="line" id="L419"><a href="#L419">  419</a>             continue;</span>
+<span class="line" id="L420"><a href="#L420">  420</a>         }</span>
+<span class="line" id="L421"><a href="#L421">  421</a>         let value = words.next().and_then(|v| v.parse::&lt;u64&gt;().ok());</span>
+<span class="line" id="L422"><a href="#L422">  422</a>         match (inside, first, value) {</span>
+<span class="line" id="L423"><a href="#L423">  423</a>             (true, &quot;KernelPageSize:&quot;, Some(kib)) =&gt; page = page.max(kib),</span>
+<span class="line" id="L424"><a href="#L424">  424</a>             (true, &quot;Rss:&quot;, Some(kib)) =&gt; resident += kib,</span>
+<span class="line" id="L425"><a href="#L425">  425</a>             (true, &quot;AnonHugePages:&quot; | &quot;FilePmdMapped:&quot; | &quot;ShmemPmdMapped:&quot;, Some(kib)) =&gt; {</span>
+<span class="line" id="L426"><a href="#L426">  426</a>                 huge += kib;</span>
+<span class="line" id="L427"><a href="#L427">  427</a>             }</span>
+<span class="line" id="L428"><a href="#L428">  428</a>             _ =&gt; {}</span>
+<span class="line" id="L429"><a href="#L429">  429</a>         }</span>
+<span class="line" id="L430"><a href="#L430">  430</a>     }</span>
+<span class="line" id="L431"><a href="#L431">  431</a>     match page {</span>
+<span class="line" id="L432"><a href="#L432">  432</a>         0 =&gt; &quot;page sizes unknown (not in /proc/self/smaps)&quot;.to_string(),</span>
+<span class="line" id="L433"><a href="#L433">  433</a>         1_048_576 =&gt; &quot;1 GiB pages (hugetlbfs)&quot;.to_string(),</span>
+<span class="line" id="L434"><a href="#L434">  434</a>         2048 =&gt; &quot;2 MiB pages (hugetlbfs)&quot;.to_string(),</span>
+<span class="line" id="L435"><a href="#L435">  435</a>         _ =&gt; {</span>
+<span class="line" id="L436"><a href="#L436">  436</a>             #[expect(clippy::cast_precision_loss, reason = &quot;a report&quot;)]</span>
+<span class="line" id="L437"><a href="#L437">  437</a>             let share = 100.0 * huge as f64 / resident.max(1) as f64;</span>
+<span class="line" id="L438"><a href="#L438">  438</a>             format!(</span>
+<span class="line" id="L439"><a href="#L439">  439</a>                 &quot;{page} KiB pages, {share:.0}% of {:.2} GiB resident in transparent huge pages&quot;,</span>
+<span class="line" id="L440"><a href="#L440">  440</a>                 gib(usize::try_from(resident &lt;&lt; 10).unwrap_or(usize::MAX))</span>
+<span class="line" id="L441"><a href="#L441">  441</a>             )</span>
+<span class="line" id="L442"><a href="#L442">  442</a>         }</span>
+<span class="line" id="L443"><a href="#L443">  443</a>     }</span>
+<span class="line" id="L444"><a href="#L444">  444</a> }</span>
+<span class="line" id="L445"><a href="#L445">  445</a> </span>
+<span class="line" id="L446"><a href="#L446">  446</a> /// The page sizes of a memory range (unknown off Linux).</span>
+<span class="line" id="L447"><a href="#L447">  447</a> #[cfg(not(target_os = &quot;linux&quot;))]</span>
+<span class="line" id="L448"><a href="#L448">  448</a> fn page_report(_: usize, _: usize) -&gt; String {</span>
+<span class="line" id="L449"><a href="#L449">  449</a>     &quot;page sizes unknown (only reported on Linux)&quot;.to_string()</span>
+<span class="line" id="L450"><a href="#L450">  450</a> }</span>
+<span class="line" id="L451"><a href="#L451">  451</a> </span>
+<span class="line" id="L452"><a href="#L452">  452</a> /// Lanes per thread for `threads` threads on the table at `path` (of `k`):</span>
+<span class="line" id="L453"><a href="#L453">  453</a> /// `asked`, else from `&lt;path&gt;.tune` (`bench tune`), else the untuned</span>
+<span class="line" id="L454"><a href="#L454">  454</a> /// default for `k` (`tables::file::default_lanes`). Logs where it came from.</span>
+<span class="line" id="L455"><a href="#L455">  455</a> #[must_use]</span>
+<span class="line" id="L456"><a href="#L456">  456</a> pub fn lanes(asked: Option&lt;usize&gt;, path: &amp;str, k: u32, threads: usize) -&gt; usize {</span>
+<span class="line" id="L457"><a href="#L457">  457</a>     let lanes = asked.unwrap_or_else(|| crate::tables::file::default_lanes(path, k)(threads));</span>
+<span class="line" id="L458"><a href="#L458">  458</a>     let source = if asked.is_some() {</span>
+<span class="line" id="L459"><a href="#L459">  459</a>         &quot;as asked&quot;</span>
+<span class="line" id="L460"><a href="#L460">  460</a>     } else if std::path::Path::new(&amp;format!(&quot;{path}.tune&quot;)).exists() {</span>
+<span class="line" id="L461"><a href="#L461">  461</a>         &quot;from the table&#x27;s .tune file&quot;</span>
+<span class="line" id="L462"><a href="#L462">  462</a>     } else {</span>
+<span class="line" id="L463"><a href="#L463">  463</a>         &quot;untuned default&quot;</span>
+<span class="line" id="L464"><a href="#L464">  464</a>     };</span>
+<span class="line" id="L465"><a href="#L465">  465</a>     log::info!(&quot;{threads} threads, {lanes} lanes per thread ({source})&quot;);</span>
+<span class="line" id="L466"><a href="#L466">  466</a>     lanes</span>
+<span class="line" id="L467"><a href="#L467">  467</a> }</span>
+<span class="line" id="L468"><a href="#L468">  468</a> </span>
+<span class="line" id="L469"><a href="#L469">  469</a> /// Print the completion script of the command `C` for `shell`.</span>
+<span class="line" id="L470"><a href="#L470">  470</a> pub fn print_completions&lt;C: clap::CommandFactory&gt;(shell: clap_complete::Shell) {</span>
+<span class="line" id="L471"><a href="#L471">  471</a>     let mut command = C::command();</span>
+<span class="line" id="L472"><a href="#L472">  472</a>     let name = command.get_name().to_string();</span>
+<span class="line" id="L473"><a href="#L473">  473</a>     clap_complete::generate(shell, &amp;mut command, name, &amp;mut std::io::stdout());</span>
+<span class="line" id="L474"><a href="#L474">  474</a> }</span>
+<span class="line" id="L475"><a href="#L475">  475</a> </span>
+<span class="line" id="L476"><a href="#L476">  476</a> /// An unusable input: an error with exit status 2, the status of usage</span>
+<span class="line" id="L477"><a href="#L477">  477</a> /// errors (clap&#x27;s too), as the binaries gave these before clap.</span>
+<span class="line" id="L478"><a href="#L478">  478</a> #[derive(Debug, thiserror::Error)]</span>
+<span class="line" id="L479"><a href="#L479">  479</a> #[error(&quot;{0}&quot;)]</span>
+<span class="line" id="L480"><a href="#L480">  480</a> pub struct BadInput(pub String);</span>
+<span class="line" id="L481"><a href="#L481">  481</a> </span>
+<span class="line" id="L482"><a href="#L482">  482</a> /// The exit status of a binary&#x27;s run: its own if it ran, else (after</span>
+<span class="line" id="L483"><a href="#L483">  483</a> /// printing `name: error: cause: ...` to stderr) 2 for a `BadInput`, 1 for</span>
+<span class="line" id="L484"><a href="#L484">  484</a> /// other errors.</span>
+<span class="line" id="L485"><a href="#L485">  485</a> #[must_use]</span>
+<span class="line" id="L486"><a href="#L486">  486</a> pub fn exit_status(name: &amp;str, result: anyhow::Result&lt;ExitCode&gt;) -&gt; ExitCode {</span>
+<span class="line" id="L487"><a href="#L487">  487</a>     match result {</span>
+<span class="line" id="L488"><a href="#L488">  488</a>         Ok(status) =&gt; status,</span>
+<span class="line" id="L489"><a href="#L489">  489</a>         Err(error) =&gt; {</span>
+<span class="line" id="L490"><a href="#L490">  490</a>             eprintln!(&quot;{name}: {error:#}&quot;);</span>
+<span class="line" id="L491"><a href="#L491">  491</a>             if error.downcast_ref::&lt;BadInput&gt;().is_some() {</span>
+<span class="line" id="L492"><a href="#L492">  492</a>                 ExitCode::from(2)</span>
+<span class="line" id="L493"><a href="#L493">  493</a>             } else {</span>
+<span class="line" id="L494"><a href="#L494">  494</a>                 ExitCode::FAILURE</span>
+<span class="line" id="L495"><a href="#L495">  495</a>             }</span>
+<span class="line" id="L496"><a href="#L496">  496</a>         }</span>
+<span class="line" id="L497"><a href="#L497">  497</a>     }</span>
+<span class="line" id="L498"><a href="#L498">  498</a> }</span></pre></html>

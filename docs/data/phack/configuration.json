@@ -1,0 +1,11 @@
+{
+  "mode": "full",
+  "source": "935cb7fa369248161244507b7c13aa9c405f9ff1",
+  "cpu_target": "westmere",
+  "backend": "portable scalar",
+  "warmup": 8.0,
+  "window": 20.0,
+  "repeats": 3,
+  "default_lanes": 24,
+  "parameters": {}
+}

@@ -1,0 +1,15 @@
+status 0
+run nxopt22 1 random_state 25 thp pgo 1
+pagemode thp arena 0 only -
+start 2026-11-05 08:52:43
+wall_s 209.75
+cpu_s 151.85 3.35
+maxrss_kb 7633120
+gate_wait_s 0
+ext_cores 0.0
+pages 7633308 7633308 7629540 5849088 0 1628645 nxopt22-pgo
+free_1g_pages 0 0
+memfree_gib_at_start 10.3
+thpwarm_pct 79.3
+table /data/competitors/nxopt/nxopth22b.dat 7809269764
+thp always [madvise] never defrag always defer defer+madvise [madvise] never

@@ -1,0 +1,902 @@
+{
+  "baseline-one": {
+    "n": 3,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "baseline-socket": {
+    "n": 3,
+    "throughput_median": 1.05,
+    "throughput_min": 0.85,
+    "throughput_max": 1.05
+  },
+  "baseline-physical": {
+    "n": 3,
+    "throughput_median": 1.55,
+    "throughput_min": 1.55,
+    "throughput_max": 1.6
+  },
+  "baseline-smt": {
+    "n": 3,
+    "throughput_median": 1.4,
+    "throughput_min": 1.3,
+    "throughput_max": 1.6
+  },
+  "events-one-00": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-01": {
+    "n": 3,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-02": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-03": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-04": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-05": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-06": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-07": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-08": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-09": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-10": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-11": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-12": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-13": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-14": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-15": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-16": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-17": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-18": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-19": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-20": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-21": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-22": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-23": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-24": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-25": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-26": {
+    "n": 3,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-27": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-28": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-29": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-30": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-31": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-32": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-33": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-34": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-35": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-36": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-37": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-38": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-39": {
+    "n": 3,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-40": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-41": {
+    "n": 3,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-42": {
+    "n": 3,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-43": {
+    "n": 3,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-44": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-45": {
+    "n": 3,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-46": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-47": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-48": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-49": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-50": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-51": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-52": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-53": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-54": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-one-55": {
+    "n": 1,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "events-physical-00": {
+    "n": 1,
+    "throughput_median": 1.65,
+    "throughput_min": 1.65,
+    "throughput_max": 1.65
+  },
+  "events-physical-01": {
+    "n": 3,
+    "throughput_median": 1.5,
+    "throughput_min": 1.5,
+    "throughput_max": 1.6
+  },
+  "events-physical-02": {
+    "n": 1,
+    "throughput_median": 1.55,
+    "throughput_min": 1.55,
+    "throughput_max": 1.55
+  },
+  "events-physical-03": {
+    "n": 1,
+    "throughput_median": 1.8,
+    "throughput_min": 1.8,
+    "throughput_max": 1.8
+  },
+  "events-physical-04": {
+    "n": 1,
+    "throughput_median": 1.75,
+    "throughput_min": 1.75,
+    "throughput_max": 1.75
+  },
+  "events-physical-05": {
+    "n": 1,
+    "throughput_median": 1.65,
+    "throughput_min": 1.65,
+    "throughput_max": 1.65
+  },
+  "events-physical-06": {
+    "n": 1,
+    "throughput_median": 1.55,
+    "throughput_min": 1.55,
+    "throughput_max": 1.55
+  },
+  "events-physical-07": {
+    "n": 1,
+    "throughput_median": 1.6,
+    "throughput_min": 1.6,
+    "throughput_max": 1.6
+  },
+  "events-physical-08": {
+    "n": 1,
+    "throughput_median": 1.55,
+    "throughput_min": 1.55,
+    "throughput_max": 1.55
+  },
+  "events-physical-09": {
+    "n": 1,
+    "throughput_median": 1.6,
+    "throughput_min": 1.6,
+    "throughput_max": 1.6
+  },
+  "events-physical-10": {
+    "n": 1,
+    "throughput_median": 1.7,
+    "throughput_min": 1.7,
+    "throughput_max": 1.7
+  },
+  "events-physical-11": {
+    "n": 1,
+    "throughput_median": 1.6,
+    "throughput_min": 1.6,
+    "throughput_max": 1.6
+  },
+  "events-physical-12": {
+    "n": 1,
+    "throughput_median": 1.5,
+    "throughput_min": 1.5,
+    "throughput_max": 1.5
+  },
+  "events-physical-13": {
+    "n": 1,
+    "throughput_median": 1.65,
+    "throughput_min": 1.65,
+    "throughput_max": 1.65
+  },
+  "events-physical-14": {
+    "n": 1,
+    "throughput_median": 1.65,
+    "throughput_min": 1.65,
+    "throughput_max": 1.65
+  },
+  "events-physical-15": {
+    "n": 1,
+    "throughput_median": 1.75,
+    "throughput_min": 1.75,
+    "throughput_max": 1.75
+  },
+  "events-physical-16": {
+    "n": 1,
+    "throughput_median": 1.5,
+    "throughput_min": 1.5,
+    "throughput_max": 1.5
+  },
+  "events-physical-17": {
+    "n": 1,
+    "throughput_median": 1.65,
+    "throughput_min": 1.65,
+    "throughput_max": 1.65
+  },
+  "events-physical-18": {
+    "n": 1,
+    "throughput_median": 1.55,
+    "throughput_min": 1.55,
+    "throughput_max": 1.55
+  },
+  "events-physical-19": {
+    "n": 1,
+    "throughput_median": 1.55,
+    "throughput_min": 1.55,
+    "throughput_max": 1.55
+  },
+  "events-physical-20": {
+    "n": 1,
+    "throughput_median": 1.55,
+    "throughput_min": 1.55,
+    "throughput_max": 1.55
+  },
+  "events-physical-21": {
+    "n": 1,
+    "throughput_median": 1.65,
+    "throughput_min": 1.65,
+    "throughput_max": 1.65
+  },
+  "events-physical-22": {
+    "n": 1,
+    "throughput_median": 1.55,
+    "throughput_min": 1.55,
+    "throughput_max": 1.55
+  },
+  "events-physical-23": {
+    "n": 1,
+    "throughput_median": 1.6,
+    "throughput_min": 1.6,
+    "throughput_max": 1.6
+  },
+  "events-physical-24": {
+    "n": 1,
+    "throughput_median": 1.6,
+    "throughput_min": 1.6,
+    "throughput_max": 1.6
+  },
+  "events-physical-25": {
+    "n": 1,
+    "throughput_median": 1.6,
+    "throughput_min": 1.6,
+    "throughput_max": 1.6
+  },
+  "events-physical-26": {
+    "n": 3,
+    "throughput_median": 1.6,
+    "throughput_min": 1.55,
+    "throughput_max": 1.65
+  },
+  "events-physical-27": {
+    "n": 1,
+    "throughput_median": 1.6,
+    "throughput_min": 1.6,
+    "throughput_max": 1.6
+  },
+  "events-physical-28": {
+    "n": 1,
+    "throughput_median": 1.65,
+    "throughput_min": 1.65,
+    "throughput_max": 1.65
+  },
+  "events-physical-29": {
+    "n": 1,
+    "throughput_median": 1.6,
+    "throughput_min": 1.6,
+    "throughput_max": 1.6
+  },
+  "events-physical-30": {
+    "n": 1,
+    "throughput_median": 1.7,
+    "throughput_min": 1.7,
+    "throughput_max": 1.7
+  },
+  "events-physical-31": {
+    "n": 1,
+    "throughput_median": 1.7,
+    "throughput_min": 1.7,
+    "throughput_max": 1.7
+  },
+  "events-physical-32": {
+    "n": 1,
+    "throughput_median": 1.55,
+    "throughput_min": 1.55,
+    "throughput_max": 1.55
+  },
+  "events-physical-33": {
+    "n": 1,
+    "throughput_median": 1.55,
+    "throughput_min": 1.55,
+    "throughput_max": 1.55
+  },
+  "events-physical-34": {
+    "n": 1,
+    "throughput_median": 1.75,
+    "throughput_min": 1.75,
+    "throughput_max": 1.75
+  },
+  "events-physical-35": {
+    "n": 1,
+    "throughput_median": 1.6,
+    "throughput_min": 1.6,
+    "throughput_max": 1.6
+  },
+  "events-physical-36": {
+    "n": 1,
+    "throughput_median": 1.45,
+    "throughput_min": 1.45,
+    "throughput_max": 1.45
+  },
+  "events-physical-37": {
+    "n": 1,
+    "throughput_median": 1.6,
+    "throughput_min": 1.6,
+    "throughput_max": 1.6
+  },
+  "events-physical-38": {
+    "n": 1,
+    "throughput_median": 1.65,
+    "throughput_min": 1.65,
+    "throughput_max": 1.65
+  },
+  "events-physical-39": {
+    "n": 3,
+    "throughput_median": 1.55,
+    "throughput_min": 1.55,
+    "throughput_max": 1.65
+  },
+  "events-physical-40": {
+    "n": 1,
+    "throughput_median": 1.65,
+    "throughput_min": 1.65,
+    "throughput_max": 1.65
+  },
+  "events-physical-41": {
+    "n": 3,
+    "throughput_median": 1.65,
+    "throughput_min": 1.55,
+    "throughput_max": 1.65
+  },
+  "events-physical-42": {
+    "n": 3,
+    "throughput_median": 1.55,
+    "throughput_min": 1.55,
+    "throughput_max": 1.7
+  },
+  "events-physical-43": {
+    "n": 3,
+    "throughput_median": 1.6,
+    "throughput_min": 1.5,
+    "throughput_max": 1.7
+  },
+  "events-physical-44": {
+    "n": 1,
+    "throughput_median": 1.7,
+    "throughput_min": 1.7,
+    "throughput_max": 1.7
+  },
+  "events-physical-45": {
+    "n": 3,
+    "throughput_median": 1.6,
+    "throughput_min": 1.6,
+    "throughput_max": 1.65
+  },
+  "events-physical-46": {
+    "n": 1,
+    "throughput_median": 1.5,
+    "throughput_min": 1.5,
+    "throughput_max": 1.5
+  },
+  "events-physical-47": {
+    "n": 1,
+    "throughput_median": 1.5,
+    "throughput_min": 1.5,
+    "throughput_max": 1.5
+  },
+  "events-physical-48": {
+    "n": 1,
+    "throughput_median": 1.7,
+    "throughput_min": 1.7,
+    "throughput_max": 1.7
+  },
+  "events-physical-49": {
+    "n": 1,
+    "throughput_median": 1.6,
+    "throughput_min": 1.6,
+    "throughput_max": 1.6
+  },
+  "events-physical-50": {
+    "n": 1,
+    "throughput_median": 1.6,
+    "throughput_min": 1.6,
+    "throughput_max": 1.6
+  },
+  "events-physical-51": {
+    "n": 1,
+    "throughput_median": 1.55,
+    "throughput_min": 1.55,
+    "throughput_max": 1.55
+  },
+  "events-physical-52": {
+    "n": 1,
+    "throughput_median": 1.6,
+    "throughput_min": 1.6,
+    "throughput_max": 1.6
+  },
+  "events-physical-53": {
+    "n": 1,
+    "throughput_median": 1.7,
+    "throughput_min": 1.7,
+    "throughput_max": 1.7
+  },
+  "events-physical-54": {
+    "n": 1,
+    "throughput_median": 1.55,
+    "throughput_min": 1.55,
+    "throughput_max": 1.55
+  },
+  "events-physical-55": {
+    "n": 1,
+    "throughput_median": 1.65,
+    "throughput_min": 1.65,
+    "throughput_max": 1.65
+  },
+  "lanes-0": {
+    "n": 3,
+    "throughput_median": 0.0,
+    "throughput_min": 0.0,
+    "throughput_max": 0.0
+  },
+  "lanes-1": {
+    "n": 3,
+    "throughput_median": 0.0,
+    "throughput_min": 0.0,
+    "throughput_max": 0.0
+  },
+  "lanes-2": {
+    "n": 3,
+    "throughput_median": 0.05,
+    "throughput_min": 0.05,
+    "throughput_max": 0.05
+  },
+  "lanes-4": {
+    "n": 3,
+    "throughput_median": 0.05,
+    "throughput_min": 0.05,
+    "throughput_max": 0.05
+  },
+  "lanes-8": {
+    "n": 3,
+    "throughput_median": 0.25,
+    "throughput_min": 0.25,
+    "throughput_max": 0.25
+  },
+  "lanes-12": {
+    "n": 3,
+    "throughput_median": 0.25,
+    "throughput_min": 0.25,
+    "throughput_max": 0.25
+  },
+  "lanes-16": {
+    "n": 3,
+    "throughput_median": 0.2,
+    "throughput_min": 0.2,
+    "throughput_max": 0.2
+  },
+  "lanes-24": {
+    "n": 3,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "lanes-32": {
+    "n": 3,
+    "throughput_median": 0.1,
+    "throughput_min": 0.1,
+    "throughput_max": 0.1
+  },
+  "lanes-40": {
+    "n": 3,
+    "throughput_median": 0.2,
+    "throughput_min": 0.2,
+    "throughput_max": 0.2
+  },
+  "lanes-48": {
+    "n": 3,
+    "throughput_median": 0.2,
+    "throughput_min": 0.2,
+    "throughput_max": 0.2
+  },
+  "lanes-64": {
+    "n": 3,
+    "throughput_median": 0.2,
+    "throughput_min": 0.2,
+    "throughput_max": 0.2
+  },
+  "threads-1": {
+    "n": 3,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "threads-2": {
+    "n": 3,
+    "throughput_median": 0.4,
+    "throughput_min": 0.4,
+    "throughput_max": 0.4
+  },
+  "threads-4": {
+    "n": 3,
+    "throughput_median": 0.9,
+    "throughput_min": 0.9,
+    "throughput_max": 0.9
+  },
+  "threads-6": {
+    "n": 3,
+    "throughput_median": 0.85,
+    "throughput_min": 0.85,
+    "throughput_max": 0.85
+  },
+  "threads-12": {
+    "n": 3,
+    "throughput_median": 1.6,
+    "throughput_min": 1.6,
+    "throughput_max": 1.65
+  },
+  "threads-24": {
+    "n": 3,
+    "throughput_median": 1.2,
+    "throughput_min": 1.15,
+    "throughput_max": 1.35
+  },
+  "share-events-01": {
+    "n": 1,
+    "throughput_median": 0.55,
+    "throughput_min": 0.55,
+    "throughput_max": 0.55
+  },
+  "share-events-26": {
+    "n": 1,
+    "throughput_median": 0.55,
+    "throughput_min": 0.55,
+    "throughput_max": 0.55
+  },
+  "share-events-29": {
+    "n": 1,
+    "throughput_median": 0.55,
+    "throughput_min": 0.55,
+    "throughput_max": 0.55
+  },
+  "share-events-44": {
+    "n": 1,
+    "throughput_median": 0.55,
+    "throughput_min": 0.55,
+    "throughput_max": 0.55
+  },
+  "share-events-45": {
+    "n": 1,
+    "throughput_median": 0.55,
+    "throughput_min": 0.55,
+    "throughput_max": 0.55
+  },
+  "share-events-46": {
+    "n": 1,
+    "throughput_median": 0.55,
+    "throughput_min": 0.55,
+    "throughput_max": 0.55
+  },
+  "share-events-47": {
+    "n": 1,
+    "throughput_median": 0.55,
+    "throughput_min": 0.55,
+    "throughput_max": 0.55
+  },
+  "share-events-48": {
+    "n": 1,
+    "throughput_median": 0.55,
+    "throughput_min": 0.55,
+    "throughput_max": 0.55
+  },
+  "share-events-55": {
+    "n": 1,
+    "throughput_median": 0.55,
+    "throughput_min": 0.55,
+    "throughput_max": 0.55
+  },
+  "share1-one": {
+    "n": 3,
+    "throughput_median": 0.1,
+    "throughput_min": 0.1,
+    "throughput_max": 0.1
+  },
+  "share1-physical": {
+    "n": 3,
+    "throughput_median": 0.55,
+    "throughput_min": 0.55,
+    "throughput_max": 0.6
+  },
+  "share1-smt": {
+    "n": 3,
+    "throughput_median": 0.65,
+    "throughput_min": 0.65,
+    "throughput_max": 0.65
+  },
+  "numa-node1": {
+    "n": 3,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "numa-node0": {
+    "n": 3,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "pages-4k-one": {
+    "n": 3,
+    "throughput_median": 0.15,
+    "throughput_min": 0.15,
+    "throughput_max": 0.15
+  },
+  "pages-4k-physical": {
+    "n": 3,
+    "throughput_median": 1.6,
+    "throughput_min": 1.5,
+    "throughput_max": 1.7
+  }
+}

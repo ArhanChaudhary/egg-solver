@@ -1,0 +1,40 @@
+1 random_state A 1.6180
+1 random_state B 1.6370
+1 random_move_17f A 0.5280
+1 random_move_17f B 0.5420
+1 random_state_depth17 A 0.6300
+1 random_state_depth17 B 0.6350
+2 random_state B 1.5950
+2 random_state A 1.6050
+2 random_move_17f B 0.5450
+2 random_move_17f A 0.5290
+2 random_state_depth17 B 0.6350
+2 random_state_depth17 A 0.6110
+3 random_state A 1.6320
+3 random_state B 1.6270
+3 random_move_17f A 0.5380
+3 random_move_17f B 0.5430
+3 random_state_depth17 A 0.6160
+3 random_state_depth17 B 0.6290
+4 random_state B 1.6200
+4 random_state A 1.6100
+4 random_move_17f B 0.5440
+4 random_move_17f A 0.5310
+4 random_state_depth17 B 0.6200
+4 random_state_depth17 A 0.6150
+5 random_state A 1.6380
+5 random_state B 1.6260
+5 random_move_17f A 0.5290
+5 random_move_17f B 0.5460
+5 random_state_depth17 A 0.6300
+5 random_state_depth17 B 0.6320
+6 random_state B 1.6430
+6 random_state A 1.6190
+6 random_move_17f B 0.5570
+6 random_move_17f A 0.5300
+6 random_state_depth17 B 0.6390
+6 random_state_depth17 A 0.6290
+== B/A wall-per-cube ratio per set (median of pairs; <1 = B faster)
+random_state           n=6 median 1.0016  [ 0.993 0.994 0.997 1.006 1.012 1.015 ]
+random_move_17f        n=6 median 1.0284  [ 1.009 1.024 1.027 1.030 1.032 1.051 ]
+random_state_depth17   n=6 median 1.0120  [ 1.003 1.008 1.008 1.016 1.021 1.039 ]

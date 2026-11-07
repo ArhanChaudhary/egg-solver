@@ -1,0 +1,222 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.38s
+     Running unittests src/lib.rs (/data2/build/egg-solver-target/miri-current-miri-current/miri/x86_64-unknown-linux-gnu/debug/build/egg-solver/2c049e830a763edb/out/egg_solver-2c049e830a763edb)
+warning: Miri does not support optimizations: the opt-level is ignored. The only effect of selecting a Cargo profile that enables optimizations (such as --release) is to apply its remaining settings, such as whether debug assertions and overflow checks are enabled.
+
+Trying seed: 0
+Trying seed: 15
+Trying seed: 14
+Trying seed: 13
+Trying seed: 12
+Trying seed: 11
+Trying seed: 10
+Trying seed: 9
+
+running 4 tests
+
+running 4 tests
+
+running 4 tests
+
+running 4 tests
+
+running 4 tests
+
+running 4 tests
+test lanes::share::tests::share_first_pass_reports_the_shortest_solution ... test lanes::share::tests::share_first_pass_reports_the_shortest_solution ... test lanes::share::tests::share_first_pass_reports_the_shortest_solution ... test lanes::share::tests::share_first_pass_reports_the_shortest_solution ... test lanes::share::tests::share_first_pass_reports_the_shortest_solution ... test lanes::share::tests::share_first_pass_reports_the_shortest_solution ... 
+running 4 tests
+
+running 4 tests
+test lanes::share::tests::share_first_pass_reports_the_shortest_solution ... test lanes::share::tests::share_first_pass_reports_the_shortest_solution ... ok
+test lanes::share::tests::share_fresh_cube_solved_by_others_at_once ... ok
+test lanes::share::tests::share_fresh_cube_solved_by_others_at_once ... ok
+test lanes::share::tests::share_fresh_cube_solved_by_others_at_once ... ok
+test lanes::share::tests::share_fresh_cube_solved_by_others_at_once ... ok
+test lanes::share::tests::share_fresh_cube_solved_by_others_at_once ... ok
+test lanes::share::tests::share_fresh_cube_solved_by_others_at_once ... ok
+test lanes::share::tests::share_fresh_cube_solved_by_others_at_once ... ok
+test lanes::share::tests::share_fresh_cube_solved_by_others_at_once ... ok
+test lanes::share::tests::share_protocol_with_tiny_search ... ok
+test lanes::share::tests::share_protocol_with_tiny_search ... warning: integer-to-pointer cast
+    --> vendor/parking_lot_core/src/word_lock.rs:320:9
+     |
+ 320 |         (self & QUEUE_MASK) as *const ThreadData
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ integer-to-pointer cast
+     |
+     = help: this program is using integer-to-pointer casts or (equivalently) `ptr::with_exposed_provenance`, which means that Miri might miss pointer bugs in this program
+     = help: see https://doc.rust-lang.org/nightly/std/ptr/fn.with_exposed_provenance.html for more details on that operation
+     = help: to ensure that Miri does not miss bugs in your program, use Strict Provenance APIs (https://doc.rust-lang.org/nightly/std/ptr/index.html#strict-provenance, https://crates.io/crates/sptr) instead
+     = help: you can then set `MIRIFLAGS=-Zmiri-strict-provenance` to ensure you are not relying on `with_exposed_provenance` semantics
+     = help: alternatively, `MIRIFLAGS=-Zmiri-permissive-provenance` disables this warning
+     = note: this is on thread `unnamed-9`
+     = note: stack backtrace:
+             0: <usize as parking_lot_core::word_lock::LockState>::queue_head
+                 at vendor/parking_lot_core/src/word_lock.rs:320:9: 320:49
+             1: parking_lot_core::word_lock::WordLock::unlock
+                 at vendor/parking_lot_core/src/word_lock.rs:104:39: 104:57
+             2: parking_lot_core::parking_lot::unpark_one::<{closure@parking_lot::RawMutex::unlock_slow::{closure#0}}>
+                 at vendor/parking_lot_core/src/parking_lot.rs:793:5: 793:26
+             3: parking_lot::RawMutex::unlock_slow
+                 at /home/super/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot-0.12.5/src/raw_mutex.rs:321:13: 321:57
+             4: <parking_lot::RawMutex as parking_lot::lock_api::RawMutex>::unlock
+                 at /home/super/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot-0.12.5/src/raw_mutex.rs:109:9: 109:32
+             5: <parking_lot::lock_api::MutexGuard<'_, parking_lot::RawMutex, [u64; 14]> as std::ops::Drop>::drop
+                 at /home/super/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lock_api-0.4.14/src/mutex.rs:706:13: 706:36
+             6: std::ptr::drop_glue::<parking_lot::lock_api::MutexGuard<'_, parking_lot::RawMutex, [u64; 14]>> - shim(Some(parking_lot::lock_api::MutexGuard<'_, parking_lot::RawMutex, [u64; 14]>))
+                 at /home/super/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mod.rs:844:1: 846:25
+             7: lanes::share::Pool::<'_>::run::<{closure@src/lanes/share.rs:3840:57: 3840:76}>
+                 at src/lanes/share.rs:890:5: 890:6
+             8: lanes::share::tests::solve_with_pool_counted::<{closure@src/lanes/share.rs:3815:79: 3815:85}>::{closure#1}::{closure#0}::{closure#0}
+                 at src/lanes/share.rs:3840:25: 3844:27
+             9: <{closure@src/lanes/share.rs:3839:88: 3839:90} as std::ops::FnOnce<()>>::call_once - shim
+                 at /home/super/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5: 250:71
+             10: <std::panic::AssertUnwindSafe<{closure@src/lanes/share.rs:3839:88: 3839:90}> as std::ops::FnOnce<()>>::call_once
+                 at /home/super/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272:9: 272:19
+             11: std::panicking::catch_unwind::do_call::<std::panic::AssertUnwindSafe<{closure@src/lanes/share.rs:3839:88: 3839:90}>, ()>
+                 at /home/super/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:573:43: 573:46
+             12: std::panicking::catch_unwind::<(), std::panic::AssertUnwindSafe<{closure@src/lanes/share.rs:3839:88: 3839:90}>>
+                 at /home/super/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:541:19: 541:77
+             13: std::panic::catch_unwind::<std::panic::AssertUnwindSafe<{closure@src/lanes/share.rs:3839:88: 3839:90}>, ()>
+                 at /home/super/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14: 359:40
+             14: lanes::share::tests::solve_with_pool_counted::<{closure@src/lanes/share.rs:3815:79: 3815:85}>::{closure#1}::{closure#0}
+                 at src/lanes/share.rs:3839:34: 3845:24
+note: the last function in that backtrace got called indirectly due to this code
+    --> src/lanes/share.rs:3836:17
+     |
+3836 | /                 scope.spawn(|| {
+3837 | |                     // A panic stops the other threads (else they could wait
+3838 | |                     // for its jobs forever and the test would hang).
+3839 | |                     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+...    |
+3850 | |                 });
+     | |__________________^
+
+ok
+test lanes::share::tests::share_protocol_with_tiny_search ... ok
+test lanes::share::tests::share_protocol_with_tiny_search ... ok
+test lanes::share::tests::share_protocol_with_tiny_search ... ok
+test lanes::share::tests::share_protocol_with_tiny_search ... ok
+test lanes::share::tests::share_protocol_with_tiny_search ... ok
+test lanes::share::tests::share_protocol_with_tiny_search ... ok
+test lanes::share::tests::share_trace_publication_with_immediate_workers ... ok
+test lanes::share::tests::share_trace_publication_with_immediate_workers ... ok
+test lanes::share::tests::share_trace_publication_with_immediate_workers ... ok
+test lanes::share::tests::share_trace_publication_with_immediate_workers ... ok
+test lanes::share::tests::share_trace_publication_with_immediate_workers ... ok
+test lanes::share::tests::share_trace_publication_with_immediate_workers ... ok
+test lanes::share::tests::share_trace_publication_with_immediate_workers ... ok
+test lanes::share::tests::share_trace_publication_with_immediate_workers ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 592.23s
+
+Trying seed: 8
+
+running 4 tests
+test lanes::share::tests::share_first_pass_reports_the_shortest_solution ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 593.09s
+
+Trying seed: 7
+
+running 4 tests
+test lanes::share::tests::share_first_pass_reports_the_shortest_solution ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 610.44s
+
+Trying seed: 6
+
+running 4 tests
+test lanes::share::tests::share_first_pass_reports_the_shortest_solution ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 592.12s
+
+Trying seed: 5
+
+running 4 tests
+test lanes::share::tests::share_first_pass_reports_the_shortest_solution ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 586.18s
+
+Trying seed: 4
+
+running 4 tests
+test lanes::share::tests::share_first_pass_reports_the_shortest_solution ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 593.21s
+
+Trying seed: 3
+
+running 4 tests
+test lanes::share::tests::share_first_pass_reports_the_shortest_solution ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 598.55s
+
+Trying seed: 1
+
+running 4 tests
+test lanes::share::tests::share_first_pass_reports_the_shortest_solution ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 594.78s
+
+Trying seed: 2
+
+running 4 tests
+test lanes::share::tests::share_first_pass_reports_the_shortest_solution ... ok
+test lanes::share::tests::share_fresh_cube_solved_by_others_at_once ... ok
+test lanes::share::tests::share_fresh_cube_solved_by_others_at_once ... ok
+test lanes::share::tests::share_fresh_cube_solved_by_others_at_once ... ok
+test lanes::share::tests::share_fresh_cube_solved_by_others_at_once ... ok
+test lanes::share::tests::share_fresh_cube_solved_by_others_at_once ... ok
+test lanes::share::tests::share_protocol_with_tiny_search ... ok
+test lanes::share::tests::share_fresh_cube_solved_by_others_at_once ... ok
+test lanes::share::tests::share_fresh_cube_solved_by_others_at_once ... ok
+test lanes::share::tests::share_fresh_cube_solved_by_others_at_once ... ok
+test lanes::share::tests::share_protocol_with_tiny_search ... ok
+test lanes::share::tests::share_protocol_with_tiny_search ... ok
+test lanes::share::tests::share_protocol_with_tiny_search ... ok
+test lanes::share::tests::share_protocol_with_tiny_search ... ok
+test lanes::share::tests::share_trace_publication_with_immediate_workers ... ok
+test lanes::share::tests::share_protocol_with_tiny_search ... ok
+test lanes::share::tests::share_trace_publication_with_immediate_workers ... ok
+test lanes::share::tests::share_protocol_with_tiny_search ... ok
+test lanes::share::tests::share_protocol_with_tiny_search ... ok
+test lanes::share::tests::share_trace_publication_with_immediate_workers ... ok
+test lanes::share::tests::share_trace_publication_with_immediate_workers ... ok
+test lanes::share::tests::share_trace_publication_with_immediate_workers ... ok
+test lanes::share::tests::share_trace_publication_with_immediate_workers ... ok
+test lanes::share::tests::share_trace_publication_with_immediate_workers ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 588.82s
+
+ok
+test lanes::share::tests::share_trace_publication_with_immediate_workers ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 587.95s
+
+ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 592.13s
+
+ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 590.75s
+
+ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 593.13s
+
+ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 600.84s
+
+ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 596.66s
+
+ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 48 filtered out; finished in 596.35s
+
+warning: 2 warnings emitted
+

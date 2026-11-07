@@ -1,0 +1,72 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Archive rejected outlined lane advancement — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="fb892a97f7fe.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="archive-rejected-outlined-lane-advancement">Archive rejected outlined lane advancement</h1>
+<p>Commit <code>fb892a97f7fece9cbf4a9b430a58420f63edd34d</code> · 2026-11-07T20:24:12+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>neg/pmu-outlined-lane-advance</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>Archive rejected outlined lane advancement</p>
+<p>Rejected experiment on historical baseline 93867a4597ab821b4064a0d407d3c89e133c9013.
+Do not merge into release main. This branch preserves the tested source patch
+with a result-only comment annotation; executable statements match the frozen
+experiment source. Measurements below use the original frozen binaries, not a
+rebuild from this archival commit. Main retains the later audited safety fixes.</p>
+<p>1T same-pad screen: h8, 24 lanes, seed 2026, warm-up 10 s, window 60 s.
+Three repeats per code-padding setting; rotating CPU slots and paired controls.
+All values are completed solves/s. The headline is the median paired ratio,
+not the ratio of the two marginal medians.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th align="right">Pad</th><th align="right">Repeat</th><th align="right">Before solves/s</th><th align="right">After solves/s</th><th align="right">After / before</th></tr>
+</thead>
+<tbody>
+<tr><td align="right">0</td><td align="right">1</td><td align="right">4.100</td><td align="right">3.867</td><td align="right">0.943171</td></tr>
+<tr><td align="right">16</td><td align="right">1</td><td align="right">4.167</td><td align="right">3.867</td><td align="right">0.928006</td></tr>
+<tr><td align="right">32</td><td align="right">1</td><td align="right">4.083</td><td align="right">3.750</td><td align="right">0.918442</td></tr>
+<tr><td align="right">48</td><td align="right">1</td><td align="right">4.100</td><td align="right">3.800</td><td align="right">0.926829</td></tr>
+<tr><td align="right">48</td><td align="right">2</td><td align="right">4.083</td><td align="right">3.767</td><td align="right">0.922606</td></tr>
+<tr><td align="right">32</td><td align="right">2</td><td align="right">4.067</td><td align="right">3.783</td><td align="right">0.930170</td></tr>
+<tr><td align="right">16</td><td align="right">2</td><td align="right">4.050</td><td align="right">3.850</td><td align="right">0.950617</td></tr>
+<tr><td align="right">0</td><td align="right">2</td><td align="right">4.100</td><td align="right">3.717</td><td align="right">0.906585</td></tr>
+<tr><td align="right">0</td><td align="right">3</td><td align="right">4.067</td><td align="right">3.717</td><td align="right">0.913941</td></tr>
+<tr><td align="right">16</td><td align="right">3</td><td align="right">4.100</td><td align="right">3.800</td><td align="right">0.926829</td></tr>
+<tr><td align="right">32</td><td align="right">3</td><td align="right">4.183</td><td align="right">3.867</td><td align="right">0.924456</td></tr>
+<tr><td align="right">48</td><td align="right">3</td><td align="right">4.067</td><td align="right">3.733</td><td align="right">0.917876</td></tr>
+<tr><td align="right">All pads median</td><td align="right">12 pairs</td><td align="right">4.091</td><td align="right">3.792</td><td align="right">0.925643</td></tr>
+</tbody>
+</table></div>
+<p>1T paired throughput change: -7.436%.</p>
+<p>48T archival confirmation: h8, 24 lanes, seed 2026, warm-up 20 s, window 30 s.
+Five rounds, exclusive whole-machine locks, bounded holds with a 90 s yield.
+Pads frozen from the earlier control-normalized 1T screen: baseline
+0, candidate 16.
+The baseline in each round is shared by the two experiments. Orders rotate
+as recorded in plan.json. No padding sweep at 48T. Outside load &lt;1.5 cores.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th align="right">Round</th><th align="right">Before solves/s</th><th align="right">After solves/s</th><th align="right">After / before</th><th align="right">Outside cores before / after</th></tr>
+</thead>
+<tbody>
+<tr><td align="right">1</td><td align="right">153.933</td><td align="right">137.433</td><td align="right">0.892811</td><td align="right">0.1 / 0.1</td></tr>
+<tr><td align="right">2</td><td align="right">155.233</td><td align="right">136.533</td><td align="right">0.879536</td><td align="right">0.0 / 0.1</td></tr>
+<tr><td align="right">3</td><td align="right">154.533</td><td align="right">138.867</td><td align="right">0.898624</td><td align="right">0.1 / 0.1</td></tr>
+<tr><td align="right">4</td><td align="right">154.967</td><td align="right">139.000</td><td align="right">0.896965</td><td align="right">0.0 / 0.0</td></tr>
+<tr><td align="right">5</td><td align="right">153.267</td><td align="right">136.700</td><td align="right">0.891908</td><td align="right">0.0 / 0.0</td></tr>
+<tr><td align="right">Median</td><td align="right">154.533</td><td align="right">137.433</td><td align="right">0.892811</td><td align="right">—</td></tr>
+</tbody>
+</table></div>
+<p>48T paired throughput change: -10.719%.</p>
+<p>These short-window results retain the rejection decision. They do not establish
+a positive optimization or replace longer fixed-work adoption measurements.
+The VM has no hardware counters; this is timing evidence only.</p>
+<p>Validation of the measured experiment: native library/integration/CLI tests and clippy passed.
+No full-suite Miri certificate is claimed for this archived experiment.
+The 20-state seed-2026 identity check matches baseline node/lookup counts and
+solution-length histograms. Release validation belongs to main 842a504, not
+these historical experimental branches.</p>
+<p>Evidence:
+1T: /data/agents/pmu-opt/screen-summary.json (SHA256 bf67d6248f990b3eed9494a5d6b5fcbee60e399b8ae4e0c9fe5eb4e4b5fa7c32)
+48T: /data/agents/pmu-opt/negative-48t/summary.json (SHA256 3e4b51a12a67deb074ae91ee637030989f00a5ce27f5ce4f32d0e383f1388937)
+build/checks: /data/agents/pmu-opt/build-validation.json
+original patch: /data/agents/pmu-opt/variants/outline.patch
+baseline binary SHA256: 8dadabae98f69673be8f1f800c59cde5435fdf16edb1ff2c67159db02c5dd3b8
+candidate binary SHA256: 241411822b759f29ba5b80e2dbc97397538f48cd6bf61e37cd491e60a8989f69</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

@@ -1,0 +1,23 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 3K of event 'cycles:u'
+# Event count (approx.): 63664
+#
+# Overhead  Symbol                                                                              IPC   [IPC Coverage]
+# ........  ..................................................................................  ....................
+#
+    97.47%  [.] cubeopt::lanes::run_lanes::<bench::run::{closure#1}::{closure#0}::{closure#0}>  0.00  [  0.0%]      
+     1.17%  [.] <cubeopt::lanes::Lane>::setup_run                                               0.00  [  0.0%]      
+     0.63%  [.] <cubeopt::lanes::Lane>::setup_job                                               0.00  [  0.0%]      
+     0.46%  [.] <cubeopt::lanes::Lane>::next_run                                                0.00  [  0.0%]      
+     0.13%  [.] <cubeopt::lanes::Lane>::extend_jobs                                             0.00  [  0.0%]      
+     0.13%  [.] <cubeopt::lanes::Lane>::start_iteration                                         0.00  [  0.0%]      
+     0.03%  [.] <cubeopt::symstart::SymFilter>::new                                             0.00  [  0.0%]      
+
+
+#
+# (Tip: Save output of perf stat using: perf stat record <target workload>)
+#

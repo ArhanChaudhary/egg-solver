@@ -1,0 +1,40 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEGATIVE c9: claims sized to idle lanes (not merged) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="e6a8130ee4f1.md">Markdown source</a> · Offline document</p><h1 id="negative-c9-claims-sized-to-idle-lanes-not-merged">NEGATIVE c9: claims sized to idle lanes (not merged)</h1>
+<p>Commit <code>e6a8130ee4f1207d7ba7ec3bf1852df9a83dbdc6</code> · 2026-11-04T10:27:40+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>neg/c9-claims-idle-lanes</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>NEGATIVE c9: claims sized to idle lanes (not merged)</p>
+<p>NEGATIVE c9: claims sized to the idle lanes in iterations on the same jobs (T&gt;=18)</p>
+<p>Idea: with CHUNK_MAX=64 &gt; 24 lanes, a thread's first-wave claim at T18 holds ranks whose chunk position is &gt;= 24.
+Those wait a whole job duration, e.g. rank 27 started 0.32 ms into T18. Claim min(chunk, max(idle lanes + 1, CLAIM_MIN)).
+48T screening, 500 random states, ms/cube, 3 holds each:</p>
+<ul>
+<li>without tail lanes: p16 1.778/1.815/1.780 vs p16+claims(min 4) 1.860/1.828/1.814 (-c 1, worse); min 1: -c 0 +4.8%.</li>
+<li>with tail lanes (TAIL_LANES=8): scr4 tl8 1.705/1.773/1.717 vs tl8+claims 1.700/1.721/1.744; scr5 1.808/1.737/1.760 vs 1.720/1.703/1.694.
+Nodes/cube fall 3.76M -&gt; 3.66M (-2.6%) consistently, latency is within noise; needs &gt;=7 paired holds before any claim.
+--- /data/agents/c9-wt/src/lanes/share.rs	2026-11-04 08:33:09.147915389 +0000
++++ negclaims/src/lanes/share.rs	2026-11-04 09:43:16.256854064 +0000
+@@ -65,6 +65,8 @@
+const SORT_MIN: usize = 8192;
+/// Most jobs a thread claims at once.
+const CHUNK_MAX: u32 = 64;
++/// Fewest jobs a thread claims at once in iterations on the same jobs.
++const CLAIM_MIN: u32 = 4;
+/// Smallest remaining depth of a node split for another lane of the same
+/// thread, and for another thread.
+const SPLIT_R_LOCAL: u8 = 4;
+@@ -87,6 +89,10 @@
+/// over the job's pieces.
+stats: Vec<AtomicU32>,
+target: u8,</li>
+</ul>
+<ul>
+<li>/// The jobs are those of the last iteration (not extended): their trees</li>
+<li>/// are ~13 times larger, and claims are sized to the idle lanes</li>
+<li>/// (<code>Worker::claim</code>).</li>
+<li>same_jobs: bool,
+/// Buffers of the build in progress (from <code>Pool::bufs</code>).
+b: Bufs,
+/// (trace) When the current iteration's build started, its jobs were</li>
+</ul>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

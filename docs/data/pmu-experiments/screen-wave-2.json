@@ -1,0 +1,35 @@
+{
+  "wave": 2,
+  "repeat": 1,
+  "pad": 32,
+  "records": [
+    {
+      "variant": "outline",
+      "pad": 32,
+      "slot": 3,
+      "throughput": 3.75,
+      "log": "/data/agents/pmu-opt/logs/screen-w2-outline.log"
+    },
+    {
+      "variant": "control",
+      "pad": 16,
+      "slot": 4,
+      "throughput": 4.117,
+      "log": "/data/agents/pmu-opt/logs/screen-w2-control.log"
+    },
+    {
+      "variant": "base",
+      "pad": 32,
+      "slot": 5,
+      "throughput": 4.083,
+      "log": "/data/agents/pmu-opt/logs/screen-w2-base.log"
+    },
+    {
+      "variant": "bytes",
+      "pad": 32,
+      "slot": 1,
+      "throughput": 4.067,
+      "log": "/data/agents/pmu-opt/logs/screen-w2-bytes.log"
+    }
+  ]
+}

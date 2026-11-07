@@ -1,0 +1,65 @@
+# Archived experiment branches
+
+These are historical records. Their measurements use the sources, machines, workloads and noise controls stated in each record; gains are not additive.
+
+| Reference | Commit | Record |
+|---|---|---|
+| `archive/c7-childsplit` | `20a770bb9da8` | [read](commits/20a770bb9da8.md) |
+| `archive/c7-clean` | `59971d56129d` | [read](commits/59971d56129d.md) |
+| `archive/c7-exp` | `8ed40c709531` | [read](commits/8ed40c709531.md) |
+| `archive/c7-glob` | `d03784e35ede` | [read](commits/d03784e35ede.md) |
+| `archive/m7` | `8ce5f911216e` | [read](commits/8ce5f911216e.md) |
+| `archive/m7-align-abce` | `eebb0c208162` | [read](commits/eebb0c208162.md) |
+| `archive/m7-c1` | `ef5887fca9f6` | [read](commits/ef5887fca9f6.md) |
+| `archive/m7-c1n` | `9b5d34d9557c` | [read](commits/9b5d34d9557c.md) |
+| `archive/m7-c2` | `48d9d272d87f` | [read](commits/48d9d272d87f.md) |
+| `archive/m7-c2n` | `5edd4935e0f9` | [read](commits/5edd4935e0f9.md) |
+| `archive/m7-cnt` | `07b86e77c6e3` | [read](commits/07b86e77c6e3.md) |
+| `archive/m7-diag` | `619bfce8f2e3` | [read](commits/619bfce8f2e3.md) |
+| `archive/m7-dlat` | `6b19f9eacd19` | [read](commits/6b19f9eacd19.md) |
+| `archive/m7-dnolat` | `6391056539e3` | [read](commits/6391056539e3.md) |
+| `archive/m7-early` | `c048b83cd4f1` | [read](commits/c048b83cd4f1.md) |
+| `archive/m7-final` | `860d79e14a43` | [read](commits/860d79e14a43.md) |
+| `archive/m7-idx` | `d274402d3df1` | [read](commits/d274402d3df1.md) |
+| `archive/m7-kind` | `a4c9a93713bc` | [read](commits/a4c9a93713bc.md) |
+| `archive/m7-lanes` | `22161f55b5d6` | [read](commits/22161f55b5d6.md) |
+| `archive/m7-lazy` | `eeb7fd4eb9ff` | [read](commits/eeb7fd4eb9ff.md) |
+| `archive/m7-lz` | `a44b861a9ff3` | [read](commits/a44b861a9ff3.md) |
+| `archive/m7-lz-595` | `3603c4943cb4` | [read](commits/3603c4943cb4.md) |
+| `archive/m7-lz-f2` | `b68d360d3aaf` | [read](commits/b68d360d3aaf.md) |
+| `archive/m7-lz-next` | `f3c38ea2eb4b` | [read](commits/f3c38ea2eb4b.md) |
+| `archive/m7-lz-rb` | `5148cb7b52bd` | [read](commits/5148cb7b52bd.md) |
+| `archive/m7-memcnt-595` | `91a997cd1e8d` | [read](commits/91a997cd1e8d.md) |
+| `archive/m7-memcnt-f2` | `af05c64df43f` | [read](commits/af05c64df43f.md) |
+| `archive/m7-port` | `67cae2e77b76` | [read](commits/67cae2e77b76.md) |
+| `archive/m7-port-base` | `53c26be3bb63` | [read](commits/53c26be3bb63.md) |
+| `archive/m7-ra` | `e5a83a06707c` | [read](commits/e5a83a06707c.md) |
+| `archive/m7-ra-next` | `a3eb8bf5e3dd` | [read](commits/a3eb8bf5e3dd.md) |
+| `archive/m7-ra2` | `d575f4074457` | [read](commits/d575f4074457.md) |
+| `archive/m7-ra5` | `f47a736cbe2c` | [read](commits/f47a736cbe2c.md) |
+| `archive/m7-ra7` | `ab059ff16677` | [read](commits/ab059ff16677.md) |
+| `archive/m7-s1` | `b23161604013` | [read](commits/b23161604013.md) |
+| `archive/m7-smc-abce` | `d32017790819` | [read](commits/d32017790819.md) |
+| `archive/m7-spec` | `a2682d9e2c65` | [read](commits/a2682d9e2c65.md) |
+| `archive/m7-stack-595` | `c91bbd9ad103` | [read](commits/c91bbd9ad103.md) |
+| `archive/m7-stack-abce` | `d8dd89306e9e` | [read](commits/d8dd89306e9e.md) |
+| `archive/m7-stack-next` | `ceef720dd9d4` | [read](commits/ceef720dd9d4.md) |
+| `archive/m8-e1` | `34cb3d01345f` | [read](commits/34cb3d01345f.md) |
+| `archive/m8-ix` | `96c1c48fd3cd` | [read](commits/96c1c48fd3cd.md) |
+| `archive/m8-ix3` | `ddd551ce6cea` | [read](commits/ddd551ce6cea.md) |
+| `archive/m8-pm` | `2227080975db` | [read](commits/2227080975db.md) |
+| `archive/m8-pre-def2` | `cb3f335f9cdc` | [read](commits/cb3f335f9cdc.md) |
+| `archive/m8-rp` | `fcfabaf74b2e` | [read](commits/fcfabaf74b2e.md) |
+| `archive/m8-rp2` | `442f868ccbd9` | [read](commits/442f868ccbd9.md) |
+| `archive/m8-stack` | `cff53a57691e` | [read](commits/cff53a57691e.md) |
+| `archive/m8-stack2` | `df0c43c49ba0` | [read](commits/df0c43c49ba0.md) |
+| `archive/m8-uL` | `18ae814422d1` | [read](commits/18ae814422d1.md) |
+| `archive/opt/batch-other` | `ae66c99341c3` | [read](commits/ae66c99341c3.md) |
+| `archive/opt/childorder` | `63147742a36e` | [read](commits/63147742a36e.md) |
+| `archive/opt/cocsep-additive` | `794508e9347b` | [read](commits/794508e9347b.md) |
+| `archive/opt/cocsep-prefetch-lanes` | `79975e23b9fb` | [read](commits/79975e23b9fb.md) |
+| `archive/opt/value-branchless` | `c736b5b5bf3f` | [read](commits/c736b5b5bf3f.md) |
+| `archive/r6c` | `9f1daf44617e` | [read](commits/9f1daf44617e.md) |
+| `archive/r6e` | `880fcda18fa9` | [read](commits/880fcda18fa9.md) |
+| `archive/s2-prologue` | `0a20becb63ef` | [read](commits/0a20becb63ef.md) |
+| `archive/stash-b90b706` | `abc8c0d77561` | [read](commits/abc8c0d77561.md) |

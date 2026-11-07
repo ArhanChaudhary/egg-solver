@@ -1,0 +1,16 @@
+status 0
+run cubeopt30 1 distance20_random10_from1 1 1g shipped 1
+pagemode hugetlb arena 3221225472 only cubeopt30,cubeopt30-pgo
+start 2026-11-05 20:18:13
+wall_s 295.51
+cpu_s 278.46 0.26
+maxrss_kb 7320
+gate_wait_s 0
+ext_cores 3.7
+pages 3150632 4904 1196 0 3145728 116511 cubeopt30
+free_1g_pages 46 46
+memfree_gib_at_start 16.6
+thpwarm_pct -
+table /data2/competitors/cube48opt/nxprun30.dat 2603089920
+thp always [madvise] never defrag always defer defer+madvise [madvise] never
+par 5 slot 16-23

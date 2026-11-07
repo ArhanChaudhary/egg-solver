@@ -1,0 +1,124 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>lanes: fewer µops per generated child (lazy child cube, blsmsk count, move tables, early stores, index tweaks) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="f8a4919d0675.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="lanes-fewer-µops-per-generated-child-lazy-child-cube-blsmsk-count-move-tables-early-stores-index-tweaks">lanes: fewer µops per generated child (lazy child cube, blsmsk count, move tables, early stores, index tweaks)</h1>
+<p>Commit <code>f8a4919d06752c1f4d80a201cc2a9f8006cbe394</code> · 2026-11-04T15:14:23+00:00</p>
+<p>This commit is reachable from the released main history. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: Historical ancestor; no current branch tip</p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>lanes: fewer µops per generated child (lazy child cube, blsmsk count, move tables, early stores, index tweaks)</p>
+<p>Five per-child instruction cuts in advance and the index path. Each has
+a clear mechanism; they were measured together (part of a stack).</p>
+<ul>
+<li>Lazy child cube: advance computes only the looked-up cube, as one
+composition of operands selected by a per-move k-mask loaded from a
+table (<code>Cube::child_lookup</code>, <code>HOT_TABLES.x_move_mask</code>, <code>pending_cube</code>,
+replacing <code>pending_moved</code> / <code>pending_other</code>):
+<ul>
+<li>X moves: inv_mv[m] o b;</li>
+<li>other moves: a o mv[m].
+The other cube is computed only on the X pass path (resolve_other)
+and on a push (<code>push_child</code> / <code>child_node</code> take the cubes). This is a
+new angle on neg/m6-lazy-child-cube, whose mask came from m % 3 at the
+head of the index chain. It also replaces the stores of two pending
+cubes with one.</li>
+</ul>
+</li>
+<li>blsmsk count: <code>todo &amp; blsmsk(live)</code> counts the skipped X' moves and the
+generated child with one popcount and clears them from <code>todo</code> with one
+andn. This is fewer µops than the bzhi count + <code>nodes += 1</code> + blsr,
+unlike neg/m3-merged-node-count, which added a masked count on the pop
+path.</li>
+<li>Move tables: a move's face and kind (and the face mask at a pop) come
+from HOT_TABLES (<code>move_face</code>, <code>move_kind</code>, <code>move_keep</code>), with no
+imul/shr/lea/sub.</li>
+<li>Early stores: pending_face, pending_other_bound, phase and the node
+count are written before the index computation, so that they are not
+live across it. A child pruned by its corner bound reads them back,
+volatile. This removes the spill and reload of the node counter.</li>
+<li>Index: Tinv's eo is folded into the first xor of edge_parts_sym, which
+becomes a vpternlog with a memory operand: no p load into a register,
+no z ^ p. <code>SymEdge</code> entries (classes, perm, perm_eo) are 128 bytes,
+so the entry offset stays one masked, scaled index. msplit's pext and
+the asm vpmovmskb output are 64-bit (no zero extensions).</li>
+<li>Table reads in the hot path use <code>get_unchecked</code> (bounds known: moves
+are below 18), each with a one-line SAFETY comment.</li>
+</ul>
+<p>Instructions per node on an older base (cachegrind, x86-64-v3 build,
+random:20:2026, 1T): 148.79 -&gt; 140.25 (-5.7%). On v3 the k-mask blends
+fall back to vpblendvb with a broadcast mask, so the native cut is
+larger. (Cachegrind no longer runs: next_run uses AVX-512
+unconditionally, SIGILL under valgrind.)</p>
+<p>The search is unchanged. verify.sh on this build:
+nodes/cube 3058198 lookups/cube 2588380
+lengths 15:1 16:35 17:270 18:662 19:32
+nodes/cube 3644301 lookups/cube 3084160
+lengths 18:100
+(equal to main's). check.sh passes (exit 0, pedantic enforced). The
+stream_thread code of this build is identical (asm, addresses stripped)
+to the 735dd25 build measured below, and Worker::rounds to the 1f4c85a
+build measured below.</p>
+<p>Measurements (24 lanes, solves/s). With the previous commit both sides
+have stream_thread at offset 16 of a 64-byte line. Without it, the
+offset was a lottery: see there.</p>
+<p>1T, offset-stratified, on abce87c (relinks with lld --shuffle-sections
+seeds, 3 per offset class and side, paired concurrent runs, stream 10 60
+1 24):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>offset</th><th>main</th><th>stack</th><th>pairs</th></tr>
+</thead>
+<tbody>
+<tr><td>0</td><td>25.517 25.483 25.600</td><td>25.600 24.933 25.050</td><td>+0.3 -2.2 -2.2%</td></tr>
+<tr><td>16</td><td>24.867 25.050 25.133</td><td>25.750 25.717 25.517</td><td>+3.6 +2.7 +1.5%</td></tr>
+<tr><td>32</td><td>24.750 24.867 25.050</td><td>25.517 25.550 26.000</td><td>+3.1 +2.8 +3.8%</td></tr>
+<tr><td>48</td><td>25.183 24.967 25.333</td><td>25.533 25.517 25.667</td><td>+1.4 +2.2 +1.3%</td></tr>
+<tr><td>Median +1.53%, mean +1.53% over the 12 pairs. Averaged over the four</td><td></td><td></td><td></td></tr>
+<tr><td>offsets, main ran at 25.15 and the stack at 25.49 (+1.4%). On abce87c,</td><td></td><td></td><td></td></tr>
+<tr><td>main was fastest at offset 0, the stack at 16 or 32. Earlier, also</td><td></td><td></td><td></td></tr>
+<tr><td>layout-averaged (abl1t.sh 2, 4 shuffle layouts): +1.92% on 595e424 (8 of 8</td><td></td><td></td><td></td></tr>
+<tr><td>pairs positive), +0.33% median / -0.57% mean on abce87c (its layouts put</td><td></td><td></td><td></td></tr>
+<tr><td>main at 0, 32, 48, 0 and the stack at 48, 0, 0, 16).</td><td></td><td></td><td></td></tr>
+</tbody>
+</table></div>
+<p>On 735dd25 (s8's loops; same stream code as 9e69243):</p>
+<ul>
+<li>1T pad sweep against main as built (2 seeds per pad; noisy, p10's
+8-thread benches were running): pad 0 -0.7 +0.8%, 16 +1.4 -0.4%, 32
+-0.5 -3.7%, 48 +0.4 -5.5%. 16 it is.</li>
+<li>1T, 5 paired runs (abn.sh, 3-way), all at pad 16:
+<div class="table-wrap"><table>
+<thead>
+<tr><th>build</th><th>runs</th><th>median</th></tr>
+</thead>
+<tbody>
+<tr><td>main</td><td>24.933 25.083 24.417 24.817 24.567</td><td>24.817</td></tr>
+<tr><td>pins only</td><td>24.983 25.150 24.867 24.967 24.533</td><td>24.967 (+0.6%)</td></tr>
+<tr><td>stack</td><td>25.083 25.300 23.900 24.983 25.367</td><td>25.083 (+1.1%)</td></tr>
+<tr><td>Stack vs main per run: +0.6 +0.9 -2.1 +0.7 +3.3%.</td><td></td><td></td></tr>
+</tbody>
+</table></div>
+</li>
+<li>48T (ab48.sh 5, stream 20 30 48 24, outside load 0.1 cores):
+<div class="table-wrap"><table>
+<thead>
+<tr><th>build</th><th>runs</th><th>median</th></tr>
+</thead>
+<tbody>
+<tr><td>main</td><td>1081.100 1067.433 1090.567 1083.667 1088.200</td><td>1083.667</td></tr>
+<tr><td>stack</td><td>1078.700 1084.667 1080.100 1095.300 1081.533</td><td>1081.533 (-0.2%)</td></tr>
+<tr><td>Per run: -0.2 +1.6 -1.0 +1.1 -0.6%: even at 48T.</td><td></td><td></td></tr>
+</tbody>
+</table></div>
+</li>
+<li>Share mode, 48T (bench random:1000:2026 1000 48 24 share), 3 rounds:
+main 949.9 957.0 946.3, pins only 949.6 953.4 954.5, stack 954.5 948.9
+952.7: even. Lengths identical.</li>
+</ul>
+<p>So: about +1% at 1T, even at 48T and in share mode. At 48T the 48
+threads share the memory system; the lookup latency, not the per-child
+µops, limits them.</p>
+<p>Share mode with this commit at each share pad (1f4c85a, Worker::rounds
+instruction-identical here; 48T, 3 rounds, against main 965.7 median):
+pad 0 973.513 965.532 981.652 (median 973.5, +0.8%); 16 964.478 959.525
+947.181; 32 971.542 968.302 937.121; 48 968.981 965.811 964.960. At 1T
+share, pad 0 against 48: -0.21 +0.90 +1.20%. The previous commit's pad
+0 is also this commit's best.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

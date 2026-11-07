@@ -1,0 +1,46 @@
+     Locking 22 packages to highest Rust 1.101.0-nightly compatible versions
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.27
+   Compiling thiserror v2.0.21
+   Compiling libc v0.2.191
+   Compiling parking_lot_core v0.9.12
+   Compiling scopeguard v1.2.0
+   Compiling smallvec v1.16.4
+   Compiling cfg-if v1.0.5
+   Compiling crossbeam-utils v0.8.23
+   Compiling lock_api v0.4.14
+   Compiling allocator-api2 v0.2.21
+   Compiling equivalent v1.0.3
+   Compiling foldhash v0.2.0
+   Compiling hashbrown v0.16.1
+   Compiling syn v3.0.9
+   Compiling parking_lot v0.12.5
+   Compiling thiserror-impl v2.0.21
+   Compiling egg-solver v0.1.0 (/home/super/egg-solver)
+   Compiling miri-memory-api-probe v0.0.0 (/data/agents/codex-resume/miri-memory-api-probe)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.70s
+     Running `/home/super/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/bin/cargo-miri runner /data2/build/egg-solver-target/miri-api-probe/miri/x86_64-unknown-linux-gnu/debug/miri-memory-api-probe`
+error: Undefined Behavior: attempting a read access using <380> at alloc160[0x0], but that tag does not exist in the borrow stack for this location
+ --> src/main.rs:9:26
+  |
+9 |     std::hint::black_box(bytes[0]);
+  |                          ^^^^^^^^ this error occurs as part of an access at alloc160[0x0..0x1]
+  |
+  = help: this indicates a potential bug in the program: it performed an invalid operation, but the Stacked Borrows rules it violated are still experimental
+  = help: see https://github.com/rust-lang/unsafe-code-guidelines/blob/master/wip/stacked-borrows.md for further information
+help: <380> was created by a SharedReadOnly retag at offsets [0x0..0x8]
+ --> src/main.rs:6:17
+  |
+6 |     let bytes = memory.bytes().unwrap();
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^
+help: <380> was later invalidated at offsets [0x0..0x8] by a write access
+ --> src/main.rs:8:5
+  |
+8 |     words[0].store(1, Ordering::Relaxed);
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+note: some details are omitted, run with `MIRIFLAGS=-Zmiri-backtrace=full` for a verbose backtrace
+
+error: aborting due to 1 previous error
+

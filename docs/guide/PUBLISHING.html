@@ -1,0 +1,29 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>GitHub Pages — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../index.html">Home</a><a href="OVERVIEW.html">Learn</a><a href="../comparisons/index.html">Compare</a><a href="../performance/index.html">Performance</a><a href="../safety/index.html">Safety</a><a href="../history/index.html">History</a><a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="PUBLISHING.md">Markdown source</a> · Offline document</p><h1 id="github-pages">GitHub Pages</h1>
+<p><a href="../index.html">Documentation home</a></p>
+<p>The repository includes <code>.github/workflows/pages.yml</code>. It builds the browser
+solver and publishes the documentation at <code>docs/</code> on the same site.</p>
+<ol>
+<li>Push the project, including <code>.github/</code> and <code>docs/</code>, to your GitHub repository.</li>
+<li>Open <strong>Settings → Pages → Build and deployment</strong>, and select <strong>GitHub Actions</strong>.</li>
+<li>Run <strong>GitHub Pages</strong> from the Actions tab, or push to the default branch.</li>
+</ol>
+<p>The workflow deploys only the default branch. The deployment URL appears in
+the Actions run and the <code>github-pages</code> environment. No account, repository name,
+or site base path is hardcoded. See GitHub's <a href="https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages">custom workflow documentation</a>.</p>
+<p>The site runs the solver in your browser. Generate a small table there or
+select your own table file; large pruning tables are not uploaded to Pages.
+The demo uses one thread when cross-origin isolation is unavailable, including
+standard GitHub Pages hosting. Local <code>wasm/serve.mjs</code> enables multiple threads
+by serving the required isolation headers.</p>
+<p>To build the same site locally:</p>
+<pre><code class="language-sh">rustup target add wasm32-wasip1 wasm32-wasip1-threads
+scripts/build-pages.sh /tmp/egg-solver-pages
+python3 -m http.server 8000 --directory /tmp/egg-solver-pages
+</code></pre>
+<p>Choose an output directory that does not already exist. Open
+<code>http://localhost:8000/</code>. This plain HTTP server exercises the one-thread
+hosting mode. Build artifacts are generated locally and are not committed.</p>
+<p>Documentation HTML is included for offline browsing. After editing Markdown,
+run <code>bun scripts/render-docs.mjs</code> before committing. Historical benchmark
+results keep their recorded build and hardware provenance.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

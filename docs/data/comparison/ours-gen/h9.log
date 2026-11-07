@@ -1,0 +1,44 @@
+[gen] h9 base 10: 14.50 GiB, 48 threads, 4 parts
+[gen] prefix depth 1: 1 h11 entries
+[gen] prefix depth 2: 4 h11 entries
+[gen] prefix depth 3: 34 h11 entries
+[gen] prefix depth 4: 333 h11 entries
+[gen] prefix depth 5: 3815 h11 entries
+[gen] prefix depth 6: 45382 h11 entries
+[gen] prefix depth 7: 548562 h11 entries
+[gen] prefix depth 8: 6839723 h11 entries
+[gen h9] prefix in 0.6s
+[gen h9] rows 0..30408704: depth 9 in 0.3s (0.4s for these rows)
+[gen h9] rows 0..30408704: depth 10 in 0.7s (1.1s for these rows)
+[gen h9] rows 0..30408704: depth 11 in 3.0s (4.1s for these rows)
+[gen h9] depth 12: 22.9% after 10s, ~34s to go
+[gen h9] depth 12: 52.9% after 20s, ~18s to go
+[gen h9] depth 12: 89.9% after 30s, ~3s to go
+[gen h9] rows 0..30408704: depth 12 in 32.4s (36.4s for these rows)
+[gen h9] rows 0..30408704 written in 27.1s
+[gen h9] rows 30408704..60817408: depth 9 in 0.3s (0.4s for these rows)
+[gen h9] rows 30408704..60817408: depth 10 in 0.6s (1.0s for these rows)
+[gen h9] rows 30408704..60817408: depth 11 in 2.8s (3.8s for these rows)
+[gen h9] depth 12: 28.7% after 10s, ~25s to go
+[gen h9] depth 12: 55.3% after 20s, ~16s to go
+[gen h9] depth 12: 86.3% after 30s, ~5s to go
+[gen h9] rows 30408704..60817408: depth 12 in 34.0s (37.8s for these rows)
+[gen h9] rows 30408704..60817408 written in 27.0s
+[gen h9] rows 60817408..91226112: depth 9 in 0.3s (0.4s for these rows)
+[gen h9] rows 60817408..91226112: depth 10 in 0.6s (1.0s for these rows)
+[gen h9] rows 60817408..91226112: depth 11 in 2.6s (3.6s for these rows)
+[gen h9] depth 12: 33.3% after 10s, ~20s to go
+[gen h9] depth 12: 61.1% after 20s, ~13s to go
+[gen h9] depth 12: 89.9% after 30s, ~3s to go
+[gen h9] rows 60817408..91226112: depth 12 in 33.5s (37.1s for these rows)
+[gen h9] rows 60817408..91226112 written in 27.1s
+[gen h9] rows 91226112..121605120: depth 9 in 0.2s (0.3s for these rows)
+[gen h9] rows 91226112..121605120: depth 10 in 0.6s (0.9s for these rows)
+[gen h9] rows 91226112..121605120: depth 11 in 2.3s (3.2s for these rows)
+[gen h9] depth 12: 43.6% after 10s, ~13s to go
+[gen h9] depth 12: 79.3% after 20s, ~5s to go
+[gen h9] rows 91226112..121605120: depth 12 in 26.3s (29.5s for these rows)
+[gen h9] rows 91226112..121605120 written in 27.1s
+generated in 250.1s, peak memory 3.92 GiB
+h9 base 10 distribution [1102038343, 9888266493, 38299376032, 10904853532]
+250.18 s wall, 6597.07 s user, maxrss 4115004 KB, exit 0

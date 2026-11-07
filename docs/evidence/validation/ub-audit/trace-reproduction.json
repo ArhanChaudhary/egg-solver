@@ -1,0 +1,10 @@
+{
+  "status": "UB_REPRODUCED",
+  "seed": 15,
+  "backend": "x86 AVX2/BMI2",
+  "log": "/data/agents/ub-audit/trace-before-fix.log",
+  "source": "/data/agents/ub-audit/trace-before-fix.rs",
+  "source_sha256": "95f020dcdf3d1bf84a9235434a9f349dbd64b3acd900ebb6eb71ba0c73bb8ae8",
+  "note": "Candidate before trace fix; regression enables tracing and inserts a test-only scheduling delay after publication. All Miri UB checks enabled.",
+  "completed_at": "2026-11-07T07:01:36.432151+00:00"
+}

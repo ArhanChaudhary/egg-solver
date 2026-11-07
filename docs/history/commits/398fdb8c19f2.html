@@ -1,0 +1,33 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEGATIVE m8: Worker::rounds keeps only the lane pointers live (neutral to negative) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="398fdb8c19f2.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="negative-m8-worker-rounds-keeps-only-the-lane-pointers-live-neutral-to-negative">NEGATIVE m8: Worker::rounds keeps only the lane pointers live (neutral to negative)</h1>
+<p>Commit <code>398fdb8c19f25fa2cc5a4d61110d88923a2fd1e5</code> · 2026-11-05T02:56:50+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>neg/m8-rounds-live-set</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>NEGATIVE m8: Worker::rounds keeps only the lane pointers live (neutral to negative)</p>
+<p>The pointer walk of 95cbb11 raised Worker::rounds' stack operands from
+102 to 124 (static count). This variant keeps only <code>next</code> and <code>end</code> live
+across the visits: the vector's base (for <code>offset_from</code> after <code>on_end</code>)
+and the active count (for the per-round counters and <code>maintain</code>'s test)
+are read from <code>self</code> again where needed.</p>
+<p>asm: rounds 1231 -&gt; 1229 instructions, stack operands 124 -&gt; 119. A perf
+cpu-clock profile of the loop (share 1T) puts ~2% of its samples on
+instructions with stack operands: the spills are mostly the solver's
+loop-invariant fields (packed and table pointers, base, max value, row
+multiplier, eo mask) hoisted out of the loop and reloaded, which cost
+the same as loads from the solver; not the pointer walk's.</p>
+<p>1T share (abs.sh: bench random:1000:2026 1000 1 24 share, paired,
+alternating) against 7608a28 at its share pad 16:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>rp2 share pad</th><th>pairs</th></tr>
+</thead>
+<tbody>
+<tr><td>0</td><td>+1.43 +0.12%</td></tr>
+<tr><td>16</td><td>-0.51 -0.42%</td></tr>
+<tr><td>32</td><td>+0.97 +2.69%, then 6 more: -1.23 -0.35 -0.43 +0.06 -0.73 -0.83% (medians 24.715 -&gt; 24.626, -0.4%)</td></tr>
+<tr><td>48</td><td>-0.22 +1.08%</td></tr>
+<tr><td>At the best pad (32) the 6 confirmation pairs are negative (5 of 6; median</td><td></td></tr>
+<tr><td>-0.58%). Not delivered.</td><td></td></tr>
+</tbody>
+</table></div>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

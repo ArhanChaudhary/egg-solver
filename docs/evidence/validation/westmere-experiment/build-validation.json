@@ -1,0 +1,263 @@
+{
+  "status": "PASS",
+  "base": "93867a4597ab821b4064a0d407d3c89e133c9013",
+  "target": "westmere",
+  "measured_host": "AMD EPYC9V45 VM; not phack",
+  "binaries": [
+    {
+      "variant": "base",
+      "pad": 0,
+      "binary": "bench",
+      "path": "/data/agents/pmu-westmere/bin/base-p0-bench",
+      "sha256": "48607fcb3a0bf68e6a036d44c7be9aa21608a2a17b404c6e784b64aaff129d82"
+    },
+    {
+      "variant": "base",
+      "pad": 0,
+      "binary": "solve",
+      "path": "/data/agents/pmu-westmere/bin/base-p0-solve",
+      "sha256": "4fc5bf73eb65e7eabe195d8746232afad1bad785f0c29f434d855fdb8ed4d465"
+    },
+    {
+      "variant": "base",
+      "pad": 0,
+      "binary": "gen",
+      "path": "/data/agents/pmu-westmere/bin/base-p0-gen",
+      "sha256": "570627f19247c71e9d7720f926f6afa5ea2931b20f9d2e89a678d8625489af6e"
+    },
+    {
+      "variant": "base",
+      "pad": 16,
+      "binary": "bench",
+      "path": "/data/agents/pmu-westmere/bin/base-p16-bench",
+      "sha256": "4e99b88fb7319df9531dfc4691d1cfa0d098d9d36f0e1914638a3a4e9a48a2e1"
+    },
+    {
+      "variant": "base",
+      "pad": 16,
+      "binary": "solve",
+      "path": "/data/agents/pmu-westmere/bin/base-p16-solve",
+      "sha256": "4fc5bf73eb65e7eabe195d8746232afad1bad785f0c29f434d855fdb8ed4d465"
+    },
+    {
+      "variant": "base",
+      "pad": 16,
+      "binary": "gen",
+      "path": "/data/agents/pmu-westmere/bin/base-p16-gen",
+      "sha256": "570627f19247c71e9d7720f926f6afa5ea2931b20f9d2e89a678d8625489af6e"
+    },
+    {
+      "variant": "base",
+      "pad": 32,
+      "binary": "bench",
+      "path": "/data/agents/pmu-westmere/bin/base-p32-bench",
+      "sha256": "f47d74f91b56ad1e7ae74cbe933c3cc26c872fbd6425fdaaf50744c22978b608"
+    },
+    {
+      "variant": "base",
+      "pad": 32,
+      "binary": "solve",
+      "path": "/data/agents/pmu-westmere/bin/base-p32-solve",
+      "sha256": "4fc5bf73eb65e7eabe195d8746232afad1bad785f0c29f434d855fdb8ed4d465"
+    },
+    {
+      "variant": "base",
+      "pad": 32,
+      "binary": "gen",
+      "path": "/data/agents/pmu-westmere/bin/base-p32-gen",
+      "sha256": "570627f19247c71e9d7720f926f6afa5ea2931b20f9d2e89a678d8625489af6e"
+    },
+    {
+      "variant": "base",
+      "pad": 48,
+      "binary": "bench",
+      "path": "/data/agents/pmu-westmere/bin/base-p48-bench",
+      "sha256": "d9379826bb4f1a06698bffd1f0434febbad09530b55ea48306376c0a19b36d07"
+    },
+    {
+      "variant": "base",
+      "pad": 48,
+      "binary": "solve",
+      "path": "/data/agents/pmu-westmere/bin/base-p48-solve",
+      "sha256": "4fc5bf73eb65e7eabe195d8746232afad1bad785f0c29f434d855fdb8ed4d465"
+    },
+    {
+      "variant": "base",
+      "pad": 48,
+      "binary": "gen",
+      "path": "/data/agents/pmu-westmere/bin/base-p48-gen",
+      "sha256": "570627f19247c71e9d7720f926f6afa5ea2931b20f9d2e89a678d8625489af6e"
+    },
+    {
+      "variant": "ssse3",
+      "pad": 0,
+      "binary": "bench",
+      "path": "/data/agents/pmu-westmere/bin/ssse3-p0-bench",
+      "sha256": "15d5baaec14ec5c649fdccced7be69091131f153ffcab94c6bf61c966dc9acb7"
+    },
+    {
+      "variant": "ssse3",
+      "pad": 0,
+      "binary": "solve",
+      "path": "/data/agents/pmu-westmere/bin/ssse3-p0-solve",
+      "sha256": "95fdedf6eadf85cb038b7b0399801f85a2cb6e34896ad374f1c20b9a884caeed"
+    },
+    {
+      "variant": "ssse3",
+      "pad": 0,
+      "binary": "gen",
+      "path": "/data/agents/pmu-westmere/bin/ssse3-p0-gen",
+      "sha256": "7f42ed1c18ff17e6fdfac1f79c4ca3fb53fd186acb55d8398d968fda3ece924b"
+    },
+    {
+      "variant": "ssse3",
+      "pad": 16,
+      "binary": "bench",
+      "path": "/data/agents/pmu-westmere/bin/ssse3-p16-bench",
+      "sha256": "82415c436cb9f68bc4cae28e5fc28b9004719343e04464b2f414b4c9d9ceaede"
+    },
+    {
+      "variant": "ssse3",
+      "pad": 16,
+      "binary": "solve",
+      "path": "/data/agents/pmu-westmere/bin/ssse3-p16-solve",
+      "sha256": "95fdedf6eadf85cb038b7b0399801f85a2cb6e34896ad374f1c20b9a884caeed"
+    },
+    {
+      "variant": "ssse3",
+      "pad": 16,
+      "binary": "gen",
+      "path": "/data/agents/pmu-westmere/bin/ssse3-p16-gen",
+      "sha256": "7f42ed1c18ff17e6fdfac1f79c4ca3fb53fd186acb55d8398d968fda3ece924b"
+    },
+    {
+      "variant": "ssse3",
+      "pad": 32,
+      "binary": "bench",
+      "path": "/data/agents/pmu-westmere/bin/ssse3-p32-bench",
+      "sha256": "20ff10fa3b44830bb357ce148cf6327420c814a66f060e5c913c23ed6ee1120d"
+    },
+    {
+      "variant": "ssse3",
+      "pad": 32,
+      "binary": "solve",
+      "path": "/data/agents/pmu-westmere/bin/ssse3-p32-solve",
+      "sha256": "95fdedf6eadf85cb038b7b0399801f85a2cb6e34896ad374f1c20b9a884caeed"
+    },
+    {
+      "variant": "ssse3",
+      "pad": 32,
+      "binary": "gen",
+      "path": "/data/agents/pmu-westmere/bin/ssse3-p32-gen",
+      "sha256": "7f42ed1c18ff17e6fdfac1f79c4ca3fb53fd186acb55d8398d968fda3ece924b"
+    },
+    {
+      "variant": "ssse3",
+      "pad": 48,
+      "binary": "bench",
+      "path": "/data/agents/pmu-westmere/bin/ssse3-p48-bench",
+      "sha256": "d84a6d3affeb8ce707c82de20918b71b541dd79797d9689cc515529b9a2f8ed3"
+    },
+    {
+      "variant": "ssse3",
+      "pad": 48,
+      "binary": "solve",
+      "path": "/data/agents/pmu-westmere/bin/ssse3-p48-solve",
+      "sha256": "95fdedf6eadf85cb038b7b0399801f85a2cb6e34896ad374f1c20b9a884caeed"
+    },
+    {
+      "variant": "ssse3",
+      "pad": 48,
+      "binary": "gen",
+      "path": "/data/agents/pmu-westmere/bin/ssse3-p48-gen",
+      "sha256": "7f42ed1c18ff17e6fdfac1f79c4ca3fb53fd186acb55d8398d968fda3ece924b"
+    }
+  ],
+  "checks": {
+    "base": "release native library/integration/CLI tests and clippy passed",
+    "ssse3_native": {
+      "status": "PASS",
+      "source": {
+        "sha256": "db2d12ac5f077e4884beeaca764f8d2cccbfda06683fb1f37e34350b4e2d3e8b",
+        "files": [
+          ".cargo/config.toml",
+          "Cargo.lock",
+          "Cargo.toml",
+          "benches/kernels.rs",
+          "build.rs",
+          "check.sh",
+          "examples/symgen.rs",
+          "examples/tabcheck.rs",
+          "examples/xsolve.rs",
+          "miri.sh",
+          "src/bin/bench.rs",
+          "src/bin/gen.rs",
+          "src/bin/solve.rs",
+          "src/cli.rs",
+          "src/cli/preflight.rs",
+          "src/coord.rs",
+          "src/cubie.rs",
+          "src/env.rs",
+          "src/gen.rs",
+          "src/gen/collapse.rs",
+          "src/gen/dfs.rs",
+          "src/gen/progress.rs",
+          "src/hot.rs",
+          "src/lanes.rs",
+          "src/lanes/share.rs",
+          "src/lib.rs",
+          "src/main.rs",
+          "src/parallel.rs",
+          "src/portable/coord.rs",
+          "src/portable/mod.rs",
+          "src/portable/v16_neon.rs",
+          "src/portable/v16_scalar.rs",
+          "src/portable/v16_ssse3.rs",
+          "src/portable/v16_wasm.rs",
+          "src/prefetch.rs",
+          "src/simd.rs",
+          "src/solver.rs",
+          "src/symstart.rs",
+          "src/tables.rs",
+          "src/tables/file.rs",
+          "src/tables/shm.rs",
+          "tests/cli.rs",
+          "tests/correctness.rs",
+          "tests/no_runtime_panics.rs",
+          "vendor/parking_lot_core/Cargo.toml",
+          "vendor/parking_lot_core/build.rs",
+          "vendor/parking_lot_core/src/lib.rs",
+          "vendor/parking_lot_core/src/parking_lot.rs",
+          "vendor/parking_lot_core/src/spinwait.rs",
+          "vendor/parking_lot_core/src/thread_parker/generic.rs",
+          "vendor/parking_lot_core/src/thread_parker/linux.rs",
+          "vendor/parking_lot_core/src/thread_parker/mod.rs",
+          "vendor/parking_lot_core/src/thread_parker/redox.rs",
+          "vendor/parking_lot_core/src/thread_parker/sgx.rs",
+          "vendor/parking_lot_core/src/thread_parker/unix.rs",
+          "vendor/parking_lot_core/src/thread_parker/wasm.rs",
+          "vendor/parking_lot_core/src/thread_parker/wasm_atomic.rs",
+          "vendor/parking_lot_core/src/thread_parker/windows/bindings.rs",
+          "vendor/parking_lot_core/src/thread_parker/windows/keyed_event.rs",
+          "vendor/parking_lot_core/src/thread_parker/windows/mod.rs",
+          "vendor/parking_lot_core/src/thread_parker/windows/waitaddress.rs",
+          "vendor/parking_lot_core/src/util.rs",
+          "vendor/parking_lot_core/src/word_lock.rs",
+          "wasm/Cargo.toml",
+          "wasm/build.rs",
+          "wasm/src/lib.rs",
+          "wasm/src/threads.rs"
+        ]
+      },
+      "suite": "Westmere-target release library/integration/CLI tests and clippy all-targets",
+      "rustflags": "-C target-cpu=westmere",
+      "reuse_reason": "Only the external Miri driver argument ordering changed after these successful checks",
+      "logs": [
+        "/data/agents/pmu-westmere/attempt-1-cli-error/ssse3-tests.log",
+        "/data/agents/pmu-westmere/attempt-1-cli-error/ssse3-clippy.log"
+      ]
+    },
+    "miri_vectors": "PASS: three tests, strict provenance; full-suite validation still required before adoption",
+    "ssse3": "release native library/integration/CLI tests and clippy passed"
+  }
+}

@@ -1,0 +1,15 @@
+status 0
+run cubeoptrsstreamh11 1 random_state 0 1g shipped 1
+pagemode none arena 0 only -
+start 2026-11-05 14:25:25
+wall_s 50.04
+cpu_s 49.97 0.05
+maxrss_kb 97080
+gate_wait_s 0
+ext_cores 0.0
+pages 60914680 97272 94208 2048 60817408 2916251 bench
+free_1g_pages 0 0
+memfree_gib_at_start 14.5
+thpwarm_pct -
+table /mnt/huge/h11 62277025792
+thp always [madvise] never defrag always defer defer+madvise [madvise] never

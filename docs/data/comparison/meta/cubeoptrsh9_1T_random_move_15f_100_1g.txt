@@ -1,0 +1,16 @@
+status 0
+run cubeoptrsh9 1 random_move_15f 100 1g shipped 1
+pagemode none arena 0 only -
+start 2026-11-07 06:09:23
+wall_s 0.08
+cpu_s 0.04 0.02
+maxrss_kb 12172
+gate_wait_s 0
+ext_cores 0.3
+pages 7344 7344 872 0 0 1475950 systemd-run
+free_1g_pages 14 14
+memfree_gib_at_start 12.8
+thpwarm_pct -
+table /mnt/huge/h9 16106127360
+thp always [madvise] never defrag always defer defer+madvise [madvise] never
+par 0 slot -

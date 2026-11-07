@@ -1,0 +1,96 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>share: Pad is crossbeam's CachePadded — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="2f4fb7a0b16a.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="share-pad-is-crossbeam-s-cachepadded">share: Pad is crossbeam's CachePadded</h1>
+<p>Commit <code>2f4fb7a0b16a16292a12448032cd70d5c0497cb0</code> · 2026-11-05T06:45:26+00:00</p>
+<p>This commit is reachable from the released main history. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: Historical ancestor; no current branch tip</p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>share: Pad is crossbeam's CachePadded</p>
+<p>The share mode keeps its shared atomics, rarely written fields and free
+lists on cache lines of their own (Pad, l6-share-2: bench share 787 vs
+845/s without it). Pad was our own <code>#[repr(align(128))]</code> newtype with a
+Deref; it is now an alias of crossbeam_utils::CachePadded, the usual crate
+for this. CachePadded is align(128) on x86-64 (the spatial prefetcher
+pulls 64-byte lines in pairs) and aarch64 (128-byte lines on Apple cores),
+so the layout is the same, and so is the code: every cubeopt/bench/solve
+function of the release build has the same instructions as on main
+(addresses and call targets stripped), except solve::main (Pool::new
+inlined), where two registers swap. On wasm32 CachePadded is align(64)
+(was 128). The call sites stay: <code>Pad&lt;T&gt;</code> is kept as the alias,
+<code>Pad(x)</code> -&gt; <code>Pad::new(x)</code>, and two <code>.0</code> become derefs.</p>
+<p>Not a speedup (the same code), measured as neutral:</p>
+<ul>
+<li>Hot functions against 7608a28 (= 3a9a50a on x86): Worker::rounds the
+same code at the same line offset (16), the share thread closures
+(solve, bench::share_thread) frame 0x1f40, bench::stream_thread frame
+0x1c80, all unchanged.</li>
+<li>Search identical (verify.sh on the whole series: nodes/cube 3058198
+lookups/cube 2588380, lengths 15:1 16:35 17:270 18:662 19:32; 3644301
+3084160, 18:100); no bad solutions.</li>
+</ul>
+<p>48T share (d1, against 7608a28; one exclusive hold per rep, the binaries
+of the screening in rotating order, quiet gate; solve -t 48 -c 1 -n 500;
+outside load &lt;= 0.4 cores except one run at 1.2, cp's rep-6 random_state):
+solve -c 1, random_state (ms/cube):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>rep</th><th>7608a28</th><th>this commit</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>1.649</td><td>1.586</td></tr>
+<tr><td>2</td><td>1.617</td><td>1.651</td></tr>
+<tr><td>3</td><td>1.745</td><td>1.629</td></tr>
+<tr><td>4</td><td>1.622</td><td>1.62</td></tr>
+<tr><td>5</td><td>1.74</td><td>1.584</td></tr>
+<tr><td>6</td><td>1.798</td><td>1.869</td></tr>
+<tr><td>7</td><td>1.658</td><td>1.685</td></tr>
+<tr><td>8</td><td>1.612</td><td>1.635</td></tr>
+<tr><td>median</td><td>1.6535</td><td>1.632 (-1.3%; pairs -3.8 +2.1 -6.6 -0.1 -9.0 +3.9 +1.6 +1.4; median pair +0.7%)</td></tr>
+<tr><td>solve -c 1, random_move_17f (ms/cube):</td><td></td><td></td></tr>
+<tr><td>rep</td><td>7608a28</td><td>this commit</td></tr>
+<tr><td>-----</td><td>------</td><td>------</td></tr>
+<tr><td>1</td><td>0.542</td><td>0.574</td></tr>
+<tr><td>2</td><td>0.571</td><td>0.536</td></tr>
+<tr><td>3</td><td>0.544</td><td>0.544</td></tr>
+<tr><td>4</td><td>0.56</td><td>0.538</td></tr>
+<tr><td>5</td><td>0.57</td><td>0.537</td></tr>
+<tr><td>6</td><td>0.581</td><td>0.654</td></tr>
+<tr><td>7</td><td>0.575</td><td>0.588</td></tr>
+<tr><td>8</td><td>0.557</td><td>0.533</td></tr>
+<tr><td>median</td><td>0.565</td><td>0.541 (-4.2%; pairs +5.9 -6.1 +0.0 -3.9 -5.8 +12.6 +2.3 -4.3; median pair -2.0%)</td></tr>
+<tr><td>solve -c 1, random_state_depth17 (ms/cube):</td><td></td><td></td></tr>
+<tr><td>rep</td><td>7608a28</td><td>this commit</td></tr>
+<tr><td>-----</td><td>------</td><td>------</td></tr>
+<tr><td>1</td><td>0.606</td><td>0.616</td></tr>
+<tr><td>2</td><td>0.648</td><td>0.618</td></tr>
+<tr><td>3</td><td>0.617</td><td>0.606</td></tr>
+<tr><td>4</td><td>0.621</td><td>0.615</td></tr>
+<tr><td>5</td><td>0.623</td><td>0.623</td></tr>
+<tr><td>6</td><td>0.653</td><td>0.67</td></tr>
+<tr><td>7</td><td>0.658</td><td>0.644</td></tr>
+<tr><td>8</td><td>0.622</td><td>0.643</td></tr>
+<tr><td>median</td><td>0.6225</td><td>0.6205 (-0.3%; pairs +1.7 -4.6 -1.8 -1.0 +0.0 +2.6 -2.1 +3.4; median pair -0.5%)</td></tr>
+<tr><td>bench share random:1000:2026 (solves/s):</td><td></td><td></td></tr>
+<tr><td>rep</td><td>7608a28</td><td>this commit</td></tr>
+<tr><td>-----</td><td>------</td><td>------</td></tr>
+<tr><td>1</td><td>962.916</td><td>956.798</td></tr>
+<tr><td>2</td><td>970.203</td><td>968.998</td></tr>
+<tr><td>3</td><td>986.879</td><td>972.476</td></tr>
+<tr><td>4</td><td>977.928</td><td>967.747</td></tr>
+<tr><td>5</td><td>966.408</td><td>966.428</td></tr>
+<tr><td>6</td><td>898.479</td><td>909.145</td></tr>
+<tr><td>7</td><td>905.897</td><td>905.66</td></tr>
+<tr><td>8</td><td>962.297</td><td>969.479</td></tr>
+<tr><td>median</td><td>964.662</td><td>967.087 (+0.3%; pairs -0.6 -0.1 -1.5 -1.0 +0.0 +1.2 -0.0 +0.7; median pair -0.1%)</td></tr>
+<tr><td>1T share (abs.sh: bench random:1000:2026 1000 1 24 share, A and B at once</td><td></td><td></td></tr>
+<tr><td>in two slots, start order alternating):</td><td></td><td></td></tr>
+<tr><td>run</td><td>7608a28</td><td>this commit</td></tr>
+<tr><td>-----</td><td>------</td><td>------</td></tr>
+<tr><td>1</td><td>23.465</td><td>23.071</td></tr>
+<tr><td>2</td><td>24.724</td><td>24.98</td></tr>
+<tr><td>3</td><td>25.049</td><td>25.148</td></tr>
+<tr><td>4</td><td>24.924</td><td>24.846</td></tr>
+<tr><td>5</td><td>24.728</td><td>24.765</td></tr>
+<tr><td>6</td><td>25.006</td><td>25.059</td></tr>
+<tr><td>median</td><td>24.826</td><td>24.913 (+0.4%; pairs -1.68 +1.04 +0.40 -0.31 +0.15 +0.21; median pair +0.18%)</td></tr>
+</tbody>
+</table></div>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

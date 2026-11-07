@@ -1,0 +1,45 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>lanes: read the next lane's lookup ahead, and the prune bound — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="97ae7e5c1c5f.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="lanes-read-the-next-lane-s-lookup-ahead-and-the-prune-bound">lanes: read the next lane's lookup ahead, and the prune bound</h1>
+<p>Commit <code>97ae7e5c1c5f68087a61cae84aa3ccb22d8bb099</code> · 2026-11-03T23:55:17+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>neg/m7-ra</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>lanes: read the next lane's lookup ahead, and the prune bound</p>
+<p>NEGATIVE (not for merge). Against cb8cb70 (= fc6d9c9's tree).</p>
+<p>Idea: the prune branches of a visit (po &gt; r1, pm &gt; r1, and the
+exhausted-node test after the face cut) wait for the pending value: lane
+state load -&gt; table word load -&gt; shift -&gt; code. A diagnostic that adds 9
+cycles to that chain (3 dependent imuls on the value) costs 1.7% more
+than the same imuls off the chain (1T, 3 runs: main 21.533, on-chain
+20.950, off-chain 21.317), so the chain's latency counts.</p>
+<p>This version (the last of four):</p>
+<ul>
+<li>each visit loads the next lane's table word (<code>Solver::value_word</code>,
+the load half of <code>value</code>) into that lane's <code>k_word</code>. The visit then
+needs only <code>k_word</code> &amp; 3 and the base (the code-0 path loads the group
+minimum as before). A spare lane past the active ones absorbs the
+read-ahead of a round's last visit;</li>
+<li>the pending child's r - 1 is kept in the lane (<code>k_remaining</code>), so the
+prune tests do not wait for sp -&gt; node loads.</li>
+</ul>
+<p>Search unchanged. But every version is slower:</p>
+<ul>
+<li>the read-ahead takes one visit of slack from each lookup, at a lane
+count that is already short of slack (16/20/28 lanes: -9.6% / 0 /
++10.2% at 1T);</li>
+<li>the extra loads and stores raise register pressure: the TABS base
+register is lost, so each table access needs an lea.</li>
+</ul>
+<p>1T (ab1t.sh, paired concurrent runs, solves/s):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>build</th><th>lanes</th><th>main runs</th><th>variant runs</th><th>change</th></tr>
+</thead>
+<tbody>
+<tr><td>ra: value carried in a register</td><td>20</td><td>21.467</td><td>20.350</td><td>-5.2% (1 run; cachegrind 148.79 -&gt; 161.8 Ir/node, spills)</td></tr>
+<tr><td>ra6: word through the next lane's field</td><td>24</td><td>23.617 23.783 23.583</td><td>22.617 22.800 22.517</td><td>-4.2% (medians)</td></tr>
+<tr><td>ra7: ra6 + k_remaining</td><td>24</td><td>23.467 22.667 22.667</td><td>22.517 21.500 21.650</td><td>-4.5% (medians)</td></tr>
+<tr><td>(ra4, the word carried in a register: cachegrind 157.19 Ir/node, more</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>spills; not timed.) Not run at 48T.</td><td></td><td></td><td></td><td></td></tr>
+</tbody>
+</table></div>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

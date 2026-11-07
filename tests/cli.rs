@@ -202,8 +202,7 @@ fn solve_legacy_forms() {
     }
 }
 
-/// `solve --fast` (fast.sh's lines), with a given table and scramble and a
-/// short warm-up cube (fast.sh's own takes minutes on h0).
+/// One explicit scramble, with an optional short warm-up.
 #[test]
 fn solve_fast() {
     let table = h0();
@@ -211,7 +210,7 @@ fn solve_fast() {
     let fast = ["--fast", "-t", "2", "--warmup", "F2 D"];
     for args in [
         [&fast[..], &["--table", table, "R", "U", "R'", "U'"]].concat(),
-        [&[table], &fast[..], &["R U R' U'"]].concat(),
+        [&fast[..], &["--table", table, "R U R' U'"]].concat(),
     ] {
         let out = ok(&run(solve, &args, ""));
         let lines: Vec<&str> = out.lines().collect();
@@ -261,6 +260,53 @@ fn solve_fast() {
         .code(),
         Some(2)
     );
+}
+
+/// Empty input and missing table flags must fail without opening a table or
+/// starting a hidden solve. The nonexistent path makes that ordering visible.
+#[test]
+fn solve_requires_explicit_input() {
+    let solve = env!("CARGO_BIN_EXE_solve");
+    let missing = scratch_file("not-a-table");
+    for args in [vec!["--fast", "--table", &missing], vec![&missing]] {
+        for input in ["", " \n\t\n"] {
+            let out = run(solve, &args, input);
+            assert_eq!(out.status.code(), Some(2), "{}", text(&out.stderr));
+            assert!(text(&out.stderr).contains("no scramble"));
+            assert_eq!(text(&out.stdout), "");
+        }
+    }
+    for args in [vec!["--fast", "R"], vec!["--fast", &missing, "R"]] {
+        let out = run(solve, &args, "");
+        assert_eq!(out.status.code(), Some(2));
+        assert!(text(&out.stderr).contains("--table"));
+    }
+    let out = run_env(
+        solve,
+        &["--fast", "R"],
+        "",
+        &[("EGG_SOLVER_TABLE", &missing)],
+    );
+    assert_eq!(out.status.code(), Some(2));
+    assert!(text(&out.stderr).contains("explicit --table"));
+    let out = run(solve, &["--fast", "--table", &missing], "R\nU\n");
+    assert_eq!(out.status.code(), Some(2));
+    assert!(text(&out.stderr).contains("exactly one scramble"));
+    assert_eq!(text(&out.stdout), "");
+}
+
+#[test]
+fn solve_fast_stdin_without_warmup() {
+    let solve = env!("CARGO_BIN_EXE_solve");
+    let args = ["--fast", "--table", h0(), "-t", "2", "--json"];
+    let out = run(solve, &args, "\nR U R' U'\n\n");
+    let report: serde_json::Value = serde_json::from_str(&ok(&out)).unwrap();
+    assert_eq!(report["scramble"], "R U R' U'");
+    assert_eq!(report["length"], 4);
+    // With no default warm-up even h0 can solve an explicit argument quickly.
+    let out = run(solve, &[&args[..], &["R"]].concat(), "");
+    let report: serde_json::Value = serde_json::from_str(&ok(&out)).unwrap();
+    assert_eq!(report["length"], 1);
 }
 
 #[test]

@@ -1,0 +1,99 @@
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (/data/agents/ub-audit/target/miri/x86_64-unknown-linux-gnu/debug/build/egg-solver/2c049e830a763edb/out/egg_solver-2c049e830a763edb)
+warning: Miri does not support optimizations: the opt-level is ignored. The only effect of selecting a Cargo profile that enables optimizations (such as --release) is to apply its remaining settings, such as whether debug assertions and overflow checks are enabled.
+
+Trying seed: 15
+Trying seed: 14
+Trying seed: 11
+Trying seed: 9
+Trying seed: 13
+Trying seed: 12
+Trying seed: 0
+Trying seed: 10
+
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+
+running 1 test
+test lanes::share::tests::share_trace_publication_with_immediate_workers ... test lanes::share::tests::share_trace_publication_with_immediate_workers ... test lanes::share::tests::share_trace_publication_with_immediate_workers ... test lanes::share::tests::share_trace_publication_with_immediate_workers ... test lanes::share::tests::share_trace_publication_with_immediate_workers ... test lanes::share::tests::share_trace_publication_with_immediate_workers ... test lanes::share::tests::share_trace_publication_with_immediate_workers ... test lanes::share::tests::share_trace_publication_with_immediate_workers ... error: Undefined Behavior: not granting access to tag <29361635> because that would remove [SharedReadOnly for <29315359>] which is strongly protected (i.e. it is in use as a function argument)
+    --> src/lanes/share.rs:1180:26
+     |
+1180 |     let inner = unsafe { &mut *ctx.inner.get() };
+     |                          ^^^^^^^^^^^^^^^^^^^^^ Undefined Behavior occurred here
+     |
+     = help: this indicates a potential bug in the program: it performed an invalid operation, but the Stacked Borrows rules it violated are still experimental
+     = help: see https://github.com/rust-lang/unsafe-code-guidelines/blob/master/wip/stacked-borrows.md for further information
+help: <29361635> was created by a SharedReadWrite retag at offsets [0x440..0x670]
+    --> src/lanes/share.rs:1180:32
+     |
+1180 |     let inner = unsafe { &mut *ctx.inner.get() };
+     |                                ^^^^^^^^^^^^^^^
+help: <29315359> is this argument
+    --> src/lanes/share.rs:2209:44
+     |
+2209 | fn trace_build(pool: &Pool, ctx: &CubeCtx, inner: &Inner, sorted: Instant) {
+     |                                            ^^^^^
+     = note: this is on thread `unnamed-3`
+     = note: stack backtrace:
+             0: lanes::share::build
+                 at src/lanes/share.rs:1180:26: 1180:47
+             1: lanes::share::Worker::<'_, '_>::settle
+                 at src/lanes/share.rs:3077:16: 3084:14
+             2: lanes::share::Worker::<'_, '_>::continue_local
+                 at src/lanes/share.rs:2793:13: 2793:30
+             3: lanes::share::Worker::<'_, '_>::refill
+                 at src/lanes/share.rs:2755:16: 2755:45
+             4: lanes::share::Worker::<'_, '_>::restart
+                 at src/lanes/share.rs:2536:17: 2536:39
+             5: lanes::share::Worker::<'_, '_>::on_end
+                 at src/lanes/share.rs:2523:12: 2523:39
+             6: lanes::share::Worker::<'_, '_>::rounds
+                 at src/lanes/share.rs:2461:28: 2461:74
+             7: lanes::share::Worker::<'_, '_>::run
+                 at src/lanes/share.rs:2400:17: 2400:59
+             8: lanes::share::Pool::<'_>::run::<{closure@src/lanes/share.rs:3835:57: 3835:76}>
+                 at src/lanes/share.rs:885:9: 885:25
+             9: lanes::share::tests::solve_with_pool_counted::<{closure@src/lanes/share.rs:3899:82: 3899:88}>::{closure#1}::{closure#0}::{closure#0}
+                 at src/lanes/share.rs:3835:25: 3839:27
+             10: <{closure@src/lanes/share.rs:3834:88: 3834:90} as std::ops::FnOnce<()>>::call_once - shim
+                 at /home/super/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5: 250:71
+             11: <std::panic::AssertUnwindSafe<{closure@src/lanes/share.rs:3834:88: 3834:90}> as std::ops::FnOnce<()>>::call_once
+                 at /home/super/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272:9: 272:19
+             12: std::panicking::catch_unwind::do_call::<std::panic::AssertUnwindSafe<{closure@src/lanes/share.rs:3834:88: 3834:90}>, ()>
+                 at /home/super/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:573:43: 573:46
+             13: std::panicking::catch_unwind::<(), std::panic::AssertUnwindSafe<{closure@src/lanes/share.rs:3834:88: 3834:90}>>
+                 at /home/super/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:541:19: 541:77
+             14: std::panic::catch_unwind::<std::panic::AssertUnwindSafe<{closure@src/lanes/share.rs:3834:88: 3834:90}>, ()>
+                 at /home/super/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14: 359:40
+             15: lanes::share::tests::solve_with_pool_counted::<{closure@src/lanes/share.rs:3899:82: 3899:88}>::{closure#1}::{closure#0}
+                 at src/lanes/share.rs:3834:34: 3840:24
+note: the last function in that backtrace got called indirectly due to this code
+    --> src/lanes/share.rs:3831:17
+     |
+3831 | /                 scope.spawn(|| {
+3832 | |                     // A panic stops the other threads (else they could wait
+3833 | |                     // for its jobs forever and the test would hang).
+3834 | |                     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+...    |
+3845 | |                 });
+     | |__________________^
+
+note: some details are omitted, run with `MIRIFLAGS=-Zmiri-backtrace=full` for a verbose backtrace
+
+FAILING SEED: 15
+error: test failed, to rerun pass `--lib`
+
+Caused by:
+  process didn't exit successfully: `/home/super/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/bin/cargo-miri runner /data/agents/ub-audit/target/miri/x86_64-unknown-linux-gnu/debug/build/egg-solver/2c049e830a763edb/out/egg_solver-2c049e830a763edb share_trace_publication_with_immediate_workers --test-threads=1` (exit status: 1)
+note: test exited abnormally; to see the full output pass --no-capture to the harness.

@@ -1,0 +1,47 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEGATIVE/EXPERIMENT (c7): the knob build behind c7-childsplit's tuning (C7K env), with all variants measured — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="fb8124b6654e.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="negative-experiment-c7-the-knob-build-behind-c7-childsplit-s-tuning-c7k-env-with-all-variants-measured">NEGATIVE/EXPERIMENT (c7): the knob build behind c7-childsplit's tuning (C7K env), with all variants measured</h1>
+<p>Commit <code>fb8124b6654e1c561ae8bce4df7591bb20c57010</code> · 2026-11-03T22:14:59+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>neg/c7-knob-experiments</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>NEGATIVE/EXPERIMENT (c7): the knob build behind c7-childsplit's tuning (C7K env), with all variants measured</p>
+<p>Experiment-only code (env knobs in hot paths; not for merging). Applies to 78ce33e.
+Knobs (11/12: statistic of a lookup normalised by remaining depth r1, sign):
+0 FIRST, 1 MERGE (steps), 2 force normal side at full-length whole runs (2: also at T=16 with
+pstat), 3 exact attribution of root-level lookups (select on sp), 4 INV half-turn keys, 5 inverse-side
+jobs run whole on the normal side, 6 face max for 4, 7 job_len offset, 8 per-child inheritance at
+extension (pstat), 9 rest key = T-1 job stat, 10 face bias steps.</p>
+<p>Nodes/cube (count.sh; main: 1000:2026 3295521, 3000:777 3249811; combined = (1000 + 3*3000)/4, main 3261238):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>variant</th><th>1000:2026</th><th>3000:777</th><th>combined</th></tr>
+</thead>
+<tbody>
+<tr><td>free side, stale root attribution, 0.1, merge 8</td><td>3208052</td><td></td><td>(-2.65% on 2026)</td></tr>
+<tr><td>free side + exact attribution (300 cubes)</td><td>-4.8% (300)</td><td></td><td></td></tr>
+<tr><td>free side, INV jobs split on inverse side, half keys=max</td><td>3123679</td><td></td><td>(-5.2%)</td></tr>
+<tr><td>... half keys = max+4 / face max</td><td>3134841 / 3118603</td><td></td><td></td></tr>
+<tr><td>free side, INV jobs whole by best child (c1: 0.1, m8)</td><td>3089690</td><td>3096967</td><td>-5.09%</td></tr>
+<tr><td>... FIRST 0.05 / 0.2</td><td>3064971 / 3080508</td><td>3110850 / 3077338</td><td>-4.96% / -5.61%</td></tr>
+<tr><td>... merge 4 / merge off</td><td>3072812 / 3070502</td><td>3094934 / -</td><td></td></tr>
+<tr><td>... FIRST 0.02 / 0.03 / 0.3</td><td>3174066 / 3119653 / 3131010</td><td></td><td></td></tr>
+<tr><td>... rest key = T-1 job stat (0.05)</td><td>3103796</td><td></td><td></td></tr>
+<tr><td>... pstat inheritance at extension</td><td>3100765</td><td></td><td>(+0.4% on 2026)</td></tr>
+<tr><td>forced normal, 0.1, m8</td><td>3113996</td><td>3063220</td><td>-5.68%</td></tr>
+<tr><td>forced, 0.15 / 0.2 / 0.3, m8</td><td>3151381 / 3096478 / 3114670</td><td>3048027 / 3045535 / 3057949</td><td>-5.75% / -6.22% / -</td></tr>
+<tr><td>forced, 0.2, m4</td><td>3097195</td><td>3036720</td><td>-6.42%</td></tr>
+<tr><td>forced, 0.2, m8, face bias 1</td><td>3086189</td><td>3023197</td><td>-6.82%</td></tr>
+<tr><td>forced, 0.2, m4, face bias 1 (= c7-childsplit)</td><td>3089312</td><td>3015162</td><td>-6.98%</td></tr>
+<tr><td>forced, 0.2, m4, face bias 2</td><td>3103454</td><td>3013925</td><td>-6.90%</td></tr>
+<tr><td>forced, 0.2, m2, face bias 1</td><td>3087642</td><td>3013612</td><td>-7.03%</td></tr>
+<tr><td>forced, 0.15 / 0.25, m4, fb 1</td><td>3141211 / 3121284</td><td>3036285 / 3040529</td><td>-6.09% / -6.15%</td></tr>
+<tr><td>forced at T=16 too + pstat (0.2, m4, fb1)</td><td>3105447</td><td>3003426</td><td>-7.12% (+-0: noise)</td></tr>
+<tr><td>depth-normalised term 8^(16-(h-r1+12)) (knob 11)</td><td>3150921</td><td>3089907</td><td>-4.79%</td></tr>
+<tr><td>depth-emphasised term 8^(16-(h+r1-12)) (knobs 11, 12)</td><td>3130114</td><td>3050293</td><td>-5.86%</td></tr>
+<tr><td>4-move jobs from T=16 (split at T=17, r = 13)</td><td>3410972</td><td></td><td>+3.5% on 2026</td></tr>
+<tr><td>forced normal alone (main policy, T=17 / all roots)</td><td>3336992 / 3338126</td><td></td><td>+1.26% / +1.29% on 2026</td></tr>
+</tbody>
+</table></div>
+<p>depth18 (main 3607979): c7-childsplit 3990866 (+10.6%); free side INV-whole 0.1: 3697972 (+2.5%);
+forced 0.1 m8: 3816967; forced FIRST 0.05 fb1: 3930922; forced, rest only (FIRST ~0): 3704940.</p>
+<hr />
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

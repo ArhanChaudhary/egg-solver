@@ -1,0 +1,1352 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>shm.rs — source evidence</title><style>body{font:15px system-ui;margin:2rem}pre{font:13px/1.6 monospace;overflow:auto}.line:target{background:#fff0a0}a{color:#42617a;text-decoration:none}</style><h1>shm.rs</h1><p>Source evidence snapshot. Original file SHA-256: <code>3089c568b99d2d5235c4c2e20aba27a992a093679d8c24743ef28515a907553f</code>. <a href="shm.rs">Raw source</a></p><pre><span class="line" id="L1"><a href="#L1">    1</a> //! System V shared memory segments for tables (`LoadMode::Shm`, `--shm`,</span>
+<span class="line" id="L2"><a href="#L2">    2</a> //! as vcube&#x27;s `--shm`): the first run copies a table file into a segment,</span>
+<span class="line" id="L3"><a href="#L3">    3</a> //! which stays in memory after the process exits (until reboot or `ipcrm`);</span>
+<span class="line" id="L4"><a href="#L4">    4</a> //! later runs attach it read-only and start at once.</span>
+<span class="line" id="L5"><a href="#L5">    5</a> //!</span>
+<span class="line" id="L6"><a href="#L6">    6</a> //! A segment holds the table file&#x27;s bytes as a hugetlbfs file does: the data</span>
+<span class="line" id="L7"><a href="#L7">    7</a> //! at offset 0 (so the search sees the same alignment), and the file&#x27;s</span>
+<span class="line" id="L8"><a href="#L8">    8</a> //! trailer in the segment&#x27;s last 4 KiB, with `segment-*` lines added. The</span>
+<span class="line" id="L9"><a href="#L9">    9</a> //! trailer is written last, after the data is in and its checksum checked:</span>
+<span class="line" id="L10"><a href="#L10">   10</a> //! a segment without one is still loading, or its load was interrupted. The</span>
+<span class="line" id="L11"><a href="#L11">   11</a> //! key is legacy ASCII &quot;co&quot; (retained for compatibility), then k, then base (`key`: 0x636f0b0a for h11</span>
+<span class="line" id="L12"><a href="#L12">   12</a> //! base 10), so every run of a table finds the same segment; every attach</span>
+<span class="line" id="L13"><a href="#L13">   13</a> //! compares the segment&#x27;s trailer with the table file&#x27;s (k, base, size,</span>
+<span class="line" id="L14"><a href="#L14">   14</a> //! distribution, checksum), so a segment of another table under that key is</span>
+<span class="line" id="L15"><a href="#L15">   15</a> //! never used.</span>
+<span class="line" id="L16"><a href="#L16">   16</a> //!</span>
+<span class="line" id="L17"><a href="#L17">   17</a> //! A new segment gets 1 GiB pages, else 2 MiB, else 4 KiB pages (as</span>
+<span class="line" id="L18"><a href="#L18">   18</a> //! `ShmPages` allows). Huge pages come from the kernel&#x27;s hugetlb pool and</span>
+<span class="line" id="L19"><a href="#L19">   19</a> //! need free pages there and the permission (`vm.hugetlb_shm_group`); a size</span>
+<span class="line" id="L20"><a href="#L20">   20</a> //! that cannot be had is skipped with a note that says how to get it.</span>
+<span class="line" id="L21"><a href="#L21">   21</a> //! Linux only: elsewhere `LoadMode::Shm` fails and `Auto` skips segments.</span>
+<span class="line" id="L22"><a href="#L22">   22</a> //!</span>
+<span class="line" id="L23"><a href="#L23">   23</a> //! Measured on h7 (3.62 GiB, the 48-core server): a later run attaches the</span>
+<span class="line" id="L24"><a href="#L24">   24</a> //! segment in 0.00 s on 1 GiB pages (0.6 s on 4 KiB pages, mapping 0.95</span>
+<span class="line" id="L25"><a href="#L25">   25</a> //! million pages; 0.00 s with `--prefault 0`), where copying the file from</span>
+<span class="line" id="L26"><a href="#L26">   26</a> //! a ~140 MB/s disk takes 28 s; making it from a file in memory takes 0.10 s</span>
+<span class="line" id="L27"><a href="#L27">   27</a> //! on 1 GiB pages and 1.9 s on 4 KiB pages, its checksum check included. The</span>
+<span class="line" id="L28"><a href="#L28">   28</a> //! search on a segment is as fast as on the same pages otherwise (1T, 6</span>
+<span class="line" id="L29"><a href="#L29">   29</a> //! pairs each: equal to a hugetlbfs map on 1 GiB pages and to a `/dev/shm`</span>
+<span class="line" id="L30"><a href="#L30">   30</a> //! map on 4 KiB pages); 4 KiB pages are 27% slower at 1T and 32% at 48T</span>
+<span class="line" id="L31"><a href="#L31">   31</a> //! than 1 GiB pages.</span>
+<span class="line" id="L32"><a href="#L32">   32</a> </span>
+<span class="line" id="L33"><a href="#L33">   33</a> use super::file::{self, LoadOptions, TableError};</span>
+<span class="line" id="L34"><a href="#L34">   34</a> use super::Memory;</span>
+<span class="line" id="L35"><a href="#L35">   35</a> </span>
+<span class="line" id="L36"><a href="#L36">   36</a> /// Copy a trailer only after its one-time publication. The caller provides</span>
+<span class="line" id="L37"><a href="#L37">   37</a> /// live storage whose first byte is atomic; the writer publishes once with</span>
+<span class="line" id="L38"><a href="#L38">   38</a> /// Release and never changes the payload afterwards. `out` is disjoint.</span>
+<span class="line" id="L39"><a href="#L39">   39</a> #[cfg(any(test, all(target_os = &quot;linux&quot;, not(miri))))]</span>
+<span class="line" id="L40"><a href="#L40">   40</a> unsafe fn copy_published_trailer(start: *mut u8, out: &amp;mut [u8]) {</span>
+<span class="line" id="L41"><a href="#L41">   41</a>     use std::sync::atomic::{AtomicU8, Ordering};</span>
+<span class="line" id="L42"><a href="#L42">   42</a>     let Some((first, rest)) = out.split_first_mut() else {</span>
+<span class="line" id="L43"><a href="#L43">   43</a>         return;</span>
+<span class="line" id="L44"><a href="#L44">   44</a>     };</span>
+<span class="line" id="L45"><a href="#L45">   45</a>     // SAFETY: the first byte is atomic throughout publication and reading.</span>
+<span class="line" id="L46"><a href="#L46">   46</a>     *first = unsafe { AtomicU8::from_ptr(start) }.load(Ordering::Acquire);</span>
+<span class="line" id="L47"><a href="#L47">   47</a>     if *first != 0 {</span>
+<span class="line" id="L48"><a href="#L48">   48</a>         // SAFETY: Acquire observed publication; the initialized payload is</span>
+<span class="line" id="L49"><a href="#L49">   49</a>         // now immutable. A zero marker must never permit this read.</span>
+<span class="line" id="L50"><a href="#L50">   50</a>         unsafe {</span>
+<span class="line" id="L51"><a href="#L51">   51</a>             std::ptr::copy_nonoverlapping(start.add(1), rest.as_mut_ptr(), rest.len());</span>
+<span class="line" id="L52"><a href="#L52">   52</a>         }</span>
+<span class="line" id="L53"><a href="#L53">   53</a>     }</span>
+<span class="line" id="L54"><a href="#L54">   54</a> }</span>
+<span class="line" id="L55"><a href="#L55">   55</a> </span>
+<span class="line" id="L56"><a href="#L56">   56</a> /// The first two bytes of every key: legacy ASCII &quot;co&quot; (retained for compatibility).</span>
+<span class="line" id="L57"><a href="#L57">   57</a> pub const KEY_PREFIX: u32 = 0x636f_0000;</span>
+<span class="line" id="L58"><a href="#L58">   58</a> </span>
+<span class="line" id="L59"><a href="#L59">   59</a> /// The segment key of table hk with `base`: `KEY_PREFIX`, then k and base,</span>
+<span class="line" id="L60"><a href="#L60">   60</a> /// a byte each (`ipcs -m` shows 0x636f0709 for h7 base 9).</span>
+<span class="line" id="L61"><a href="#L61">   61</a> #[must_use]</span>
+<span class="line" id="L62"><a href="#L62">   62</a> pub fn key(k: u32, base: u8) -&gt; u32 {</span>
+<span class="line" id="L63"><a href="#L63">   63</a>     KEY_PREFIX | (k &amp; 0xFF) &lt;&lt; 8 | u32::from(base)</span>
+<span class="line" id="L64"><a href="#L64">   64</a> }</span>
+<span class="line" id="L65"><a href="#L65">   65</a> </span>
+<span class="line" id="L66"><a href="#L66">   66</a> /// A key as `ipcs` shows it (`0x636f0709`) or in decimal; not 0</span>
+<span class="line" id="L67"><a href="#L67">   67</a> /// (`IPC_PRIVATE`, which makes a new segment every time).</span>
+<span class="line" id="L68"><a href="#L68">   68</a> #[must_use]</span>
+<span class="line" id="L69"><a href="#L69">   69</a> pub fn parse_key(text: &amp;str) -&gt; Option&lt;u32&gt; {</span>
+<span class="line" id="L70"><a href="#L70">   70</a>     let key = match text.strip_prefix(&quot;0x&quot;).or_else(|| text.strip_prefix(&quot;0X&quot;)) {</span>
+<span class="line" id="L71"><a href="#L71">   71</a>         Some(hex) =&gt; u32::from_str_radix(hex, 16).ok()?,</span>
+<span class="line" id="L72"><a href="#L72">   72</a>         None =&gt; text.parse().ok()?,</span>
+<span class="line" id="L73"><a href="#L73">   73</a>     };</span>
+<span class="line" id="L74"><a href="#L74">   74</a>     (key != 0).then_some(key)</span>
+<span class="line" id="L75"><a href="#L75">   75</a> }</span>
+<span class="line" id="L76"><a href="#L76">   76</a> </span>
+<span class="line" id="L77"><a href="#L77">   77</a> /// The page sizes a new segment may get, tried largest first: 1 GiB and 2</span>
+<span class="line" id="L78"><a href="#L78">   78</a> /// MiB pages from the kernel&#x27;s hugetlb pool, and normal (4 KiB) pages.</span>
+<span class="line" id="L79"><a href="#L79">   79</a> #[derive(Clone, Copy, Debug, PartialEq, Eq)]</span>
+<span class="line" id="L80"><a href="#L80">   80</a> pub struct ShmPages(u8);</span>
+<span class="line" id="L81"><a href="#L81">   81</a> </span>
+<span class="line" id="L82"><a href="#L82">   82</a> /// Normal pages (the `4k` of `ShmPages`).</span>
+<span class="line" id="L83"><a href="#L83">   83</a> pub const NORMAL_PAGE: u64 = 1 &lt;&lt; 12;</span>
+<span class="line" id="L84"><a href="#L84">   84</a> </span>
+<span class="line" id="L85"><a href="#L85">   85</a> impl ShmPages {</span>
+<span class="line" id="L86"><a href="#L86">   86</a>     /// All three sizes.</span>
+<span class="line" id="L87"><a href="#L87">   87</a>     pub const ALL: ShmPages = ShmPages(0b111);</span>
+<span class="line" id="L88"><a href="#L88">   88</a>     /// Each size, largest first, with its name in `parse`.</span>
+<span class="line" id="L89"><a href="#L89">   89</a>     const SIZES: [(u64, &amp;&#x27;static str); 3] = [(1 &lt;&lt; 30, &quot;1g&quot;), (1 &lt;&lt; 21, &quot;2m&quot;), (NORMAL_PAGE, &quot;4k&quot;)];</span>
+<span class="line" id="L90"><a href="#L90">   90</a> </span>
+<span class="line" id="L91"><a href="#L91">   91</a>     /// The allowed page sizes in bytes, largest first.</span>
+<span class="line" id="L92"><a href="#L92">   92</a>     pub fn sizes(self) -&gt; impl Iterator&lt;Item = u64&gt; {</span>
+<span class="line" id="L93"><a href="#L93">   93</a>         (0..Self::SIZES.len())</span>
+<span class="line" id="L94"><a href="#L94">   94</a>             .filter(move |&amp;i| self.0 &amp; (1 &lt;&lt; i) != 0)</span>
+<span class="line" id="L95"><a href="#L95">   95</a>             .map(|i| Self::SIZES[i].0)</span>
+<span class="line" id="L96"><a href="#L96">   96</a>     }</span>
+<span class="line" id="L97"><a href="#L97">   97</a> </span>
+<span class="line" id="L98"><a href="#L98">   98</a>     /// A comma-separated list of `1g`, `2m` and `4k` (any order, at least</span>
+<span class="line" id="L99"><a href="#L99">   99</a>     /// one), or `all`.</span>
+<span class="line" id="L100"><a href="#L100">  100</a>     #[must_use]</span>
+<span class="line" id="L101"><a href="#L101">  101</a>     pub fn parse(text: &amp;str) -&gt; Option&lt;ShmPages&gt; {</span>
+<span class="line" id="L102"><a href="#L102">  102</a>         if text.eq_ignore_ascii_case(&quot;all&quot;) {</span>
+<span class="line" id="L103"><a href="#L103">  103</a>             return Some(ShmPages::ALL);</span>
+<span class="line" id="L104"><a href="#L104">  104</a>         }</span>
+<span class="line" id="L105"><a href="#L105">  105</a>         let mut bits = 0;</span>
+<span class="line" id="L106"><a href="#L106">  106</a>         for word in text.split(&#x27;,&#x27;) {</span>
+<span class="line" id="L107"><a href="#L107">  107</a>             let word = word.trim();</span>
+<span class="line" id="L108"><a href="#L108">  108</a>             let i = Self::SIZES</span>
+<span class="line" id="L109"><a href="#L109">  109</a>                 .iter()</span>
+<span class="line" id="L110"><a href="#L110">  110</a>                 .position(|(_, name)| word.eq_ignore_ascii_case(name))?;</span>
+<span class="line" id="L111"><a href="#L111">  111</a>             bits |= 1 &lt;&lt; i;</span>
+<span class="line" id="L112"><a href="#L112">  112</a>         }</span>
+<span class="line" id="L113"><a href="#L113">  113</a>         (bits != 0).then_some(ShmPages(bits))</span>
+<span class="line" id="L114"><a href="#L114">  114</a>     }</span>
+<span class="line" id="L115"><a href="#L115">  115</a> }</span>
+<span class="line" id="L116"><a href="#L116">  116</a> </span>
+<span class="line" id="L117"><a href="#L117">  117</a> impl Default for ShmPages {</span>
+<span class="line" id="L118"><a href="#L118">  118</a>     fn default() -&gt; ShmPages {</span>
+<span class="line" id="L119"><a href="#L119">  119</a>         ShmPages::ALL</span>
+<span class="line" id="L120"><a href="#L120">  120</a>     }</span>
+<span class="line" id="L121"><a href="#L121">  121</a> }</span>
+<span class="line" id="L122"><a href="#L122">  122</a> </span>
+<span class="line" id="L123"><a href="#L123">  123</a> /// A page size for messages: &quot;1 GiB&quot;, &quot;2 MiB&quot;, &quot;4 KiB&quot;.</span>
+<span class="line" id="L124"><a href="#L124">  124</a> #[must_use]</span>
+<span class="line" id="L125"><a href="#L125">  125</a> pub fn page_name(page: u64) -&gt; String {</span>
+<span class="line" id="L126"><a href="#L126">  126</a>     match page {</span>
+<span class="line" id="L127"><a href="#L127">  127</a>         p if p &gt;= 1 &lt;&lt; 30 =&gt; format!(&quot;{} GiB&quot;, p &gt;&gt; 30),</span>
+<span class="line" id="L128"><a href="#L128">  128</a>         p if p &gt;= 1 &lt;&lt; 20 =&gt; format!(&quot;{} MiB&quot;, p &gt;&gt; 20),</span>
+<span class="line" id="L129"><a href="#L129">  129</a>         p =&gt; format!(&quot;{} KiB&quot;, p &gt;&gt; 10),</span>
+<span class="line" id="L130"><a href="#L130">  130</a>     }</span>
+<span class="line" id="L131"><a href="#L131">  131</a> }</span>
+<span class="line" id="L132"><a href="#L132">  132</a> </span>
+<span class="line" id="L133"><a href="#L133">  133</a> /// Bytes of a segment for `data_bytes` of table data on pages of `page`</span>
+<span class="line" id="L134"><a href="#L134">  134</a> /// bytes: the data and a trailer, in whole pages (so that the segment&#x27;s</span>
+<span class="line" id="L135"><a href="#L135">  135</a> /// length is that of its mapping).</span>
+<span class="line" id="L136"><a href="#L136">  136</a> #[must_use]</span>
+<span class="line" id="L137"><a href="#L137">  137</a> pub fn segment_bytes(data_bytes: u64, page: u64) -&gt; u64 {</span>
+<span class="line" id="L138"><a href="#L138">  138</a>     (data_bytes + file::TRAILER_BYTES).next_multiple_of(page)</span>
+<span class="line" id="L139"><a href="#L139">  139</a> }</span>
+<span class="line" id="L140"><a href="#L140">  140</a> </span>
+<span class="line" id="L141"><a href="#L141">  141</a> /// A table&#x27;s segment, as `open` found or made it.</span>
+<span class="line" id="L142"><a href="#L142">  142</a> #[derive(Clone, Debug, PartialEq, Eq)]</span>
+<span class="line" id="L143"><a href="#L143">  143</a> pub struct Segment {</span>
+<span class="line" id="L144"><a href="#L144">  144</a>     pub key: u32,</span>
+<span class="line" id="L145"><a href="#L145">  145</a>     /// Its id (`ipcs -m`&#x27;s shmid).</span>
+<span class="line" id="L146"><a href="#L146">  146</a>     pub id: i32,</span>
+<span class="line" id="L147"><a href="#L147">  147</a>     /// Its size: the data and the trailer, in whole pages.</span>
+<span class="line" id="L148"><a href="#L148">  148</a>     pub bytes: u64,</span>
+<span class="line" id="L149"><a href="#L149">  149</a>     /// Its page size: 1 GiB, 2 MiB or 4 KiB.</span>
+<span class="line" id="L150"><a href="#L150">  150</a>     pub page_bytes: u64,</span>
+<span class="line" id="L151"><a href="#L151">  151</a>     /// Made (and filled from the table file) by this process, not found.</span>
+<span class="line" id="L152"><a href="#L152">  152</a>     pub created: bool,</span>
+<span class="line" id="L153"><a href="#L153">  153</a>     /// The table file it was filled from.</span>
+<span class="line" id="L154"><a href="#L154">  154</a>     pub source: String,</span>
+<span class="line" id="L155"><a href="#L155">  155</a>     /// The process that made it.</span>
+<span class="line" id="L156"><a href="#L156">  156</a>     pub creator: i32,</span>
+<span class="line" id="L157"><a href="#L157">  157</a> }</span>
+<span class="line" id="L158"><a href="#L158">  158</a> </span>
+<span class="line" id="L159"><a href="#L159">  159</a> /// What `remove` removed.</span>
+<span class="line" id="L160"><a href="#L160">  160</a> #[derive(Clone, Debug)]</span>
+<span class="line" id="L161"><a href="#L161">  161</a> pub struct Removed {</span>
+<span class="line" id="L162"><a href="#L162">  162</a>     pub id: i32,</span>
+<span class="line" id="L163"><a href="#L163">  163</a>     pub bytes: u64,</span>
+<span class="line" id="L164"><a href="#L164">  164</a>     /// The table it held, for messages.</span>
+<span class="line" id="L165"><a href="#L165">  165</a>     pub held: String,</span>
+<span class="line" id="L166"><a href="#L166">  166</a>     /// Processes that still have it attached (it is freed when they detach).</span>
+<span class="line" id="L167"><a href="#L167">  167</a>     pub attached: u64,</span>
+<span class="line" id="L168"><a href="#L168">  168</a> }</span>
+<span class="line" id="L169"><a href="#L169">  169</a> </span>
+<span class="line" id="L170"><a href="#L170">  170</a> /// Open the table file `path` from its segment: attach it if it holds this</span>
+<span class="line" id="L171"><a href="#L171">  171</a> /// table; else, with `create` (`LoadMode::Shm`), make it from the file.</span>
+<span class="line" id="L172"><a href="#L172">  172</a> /// Without `create` (`Auto`) every problem is a note and `None`: the caller</span>
+<span class="line" id="L173"><a href="#L173">  173</a> /// loads the file as before.</span>
+<span class="line" id="L174"><a href="#L174">  174</a> ///</span>
+<span class="line" id="L175"><a href="#L175">  175</a> /// # Errors</span>
+<span class="line" id="L176"><a href="#L176">  176</a> /// With `create`: if the table has no checksum, if the segment holds</span>
+<span class="line" id="L177"><a href="#L177">  177</a> /// another table, is being loaded by another process (`ShmLoading`, try</span>
+<span class="line" id="L178"><a href="#L178">  178</a> /// again) or cannot be made (memory, kernel limits), or the copy&#x27;s checksum</span>
+<span class="line" id="L179"><a href="#L179">  179</a> /// is wrong.</span>
+<span class="line" id="L180"><a href="#L180">  180</a> pub(crate) fn open(</span>
+<span class="line" id="L181"><a href="#L181">  181</a>     path: &amp;str,</span>
+<span class="line" id="L182"><a href="#L182">  182</a>     options: &amp;LoadOptions,</span>
+<span class="line" id="L183"><a href="#L183">  183</a>     create: bool,</span>
+<span class="line" id="L184"><a href="#L184">  184</a>     notes: &amp;mut Vec&lt;String&gt;,</span>
+<span class="line" id="L185"><a href="#L185">  185</a> ) -&gt; Result&lt;Option&lt;(Memory, Segment)&gt;, TableError&gt; {</span>
+<span class="line" id="L186"><a href="#L186">  186</a>     match linux::open(path, options, create, notes) {</span>
+<span class="line" id="L187"><a href="#L187">  187</a>         Err(error) if !create =&gt; {</span>
+<span class="line" id="L188"><a href="#L188">  188</a>             notes.push(format!(&quot;shared memory not used: {error}&quot;));</span>
+<span class="line" id="L189"><a href="#L189">  189</a>             Ok(None)</span>
+<span class="line" id="L190"><a href="#L190">  190</a>         }</span>
+<span class="line" id="L191"><a href="#L191">  191</a>         result =&gt; result,</span>
+<span class="line" id="L192"><a href="#L192">  192</a>     }</span>
+<span class="line" id="L193"><a href="#L193">  193</a> }</span>
+<span class="line" id="L194"><a href="#L194">  194</a> </span>
+<span class="line" id="L195"><a href="#L195">  195</a> /// Whether the table file `path` has its segment loaded (under its key,</span>
+<span class="line" id="L196"><a href="#L196">  196</a> /// holding this table): `LoadMode::Auto` and `Shm` attach it, so a load</span>
+<span class="line" id="L197"><a href="#L197">  197</a> /// needs no memory.</span>
+<span class="line" id="L198"><a href="#L198">  198</a> #[must_use]</span>
+<span class="line" id="L199"><a href="#L199">  199</a> /// # Safety</span>
+<span class="line" id="L200"><a href="#L200">  200</a> /// Any segment inspected must follow this module&#x27;s publication protocol:</span>
+<span class="line" id="L201"><a href="#L201">  201</a> /// its trailer is written once, before the Release marker, and immutable</span>
+<span class="line" id="L202"><a href="#L202">  202</a> /// thereafter for the duration of this call.</span>
+<span class="line" id="L203"><a href="#L203">  203</a> pub unsafe fn loaded(path: &amp;str, options: &amp;LoadOptions) -&gt; bool {</span>
+<span class="line" id="L204"><a href="#L204">  204</a>     linux::loaded(path, options)</span>
+<span class="line" id="L205"><a href="#L205">  205</a> }</span>
+<span class="line" id="L206"><a href="#L206">  206</a> </span>
+<span class="line" id="L207"><a href="#L207">  207</a> /// The page size a new segment of the table file `path` would get, as far</span>
+<span class="line" id="L208"><a href="#L208">  208</a> /// as can be told before making it (the kernel&#x27;s segment limits, the</span>
+<span class="line" id="L209"><a href="#L209">  209</a> /// permission and pool pages for huge pages; not the memory for 4 KiB</span>
+<span class="line" id="L210"><a href="#L210">  210</a> /// pages, which the caller checks: `cli::preflight`), or `None` if none.</span>
+<span class="line" id="L211"><a href="#L211">  211</a> #[must_use]</span>
+<span class="line" id="L212"><a href="#L212">  212</a> pub fn new_segment_page(path: &amp;str, options: &amp;LoadOptions) -&gt; Option&lt;u64&gt; {</span>
+<span class="line" id="L213"><a href="#L213">  213</a>     linux::new_segment_page(path, options)</span>
+<span class="line" id="L214"><a href="#L214">  214</a> }</span>
+<span class="line" id="L215"><a href="#L215">  215</a> </span>
+<span class="line" id="L216"><a href="#L216">  216</a> /// Remove segment `key` (`IPC_RMID`; its memory is freed once no process has</span>
+<span class="line" id="L217"><a href="#L217">  217</a> /// it attached). Returns what it held, or `None` if there is none.</span>
+<span class="line" id="L218"><a href="#L218">  218</a> ///</span>
+<span class="line" id="L219"><a href="#L219">  219</a> /// # Errors</span>
+<span class="line" id="L220"><a href="#L220">  220</a> /// If it cannot be removed (it belongs to another user), or off Linux.</span>
+<span class="line" id="L221"><a href="#L221">  221</a> /// # Safety</span>
+<span class="line" id="L222"><a href="#L222">  222</a> /// Any segment inspected must follow the publication and immutability</span>
+<span class="line" id="L223"><a href="#L223">  223</a> /// contract of [`loaded`] until this call returns.</span>
+<span class="line" id="L224"><a href="#L224">  224</a> pub unsafe fn remove(key: u32) -&gt; Result&lt;Option&lt;Removed&gt;, TableError&gt; {</span>
+<span class="line" id="L225"><a href="#L225">  225</a>     linux::remove(key)</span>
+<span class="line" id="L226"><a href="#L226">  226</a> }</span>
+<span class="line" id="L227"><a href="#L227">  227</a> </span>
+<span class="line" id="L228"><a href="#L228">  228</a> #[cfg(not(all(target_os = &quot;linux&quot;, not(miri))))]</span>
+<span class="line" id="L229"><a href="#L229">  229</a> mod linux {</span>
+<span class="line" id="L230"><a href="#L230">  230</a>     use super::{LoadOptions, Memory, Removed, Segment, TableError};</span>
+<span class="line" id="L231"><a href="#L231">  231</a> </span>
+<span class="line" id="L232"><a href="#L232">  232</a>     pub(super) fn open(</span>
+<span class="line" id="L233"><a href="#L233">  233</a>         _: &amp;str,</span>
+<span class="line" id="L234"><a href="#L234">  234</a>         _: &amp;LoadOptions,</span>
+<span class="line" id="L235"><a href="#L235">  235</a>         create: bool,</span>
+<span class="line" id="L236"><a href="#L236">  236</a>         _: &amp;mut Vec&lt;String&gt;,</span>
+<span class="line" id="L237"><a href="#L237">  237</a>     ) -&gt; Result&lt;Option&lt;(Memory, Segment)&gt;, TableError&gt; {</span>
+<span class="line" id="L238"><a href="#L238">  238</a>         if create {</span>
+<span class="line" id="L239"><a href="#L239">  239</a>             Err(TableError::ShmUnsupported)</span>
+<span class="line" id="L240"><a href="#L240">  240</a>         } else {</span>
+<span class="line" id="L241"><a href="#L241">  241</a>             Ok(None)</span>
+<span class="line" id="L242"><a href="#L242">  242</a>         }</span>
+<span class="line" id="L243"><a href="#L243">  243</a>     }</span>
+<span class="line" id="L244"><a href="#L244">  244</a> </span>
+<span class="line" id="L245"><a href="#L245">  245</a>     pub(super) fn remove(_: u32) -&gt; Result&lt;Option&lt;Removed&gt;, TableError&gt; {</span>
+<span class="line" id="L246"><a href="#L246">  246</a>         Err(TableError::ShmUnsupported)</span>
+<span class="line" id="L247"><a href="#L247">  247</a>     }</span>
+<span class="line" id="L248"><a href="#L248">  248</a> </span>
+<span class="line" id="L249"><a href="#L249">  249</a>     pub(super) fn loaded(_: &amp;str, _: &amp;LoadOptions) -&gt; bool {</span>
+<span class="line" id="L250"><a href="#L250">  250</a>         false</span>
+<span class="line" id="L251"><a href="#L251">  251</a>     }</span>
+<span class="line" id="L252"><a href="#L252">  252</a> </span>
+<span class="line" id="L253"><a href="#L253">  253</a>     pub(super) fn new_segment_page(_: &amp;str, _: &amp;LoadOptions) -&gt; Option&lt;u64&gt; {</span>
+<span class="line" id="L254"><a href="#L254">  254</a>         None</span>
+<span class="line" id="L255"><a href="#L255">  255</a>     }</span>
+<span class="line" id="L256"><a href="#L256">  256</a> }</span>
+<span class="line" id="L257"><a href="#L257">  257</a> </span>
+<span class="line" id="L258"><a href="#L258">  258</a> #[cfg(all(target_os = &quot;linux&quot;, not(miri)))]</span>
+<span class="line" id="L259"><a href="#L259">  259</a> mod linux {</span>
+<span class="line" id="L260"><a href="#L260">  260</a>     use super::{</span>
+<span class="line" id="L261"><a href="#L261">  261</a>         file, key, page_name, segment_bytes, LoadOptions, Memory, Removed, Segment, TableError,</span>
+<span class="line" id="L262"><a href="#L262">  262</a>         NORMAL_PAGE,</span>
+<span class="line" id="L263"><a href="#L263">  263</a>     };</span>
+<span class="line" id="L264"><a href="#L264">  264</a>     use crate::tables::file::Trailer;</span>
+<span class="line" id="L265"><a href="#L265">  265</a>     use std::io;</span>
+<span class="line" id="L266"><a href="#L266">  266</a>     use std::sync::atomic::{AtomicU8, Ordering};</span>
+<span class="line" id="L267"><a href="#L267">  267</a> </span>
+<span class="line" id="L268"><a href="#L268">  268</a>     /// Trailer keys a segment adds to the table file&#x27;s trailer.</span>
+<span class="line" id="L269"><a href="#L269">  269</a>     const PAGE_KEY: &amp;str = &quot;segment-page-bytes&quot;;</span>
+<span class="line" id="L270"><a href="#L270">  270</a>     const SOURCE_KEY: &amp;str = &quot;segment-source&quot;;</span>
+<span class="line" id="L271"><a href="#L271">  271</a> </span>
+<span class="line" id="L272"><a href="#L272">  272</a>     /// A segment&#x27;s trailer: the table file&#x27;s, and the segment&#x27;s own lines.</span>
+<span class="line" id="L273"><a href="#L273">  273</a>     #[derive(Debug, PartialEq, Eq)]</span>
+<span class="line" id="L274"><a href="#L274">  274</a>     pub(super) struct Header {</span>
+<span class="line" id="L275"><a href="#L275">  275</a>         pub(super) trailer: Trailer,</span>
+<span class="line" id="L276"><a href="#L276">  276</a>         pub(super) page_bytes: Option&lt;u64&gt;,</span>
+<span class="line" id="L277"><a href="#L277">  277</a>         pub(super) source: String,</span>
+<span class="line" id="L278"><a href="#L278">  278</a>     }</span>
+<span class="line" id="L279"><a href="#L279">  279</a> </span>
+<span class="line" id="L280"><a href="#L280">  280</a>     /// The last 4 KiB of a segment: the table file&#x27;s trailer, then the</span>
+<span class="line" id="L281"><a href="#L281">  281</a>     /// segment&#x27;s page size and source file (keys `Trailer::parse` ignores).</span>
+<span class="line" id="L282"><a href="#L282">  282</a>     pub(super) fn header_bytes(trailer: &amp;Trailer, page: u64, source: &amp;str) -&gt; Vec&lt;u8&gt; {</span>
+<span class="line" id="L283"><a href="#L283">  283</a>         let mut bytes = trailer.to_bytes();</span>
+<span class="line" id="L284"><a href="#L284">  284</a>         let end = bytes.iter().position(|&amp;b| b == 0).unwrap_or(bytes.len());</span>
+<span class="line" id="L285"><a href="#L285">  285</a>         // (One line of at most 2000 bytes: the trailer text is far shorter</span>
+<span class="line" id="L286"><a href="#L286">  286</a>         // than its 4 KiB.)</span>
+<span class="line" id="L287"><a href="#L287">  287</a>         let source = source.replace(char::is_control, &quot;?&quot;);</span>
+<span class="line" id="L288"><a href="#L288">  288</a>         let source = &amp;source[..source.floor_char_boundary(2000)];</span>
+<span class="line" id="L289"><a href="#L289">  289</a>         let extra = format!(&quot;{PAGE_KEY} {page}\n{SOURCE_KEY} {source}\n&quot;);</span>
+<span class="line" id="L290"><a href="#L290">  290</a>         bytes[end..end + extra.len()].copy_from_slice(extra.as_bytes());</span>
+<span class="line" id="L291"><a href="#L291">  291</a>         bytes</span>
+<span class="line" id="L292"><a href="#L292">  292</a>     }</span>
+<span class="line" id="L293"><a href="#L293">  293</a> </span>
+<span class="line" id="L294"><a href="#L294">  294</a>     /// The `Header` in a segment&#x27;s last 4 KiB, or `None` if there is no</span>
+<span class="line" id="L295"><a href="#L295">  295</a>     /// trailer there.</span>
+<span class="line" id="L296"><a href="#L296">  296</a>     pub(super) fn parse_header(bytes: &amp;[u8]) -&gt; Result&lt;Option&lt;Header&gt;, TableError&gt; {</span>
+<span class="line" id="L297"><a href="#L297">  297</a>         let Some(trailer) = Trailer::parse(bytes)? else {</span>
+<span class="line" id="L298"><a href="#L298">  298</a>             return Ok(None);</span>
+<span class="line" id="L299"><a href="#L299">  299</a>         };</span>
+<span class="line" id="L300"><a href="#L300">  300</a>         let end = bytes.iter().position(|&amp;b| b == 0).unwrap_or(bytes.len());</span>
+<span class="line" id="L301"><a href="#L301">  301</a>         let text = String::from_utf8_lossy(&amp;bytes[..end]);</span>
+<span class="line" id="L302"><a href="#L302">  302</a>         let value = |key: &amp;str| {</span>
+<span class="line" id="L303"><a href="#L303">  303</a>             text.lines()</span>
+<span class="line" id="L304"><a href="#L304">  304</a>                 .find_map(|line| line.strip_prefix(key)?.strip_prefix(&#x27; &#x27;))</span>
+<span class="line" id="L305"><a href="#L305">  305</a>                 .map(str::to_string)</span>
+<span class="line" id="L306"><a href="#L306">  306</a>         };</span>
+<span class="line" id="L307"><a href="#L307">  307</a>         Ok(Some(Header {</span>
+<span class="line" id="L308"><a href="#L308">  308</a>             trailer,</span>
+<span class="line" id="L309"><a href="#L309">  309</a>             page_bytes: value(PAGE_KEY).and_then(|v| v.parse().ok()),</span>
+<span class="line" id="L310"><a href="#L310">  310</a>             source: value(SOURCE_KEY).unwrap_or_else(|| &quot;?&quot;.to_string()),</span>
+<span class="line" id="L311"><a href="#L311">  311</a>         }))</span>
+<span class="line" id="L312"><a href="#L312">  312</a>     }</span>
+<span class="line" id="L313"><a href="#L313">  313</a> </span>
+<span class="line" id="L314"><a href="#L314">  314</a>     /// A table for messages: &quot;h7 base 9, checksum a8f0d2657a36a775&quot;.</span>
+<span class="line" id="L315"><a href="#L315">  315</a>     fn describe(trailer: &amp;Trailer) -&gt; String {</span>
+<span class="line" id="L316"><a href="#L316">  316</a>         match trailer.checksum {</span>
+<span class="line" id="L317"><a href="#L317">  317</a>             Some(c) =&gt; format!(&quot;h{} base {}, checksum {c:016x}&quot;, trailer.k, trailer.base),</span>
+<span class="line" id="L318"><a href="#L318">  318</a>             None =&gt; format!(&quot;h{} base {}, no checksum&quot;, trailer.k, trailer.base),</span>
+<span class="line" id="L319"><a href="#L319">  319</a>         }</span>
+<span class="line" id="L320"><a href="#L320">  320</a>     }</span>
+<span class="line" id="L321"><a href="#L321">  321</a> </span>
+<span class="line" id="L322"><a href="#L322">  322</a>     /// How to remove segment `key` of the table at `path`.</span>
+<span class="line" id="L323"><a href="#L323">  323</a>     fn remove_hint(path: &amp;str, key: u32) -&gt; String {</span>
+<span class="line" id="L324"><a href="#L324">  324</a>         format!(&quot;`solve --shm-remove {path}` or `ipcrm -M {key:#010x}`&quot;)</span>
+<span class="line" id="L325"><a href="#L325">  325</a>     }</span>
+<span class="line" id="L326"><a href="#L326">  326</a> </span>
+<span class="line" id="L327"><a href="#L327">  327</a>     /// `shmget`&#x27;s page size field (linux/shm.h `SHM_HUGE_SHIFT`): log2 of the</span>
+<span class="line" id="L328"><a href="#L328">  328</a>     /// size, from bit 26.</span>
+<span class="line" id="L329"><a href="#L329">  329</a>     const SHM_HUGE_SHIFT: u32 = 26;</span>
+<span class="line" id="L330"><a href="#L330">  330</a> </span>
+<span class="line" id="L331"><a href="#L331">  331</a>     fn call_error(key: u32, call: &amp;&#x27;static str) -&gt; impl FnOnce(io::Error) -&gt; TableError {</span>
+<span class="line" id="L332"><a href="#L332">  332</a>         move |source| TableError::ShmCall { key, call, source }</span>
+<span class="line" id="L333"><a href="#L333">  333</a>     }</span>
+<span class="line" id="L334"><a href="#L334">  334</a> </span>
+<span class="line" id="L335"><a href="#L335">  335</a>     fn is(error: &amp;io::Error, code: i32) -&gt; bool {</span>
+<span class="line" id="L336"><a href="#L336">  336</a>         error.raw_os_error() == Some(code)</span>
+<span class="line" id="L337"><a href="#L337">  337</a>     }</span>
+<span class="line" id="L338"><a href="#L338">  338</a> </span>
+<span class="line" id="L339"><a href="#L339">  339</a>     pub(super) fn shmget(key: u32, bytes: u64, flags: i32) -&gt; io::Result&lt;i32&gt; {</span>
+<span class="line" id="L340"><a href="#L340">  340</a>         let bytes = usize::try_from(bytes).map_err(io::Error::other)?;</span>
+<span class="line" id="L341"><a href="#L341">  341</a>         // SAFETY: no pointers.</span>
+<span class="line" id="L342"><a href="#L342">  342</a>         let id = unsafe { libc::shmget(key.cast_signed(), bytes, flags) };</span>
+<span class="line" id="L343"><a href="#L343">  343</a>         if id &lt; 0 {</span>
+<span class="line" id="L344"><a href="#L344">  344</a>             Err(io::Error::last_os_error())</span>
+<span class="line" id="L345"><a href="#L345">  345</a>         } else {</span>
+<span class="line" id="L346"><a href="#L346">  346</a>             Ok(id)</span>
+<span class="line" id="L347"><a href="#L347">  347</a>         }</span>
+<span class="line" id="L348"><a href="#L348">  348</a>     }</span>
+<span class="line" id="L349"><a href="#L349">  349</a> </span>
+<span class="line" id="L350"><a href="#L350">  350</a>     pub(super) fn stat(id: i32) -&gt; io::Result&lt;libc::shmid_ds&gt; {</span>
+<span class="line" id="L351"><a href="#L351">  351</a>         // SAFETY: a valid out-pointer.</span>
+<span class="line" id="L352"><a href="#L352">  352</a>         unsafe {</span>
+<span class="line" id="L353"><a href="#L353">  353</a>             let mut ds: libc::shmid_ds = std::mem::zeroed();</span>
+<span class="line" id="L354"><a href="#L354">  354</a>             if libc::shmctl(id, libc::IPC_STAT, &amp;raw mut ds) != 0 {</span>
+<span class="line" id="L355"><a href="#L355">  355</a>                 return Err(io::Error::last_os_error());</span>
+<span class="line" id="L356"><a href="#L356">  356</a>             }</span>
+<span class="line" id="L357"><a href="#L357">  357</a>             Ok(ds)</span>
+<span class="line" id="L358"><a href="#L358">  358</a>         }</span>
+<span class="line" id="L359"><a href="#L359">  359</a>     }</span>
+<span class="line" id="L360"><a href="#L360">  360</a> </span>
+<span class="line" id="L361"><a href="#L361">  361</a>     /// `IPC_RMID`: the segment goes once no process has it attached.</span>
+<span class="line" id="L362"><a href="#L362">  362</a>     fn mark_removed(id: i32) -&gt; io::Result&lt;()&gt; {</span>
+<span class="line" id="L363"><a href="#L363">  363</a>         // SAFETY: no buffer is read for IPC_RMID.</span>
+<span class="line" id="L364"><a href="#L364">  364</a>         if unsafe { libc::shmctl(id, libc::IPC_RMID, std::ptr::null_mut()) } != 0 {</span>
+<span class="line" id="L365"><a href="#L365">  365</a>             return Err(io::Error::last_os_error());</span>
+<span class="line" id="L366"><a href="#L366">  366</a>         }</span>
+<span class="line" id="L367"><a href="#L367">  367</a>         Ok(())</span>
+<span class="line" id="L368"><a href="#L368">  368</a>     }</span>
+<span class="line" id="L369"><a href="#L369">  369</a> </span>
+<span class="line" id="L370"><a href="#L370">  370</a>     /// Whether process `pid` exists.</span>
+<span class="line" id="L371"><a href="#L371">  371</a>     fn alive(pid: i32) -&gt; bool {</span>
+<span class="line" id="L372"><a href="#L372">  372</a>         // SAFETY: signal 0 only checks.</span>
+<span class="line" id="L373"><a href="#L373">  373</a>         let sent = unsafe { libc::kill(pid, 0) } == 0;</span>
+<span class="line" id="L374"><a href="#L374">  374</a>         sent || io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)</span>
+<span class="line" id="L375"><a href="#L375">  375</a>     }</span>
+<span class="line" id="L376"><a href="#L376">  376</a> </span>
+<span class="line" id="L377"><a href="#L377">  377</a>     /// An attachment of a segment, detached on drop (unless made `Memory`).</span>
+<span class="line" id="L378"><a href="#L378">  378</a>     struct Attachment {</span>
+<span class="line" id="L379"><a href="#L379">  379</a>         ptr: *mut u8,</span>
+<span class="line" id="L380"><a href="#L380">  380</a>         ds: libc::shmid_ds,</span>
+<span class="line" id="L381"><a href="#L381">  381</a>     }</span>
+<span class="line" id="L382"><a href="#L382">  382</a> </span>
+<span class="line" id="L383"><a href="#L383">  383</a>     impl Attachment {</span>
+<span class="line" id="L384"><a href="#L384">  384</a>         /// Attach segment `id`, read-only or writable (`ds` is its state</span>
+<span class="line" id="L385"><a href="#L385">  385</a>         /// before: `shm_nattch` does not count this attachment).</span>
+<span class="line" id="L386"><a href="#L386">  386</a>         fn new(id: i32, read_only: bool) -&gt; io::Result&lt;Attachment&gt; {</span>
+<span class="line" id="L387"><a href="#L387">  387</a>             let ds = stat(id)?;</span>
+<span class="line" id="L388"><a href="#L388">  388</a>             // Checked before last_page can do in-bounds pointer arithmetic.</span>
+<span class="line" id="L389"><a href="#L389">  389</a>             isize::try_from(ds.shm_segsz).map_err(io::Error::other)?;</span>
+<span class="line" id="L390"><a href="#L390">  390</a>             let flags = if read_only { libc::SHM_RDONLY } else { 0 };</span>
+<span class="line" id="L391"><a href="#L391">  391</a>             // SAFETY: the kernel picks the address.</span>
+<span class="line" id="L392"><a href="#L392">  392</a>             let ptr = unsafe { libc::shmat(id, std::ptr::null(), flags) };</span>
+<span class="line" id="L393"><a href="#L393">  393</a>             if ptr.addr() == usize::MAX {</span>
+<span class="line" id="L394"><a href="#L394">  394</a>                 return Err(io::Error::last_os_error());</span>
+<span class="line" id="L395"><a href="#L395">  395</a>             }</span>
+<span class="line" id="L396"><a href="#L396">  396</a>             if ptr.is_null() {</span>
+<span class="line" id="L397"><a href="#L397">  397</a>                 // SAFETY: detach the attachment just returned by shmat.</span>
+<span class="line" id="L398"><a href="#L398">  398</a>                 unsafe {</span>
+<span class="line" id="L399"><a href="#L399">  399</a>                     libc::shmdt(ptr);</span>
+<span class="line" id="L400"><a href="#L400">  400</a>                 }</span>
+<span class="line" id="L401"><a href="#L401">  401</a>                 return Err(io::Error::other(&quot;shared memory returned a null address&quot;));</span>
+<span class="line" id="L402"><a href="#L402">  402</a>             }</span>
+<span class="line" id="L403"><a href="#L403">  403</a>             Ok(Attachment {</span>
+<span class="line" id="L404"><a href="#L404">  404</a>                 ptr: ptr.cast(),</span>
+<span class="line" id="L405"><a href="#L405">  405</a>                 ds,</span>
+<span class="line" id="L406"><a href="#L406">  406</a>             })</span>
+<span class="line" id="L407"><a href="#L407">  407</a>         }</span>
+<span class="line" id="L408"><a href="#L408">  408</a> </span>
+<span class="line" id="L409"><a href="#L409">  409</a>         fn bytes(&amp;self) -&gt; u64 {</span>
+<span class="line" id="L410"><a href="#L410">  410</a>             self.ds.shm_segsz as u64</span>
+<span class="line" id="L411"><a href="#L411">  411</a>         }</span>
+<span class="line" id="L412"><a href="#L412">  412</a> </span>
+<span class="line" id="L413"><a href="#L413">  413</a>         /// Its last 4 KiB (the trailer, once loaded).</span>
+<span class="line" id="L414"><a href="#L414">  414</a>         fn last_page(&amp;self) -&gt; Option&lt;Vec&lt;u8&gt;&gt; {</span>
+<span class="line" id="L415"><a href="#L415">  415</a>             let page = usize::try_from(file::TRAILER_BYTES).ok()?;</span>
+<span class="line" id="L416"><a href="#L416">  416</a>             let offset = usize::try_from(self.bytes()).ok()?.checked_sub(page)?;</span>
+<span class="line" id="L417"><a href="#L417">  417</a>             let mut bytes = vec![0u8; page];</span>
+<span class="line" id="L418"><a href="#L418">  418</a>             // SAFETY: the last 4 KiB of the attached segment. Its first byte</span>
+<span class="line" id="L419"><a href="#L419">  419</a>             // is written last, with Release (`write_trailer`): a reader that</span>
+<span class="line" id="L420"><a href="#L420">  420</a>             // sees it sees the rest, and the data.</span>
+<span class="line" id="L421"><a href="#L421">  421</a>             unsafe {</span>
+<span class="line" id="L422"><a href="#L422">  422</a>                 let start = self.ptr.add(offset);</span>
+<span class="line" id="L423"><a href="#L423">  423</a>                 super::copy_published_trailer(start, &amp;mut bytes);</span>
+<span class="line" id="L424"><a href="#L424">  424</a>             }</span>
+<span class="line" id="L425"><a href="#L425">  425</a>             Some(bytes)</span>
+<span class="line" id="L426"><a href="#L426">  426</a>         }</span>
+<span class="line" id="L427"><a href="#L427">  427</a> </span>
+<span class="line" id="L428"><a href="#L428">  428</a>         /// The attachment as `Memory`, unmapped on drop (`munmap` detaches a</span>
+<span class="line" id="L429"><a href="#L429">  429</a>         /// segment as `shmdt` does; the length is the mapping&#x27;s, as segments</span>
+<span class="line" id="L430"><a href="#L430">  430</a>         /// are whole pages).</span>
+<span class="line" id="L431"><a href="#L431">  431</a>         fn into_memory(self) -&gt; io::Result&lt;Memory&gt; {</span>
+<span class="line" id="L432"><a href="#L432">  432</a>             let len = usize::try_from(self.bytes()).map_err(io::Error::other)?;</span>
+<span class="line" id="L433"><a href="#L433">  433</a>             isize::try_from(len).map_err(io::Error::other)?;</span>
+<span class="line" id="L434"><a href="#L434">  434</a>             let memory = Memory { ptr: self.ptr, len };</span>
+<span class="line" id="L435"><a href="#L435">  435</a>             std::mem::forget(self);</span>
+<span class="line" id="L436"><a href="#L436">  436</a>             Ok(memory)</span>
+<span class="line" id="L437"><a href="#L437">  437</a>         }</span>
+<span class="line" id="L438"><a href="#L438">  438</a>     }</span>
+<span class="line" id="L439"><a href="#L439">  439</a> </span>
+<span class="line" id="L440"><a href="#L440">  440</a>     impl Drop for Attachment {</span>
+<span class="line" id="L441"><a href="#L441">  441</a>         fn drop(&amp;mut self) {</span>
+<span class="line" id="L442"><a href="#L442">  442</a>             // SAFETY: our attachment, detached once.</span>
+<span class="line" id="L443"><a href="#L443">  443</a>             unsafe {</span>
+<span class="line" id="L444"><a href="#L444">  444</a>                 libc::shmdt(self.ptr.cast());</span>
+<span class="line" id="L445"><a href="#L445">  445</a>             }</span>
+<span class="line" id="L446"><a href="#L446">  446</a>         }</span>
+<span class="line" id="L447"><a href="#L447">  447</a>     }</span>
+<span class="line" id="L448"><a href="#L448">  448</a> </span>
+<span class="line" id="L449"><a href="#L449">  449</a>     /// Write `trailer` into the last 4 KiB of a writable segment, its first</span>
+<span class="line" id="L450"><a href="#L450">  450</a>     /// byte last (with Release: a reader that sees it, `Attachment::last_page`,</span>
+<span class="line" id="L451"><a href="#L451">  451</a>     /// sees the rest and the data).</span>
+<span class="line" id="L452"><a href="#L452">  452</a>     fn write_trailer(segment: &amp;Memory, trailer: &amp;[u8]) {</span>
+<span class="line" id="L453"><a href="#L453">  453</a>         let offset = segment.len() - trailer.len();</span>
+<span class="line" id="L454"><a href="#L454">  454</a>         // SAFETY: the last 4 KiB of our writable attachment.</span>
+<span class="line" id="L455"><a href="#L455">  455</a>         unsafe {</span>
+<span class="line" id="L456"><a href="#L456">  456</a>             let start = segment.ptr().add(offset);</span>
+<span class="line" id="L457"><a href="#L457">  457</a>             std::ptr::copy_nonoverlapping(trailer.as_ptr().add(1), start.add(1), trailer.len() - 1);</span>
+<span class="line" id="L458"><a href="#L458">  458</a>             AtomicU8::from_ptr(start).store(trailer[0], Ordering::Release);</span>
+<span class="line" id="L459"><a href="#L459">  459</a>         }</span>
+<span class="line" id="L460"><a href="#L460">  460</a>     }</span>
+<span class="line" id="L461"><a href="#L461">  461</a> </span>
+<span class="line" id="L462"><a href="#L462">  462</a>     /// What a segment holds, for the table of `trailer`.</span>
+<span class="line" id="L463"><a href="#L463">  463</a>     enum Found {</span>
+<span class="line" id="L464"><a href="#L464">  464</a>         /// This table, loaded.</span>
+<span class="line" id="L465"><a href="#L465">  465</a>         Same(Header),</span>
+<span class="line" id="L466"><a href="#L466">  466</a>         /// No trailer yet: being loaded by its maker, which is running.</span>
+<span class="line" id="L467"><a href="#L467">  467</a>         Loading(i32),</span>
+<span class="line" id="L468"><a href="#L468">  468</a>         /// No trailer, and its maker is gone: the load was interrupted.</span>
+<span class="line" id="L469"><a href="#L469">  469</a>         Interrupted(i32),</span>
+<span class="line" id="L470"><a href="#L470">  470</a>         /// Another table, or no table this code reads.</span>
+<span class="line" id="L471"><a href="#L471">  471</a>         Other(String),</span>
+<span class="line" id="L472"><a href="#L472">  472</a>     }</span>
+<span class="line" id="L473"><a href="#L473">  473</a> </span>
+<span class="line" id="L474"><a href="#L474">  474</a>     fn examine(attachment: &amp;Attachment, trailer: &amp;Trailer) -&gt; Found {</span>
+<span class="line" id="L475"><a href="#L475">  475</a>         let bytes = attachment.bytes();</span>
+<span class="line" id="L476"><a href="#L476">  476</a>         let creator = attachment.ds.shm_cpid;</span>
+<span class="line" id="L477"><a href="#L477">  477</a>         match attachment.last_page().map(|page| parse_header(&amp;page)) {</span>
+<span class="line" id="L478"><a href="#L478">  478</a>             None =&gt; Found::Other(format!(&quot;a segment of {bytes} bytes, too small for a table&quot;)),</span>
+<span class="line" id="L479"><a href="#L479">  479</a>             Some(Err(error)) =&gt; {</span>
+<span class="line" id="L480"><a href="#L480">  480</a>                 Found::Other(format!(&quot;a segment with an unreadable trailer ({error})&quot;))</span>
+<span class="line" id="L481"><a href="#L481">  481</a>             }</span>
+<span class="line" id="L482"><a href="#L482">  482</a>             Some(Ok(None)) if alive(creator) =&gt; Found::Loading(creator),</span>
+<span class="line" id="L483"><a href="#L483">  483</a>             Some(Ok(None)) =&gt; Found::Interrupted(creator),</span>
+<span class="line" id="L484"><a href="#L484">  484</a>             Some(Ok(Some(header))) =&gt; {</span>
+<span class="line" id="L485"><a href="#L485">  485</a>                 let whole = |page: u64| {</span>
+<span class="line" id="L486"><a href="#L486">  486</a>                     page &gt; 0</span>
+<span class="line" id="L487"><a href="#L487">  487</a>                         &amp;&amp; bytes.is_multiple_of(page)</span>
+<span class="line" id="L488"><a href="#L488">  488</a>                         &amp;&amp; bytes &gt;= header.trailer.data_bytes + file::TRAILER_BYTES</span>
+<span class="line" id="L489"><a href="#L489">  489</a>                 };</span>
+<span class="line" id="L490"><a href="#L490">  490</a>                 if header.trailer == *trailer &amp;&amp; header.page_bytes.is_some_and(whole) {</span>
+<span class="line" id="L491"><a href="#L491">  491</a>                     Found::Same(header)</span>
+<span class="line" id="L492"><a href="#L492">  492</a>                 } else {</span>
+<span class="line" id="L493"><a href="#L493">  493</a>                     Found::Other(format!(</span>
+<span class="line" id="L494"><a href="#L494">  494</a>                         &quot;{} (loaded from {})&quot;,</span>
+<span class="line" id="L495"><a href="#L495">  495</a>                         describe(&amp;header.trailer),</span>
+<span class="line" id="L496"><a href="#L496">  496</a>                         header.source</span>
+<span class="line" id="L497"><a href="#L497">  497</a>                     ))</span>
+<span class="line" id="L498"><a href="#L498">  498</a>                 }</span>
+<span class="line" id="L499"><a href="#L499">  499</a>             }</span>
+<span class="line" id="L500"><a href="#L500">  500</a>         }</span>
+<span class="line" id="L501"><a href="#L501">  501</a>     }</span>
+<span class="line" id="L502"><a href="#L502">  502</a> </span>
+<span class="line" id="L503"><a href="#L503">  503</a>     pub(super) fn open(</span>
+<span class="line" id="L504"><a href="#L504">  504</a>         path: &amp;str,</span>
+<span class="line" id="L505"><a href="#L505">  505</a>         options: &amp;LoadOptions,</span>
+<span class="line" id="L506"><a href="#L506">  506</a>         create: bool,</span>
+<span class="line" id="L507"><a href="#L507">  507</a>         notes: &amp;mut Vec&lt;String&gt;,</span>
+<span class="line" id="L508"><a href="#L508">  508</a>     ) -&gt; Result&lt;Option&lt;(Memory, Segment)&gt;, TableError&gt; {</span>
+<span class="line" id="L509"><a href="#L509">  509</a>         let Some(trailer) = file::read_trailer(path)?.filter(|t| t.checksum.is_some()) else {</span>
+<span class="line" id="L510"><a href="#L510">  510</a>             return if create {</span>
+<span class="line" id="L511"><a href="#L511">  511</a>                 Err(TableError::ShmNoChecksum {</span>
+<span class="line" id="L512"><a href="#L512">  512</a>                     path: path.to_string(),</span>
+<span class="line" id="L513"><a href="#L513">  513</a>                 })</span>
+<span class="line" id="L514"><a href="#L514">  514</a>             } else {</span>
+<span class="line" id="L515"><a href="#L515">  515</a>                 Ok(None)</span>
+<span class="line" id="L516"><a href="#L516">  516</a>             };</span>
+<span class="line" id="L517"><a href="#L517">  517</a>         };</span>
+<span class="line" id="L518"><a href="#L518">  518</a>         let key = options</span>
+<span class="line" id="L519"><a href="#L519">  519</a>             .shm_key</span>
+<span class="line" id="L520"><a href="#L520">  520</a>             .unwrap_or_else(|| key(trailer.k, trailer.base));</span>
+<span class="line" id="L521"><a href="#L521">  521</a>         // (A few rounds: other processes may make or remove it meanwhile.)</span>
+<span class="line" id="L522"><a href="#L522">  522</a>         for _ in 0..4 {</span>
+<span class="line" id="L523"><a href="#L523">  523</a>             let id = match shmget(key, 0, 0) {</span>
+<span class="line" id="L524"><a href="#L524">  524</a>                 Ok(id) =&gt; id,</span>
+<span class="line" id="L525"><a href="#L525">  525</a>                 Err(e) if is(&amp;e, libc::ENOENT) &amp;&amp; create =&gt; {</span>
+<span class="line" id="L526"><a href="#L526">  526</a>                     match make(key, path, &amp;trailer, options, notes)? {</span>
+<span class="line" id="L527"><a href="#L527">  527</a>                         Some(made) =&gt; return Ok(Some(made)),</span>
+<span class="line" id="L528"><a href="#L528">  528</a>                         None =&gt; continue,</span>
+<span class="line" id="L529"><a href="#L529">  529</a>                     }</span>
+<span class="line" id="L530"><a href="#L530">  530</a>                 }</span>
+<span class="line" id="L531"><a href="#L531">  531</a>                 Err(e) if is(&amp;e, libc::ENOENT) =&gt; return Ok(None),</span>
+<span class="line" id="L532"><a href="#L532">  532</a>                 Err(e) =&gt; return Err(call_error(key, &quot;shmget&quot;)(e)),</span>
+<span class="line" id="L533"><a href="#L533">  533</a>             };</span>
+<span class="line" id="L534"><a href="#L534">  534</a>             let attachment = match Attachment::new(id, true) {</span>
+<span class="line" id="L535"><a href="#L535">  535</a>                 Ok(attachment) =&gt; attachment,</span>
+<span class="line" id="L536"><a href="#L536">  536</a>                 // (Removed meanwhile.)</span>
+<span class="line" id="L537"><a href="#L537">  537</a>                 Err(e) if is(&amp;e, libc::EIDRM) || is(&amp;e, libc::EINVAL) =&gt; continue,</span>
+<span class="line" id="L538"><a href="#L538">  538</a>                 Err(e) =&gt; return Err(call_error(key, &quot;shmat&quot;)(e)),</span>
+<span class="line" id="L539"><a href="#L539">  539</a>             };</span>
+<span class="line" id="L540"><a href="#L540">  540</a>             match examine(&amp;attachment, &amp;trailer) {</span>
+<span class="line" id="L541"><a href="#L541">  541</a>                 Found::Same(header) =&gt; {</span>
+<span class="line" id="L542"><a href="#L542">  542</a>                     let segment = Segment {</span>
+<span class="line" id="L543"><a href="#L543">  543</a>                         key,</span>
+<span class="line" id="L544"><a href="#L544">  544</a>                         id,</span>
+<span class="line" id="L545"><a href="#L545">  545</a>                         bytes: attachment.bytes(),</span>
+<span class="line" id="L546"><a href="#L546">  546</a>                         page_bytes: header.page_bytes.unwrap_or(NORMAL_PAGE),</span>
+<span class="line" id="L547"><a href="#L547">  547</a>                         created: false,</span>
+<span class="line" id="L548"><a href="#L548">  548</a>                         source: header.source,</span>
+<span class="line" id="L549"><a href="#L549">  549</a>                         creator: attachment.ds.shm_cpid,</span>
+<span class="line" id="L550"><a href="#L550">  550</a>                     };</span>
+<span class="line" id="L551"><a href="#L551">  551</a>                     let memory = attachment.into_memory().map_err(call_error(key, &quot;shmat&quot;))?;</span>
+<span class="line" id="L552"><a href="#L552">  552</a>                     if options.prefault {</span>
+<span class="line" id="L553"><a href="#L553">  553</a>                         memory.prefault().map_err(call_error(key, &quot;prefault&quot;))?;</span>
+<span class="line" id="L554"><a href="#L554">  554</a>                     }</span>
+<span class="line" id="L555"><a href="#L555">  555</a>                     return Ok(Some((memory, segment)));</span>
+<span class="line" id="L556"><a href="#L556">  556</a>                 }</span>
+<span class="line" id="L557"><a href="#L557">  557</a>                 Found::Loading(pid) =&gt; return Err(TableError::ShmLoading { key, pid }),</span>
+<span class="line" id="L558"><a href="#L558">  558</a>                 // (Nobody else has it attached, and its maker is gone: no</span>
+<span class="line" id="L559"><a href="#L559">  559</a>                 // process can be filling it.)</span>
+<span class="line" id="L560"><a href="#L560">  560</a>                 Found::Interrupted(pid) if create &amp;&amp; attachment.ds.shm_nattch == 0 =&gt; {</span>
+<span class="line" id="L561"><a href="#L561">  561</a>                     drop(attachment);</span>
+<span class="line" id="L562"><a href="#L562">  562</a>                     mark_removed(id).map_err(call_error(key, &quot;shmctl(IPC_RMID)&quot;))?;</span>
+<span class="line" id="L563"><a href="#L563">  563</a>                     notes.push(format!(</span>
+<span class="line" id="L564"><a href="#L564">  564</a>                         &quot;removed segment {key:#010x}: its load by process {pid} was interrupted&quot;</span>
+<span class="line" id="L565"><a href="#L565">  565</a>                     ));</span>
+<span class="line" id="L566"><a href="#L566">  566</a>                 }</span>
+<span class="line" id="L567"><a href="#L567">  567</a>                 Found::Interrupted(pid) =&gt; {</span>
+<span class="line" id="L568"><a href="#L568">  568</a>                     return Err(TableError::Shm {</span>
+<span class="line" id="L569"><a href="#L569">  569</a>                         key,</span>
+<span class="line" id="L570"><a href="#L570">  570</a>                         message: format!(</span>
+<span class="line" id="L571"><a href="#L571">  571</a>                             &quot;has no trailer: its load by process {pid} was interrupted; \</span>
+<span class="line" id="L572"><a href="#L572">  572</a>                              remove it ({})&quot;,</span>
+<span class="line" id="L573"><a href="#L573">  573</a>                             remove_hint(path, key)</span>
+<span class="line" id="L574"><a href="#L574">  574</a>                         ),</span>
+<span class="line" id="L575"><a href="#L575">  575</a>                     });</span>
+<span class="line" id="L576"><a href="#L576">  576</a>                 }</span>
+<span class="line" id="L577"><a href="#L577">  577</a>                 Found::Other(held) =&gt; {</span>
+<span class="line" id="L578"><a href="#L578">  578</a>                     return Err(TableError::ShmOtherTable {</span>
+<span class="line" id="L579"><a href="#L579">  579</a>                         key,</span>
+<span class="line" id="L580"><a href="#L580">  580</a>                         path: path.to_string(),</span>
+<span class="line" id="L581"><a href="#L581">  581</a>                         held,</span>
+<span class="line" id="L582"><a href="#L582">  582</a>                         wanted: describe(&amp;trailer),</span>
+<span class="line" id="L583"><a href="#L583">  583</a>                         hint: remove_hint(path, key),</span>
+<span class="line" id="L584"><a href="#L584">  584</a>                     });</span>
+<span class="line" id="L585"><a href="#L585">  585</a>                 }</span>
+<span class="line" id="L586"><a href="#L586">  586</a>             }</span>
+<span class="line" id="L587"><a href="#L587">  587</a>         }</span>
+<span class="line" id="L588"><a href="#L588">  588</a>         Err(TableError::Shm {</span>
+<span class="line" id="L589"><a href="#L589">  589</a>             key,</span>
+<span class="line" id="L590"><a href="#L590">  590</a>             message: &quot;made and removed by other processes again and again; try once more&quot;.into(),</span>
+<span class="line" id="L591"><a href="#L591">  591</a>         })</span>
+<span class="line" id="L592"><a href="#L592">  592</a>     }</span>
+<span class="line" id="L593"><a href="#L593">  593</a> </span>
+<span class="line" id="L594"><a href="#L594">  594</a>     pub(super) fn loaded(path: &amp;str, options: &amp;LoadOptions) -&gt; bool {</span>
+<span class="line" id="L595"><a href="#L595">  595</a>         let Ok(Some(trailer)) = file::read_trailer(path) else {</span>
+<span class="line" id="L596"><a href="#L596">  596</a>             return false;</span>
+<span class="line" id="L597"><a href="#L597">  597</a>         };</span>
+<span class="line" id="L598"><a href="#L598">  598</a>         let key = options</span>
+<span class="line" id="L599"><a href="#L599">  599</a>             .shm_key</span>
+<span class="line" id="L600"><a href="#L600">  600</a>             .unwrap_or_else(|| key(trailer.k, trailer.base));</span>
+<span class="line" id="L601"><a href="#L601">  601</a>         trailer.checksum.is_some()</span>
+<span class="line" id="L602"><a href="#L602">  602</a>             &amp;&amp; shmget(key, 0, 0)</span>
+<span class="line" id="L603"><a href="#L603">  603</a>                 .and_then(|id| Attachment::new(id, true))</span>
+<span class="line" id="L604"><a href="#L604">  604</a>                 .is_ok_and(|attachment| matches!(examine(&amp;attachment, &amp;trailer), Found::Same(_)))</span>
+<span class="line" id="L605"><a href="#L605">  605</a>     }</span>
+<span class="line" id="L606"><a href="#L606">  606</a> </span>
+<span class="line" id="L607"><a href="#L607">  607</a>     pub(super) fn new_segment_page(path: &amp;str, options: &amp;LoadOptions) -&gt; Option&lt;u64&gt; {</span>
+<span class="line" id="L608"><a href="#L608">  608</a>         let trailer = file::read_trailer(path).ok()??;</span>
+<span class="line" id="L609"><a href="#L609">  609</a>         options</span>
+<span class="line" id="L610"><a href="#L610">  610</a>             .shm_pages</span>
+<span class="line" id="L611"><a href="#L611">  611</a>             .sizes()</span>
+<span class="line" id="L612"><a href="#L612">  612</a>             .find(|&amp;page| preflight(page, segment_bytes(trailer.data_bytes, page)).is_ok())</span>
+<span class="line" id="L613"><a href="#L613">  613</a>     }</span>
+<span class="line" id="L614"><a href="#L614">  614</a> </span>
+<span class="line" id="L615"><a href="#L615">  615</a>     /// Removes a segment on drop, unless disarmed: a failed load leaves none.</span>
+<span class="line" id="L616"><a href="#L616">  616</a>     struct RemoveOnDrop(Option&lt;i32&gt;);</span>
+<span class="line" id="L617"><a href="#L617">  617</a> </span>
+<span class="line" id="L618"><a href="#L618">  618</a>     impl RemoveOnDrop {</span>
+<span class="line" id="L619"><a href="#L619">  619</a>         fn disarm(mut self) {</span>
+<span class="line" id="L620"><a href="#L620">  620</a>             self.0 = None;</span>
+<span class="line" id="L621"><a href="#L621">  621</a>         }</span>
+<span class="line" id="L622"><a href="#L622">  622</a>     }</span>
+<span class="line" id="L623"><a href="#L623">  623</a> </span>
+<span class="line" id="L624"><a href="#L624">  624</a>     impl Drop for RemoveOnDrop {</span>
+<span class="line" id="L625"><a href="#L625">  625</a>         fn drop(&amp;mut self) {</span>
+<span class="line" id="L626"><a href="#L626">  626</a>             if let Some(id) = self.0 {</span>
+<span class="line" id="L627"><a href="#L627">  627</a>                 let _ = mark_removed(id);</span>
+<span class="line" id="L628"><a href="#L628">  628</a>             }</span>
+<span class="line" id="L629"><a href="#L629">  629</a>         }</span>
+<span class="line" id="L630"><a href="#L630">  630</a>     }</span>
+<span class="line" id="L631"><a href="#L631">  631</a> </span>
+<span class="line" id="L632"><a href="#L632">  632</a>     /// Make segment `key` from the table file: on the first page size that</span>
+<span class="line" id="L633"><a href="#L633">  633</a>     /// can be had, the data copied in and its checksum checked, then the</span>
+<span class="line" id="L634"><a href="#L634">  634</a>     /// trailer. Returns it attached read-only, or `None` if another process</span>
+<span class="line" id="L635"><a href="#L635">  635</a>     /// made it first.</span>
+<span class="line" id="L636"><a href="#L636">  636</a>     fn make(</span>
+<span class="line" id="L637"><a href="#L637">  637</a>         key: u32,</span>
+<span class="line" id="L638"><a href="#L638">  638</a>         path: &amp;str,</span>
+<span class="line" id="L639"><a href="#L639">  639</a>         trailer: &amp;Trailer,</span>
+<span class="line" id="L640"><a href="#L640">  640</a>         options: &amp;LoadOptions,</span>
+<span class="line" id="L641"><a href="#L641">  641</a>         notes: &amp;mut Vec&lt;String&gt;,</span>
+<span class="line" id="L642"><a href="#L642">  642</a>     ) -&gt; Result&lt;Option&lt;(Memory, Segment)&gt;, TableError&gt; {</span>
+<span class="line" id="L643"><a href="#L643">  643</a>         let mut made = None;</span>
+<span class="line" id="L644"><a href="#L644">  644</a>         for page in options.shm_pages.sizes() {</span>
+<span class="line" id="L645"><a href="#L645">  645</a>             let bytes = segment_bytes(trailer.data_bytes, page);</span>
+<span class="line" id="L646"><a href="#L646">  646</a>             let huge = huge_page(page);</span>
+<span class="line" id="L647"><a href="#L647">  647</a>             // Preflight: fail (or skip a page size) now, not deep into the copy.</span>
+<span class="line" id="L648"><a href="#L648">  648</a>             if let Err(why) = preflight(page, bytes) {</span>
+<span class="line" id="L649"><a href="#L649">  649</a>                 if huge {</span>
+<span class="line" id="L650"><a href="#L650">  650</a>                     notes.push(why);</span>
+<span class="line" id="L651"><a href="#L651">  651</a>                     continue;</span>
+<span class="line" id="L652"><a href="#L652">  652</a>                 }</span>
+<span class="line" id="L653"><a href="#L653">  653</a>                 return Err(TableError::Shm { key, message: why });</span>
+<span class="line" id="L654"><a href="#L654">  654</a>             }</span>
+<span class="line" id="L655"><a href="#L655">  655</a>             let page_flags = if huge {</span>
+<span class="line" id="L656"><a href="#L656">  656</a>                 libc::SHM_HUGETLB | (page.trailing_zeros() &lt;&lt; SHM_HUGE_SHIFT).cast_signed()</span>
+<span class="line" id="L657"><a href="#L657">  657</a>             } else {</span>
+<span class="line" id="L658"><a href="#L658">  658</a>                 0</span>
+<span class="line" id="L659"><a href="#L659">  659</a>             };</span>
+<span class="line" id="L660"><a href="#L660">  660</a>             match shmget(</span>
+<span class="line" id="L661"><a href="#L661">  661</a>                 key,</span>
+<span class="line" id="L662"><a href="#L662">  662</a>                 bytes,</span>
+<span class="line" id="L663"><a href="#L663">  663</a>                 libc::IPC_CREAT | libc::IPC_EXCL | 0o600 | page_flags,</span>
+<span class="line" id="L664"><a href="#L664">  664</a>             ) {</span>
+<span class="line" id="L665"><a href="#L665">  665</a>                 Ok(id) =&gt; {</span>
+<span class="line" id="L666"><a href="#L666">  666</a>                     made = Some((id, page, bytes));</span>
+<span class="line" id="L667"><a href="#L667">  667</a>                     break;</span>
+<span class="line" id="L668"><a href="#L668">  668</a>                 }</span>
+<span class="line" id="L669"><a href="#L669">  669</a>                 Err(e) if is(&amp;e, libc::EEXIST) =&gt; return Ok(None),</span>
+<span class="line" id="L670"><a href="#L670">  670</a>                 Err(e) if huge =&gt; notes.push(huge_page_failure(page, &amp;e)),</span>
+<span class="line" id="L671"><a href="#L671">  671</a>                 Err(e) =&gt; return Err(call_error(key, &quot;shmget&quot;)(e)),</span>
+<span class="line" id="L672"><a href="#L672">  672</a>             }</span>
+<span class="line" id="L673"><a href="#L673">  673</a>         }</span>
+<span class="line" id="L674"><a href="#L674">  674</a>         let Some((id, page, bytes)) = made else {</span>
+<span class="line" id="L675"><a href="#L675">  675</a>             return Err(TableError::Shm {</span>
+<span class="line" id="L676"><a href="#L676">  676</a>                 key,</span>
+<span class="line" id="L677"><a href="#L677">  677</a>                 message: format!(&quot;no allowed page size can be had: {}&quot;, notes.join(&quot;; &quot;)),</span>
+<span class="line" id="L678"><a href="#L678">  678</a>             });</span>
+<span class="line" id="L679"><a href="#L679">  679</a>         };</span>
+<span class="line" id="L680"><a href="#L680">  680</a>         let guard = RemoveOnDrop(Some(id));</span>
+<span class="line" id="L681"><a href="#L681">  681</a>         let writable = Attachment::new(id, false)</span>
+<span class="line" id="L682"><a href="#L682">  682</a>             .map_err(call_error(key, &quot;shmat&quot;))?</span>
+<span class="line" id="L683"><a href="#L683">  683</a>             .into_memory()</span>
+<span class="line" id="L684"><a href="#L684">  684</a>             .map_err(call_error(key, &quot;shmat&quot;))?;</span>
+<span class="line" id="L685"><a href="#L685">  685</a>         if !huge_page(page) {</span>
+<span class="line" id="L686"><a href="#L686">  686</a>             // Transparent huge pages, where shared memory gets them</span>
+<span class="line" id="L687"><a href="#L687">  687</a>             // (/sys/kernel/mm/transparent_hugepage/shmem_enabled: advise).</span>
+<span class="line" id="L688"><a href="#L688">  688</a>             // SAFETY: advice on our own attachment.</span>
+<span class="line" id="L689"><a href="#L689">  689</a>             unsafe {</span>
+<span class="line" id="L690"><a href="#L690">  690</a>                 libc::madvise(writable.ptr().cast(), writable.len(), libc::MADV_HUGEPAGE);</span>
+<span class="line" id="L691"><a href="#L691">  691</a>             }</span>
+<span class="line" id="L692"><a href="#L692">  692</a>         }</span>
+<span class="line" id="L693"><a href="#L693">  693</a>         let table_file = std::fs::File::open(path).map_err(file::io_error(path))?;</span>
+<span class="line" id="L694"><a href="#L694">  694</a>         let data_len =</span>
+<span class="line" id="L695"><a href="#L695">  695</a>             usize::try_from(trailer.data_bytes).map_err(|_| TableError::TooLarge(trailer.k))?;</span>
+<span class="line" id="L696"><a href="#L696">  696</a>         super::super::read_parallel(&amp;table_file, &amp;writable, data_len)</span>
+<span class="line" id="L697"><a href="#L697">  697</a>             .map_err(file::io_error(path))?;</span>
+<span class="line" id="L698"><a href="#L698">  698</a>         // The copy is the file&#x27;s table, and the file is not damaged.</span>
+<span class="line" id="L699"><a href="#L699">  699</a>         let data = (writable.bytes()?.get(..data_len)).ok_or(TableError::TooLarge(trailer.k))?;</span>
+<span class="line" id="L700"><a href="#L700">  700</a>         let got = file::checksum(data, crate::thread_count())?;</span>
+<span class="line" id="L701"><a href="#L701">  701</a>         let want = trailer.checksum.unwrap_or_default();</span>
+<span class="line" id="L702"><a href="#L702">  702</a>         if got != want {</span>
+<span class="line" id="L703"><a href="#L703">  703</a>             return Err(TableError::Checksum { got, want });</span>
+<span class="line" id="L704"><a href="#L704">  704</a>         }</span>
+<span class="line" id="L705"><a href="#L705">  705</a>         write_trailer(&amp;writable, &amp;header_bytes(trailer, page, path));</span>
+<span class="line" id="L706"><a href="#L706">  706</a>         // Read-only from now on (`ipcs -m` shows perms 400 once loaded, 600</span>
+<span class="line" id="L707"><a href="#L707">  707</a>         // while loading).</span>
+<span class="line" id="L708"><a href="#L708">  708</a>         let mut ds = stat(id).map_err(call_error(key, &quot;shmctl(IPC_STAT)&quot;))?;</span>
+<span class="line" id="L709"><a href="#L709">  709</a>         ds.shm_perm.mode = 0o400;</span>
+<span class="line" id="L710"><a href="#L710">  710</a>         // SAFETY: a valid buffer.</span>
+<span class="line" id="L711"><a href="#L711">  711</a>         if unsafe { libc::shmctl(id, libc::IPC_SET, &amp;raw mut ds) } != 0 {</span>
+<span class="line" id="L712"><a href="#L712">  712</a>             return Err(call_error(key, &quot;shmctl(IPC_SET)&quot;)(</span>
+<span class="line" id="L713"><a href="#L713">  713</a>                 io::Error::last_os_error(),</span>
+<span class="line" id="L714"><a href="#L714">  714</a>             ));</span>
+<span class="line" id="L715"><a href="#L715">  715</a>         }</span>
+<span class="line" id="L716"><a href="#L716">  716</a>         drop(writable);</span>
+<span class="line" id="L717"><a href="#L717">  717</a>         let read_only = Attachment::new(id, true).map_err(call_error(key, &quot;shmat&quot;))?;</span>
+<span class="line" id="L718"><a href="#L718">  718</a>         guard.disarm();</span>
+<span class="line" id="L719"><a href="#L719">  719</a>         let segment = Segment {</span>
+<span class="line" id="L720"><a href="#L720">  720</a>             key,</span>
+<span class="line" id="L721"><a href="#L721">  721</a>             id,</span>
+<span class="line" id="L722"><a href="#L722">  722</a>             bytes,</span>
+<span class="line" id="L723"><a href="#L723">  723</a>             page_bytes: page,</span>
+<span class="line" id="L724"><a href="#L724">  724</a>             created: true,</span>
+<span class="line" id="L725"><a href="#L725">  725</a>             source: path.to_string(),</span>
+<span class="line" id="L726"><a href="#L726">  726</a>             creator: std::process::id().cast_signed(),</span>
+<span class="line" id="L727"><a href="#L727">  727</a>         };</span>
+<span class="line" id="L728"><a href="#L728">  728</a>         let memory = read_only.into_memory().map_err(call_error(key, &quot;shmat&quot;))?;</span>
+<span class="line" id="L729"><a href="#L729">  729</a>         if options.prefault {</span>
+<span class="line" id="L730"><a href="#L730">  730</a>             memory.prefault().map_err(call_error(key, &quot;prefault&quot;))?;</span>
+<span class="line" id="L731"><a href="#L731">  731</a>         }</span>
+<span class="line" id="L732"><a href="#L732">  732</a>         Ok(Some((memory, segment)))</span>
+<span class="line" id="L733"><a href="#L733">  733</a>     }</span>
+<span class="line" id="L734"><a href="#L734">  734</a> </span>
+<span class="line" id="L735"><a href="#L735">  735</a>     fn huge_page(page: u64) -&gt; bool {</span>
+<span class="line" id="L736"><a href="#L736">  736</a>         page != NORMAL_PAGE</span>
+<span class="line" id="L737"><a href="#L737">  737</a>     }</span>
+<span class="line" id="L738"><a href="#L738">  738</a> </span>
+<span class="line" id="L739"><a href="#L739">  739</a>     /// A number in a /proc or /sys file.</span>
+<span class="line" id="L740"><a href="#L740">  740</a>     fn read_number(path: &amp;str) -&gt; Option&lt;u64&gt; {</span>
+<span class="line" id="L741"><a href="#L741">  741</a>         std::fs::read_to_string(path).ok()?.trim().parse().ok()</span>
+<span class="line" id="L742"><a href="#L742">  742</a>     }</span>
+<span class="line" id="L743"><a href="#L743">  743</a> </span>
+<span class="line" id="L744"><a href="#L744">  744</a>     /// Room for a segment of `bytes` on pages of `page` bytes: the kernel&#x27;s</span>
+<span class="line" id="L745"><a href="#L745">  745</a>     /// segment limits, then for huge pages the permission and free pages in</span>
+<span class="line" id="L746"><a href="#L746">  746</a>     /// the hugetlb pool. (Free memory for 4 KiB pages is the caller&#x27;s check:</span>
+<span class="line" id="L747"><a href="#L747">  747</a>     /// `cli::preflight`.)</span>
+<span class="line" id="L748"><a href="#L748">  748</a>     fn preflight(page: u64, bytes: u64) -&gt; Result&lt;(), String&gt; {</span>
+<span class="line" id="L749"><a href="#L749">  749</a>         kernel_limits(bytes)?;</span>
+<span class="line" id="L750"><a href="#L750">  750</a>         if !huge_page(page) {</span>
+<span class="line" id="L751"><a href="#L751">  751</a>             return Ok(());</span>
+<span class="line" id="L752"><a href="#L752">  752</a>         }</span>
+<span class="line" id="L753"><a href="#L753">  753</a>         // The permission first, as the kernel checks it first.</span>
+<span class="line" id="L754"><a href="#L754">  754</a>         if let Some(permission) = no_permission() {</span>
+<span class="line" id="L755"><a href="#L755">  755</a>             return Err(format!(&quot;{} pages: {permission}&quot;, page_name(page)));</span>
+<span class="line" id="L756"><a href="#L756">  756</a>         }</span>
+<span class="line" id="L757"><a href="#L757">  757</a>         pool_room(page, bytes)</span>
+<span class="line" id="L758"><a href="#L758">  758</a>     }</span>
+<span class="line" id="L759"><a href="#L759">  759</a> </span>
+<span class="line" id="L760"><a href="#L760">  760</a>     /// `kernel.shmmax` (bytes per segment), `kernel.shmall` (pages in all</span>
+<span class="line" id="L761"><a href="#L761">  761</a>     /// segments) and `kernel.shmmni` (segments).</span>
+<span class="line" id="L762"><a href="#L762">  762</a>     fn kernel_limits(bytes: u64) -&gt; Result&lt;(), String&gt; {</span>
+<span class="line" id="L763"><a href="#L763">  763</a>         if let Some(max) = read_number(&quot;/proc/sys/kernel/shmmax&quot;).filter(|&amp;max| bytes &gt; max) {</span>
+<span class="line" id="L764"><a href="#L764">  764</a>             return Err(format!(</span>
+<span class="line" id="L765"><a href="#L765">  765</a>                 &quot;kernel.shmmax is {max} bytes, below the segment&#x27;s {bytes}: raise it with \</span>
+<span class="line" id="L766"><a href="#L766">  766</a>                  `sudo sysctl kernel.shmmax={bytes}`&quot;</span>
+<span class="line" id="L767"><a href="#L767">  767</a>             ));</span>
+<span class="line" id="L768"><a href="#L768">  768</a>         }</span>
+<span class="line" id="L769"><a href="#L769">  769</a>         // SAFETY: no pointers.</span>
+<span class="line" id="L770"><a href="#L770">  770</a>         let system_page =</span>
+<span class="line" id="L771"><a href="#L771">  771</a>             u64::try_from(unsafe { libc::sysconf(libc::_SC_PAGESIZE) }).unwrap_or(4096);</span>
+<span class="line" id="L772"><a href="#L772">  772</a>         let (count, used) = segments_in_use(system_page);</span>
+<span class="line" id="L773"><a href="#L773">  773</a>         let pages = bytes.div_ceil(system_page);</span>
+<span class="line" id="L774"><a href="#L774">  774</a>         if let Some(all) = read_number(&quot;/proc/sys/kernel/shmall&quot;).filter(|&amp;all| used + pages &gt; all)</span>
+<span class="line" id="L775"><a href="#L775">  775</a>         {</span>
+<span class="line" id="L776"><a href="#L776">  776</a>             return Err(format!(</span>
+<span class="line" id="L777"><a href="#L777">  777</a>                 &quot;kernel.shmall is {all} pages of {} KiB, other segments use {used} and this one \</span>
+<span class="line" id="L778"><a href="#L778">  778</a>                  needs {pages}: raise it with `sudo sysctl kernel.shmall={}`&quot;,</span>
+<span class="line" id="L779"><a href="#L779">  779</a>                 system_page &gt;&gt; 10,</span>
+<span class="line" id="L780"><a href="#L780">  780</a>                 used + pages</span>
+<span class="line" id="L781"><a href="#L781">  781</a>             ));</span>
+<span class="line" id="L782"><a href="#L782">  782</a>         }</span>
+<span class="line" id="L783"><a href="#L783">  783</a>         if let Some(most) = read_number(&quot;/proc/sys/kernel/shmmni&quot;).filter(|&amp;most| count &gt;= most) {</span>
+<span class="line" id="L784"><a href="#L784">  784</a>             return Err(format!(</span>
+<span class="line" id="L785"><a href="#L785">  785</a>                 &quot;kernel.shmmni: all {most} segments are in use (`ipcs -m`)&quot;</span>
+<span class="line" id="L786"><a href="#L786">  786</a>             ));</span>
+<span class="line" id="L787"><a href="#L787">  787</a>         }</span>
+<span class="line" id="L788"><a href="#L788">  788</a>         Ok(())</span>
+<span class="line" id="L789"><a href="#L789">  789</a>     }</span>
+<span class="line" id="L790"><a href="#L790">  790</a> </span>
+<span class="line" id="L791"><a href="#L791">  791</a>     /// Segments and the system pages they take, from /proc/sysvipc/shm.</span>
+<span class="line" id="L792"><a href="#L792">  792</a>     fn segments_in_use(system_page: u64) -&gt; (u64, u64) {</span>
+<span class="line" id="L793"><a href="#L793">  793</a>         let text = std::fs::read_to_string(&quot;/proc/sysvipc/shm&quot;).unwrap_or_default();</span>
+<span class="line" id="L794"><a href="#L794">  794</a>         let sizes = text</span>
+<span class="line" id="L795"><a href="#L795">  795</a>             .lines()</span>
+<span class="line" id="L796"><a href="#L796">  796</a>             .skip(1)</span>
+<span class="line" id="L797"><a href="#L797">  797</a>             .filter_map(|line| line.split_whitespace().nth(3)?.parse::&lt;u64&gt;().ok());</span>
+<span class="line" id="L798"><a href="#L798">  798</a>         sizes.fold((0, 0), |(count, pages), size| {</span>
+<span class="line" id="L799"><a href="#L799">  799</a>             (count + 1, pages + size.div_ceil(system_page))</span>
+<span class="line" id="L800"><a href="#L800">  800</a>         })</span>
+<span class="line" id="L801"><a href="#L801">  801</a>     }</span>
+<span class="line" id="L802"><a href="#L802">  802</a> </span>
+<span class="line" id="L803"><a href="#L803">  803</a>     /// Free pages of `page` bytes in the hugetlb pool (free less reserved,</span>
+<span class="line" id="L804"><a href="#L804">  804</a>     /// plus what overcommit allows) for a segment of `bytes`.</span>
+<span class="line" id="L805"><a href="#L805">  805</a>     fn pool_room(page: u64, bytes: u64) -&gt; Result&lt;(), String&gt; {</span>
+<span class="line" id="L806"><a href="#L806">  806</a>         let pool = format!(&quot;/sys/kernel/mm/hugepages/hugepages-{}kB&quot;, page &gt;&gt; 10);</span>
+<span class="line" id="L807"><a href="#L807">  807</a>         let read = |what: &amp;str| read_number(&amp;format!(&quot;{pool}/{what}&quot;));</span>
+<span class="line" id="L808"><a href="#L808">  808</a>         let Some(total) = read(&quot;nr_hugepages&quot;) else {</span>
+<span class="line" id="L809"><a href="#L809">  809</a>             return Err(format!(</span>
+<span class="line" id="L810"><a href="#L810">  810</a>                 &quot;{} pages: this kernel has none ({pool} is missing)&quot;,</span>
+<span class="line" id="L811"><a href="#L811">  811</a>                 page_name(page)</span>
+<span class="line" id="L812"><a href="#L812">  812</a>             ));</span>
+<span class="line" id="L813"><a href="#L813">  813</a>         };</span>
+<span class="line" id="L814"><a href="#L814">  814</a>         let unused = |have: Option&lt;u64&gt;, taken: Option&lt;u64&gt;| {</span>
+<span class="line" id="L815"><a href="#L815">  815</a>             have.unwrap_or(0).saturating_sub(taken.unwrap_or(0))</span>
+<span class="line" id="L816"><a href="#L816">  816</a>         };</span>
+<span class="line" id="L817"><a href="#L817">  817</a>         let free = unused(read(&quot;free_hugepages&quot;), read(&quot;resv_hugepages&quot;))</span>
+<span class="line" id="L818"><a href="#L818">  818</a>             + unused(read(&quot;nr_overcommit_hugepages&quot;), read(&quot;surplus_hugepages&quot;));</span>
+<span class="line" id="L819"><a href="#L819">  819</a>         pool_verdict(page, bytes, total, free)</span>
+<span class="line" id="L820"><a href="#L820">  820</a>     }</span>
+<span class="line" id="L821"><a href="#L821">  821</a> </span>
+<span class="line" id="L822"><a href="#L822">  822</a>     /// Whether `free` pages of the pool of `total` pages of `page` bytes</span>
+<span class="line" id="L823"><a href="#L823">  823</a>     /// hold a segment of `bytes`; if not, how to add them.</span>
+<span class="line" id="L824"><a href="#L824">  824</a>     pub(super) fn pool_verdict(page: u64, bytes: u64, total: u64, free: u64) -&gt; Result&lt;(), String&gt; {</span>
+<span class="line" id="L825"><a href="#L825">  825</a>         let needed = bytes / page;</span>
+<span class="line" id="L826"><a href="#L826">  826</a>         if needed &lt;= free {</span>
+<span class="line" id="L827"><a href="#L827">  827</a>             return Ok(());</span>
+<span class="line" id="L828"><a href="#L828">  828</a>         }</span>
+<span class="line" id="L829"><a href="#L829">  829</a>         Err(format!(</span>
+<span class="line" id="L830"><a href="#L830">  830</a>             &quot;{} pages: {needed} needed, {free} free in the pool ({total} in all); to add them: \</span>
+<span class="line" id="L831"><a href="#L831">  831</a>              `echo {} | sudo tee /sys/kernel/mm/hugepages/hugepages-{}kB/nr_hugepages`&quot;,</span>
+<span class="line" id="L832"><a href="#L832">  832</a>             page_name(page),</span>
+<span class="line" id="L833"><a href="#L833">  833</a>             total + needed - free,</span>
+<span class="line" id="L834"><a href="#L834">  834</a>             page &gt;&gt; 10</span>
+<span class="line" id="L835"><a href="#L835">  835</a>         ))</span>
+<span class="line" id="L836"><a href="#L836">  836</a>     }</span>
+<span class="line" id="L837"><a href="#L837">  837</a> </span>
+<span class="line" id="L838"><a href="#L838">  838</a>     /// Why `shmget` of `bytes` on huge pages of `page` bytes failed, and how</span>
+<span class="line" id="L839"><a href="#L839">  839</a>     /// to fix it.</span>
+<span class="line" id="L840"><a href="#L840">  840</a>     pub(super) fn huge_page_failure(page: u64, error: &amp;io::Error) -&gt; String {</span>
+<span class="line" id="L841"><a href="#L841">  841</a>         let name = page_name(page);</span>
+<span class="line" id="L842"><a href="#L842">  842</a>         match error.raw_os_error() {</span>
+<span class="line" id="L843"><a href="#L843">  843</a>             Some(libc::EPERM) =&gt; {</span>
+<span class="line" id="L844"><a href="#L844">  844</a>                 let group = read_number(&quot;/proc/sys/vm/hugetlb_shm_group&quot;).unwrap_or(0);</span>
+<span class="line" id="L845"><a href="#L845">  845</a>                 // SAFETY: no pointers.</span>
+<span class="line" id="L846"><a href="#L846">  846</a>                 let gid = unsafe { libc::getegid() };</span>
+<span class="line" id="L847"><a href="#L847">  847</a>                 format!(&quot;{name} pages: EPERM: {}&quot;, permission_message(group, gid))</span>
+<span class="line" id="L848"><a href="#L848">  848</a>             }</span>
+<span class="line" id="L849"><a href="#L849">  849</a>             Some(libc::ENOMEM) =&gt; format!(</span>
+<span class="line" id="L850"><a href="#L850">  850</a>                 &quot;{name} pages: the pool has too few free pages (ENOMEM; see \</span>
+<span class="line" id="L851"><a href="#L851">  851</a>                  /sys/kernel/mm/hugepages/hugepages-{}kB)&quot;,</span>
+<span class="line" id="L852"><a href="#L852">  852</a>                 page &gt;&gt; 10</span>
+<span class="line" id="L853"><a href="#L853">  853</a>             ),</span>
+<span class="line" id="L854"><a href="#L854">  854</a>             _ =&gt; format!(&quot;{name} pages: shmget: {error}&quot;),</span>
+<span class="line" id="L855"><a href="#L855">  855</a>         }</span>
+<span class="line" id="L856"><a href="#L856">  856</a>     }</span>
+<span class="line" id="L857"><a href="#L857">  857</a> </span>
+<span class="line" id="L858"><a href="#L858">  858</a>     /// Why this process may not make huge-page segments, if it may not</span>
+<span class="line" id="L859"><a href="#L859">  859</a>     /// (the kernel allows them to the group `vm.hugetlb_shm_group` and to</span>
+<span class="line" id="L860"><a href="#L860">  860</a>     /// `CAP_IPC_LOCK`).</span>
+<span class="line" id="L861"><a href="#L861">  861</a>     fn no_permission() -&gt; Option&lt;String&gt; {</span>
+<span class="line" id="L862"><a href="#L862">  862</a>         // (`EGG_SOLVER_SHM_DENY_HUGE`, for tests, undocumented: as if it were</span>
+<span class="line" id="L863"><a href="#L863">  863</a>         // missing, without asking the kernel.)</span>
+<span class="line" id="L864"><a href="#L864">  864</a>         let simulated = crate::env::var_os(&quot;EGG_SOLVER_SHM_DENY_HUGE&quot;).is_some();</span>
+<span class="line" id="L865"><a href="#L865">  865</a>         let group = read_number(&quot;/proc/sys/vm/hugetlb_shm_group&quot;);</span>
+<span class="line" id="L866"><a href="#L866">  866</a>         if simulated {</span>
+<span class="line" id="L867"><a href="#L867">  867</a>             // SAFETY: no pointers.</span>
+<span class="line" id="L868"><a href="#L868">  868</a>             let message = permission_message(group.unwrap_or(0), unsafe { libc::getegid() });</span>
+<span class="line" id="L869"><a href="#L869">  869</a>             return Some(format!(&quot;{message} (simulated: EGG_SOLVER_SHM_DENY_HUGE)&quot;));</span>
+<span class="line" id="L870"><a href="#L870">  870</a>         }</span>
+<span class="line" id="L871"><a href="#L871">  871</a>         let group = group?;</span>
+<span class="line" id="L872"><a href="#L872">  872</a>         // SAFETY: no pointers; then a buffer of the size asked for.</span>
+<span class="line" id="L873"><a href="#L873">  873</a>         let (gid, groups) = unsafe {</span>
+<span class="line" id="L874"><a href="#L874">  874</a>             let n = usize::try_from(libc::getgroups(0, std::ptr::null_mut())).unwrap_or(0);</span>
+<span class="line" id="L875"><a href="#L875">  875</a>             let mut groups = vec![0; n];</span>
+<span class="line" id="L876"><a href="#L876">  876</a>             let got = libc::getgroups(i32::try_from(n).unwrap_or(0), groups.as_mut_ptr());</span>
+<span class="line" id="L877"><a href="#L877">  877</a>             groups.truncate(usize::try_from(got).unwrap_or(0));</span>
+<span class="line" id="L878"><a href="#L878">  878</a>             (libc::getegid(), groups)</span>
+<span class="line" id="L879"><a href="#L879">  879</a>         };</span>
+<span class="line" id="L880"><a href="#L880">  880</a>         let in_group = std::iter::once(gid)</span>
+<span class="line" id="L881"><a href="#L881">  881</a>             .chain(groups)</span>
+<span class="line" id="L882"><a href="#L882">  882</a>             .any(|g| u64::from(g) == group);</span>
+<span class="line" id="L883"><a href="#L883">  883</a>         // `CAP_IPC_LOCK` is capability 14 of the effective set.</span>
+<span class="line" id="L884"><a href="#L884">  884</a>         let status = std::fs::read_to_string(&quot;/proc/self/status&quot;).unwrap_or_default();</span>
+<span class="line" id="L885"><a href="#L885">  885</a>         let ipc_lock = status</span>
+<span class="line" id="L886"><a href="#L886">  886</a>             .lines()</span>
+<span class="line" id="L887"><a href="#L887">  887</a>             .find_map(|l| l.strip_prefix(&quot;CapEff:&quot;))</span>
+<span class="line" id="L888"><a href="#L888">  888</a>             .and_then(|caps| u64::from_str_radix(caps.trim(), 16).ok())</span>
+<span class="line" id="L889"><a href="#L889">  889</a>             .is_some_and(|caps| caps &amp; (1 &lt;&lt; 14) != 0);</span>
+<span class="line" id="L890"><a href="#L890">  890</a>         (!in_group &amp;&amp; !ipc_lock).then(|| permission_message(group, gid))</span>
+<span class="line" id="L891"><a href="#L891">  891</a>     }</span>
+<span class="line" id="L892"><a href="#L892">  892</a> </span>
+<span class="line" id="L893"><a href="#L893">  893</a>     /// How to get the permission for huge-page segments.</span>
+<span class="line" id="L894"><a href="#L894">  894</a>     pub(super) fn permission_message(group: u64, gid: u32) -&gt; String {</span>
+<span class="line" id="L895"><a href="#L895">  895</a>         format!(</span>
+<span class="line" id="L896"><a href="#L896">  896</a>             &quot;no permission: huge-page segments need a group of yours in \</span>
+<span class="line" id="L897"><a href="#L897">  897</a>              vm.hugetlb_shm_group (now {group}) or CAP_IPC_LOCK; to allow your group: \</span>
+<span class="line" id="L898"><a href="#L898">  898</a>              `sudo sysctl vm.hugetlb_shm_group={gid}`&quot;</span>
+<span class="line" id="L899"><a href="#L899">  899</a>         )</span>
+<span class="line" id="L900"><a href="#L900">  900</a>     }</span>
+<span class="line" id="L901"><a href="#L901">  901</a> </span>
+<span class="line" id="L902"><a href="#L902">  902</a>     pub(super) fn remove(key: u32) -&gt; Result&lt;Option&lt;Removed&gt;, TableError&gt; {</span>
+<span class="line" id="L903"><a href="#L903">  903</a>         let id = match shmget(key, 0, 0) {</span>
+<span class="line" id="L904"><a href="#L904">  904</a>             Ok(id) =&gt; id,</span>
+<span class="line" id="L905"><a href="#L905">  905</a>             Err(e) if is(&amp;e, libc::ENOENT) =&gt; return Ok(None),</span>
+<span class="line" id="L906"><a href="#L906">  906</a>             Err(e) =&gt; return Err(call_error(key, &quot;shmget&quot;)(e)),</span>
+<span class="line" id="L907"><a href="#L907">  907</a>         };</span>
+<span class="line" id="L908"><a href="#L908">  908</a>         let ds = stat(id).map_err(call_error(key, &quot;shmctl(IPC_STAT)&quot;))?;</span>
+<span class="line" id="L909"><a href="#L909">  909</a>         let held = match Attachment::new(id, true) {</span>
+<span class="line" id="L910"><a href="#L910">  910</a>             Ok(attachment) =&gt; match attachment.last_page().map(|page| parse_header(&amp;page)) {</span>
+<span class="line" id="L911"><a href="#L911">  911</a>                 Some(Ok(Some(header))) =&gt; describe(&amp;header.trailer),</span>
+<span class="line" id="L912"><a href="#L912">  912</a>                 Some(Ok(None)) =&gt; &quot;no table yet (loading, or its load was interrupted)&quot;.into(),</span>
+<span class="line" id="L913"><a href="#L913">  913</a>                 _ =&gt; &quot;no table&quot;.into(),</span>
+<span class="line" id="L914"><a href="#L914">  914</a>             },</span>
+<span class="line" id="L915"><a href="#L915">  915</a>             Err(e) =&gt; format!(&quot;unknown ({e})&quot;),</span>
+<span class="line" id="L916"><a href="#L916">  916</a>         };</span>
+<span class="line" id="L917"><a href="#L917">  917</a>         mark_removed(id).map_err(call_error(key, &quot;shmctl(IPC_RMID)&quot;))?;</span>
+<span class="line" id="L918"><a href="#L918">  918</a>         #[allow(</span>
+<span class="line" id="L919"><a href="#L919">  919</a>             clippy::unnecessary_cast,</span>
+<span class="line" id="L920"><a href="#L920">  920</a>             reason = &quot;shmatt_t is 32-bit on 32-bit targets&quot;</span>
+<span class="line" id="L921"><a href="#L921">  921</a>         )]</span>
+<span class="line" id="L922"><a href="#L922">  922</a>         let attached = ds.shm_nattch as u64;</span>
+<span class="line" id="L923"><a href="#L923">  923</a>         Ok(Some(Removed {</span>
+<span class="line" id="L924"><a href="#L924">  924</a>             id,</span>
+<span class="line" id="L925"><a href="#L925">  925</a>             bytes: ds.shm_segsz as u64,</span>
+<span class="line" id="L926"><a href="#L926">  926</a>             held,</span>
+<span class="line" id="L927"><a href="#L927">  927</a>             attached,</span>
+<span class="line" id="L928"><a href="#L928">  928</a>         }))</span>
+<span class="line" id="L929"><a href="#L929">  929</a>     }</span>
+<span class="line" id="L930"><a href="#L930">  930</a> }</span>
+<span class="line" id="L931"><a href="#L931">  931</a> </span>
+<span class="line" id="L932"><a href="#L932">  932</a> #[cfg(test)]</span>
+<span class="line" id="L933"><a href="#L933">  933</a> mod tests {</span>
+<span class="line" id="L934"><a href="#L934">  934</a>     use super::{key, parse_key, segment_bytes, ShmPages, NORMAL_PAGE};</span>
+<span class="line" id="L935"><a href="#L935">  935</a> </span>
+<span class="line" id="L936"><a href="#L936">  936</a>     /// Keys are &quot;co&quot;, k and base; `ShmPages` lists are any order of 1g, 2m</span>
+<span class="line" id="L937"><a href="#L937">  937</a>     /// and 4k, tried largest first.</span>
+<span class="line" id="L938"><a href="#L938">  938</a>     #[test]</span>
+<span class="line" id="L939"><a href="#L939">  939</a>     fn keys_and_page_lists() {</span>
+<span class="line" id="L940"><a href="#L940">  940</a>         assert_eq!(key(11, 10), 0x636f_0b0a);</span>
+<span class="line" id="L941"><a href="#L941">  941</a>         assert_eq!(key(7, 9), 0x636f_0709);</span>
+<span class="line" id="L942"><a href="#L942">  942</a>         assert_eq!(parse_key(&quot;0x636f0709&quot;), Some(0x636f_0709));</span>
+<span class="line" id="L943"><a href="#L943">  943</a>         assert_eq!(parse_key(&quot;1668220681&quot;), Some(0x636f_0709));</span>
+<span class="line" id="L944"><a href="#L944">  944</a>         for bad in [&quot;0&quot;, &quot;0x0&quot;, &quot;x&quot;, &quot;0x100000000&quot;, &quot;-1&quot;, &quot;&quot;] {</span>
+<span class="line" id="L945"><a href="#L945">  945</a>             assert_eq!(parse_key(bad), None, &quot;{bad}&quot;);</span>
+<span class="line" id="L946"><a href="#L946">  946</a>         }</span>
+<span class="line" id="L947"><a href="#L947">  947</a>         let sizes = |text: &amp;str| ShmPages::parse(text).map(|p| p.sizes().collect::&lt;Vec&lt;u64&gt;&gt;());</span>
+<span class="line" id="L948"><a href="#L948">  948</a>         let all = vec![1 &lt;&lt; 30, 1 &lt;&lt; 21, NORMAL_PAGE];</span>
+<span class="line" id="L949"><a href="#L949">  949</a>         assert_eq!(sizes(&quot;1g,2m,4k&quot;), Some(all.clone()));</span>
+<span class="line" id="L950"><a href="#L950">  950</a>         assert_eq!(sizes(&quot;4K, 1G,2m&quot;), Some(all.clone()));</span>
+<span class="line" id="L951"><a href="#L951">  951</a>         assert_eq!(sizes(&quot;all&quot;), Some(all));</span>
+<span class="line" id="L952"><a href="#L952">  952</a>         assert_eq!(sizes(&quot;4k,2m&quot;), Some(vec![1 &lt;&lt; 21, NORMAL_PAGE]));</span>
+<span class="line" id="L953"><a href="#L953">  953</a>         for bad in [&quot;&quot;, &quot;1g,&quot;, &quot;8k&quot;, &quot;2m 4k&quot;] {</span>
+<span class="line" id="L954"><a href="#L954">  954</a>             assert_eq!(sizes(bad), None, &quot;{bad}&quot;);</span>
+<span class="line" id="L955"><a href="#L955">  955</a>         }</span>
+<span class="line" id="L956"><a href="#L956">  956</a>         // Data and trailer in whole pages.</span>
+<span class="line" id="L957"><a href="#L957">  957</a>         assert_eq!(segment_bytes(30_401_280, NORMAL_PAGE), 30_408_704);</span>
+<span class="line" id="L958"><a href="#L958">  958</a>         assert_eq!(segment_bytes(3_891_363_840, 1 &lt;&lt; 30), 4 &lt;&lt; 30);</span>
+<span class="line" id="L959"><a href="#L959">  959</a>         assert_eq!(segment_bytes((1 &lt;&lt; 30) - 4096, 1 &lt;&lt; 30), 1 &lt;&lt; 30);</span>
+<span class="line" id="L960"><a href="#L960">  960</a>     }</span>
+<span class="line" id="L961"><a href="#L961">  961</a> }</span>
+<span class="line" id="L962"><a href="#L962">  962</a> </span>
+<span class="line" id="L963"><a href="#L963">  963</a> /// Segments made, attached, refused and removed, on 4 KiB pages (and 2 MiB</span>
+<span class="line" id="L964"><a href="#L964">  964</a> /// ones where the pool has them; never 1 GiB pages: the pool of those is</span>
+<span class="line" id="L965"><a href="#L965">  965</a> /// left alone). Each test&#x27;s segment has its own key and is removed at the</span>
+<span class="line" id="L966"><a href="#L966">  966</a> /// end, also when the test fails.</span>
+<span class="line" id="L967"><a href="#L967">  967</a> #[cfg(all(test, target_os = &quot;linux&quot;, not(miri)))]</span>
+<span class="line" id="L968"><a href="#L968">  968</a> mod segment_tests {</span>
+<span class="line" id="L969"><a href="#L969">  969</a>     use super::linux::{</span>
+<span class="line" id="L970"><a href="#L970">  970</a>         header_bytes, huge_page_failure, parse_header, permission_message, pool_verdict, shmget,</span>
+<span class="line" id="L971"><a href="#L971">  971</a>         stat,</span>
+<span class="line" id="L972"><a href="#L972">  972</a>     };</span>
+<span class="line" id="L973"><a href="#L973">  973</a>     use super::{remove, segment_bytes, ShmPages, NORMAL_PAGE};</span>
+<span class="line" id="L974"><a href="#L974">  974</a>     use crate::tables::file::{self, LoadMode, LoadOptions, TableError, Trailer};</span>
+<span class="line" id="L975"><a href="#L975">  975</a>     use crate::tables::{h48_bytes, scratch_path, H48Table};</span>
+<span class="line" id="L976"><a href="#L976">  976</a> </span>
+<span class="line" id="L977"><a href="#L977">  977</a>     // The interrupted-loader test forks. Its child inherits every live SysV</span>
+<span class="line" id="L978"><a href="#L978">  978</a>     // mapping in this process, which would perturb another test&#x27;s nattch checks.</span>
+<span class="line" id="L979"><a href="#L979">  979</a>     static SEGMENT_TESTS: std::sync::Mutex&lt;()&gt; = std::sync::Mutex::new(());</span>
+<span class="line" id="L980"><a href="#L980">  980</a> </span>
+<span class="line" id="L981"><a href="#L981">  981</a>     fn segment_test_guard() -&gt; std::sync::MutexGuard&lt;&#x27;static, ()&gt; {</span>
+<span class="line" id="L982"><a href="#L982">  982</a>         SEGMENT_TESTS</span>
+<span class="line" id="L983"><a href="#L983">  983</a>             .lock()</span>
+<span class="line" id="L984"><a href="#L984">  984</a>             .unwrap_or_else(std::sync::PoisonError::into_inner)</span>
+<span class="line" id="L985"><a href="#L985">  985</a>     }</span>
+<span class="line" id="L986"><a href="#L986">  986</a> </span>
+<span class="line" id="L987"><a href="#L987">  987</a>     /// Test `n`&#x27;s key in this process (0x40000000 and up, below &quot;co&quot;</span>
+<span class="line" id="L988"><a href="#L988">  988</a>     /// keys), and its segment removed on drop.</span>
+<span class="line" id="L989"><a href="#L989">  989</a>     struct TestKey(u32);</span>
+<span class="line" id="L990"><a href="#L990">  990</a> </span>
+<span class="line" id="L991"><a href="#L991">  991</a>     impl TestKey {</span>
+<span class="line" id="L992"><a href="#L992">  992</a>         fn new(n: u32) -&gt; TestKey {</span>
+<span class="line" id="L993"><a href="#L993">  993</a>             assert!(n &lt; 64);</span>
+<span class="line" id="L994"><a href="#L994">  994</a>             let key = 0x4000_0000 | std::process::id() &lt;&lt; 6 | n;</span>
+<span class="line" id="L995"><a href="#L995">  995</a>             // (A segment left by a crashed earlier process of this id.)</span>
+<span class="line" id="L996"><a href="#L996">  996</a>             let _ = unsafe { remove(key) };</span>
+<span class="line" id="L997"><a href="#L997">  997</a>             TestKey(key)</span>
+<span class="line" id="L998"><a href="#L998">  998</a>         }</span>
+<span class="line" id="L999"><a href="#L999">  999</a> </span>
+<span class="line" id="L1000"><a href="#L1000"> 1000</a>         fn options(&amp;self, mode: LoadMode, pages: &amp;str) -&gt; LoadOptions {</span>
+<span class="line" id="L1001"><a href="#L1001"> 1001</a>             LoadOptions {</span>
+<span class="line" id="L1002"><a href="#L1002"> 1002</a>                 mode,</span>
+<span class="line" id="L1003"><a href="#L1003"> 1003</a>                 shm_pages: ShmPages::parse(pages).unwrap(),</span>
+<span class="line" id="L1004"><a href="#L1004"> 1004</a>                 shm_key: Some(self.0),</span>
+<span class="line" id="L1005"><a href="#L1005"> 1005</a>                 ..LoadOptions::default()</span>
+<span class="line" id="L1006"><a href="#L1006"> 1006</a>             }</span>
+<span class="line" id="L1007"><a href="#L1007"> 1007</a>         }</span>
+<span class="line" id="L1008"><a href="#L1008"> 1008</a>     }</span>
+<span class="line" id="L1009"><a href="#L1009"> 1009</a> </span>
+<span class="line" id="L1010"><a href="#L1010"> 1010</a>     impl Drop for TestKey {</span>
+<span class="line" id="L1011"><a href="#L1011"> 1011</a>         fn drop(&amp;mut self) {</span>
+<span class="line" id="L1012"><a href="#L1012"> 1012</a>             let _ = unsafe { remove(self.0) };</span>
+<span class="line" id="L1013"><a href="#L1013"> 1013</a>         }</span>
+<span class="line" id="L1014"><a href="#L1014"> 1014</a>     }</span>
+<span class="line" id="L1015"><a href="#L1015"> 1015</a> </span>
+<span class="line" id="L1016"><a href="#L1016"> 1016</a>     /// An h0 table file (made-up data: segments do not look at it, only at</span>
+<span class="line" id="L1017"><a href="#L1017"> 1017</a>     /// its trailer and checksum), removed on drop.</span>
+<span class="line" id="L1018"><a href="#L1018"> 1018</a>     struct TableFile {</span>
+<span class="line" id="L1019"><a href="#L1019"> 1019</a>         path: String,</span>
+<span class="line" id="L1020"><a href="#L1020"> 1020</a>         data: Vec&lt;u8&gt;,</span>
+<span class="line" id="L1021"><a href="#L1021"> 1021</a>         trailer: Trailer,</span>
+<span class="line" id="L1022"><a href="#L1022"> 1022</a>     }</span>
+<span class="line" id="L1023"><a href="#L1023"> 1023</a> </span>
+<span class="line" id="L1024"><a href="#L1024"> 1024</a>     impl TableFile {</span>
+<span class="line" id="L1025"><a href="#L1025"> 1025</a>         fn new(name: &amp;str, seed: u8) -&gt; TableFile {</span>
+<span class="line" id="L1026"><a href="#L1026"> 1026</a>             let len = usize::try_from(h48_bytes(0)).unwrap();</span>
+<span class="line" id="L1027"><a href="#L1027"> 1027</a>             let data: Vec&lt;u8&gt; = (0..len)</span>
+<span class="line" id="L1028"><a href="#L1028"> 1028</a>                 .map(|i| u8::try_from(i % 251).unwrap() ^ seed)</span>
+<span class="line" id="L1029"><a href="#L1029"> 1029</a>                 .collect();</span>
+<span class="line" id="L1030"><a href="#L1030"> 1030</a>             let trailer = Trailer {</span>
+<span class="line" id="L1031"><a href="#L1031"> 1031</a>                 k: 0,</span>
+<span class="line" id="L1032"><a href="#L1032"> 1032</a>                 base: 8,</span>
+<span class="line" id="L1033"><a href="#L1033"> 1033</a>                 data_bytes: len as u64,</span>
+<span class="line" id="L1034"><a href="#L1034"> 1034</a>                 distribution: None,</span>
+<span class="line" id="L1035"><a href="#L1035"> 1035</a>                 checksum: Some(file::checksum(&amp;data, 4).unwrap()),</span>
+<span class="line" id="L1036"><a href="#L1036"> 1036</a>             };</span>
+<span class="line" id="L1037"><a href="#L1037"> 1037</a>             let path = scratch_path(name).to_string_lossy().into_owned();</span>
+<span class="line" id="L1038"><a href="#L1038"> 1038</a>             std::fs::write(&amp;path, [&amp;data[..], &amp;trailer.to_bytes()].concat()).unwrap();</span>
+<span class="line" id="L1039"><a href="#L1039"> 1039</a>             TableFile {</span>
+<span class="line" id="L1040"><a href="#L1040"> 1040</a>                 path,</span>
+<span class="line" id="L1041"><a href="#L1041"> 1041</a>                 data,</span>
+<span class="line" id="L1042"><a href="#L1042"> 1042</a>                 trailer,</span>
+<span class="line" id="L1043"><a href="#L1043"> 1043</a>             }</span>
+<span class="line" id="L1044"><a href="#L1044"> 1044</a>         }</span>
+<span class="line" id="L1045"><a href="#L1045"> 1045</a> </span>
+<span class="line" id="L1046"><a href="#L1046"> 1046</a>         fn open(</span>
+<span class="line" id="L1047"><a href="#L1047"> 1047</a>             &amp;self,</span>
+<span class="line" id="L1048"><a href="#L1048"> 1048</a>             options: &amp;LoadOptions,</span>
+<span class="line" id="L1049"><a href="#L1049"> 1049</a>         ) -&gt; Result&lt;(H48Table, crate::tables::LoadReport), TableError&gt; {</span>
+<span class="line" id="L1050"><a href="#L1050"> 1050</a>             unsafe { H48Table::open_reporting(&amp;self.path, options) }</span>
+<span class="line" id="L1051"><a href="#L1051"> 1051</a>         }</span>
+<span class="line" id="L1052"><a href="#L1052"> 1052</a>     }</span>
+<span class="line" id="L1053"><a href="#L1053"> 1053</a> </span>
+<span class="line" id="L1054"><a href="#L1054"> 1054</a>     impl Drop for TableFile {</span>
+<span class="line" id="L1055"><a href="#L1055"> 1055</a>         fn drop(&amp;mut self) {</span>
+<span class="line" id="L1056"><a href="#L1056"> 1056</a>             let _ = std::fs::remove_file(&amp;self.path);</span>
+<span class="line" id="L1057"><a href="#L1057"> 1057</a>         }</span>
+<span class="line" id="L1058"><a href="#L1058"> 1058</a>     }</span>
+<span class="line" id="L1059"><a href="#L1059"> 1059</a> </span>
+<span class="line" id="L1060"><a href="#L1060"> 1060</a>     fn attached(id: i32) -&gt; u64 {</span>
+<span class="line" id="L1061"><a href="#L1061"> 1061</a>         #[allow(</span>
+<span class="line" id="L1062"><a href="#L1062"> 1062</a>             clippy::unnecessary_cast,</span>
+<span class="line" id="L1063"><a href="#L1063"> 1063</a>             reason = &quot;shmatt_t is 32-bit on 32-bit targets&quot;</span>
+<span class="line" id="L1064"><a href="#L1064"> 1064</a>         )]</span>
+<span class="line" id="L1065"><a href="#L1065"> 1065</a>         let attached = stat(id).unwrap().shm_nattch as u64;</span>
+<span class="line" id="L1066"><a href="#L1066"> 1066</a>         attached</span>
+<span class="line" id="L1067"><a href="#L1067"> 1067</a>     }</span>
+<span class="line" id="L1068"><a href="#L1068"> 1068</a> </span>
+<span class="line" id="L1069"><a href="#L1069"> 1069</a>     /// `Shm` makes the segment once (read-only, the file&#x27;s bytes), later</span>
+<span class="line" id="L1070"><a href="#L1070"> 1070</a>     /// opens attach it (`Auto` too); every detach is counted; `remove`</span>
+<span class="line" id="L1071"><a href="#L1071"> 1071</a>     /// removes it, and `Auto` then loads the file.</span>
+<span class="line" id="L1072"><a href="#L1072"> 1072</a>     #[test]</span>
+<span class="line" id="L1073"><a href="#L1073"> 1073</a>     fn segment_is_made_once_then_attached() {</span>
+<span class="line" id="L1074"><a href="#L1074"> 1074</a>         let _serial = segment_test_guard();</span>
+<span class="line" id="L1075"><a href="#L1075"> 1075</a>         let key = TestKey::new(0);</span>
+<span class="line" id="L1076"><a href="#L1076"> 1076</a>         let table = TableFile::new(&quot;shm-made&quot;, 0);</span>
+<span class="line" id="L1077"><a href="#L1077"> 1077</a>         let (first, report) = table.open(&amp;key.options(LoadMode::Shm, &quot;4k&quot;)).unwrap();</span>
+<span class="line" id="L1078"><a href="#L1078"> 1078</a>         let segment = report.segment.unwrap();</span>
+<span class="line" id="L1079"><a href="#L1079"> 1079</a>         assert_eq!(report.mode, LoadMode::Shm);</span>
+<span class="line" id="L1080"><a href="#L1080"> 1080</a>         assert!(segment.created);</span>
+<span class="line" id="L1081"><a href="#L1081"> 1081</a>         assert_eq!(segment.key, key.0);</span>
+<span class="line" id="L1082"><a href="#L1082"> 1082</a>         assert_eq!(segment.page_bytes, NORMAL_PAGE);</span>
+<span class="line" id="L1083"><a href="#L1083"> 1083</a>         assert_eq!(segment.bytes, segment_bytes(h48_bytes(0), NORMAL_PAGE));</span>
+<span class="line" id="L1084"><a href="#L1084"> 1084</a>         assert_eq!(segment.source, table.path);</span>
+<span class="line" id="L1085"><a href="#L1085"> 1085</a>         assert_eq!((first.meta.k, first.meta.base), (0, 8));</span>
+<span class="line" id="L1086"><a href="#L1086"> 1086</a>         assert_eq!(</span>
+<span class="line" id="L1087"><a href="#L1087"> 1087</a>             &amp;first.memory.bytes().unwrap()[..table.data.len()],</span>
+<span class="line" id="L1088"><a href="#L1088"> 1088</a>             &amp;table.data[..]</span>
+<span class="line" id="L1089"><a href="#L1089"> 1089</a>         );</span>
+<span class="line" id="L1090"><a href="#L1090"> 1090</a>         let end = &amp;first.memory.bytes().unwrap()[first.memory.len() - 4096..];</span>
+<span class="line" id="L1091"><a href="#L1091"> 1091</a>         let header = parse_header(end).unwrap().unwrap();</span>
+<span class="line" id="L1092"><a href="#L1092"> 1092</a>         assert_eq!(header.trailer, table.trailer);</span>
+<span class="line" id="L1093"><a href="#L1093"> 1093</a>         assert_eq!(header.page_bytes, Some(NORMAL_PAGE));</span>
+<span class="line" id="L1094"><a href="#L1094"> 1094</a>         let ds = stat(segment.id).unwrap();</span>
+<span class="line" id="L1095"><a href="#L1095"> 1095</a>         assert_eq!(ds.shm_perm.mode &amp; 0o777, 0o400, &quot;read-only once loaded&quot;);</span>
+<span class="line" id="L1096"><a href="#L1096"> 1096</a>         assert_eq!(attached(segment.id), 1);</span>
+<span class="line" id="L1097"><a href="#L1097"> 1097</a>         for mode in [LoadMode::Shm, LoadMode::Auto] {</span>
+<span class="line" id="L1098"><a href="#L1098"> 1098</a>             let (again, report) = table.open(&amp;key.options(mode, &quot;4k&quot;)).unwrap();</span>
+<span class="line" id="L1099"><a href="#L1099"> 1099</a>             let found = report.segment.unwrap();</span>
+<span class="line" id="L1100"><a href="#L1100"> 1100</a>             assert!(!found.created);</span>
+<span class="line" id="L1101"><a href="#L1101"> 1101</a>             assert_eq!(</span>
+<span class="line" id="L1102"><a href="#L1102"> 1102</a>                 (found.id, found.bytes, found.page_bytes),</span>
+<span class="line" id="L1103"><a href="#L1103"> 1103</a>                 (segment.id, segment.bytes, NORMAL_PAGE)</span>
+<span class="line" id="L1104"><a href="#L1104"> 1104</a>             );</span>
+<span class="line" id="L1105"><a href="#L1105"> 1105</a>             assert_eq!(report.mode, LoadMode::Shm);</span>
+<span class="line" id="L1106"><a href="#L1106"> 1106</a>             assert_eq!(</span>
+<span class="line" id="L1107"><a href="#L1107"> 1107</a>                 &amp;again.memory.bytes().unwrap()[..table.data.len()],</span>
+<span class="line" id="L1108"><a href="#L1108"> 1108</a>                 &amp;table.data[..]</span>
+<span class="line" id="L1109"><a href="#L1109"> 1109</a>             );</span>
+<span class="line" id="L1110"><a href="#L1110"> 1110</a>             assert_eq!(attached(segment.id), 2);</span>
+<span class="line" id="L1111"><a href="#L1111"> 1111</a>         }</span>
+<span class="line" id="L1112"><a href="#L1112"> 1112</a>         // Explicit map and copy loads never use a segment.</span>
+<span class="line" id="L1113"><a href="#L1113"> 1113</a>         for mode in [LoadMode::Map, LoadMode::Copy] {</span>
+<span class="line" id="L1114"><a href="#L1114"> 1114</a>             let (_, report) = table.open(&amp;key.options(mode, &quot;4k&quot;)).unwrap();</span>
+<span class="line" id="L1115"><a href="#L1115"> 1115</a>             assert_eq!((report.mode, report.segment), (mode, None));</span>
+<span class="line" id="L1116"><a href="#L1116"> 1116</a>         }</span>
+<span class="line" id="L1117"><a href="#L1117"> 1117</a>         drop(first);</span>
+<span class="line" id="L1118"><a href="#L1118"> 1118</a>         assert_eq!(attached(segment.id), 0, &quot;dropping the table detaches&quot;);</span>
+<span class="line" id="L1119"><a href="#L1119"> 1119</a>         let removed = unsafe { remove(key.0) }.unwrap().unwrap();</span>
+<span class="line" id="L1120"><a href="#L1120"> 1120</a>         assert_eq!(removed.id, segment.id);</span>
+<span class="line" id="L1121"><a href="#L1121"> 1121</a>         assert!(</span>
+<span class="line" id="L1122"><a href="#L1122"> 1122</a>             removed.held.starts_with(&quot;h0 base 8, checksum&quot;),</span>
+<span class="line" id="L1123"><a href="#L1123"> 1123</a>             &quot;{}&quot;,</span>
+<span class="line" id="L1124"><a href="#L1124"> 1124</a>             removed.held</span>
+<span class="line" id="L1125"><a href="#L1125"> 1125</a>         );</span>
+<span class="line" id="L1126"><a href="#L1126"> 1126</a>         assert!(unsafe { remove(key.0) }.unwrap().is_none());</span>
+<span class="line" id="L1127"><a href="#L1127"> 1127</a>         let (_, report) = table.open(&amp;key.options(LoadMode::Auto, &quot;4k&quot;)).unwrap();</span>
+<span class="line" id="L1128"><a href="#L1128"> 1128</a>         assert_eq!(report.segment, None);</span>
+<span class="line" id="L1129"><a href="#L1129"> 1129</a>         assert!(report.notes.is_empty(), &quot;{:?}&quot;, report.notes);</span>
+<span class="line" id="L1130"><a href="#L1130"> 1130</a>     }</span>
+<span class="line" id="L1131"><a href="#L1131"> 1131</a> </span>
+<span class="line" id="L1132"><a href="#L1132"> 1132</a>     /// A segment of another table under the key (another checksum) is</span>
+<span class="line" id="L1133"><a href="#L1133"> 1133</a>     /// refused by `Shm` and passed over by `Auto`, which loads the file.</span>
+<span class="line" id="L1134"><a href="#L1134"> 1134</a>     #[test]</span>
+<span class="line" id="L1135"><a href="#L1135"> 1135</a>     fn another_table_under_the_key_is_never_used() {</span>
+<span class="line" id="L1136"><a href="#L1136"> 1136</a>         let _serial = segment_test_guard();</span>
+<span class="line" id="L1137"><a href="#L1137"> 1137</a>         let key = TestKey::new(1);</span>
+<span class="line" id="L1138"><a href="#L1138"> 1138</a>         let first = TableFile::new(&quot;shm-first&quot;, 0);</span>
+<span class="line" id="L1139"><a href="#L1139"> 1139</a>         let second = TableFile::new(&quot;shm-second&quot;, 1);</span>
+<span class="line" id="L1140"><a href="#L1140"> 1140</a>         let (_attached, _) = first.open(&amp;key.options(LoadMode::Shm, &quot;4k&quot;)).unwrap();</span>
+<span class="line" id="L1141"><a href="#L1141"> 1141</a>         let error = second</span>
+<span class="line" id="L1142"><a href="#L1142"> 1142</a>             .open(&amp;key.options(LoadMode::Shm, &quot;4k&quot;))</span>
+<span class="line" id="L1143"><a href="#L1143"> 1143</a>             .err()</span>
+<span class="line" id="L1144"><a href="#L1144"> 1144</a>             .unwrap();</span>
+<span class="line" id="L1145"><a href="#L1145"> 1145</a>         assert!(matches!(error, TableError::ShmOtherTable { .. }), &quot;{error}&quot;);</span>
+<span class="line" id="L1146"><a href="#L1146"> 1146</a>         assert!(error.to_string().contains(&quot;--shm-remove&quot;), &quot;{error}&quot;);</span>
+<span class="line" id="L1147"><a href="#L1147"> 1147</a>         let (table, report) = second.open(&amp;key.options(LoadMode::Auto, &quot;4k&quot;)).unwrap();</span>
+<span class="line" id="L1148"><a href="#L1148"> 1148</a>         assert_eq!(report.segment, None);</span>
+<span class="line" id="L1149"><a href="#L1149"> 1149</a>         assert!(</span>
+<span class="line" id="L1150"><a href="#L1150"> 1150</a>             report.notes.iter().any(|n| n.contains(&quot;holds h0 base 8&quot;)),</span>
+<span class="line" id="L1151"><a href="#L1151"> 1151</a>             &quot;{:?}&quot;,</span>
+<span class="line" id="L1152"><a href="#L1152"> 1152</a>             report.notes</span>
+<span class="line" id="L1153"><a href="#L1153"> 1153</a>         );</span>
+<span class="line" id="L1154"><a href="#L1154"> 1154</a>         assert_eq!(</span>
+<span class="line" id="L1155"><a href="#L1155"> 1155</a>             &amp;table.memory.bytes().unwrap()[..second.data.len()],</span>
+<span class="line" id="L1156"><a href="#L1156"> 1156</a>             &amp;second.data[..]</span>
+<span class="line" id="L1157"><a href="#L1157"> 1157</a>         );</span>
+<span class="line" id="L1158"><a href="#L1158"> 1158</a>     }</span>
+<span class="line" id="L1159"><a href="#L1159"> 1159</a> </span>
+<span class="line" id="L1160"><a href="#L1160"> 1160</a>     /// A segment without a trailer is being loaded (its maker runs: `Shm`</span>
+<span class="line" id="L1161"><a href="#L1161"> 1161</a>     /// says so, to try again; `Auto` loads the file) or was interrupted (its</span>
+<span class="line" id="L1162"><a href="#L1162"> 1162</a>     /// maker is gone: `Shm` removes it and loads anew).</span>
+<span class="line" id="L1163"><a href="#L1163"> 1163</a>     #[test]</span>
+<span class="line" id="L1164"><a href="#L1164"> 1164</a>     fn unfinished_segments_are_found() {</span>
+<span class="line" id="L1165"><a href="#L1165"> 1165</a>         let _serial = segment_test_guard();</span>
+<span class="line" id="L1166"><a href="#L1166"> 1166</a>         let key = TestKey::new(2);</span>
+<span class="line" id="L1167"><a href="#L1167"> 1167</a>         let table = TableFile::new(&quot;shm-unfinished&quot;, 0);</span>
+<span class="line" id="L1168"><a href="#L1168"> 1168</a>         let bytes = segment_bytes(h48_bytes(0), NORMAL_PAGE);</span>
+<span class="line" id="L1169"><a href="#L1169"> 1169</a>         let flags = libc::IPC_CREAT | libc::IPC_EXCL | 0o600;</span>
+<span class="line" id="L1170"><a href="#L1170"> 1170</a>         let id = shmget(key.0, bytes, flags).unwrap();</span>
+<span class="line" id="L1171"><a href="#L1171"> 1171</a>         let error = table.open(&amp;key.options(LoadMode::Shm, &quot;4k&quot;)).err().unwrap();</span>
+<span class="line" id="L1172"><a href="#L1172"> 1172</a>         let me = std::process::id().cast_signed();</span>
+<span class="line" id="L1173"><a href="#L1173"> 1173</a>         assert!(</span>
+<span class="line" id="L1174"><a href="#L1174"> 1174</a>             matches!(error, TableError::ShmLoading { pid, .. } if pid == me),</span>
+<span class="line" id="L1175"><a href="#L1175"> 1175</a>             &quot;{error}&quot;</span>
+<span class="line" id="L1176"><a href="#L1176"> 1176</a>         );</span>
+<span class="line" id="L1177"><a href="#L1177"> 1177</a>         let (_, report) = table.open(&amp;key.options(LoadMode::Auto, &quot;4k&quot;)).unwrap();</span>
+<span class="line" id="L1178"><a href="#L1178"> 1178</a>         assert_eq!(report.segment, None);</span>
+<span class="line" id="L1179"><a href="#L1179"> 1179</a>         assert!(</span>
+<span class="line" id="L1180"><a href="#L1180"> 1180</a>             report.notes.iter().any(|n| n.contains(&quot;being loaded&quot;)),</span>
+<span class="line" id="L1181"><a href="#L1181"> 1181</a>             &quot;{:?}&quot;,</span>
+<span class="line" id="L1182"><a href="#L1182"> 1182</a>             report.notes</span>
+<span class="line" id="L1183"><a href="#L1183"> 1183</a>         );</span>
+<span class="line" id="L1184"><a href="#L1184"> 1184</a>         assert!(unsafe { remove(key.0) }.unwrap().is_some());</span>
+<span class="line" id="L1185"><a href="#L1185"> 1185</a>         assert!(stat(id).is_err());</span>
+<span class="line" id="L1186"><a href="#L1186"> 1186</a>         // Made by a child process that exits without loading it.</span>
+<span class="line" id="L1187"><a href="#L1187"> 1187</a>         // SAFETY: the child only makes the segment and exits (no allocation,</span>
+<span class="line" id="L1188"><a href="#L1188"> 1188</a>         // no locks).</span>
+<span class="line" id="L1189"><a href="#L1189"> 1189</a>         unsafe {</span>
+<span class="line" id="L1190"><a href="#L1190"> 1190</a>             let child = libc::fork();</span>
+<span class="line" id="L1191"><a href="#L1191"> 1191</a>             if child == 0 {</span>
+<span class="line" id="L1192"><a href="#L1192"> 1192</a>                 let ok =</span>
+<span class="line" id="L1193"><a href="#L1193"> 1193</a>                     libc::shmget(key.0.cast_signed(), usize::try_from(bytes).unwrap(), flags) &gt;= 0;</span>
+<span class="line" id="L1194"><a href="#L1194"> 1194</a>                 libc::_exit(i32::from(!ok));</span>
+<span class="line" id="L1195"><a href="#L1195"> 1195</a>             }</span>
+<span class="line" id="L1196"><a href="#L1196"> 1196</a>             let mut status = 0;</span>
+<span class="line" id="L1197"><a href="#L1197"> 1197</a>             assert_eq!(libc::waitpid(child, &amp;raw mut status, 0), child);</span>
+<span class="line" id="L1198"><a href="#L1198"> 1198</a>             assert_eq!(status, 0);</span>
+<span class="line" id="L1199"><a href="#L1199"> 1199</a>         }</span>
+<span class="line" id="L1200"><a href="#L1200"> 1200</a>         let (loaded, report) = table.open(&amp;key.options(LoadMode::Shm, &quot;4k&quot;)).unwrap();</span>
+<span class="line" id="L1201"><a href="#L1201"> 1201</a>         assert!(report.segment.unwrap().created);</span>
+<span class="line" id="L1202"><a href="#L1202"> 1202</a>         assert!(</span>
+<span class="line" id="L1203"><a href="#L1203"> 1203</a>             report.notes.iter().any(|n| n.contains(&quot;was interrupted&quot;)),</span>
+<span class="line" id="L1204"><a href="#L1204"> 1204</a>             &quot;{:?}&quot;,</span>
+<span class="line" id="L1205"><a href="#L1205"> 1205</a>             report.notes</span>
+<span class="line" id="L1206"><a href="#L1206"> 1206</a>         );</span>
+<span class="line" id="L1207"><a href="#L1207"> 1207</a>         assert_eq!(</span>
+<span class="line" id="L1208"><a href="#L1208"> 1208</a>             &amp;loaded.memory.bytes().unwrap()[..table.data.len()],</span>
+<span class="line" id="L1209"><a href="#L1209"> 1209</a>             &amp;table.data[..]</span>
+<span class="line" id="L1210"><a href="#L1210"> 1210</a>         );</span>
+<span class="line" id="L1211"><a href="#L1211"> 1211</a>     }</span>
+<span class="line" id="L1212"><a href="#L1212"> 1212</a> </span>
+<span class="line" id="L1213"><a href="#L1213"> 1213</a>     /// Without huge pages to be had, a segment falls back to the next size</span>
+<span class="line" id="L1214"><a href="#L1214"> 1214</a>     /// with a note that says why; a table without a checksum gets none.</span>
+<span class="line" id="L1215"><a href="#L1215"> 1215</a>     #[test]</span>
+<span class="line" id="L1216"><a href="#L1216"> 1216</a>     fn huge_pages_fall_back_with_a_note() {</span>
+<span class="line" id="L1217"><a href="#L1217"> 1217</a>         let _serial = segment_test_guard();</span>
+<span class="line" id="L1218"><a href="#L1218"> 1218</a>         let key = TestKey::new(3);</span>
+<span class="line" id="L1219"><a href="#L1219"> 1219</a>         let table = TableFile::new(&quot;shm-pages&quot;, 0);</span>
+<span class="line" id="L1220"><a href="#L1220"> 1220</a>         let (_, report) = table.open(&amp;key.options(LoadMode::Shm, &quot;2m,4k&quot;)).unwrap();</span>
+<span class="line" id="L1221"><a href="#L1221"> 1221</a>         let segment = report.segment.unwrap();</span>
+<span class="line" id="L1222"><a href="#L1222"> 1222</a>         if segment.page_bytes == NORMAL_PAGE {</span>
+<span class="line" id="L1223"><a href="#L1223"> 1223</a>             assert!(</span>
+<span class="line" id="L1224"><a href="#L1224"> 1224</a>                 report.notes.iter().any(|n| n.starts_with(&quot;2 MiB pages: &quot;)),</span>
+<span class="line" id="L1225"><a href="#L1225"> 1225</a>                 &quot;{:?}&quot;,</span>
+<span class="line" id="L1226"><a href="#L1226"> 1226</a>                 report.notes</span>
+<span class="line" id="L1227"><a href="#L1227"> 1227</a>             );</span>
+<span class="line" id="L1228"><a href="#L1228"> 1228</a>         } else {</span>
+<span class="line" id="L1229"><a href="#L1229"> 1229</a>             assert_eq!(segment.page_bytes, 1 &lt;&lt; 21);</span>
+<span class="line" id="L1230"><a href="#L1230"> 1230</a>             assert_eq!(segment.bytes % (1 &lt;&lt; 21), 0);</span>
+<span class="line" id="L1231"><a href="#L1231"> 1231</a>         }</span>
+<span class="line" id="L1232"><a href="#L1232"> 1232</a>         drop(key);</span>
+<span class="line" id="L1233"><a href="#L1233"> 1233</a>         let key = TestKey::new(4);</span>
+<span class="line" id="L1234"><a href="#L1234"> 1234</a>         let no_checksum = TableFile::new(&quot;shm-no-checksum&quot;, 0);</span>
+<span class="line" id="L1235"><a href="#L1235"> 1235</a>         let trailer = Trailer {</span>
+<span class="line" id="L1236"><a href="#L1236"> 1236</a>             checksum: None,</span>
+<span class="line" id="L1237"><a href="#L1237"> 1237</a>             ..no_checksum.trailer</span>
+<span class="line" id="L1238"><a href="#L1238"> 1238</a>         };</span>
+<span class="line" id="L1239"><a href="#L1239"> 1239</a>         unsafe { file::write_trailer(&amp;no_checksum.path, &amp;trailer) }.unwrap();</span>
+<span class="line" id="L1240"><a href="#L1240"> 1240</a>         let error = no_checksum</span>
+<span class="line" id="L1241"><a href="#L1241"> 1241</a>             .open(&amp;key.options(LoadMode::Shm, &quot;4k&quot;))</span>
+<span class="line" id="L1242"><a href="#L1242"> 1242</a>             .err()</span>
+<span class="line" id="L1243"><a href="#L1243"> 1243</a>             .unwrap();</span>
+<span class="line" id="L1244"><a href="#L1244"> 1244</a>         assert!(matches!(error, TableError::ShmNoChecksum { .. }), &quot;{error}&quot;);</span>
+<span class="line" id="L1245"><a href="#L1245"> 1245</a>         let (_, report) = no_checksum</span>
+<span class="line" id="L1246"><a href="#L1246"> 1246</a>             .open(&amp;key.options(LoadMode::Auto, &quot;4k&quot;))</span>
+<span class="line" id="L1247"><a href="#L1247"> 1247</a>             .unwrap();</span>
+<span class="line" id="L1248"><a href="#L1248"> 1248</a>         assert_eq!(report.segment, None);</span>
+<span class="line" id="L1249"><a href="#L1249"> 1249</a>     }</span>
+<span class="line" id="L1250"><a href="#L1250"> 1250</a> </span>
+<span class="line" id="L1251"><a href="#L1251"> 1251</a>     /// The preflight verdicts and messages: pool pages and the permission,</span>
+<span class="line" id="L1252"><a href="#L1252"> 1252</a>     /// with how to fix them.</span>
+<span class="line" id="L1253"><a href="#L1253"> 1253</a>     #[test]</span>
+<span class="line" id="L1254"><a href="#L1254"> 1254</a>     fn preflight_verdicts() {</span>
+<span class="line" id="L1255"><a href="#L1255"> 1255</a>         let _serial = segment_test_guard();</span>
+<span class="line" id="L1256"><a href="#L1256"> 1256</a>         // h7 on 1 GiB pages: 4 pages.</span>
+<span class="line" id="L1257"><a href="#L1257"> 1257</a>         let h7 = segment_bytes(h48_bytes(7), 1 &lt;&lt; 30);</span>
+<span class="line" id="L1258"><a href="#L1258"> 1258</a>         assert!(pool_verdict(1 &lt;&lt; 30, h7, 70, 4).is_ok());</span>
+<span class="line" id="L1259"><a href="#L1259"> 1259</a>         let short = pool_verdict(1 &lt;&lt; 30, h7, 70, 1).unwrap_err();</span>
+<span class="line" id="L1260"><a href="#L1260"> 1260</a>         assert!(</span>
+<span class="line" id="L1261"><a href="#L1261"> 1261</a>             short.starts_with(&quot;1 GiB pages: 4 needed, 1 free in the pool (70 in all)&quot;),</span>
+<span class="line" id="L1262"><a href="#L1262"> 1262</a>             &quot;{short}&quot;</span>
+<span class="line" id="L1263"><a href="#L1263"> 1263</a>         );</span>
+<span class="line" id="L1264"><a href="#L1264"> 1264</a>         assert!(</span>
+<span class="line" id="L1265"><a href="#L1265"> 1265</a>             short.contains(</span>
+<span class="line" id="L1266"><a href="#L1266"> 1266</a>                 &quot;echo 73 | sudo tee /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages&quot;</span>
+<span class="line" id="L1267"><a href="#L1267"> 1267</a>             ),</span>
+<span class="line" id="L1268"><a href="#L1268"> 1268</a>             &quot;{short}&quot;</span>
+<span class="line" id="L1269"><a href="#L1269"> 1269</a>         );</span>
+<span class="line" id="L1270"><a href="#L1270"> 1270</a>         let denied = huge_page_failure(1 &lt;&lt; 30, &amp;std::io::Error::from_raw_os_error(libc::EPERM));</span>
+<span class="line" id="L1271"><a href="#L1271"> 1271</a>         assert!(</span>
+<span class="line" id="L1272"><a href="#L1272"> 1272</a>             denied.starts_with(&quot;1 GiB pages: EPERM: no permission&quot;),</span>
+<span class="line" id="L1273"><a href="#L1273"> 1273</a>             &quot;{denied}&quot;</span>
+<span class="line" id="L1274"><a href="#L1274"> 1274</a>         );</span>
+<span class="line" id="L1275"><a href="#L1275"> 1275</a>         assert!(</span>
+<span class="line" id="L1276"><a href="#L1276"> 1276</a>             denied.contains(&quot;vm.hugetlb_shm_group&quot;) &amp;&amp; denied.contains(&quot;CAP_IPC_LOCK&quot;),</span>
+<span class="line" id="L1277"><a href="#L1277"> 1277</a>             &quot;{denied}&quot;</span>
+<span class="line" id="L1278"><a href="#L1278"> 1278</a>         );</span>
+<span class="line" id="L1279"><a href="#L1279"> 1279</a>         let message = permission_message(0, 1000);</span>
+<span class="line" id="L1280"><a href="#L1280"> 1280</a>         assert!(</span>
+<span class="line" id="L1281"><a href="#L1281"> 1281</a>             message.ends_with(&quot;`sudo sysctl vm.hugetlb_shm_group=1000`&quot;),</span>
+<span class="line" id="L1282"><a href="#L1282"> 1282</a>             &quot;{message}&quot;</span>
+<span class="line" id="L1283"><a href="#L1283"> 1283</a>         );</span>
+<span class="line" id="L1284"><a href="#L1284"> 1284</a>     }</span>
+<span class="line" id="L1285"><a href="#L1285"> 1285</a> </span>
+<span class="line" id="L1286"><a href="#L1286"> 1286</a>     /// A segment&#x27;s trailer is the file&#x27;s, with its page size and source.</span>
+<span class="line" id="L1287"><a href="#L1287"> 1287</a>     #[test]</span>
+<span class="line" id="L1288"><a href="#L1288"> 1288</a>     fn segment_trailer_round_trip() {</span>
+<span class="line" id="L1289"><a href="#L1289"> 1289</a>         let _serial = segment_test_guard();</span>
+<span class="line" id="L1290"><a href="#L1290"> 1290</a>         let trailer = Trailer {</span>
+<span class="line" id="L1291"><a href="#L1291"> 1291</a>             k: 7,</span>
+<span class="line" id="L1292"><a href="#L1292"> 1292</a>             base: 9,</span>
+<span class="line" id="L1293"><a href="#L1293"> 1293</a>             data_bytes: h48_bytes(7),</span>
+<span class="line" id="L1294"><a href="#L1294"> 1294</a>             distribution: Some([1, 2, 3, 4]),</span>
+<span class="line" id="L1295"><a href="#L1295"> 1295</a>             checksum: Some(0xa8f0_d265_7a36_a775),</span>
+<span class="line" id="L1296"><a href="#L1296"> 1296</a>         };</span>
+<span class="line" id="L1297"><a href="#L1297"> 1297</a>         let bytes = header_bytes(&amp;trailer, 1 &lt;&lt; 21, &quot;/mnt/huge/h7\nx&quot;);</span>
+<span class="line" id="L1298"><a href="#L1298"> 1298</a>         assert_eq!(bytes.len(), 4096);</span>
+<span class="line" id="L1299"><a href="#L1299"> 1299</a>         assert_eq!(Trailer::parse(&amp;bytes).unwrap(), Some(trailer));</span>
+<span class="line" id="L1300"><a href="#L1300"> 1300</a>         let header = parse_header(&amp;bytes).unwrap().unwrap();</span>
+<span class="line" id="L1301"><a href="#L1301"> 1301</a>         assert_eq!(</span>
+<span class="line" id="L1302"><a href="#L1302"> 1302</a>             (header.trailer, header.page_bytes),</span>
+<span class="line" id="L1303"><a href="#L1303"> 1303</a>             (trailer, Some(1 &lt;&lt; 21))</span>
+<span class="line" id="L1304"><a href="#L1304"> 1304</a>         );</span>
+<span class="line" id="L1305"><a href="#L1305"> 1305</a>         assert_eq!(header.source, &quot;/mnt/huge/h7?x&quot;);</span>
+<span class="line" id="L1306"><a href="#L1306"> 1306</a>         assert!(parse_header(&amp;[0u8; 4096]).unwrap().is_none());</span>
+<span class="line" id="L1307"><a href="#L1307"> 1307</a>     }</span>
+<span class="line" id="L1308"><a href="#L1308"> 1308</a> }</span>
+<span class="line" id="L1309"><a href="#L1309"> 1309</a> </span>
+<span class="line" id="L1310"><a href="#L1310"> 1310</a> #[cfg(test)]</span>
+<span class="line" id="L1311"><a href="#L1311"> 1311</a> mod publication_tests {</span>
+<span class="line" id="L1312"><a href="#L1312"> 1312</a>     use super::*;</span>
+<span class="line" id="L1313"><a href="#L1313"> 1313</a>     use std::sync::atomic::{AtomicU8, Ordering};</span>
+<span class="line" id="L1314"><a href="#L1314"> 1314</a> </span>
+<span class="line" id="L1315"><a href="#L1315"> 1315</a>     #[test]</span>
+<span class="line" id="L1316"><a href="#L1316"> 1316</a>     fn safe_api_trailer_publication_orders_payload_reads() {</span>
+<span class="line" id="L1317"><a href="#L1317"> 1317</a>         for _ in 0..8 {</span>
+<span class="line" id="L1318"><a href="#L1318"> 1318</a>             let memory = Memory::anonymous(64).unwrap();</span>
+<span class="line" id="L1319"><a href="#L1319"> 1319</a>             std::thread::scope(|scope| {</span>
+<span class="line" id="L1320"><a href="#L1320"> 1320</a>                 let write = || {</span>
+<span class="line" id="L1321"><a href="#L1321"> 1321</a>                     // SAFETY: this is the only writer, before publication;</span>
+<span class="line" id="L1322"><a href="#L1322"> 1322</a>                     // readers leave the payload untouched until Acquire.</span>
+<span class="line" id="L1323"><a href="#L1323"> 1323</a>                     unsafe {</span>
+<span class="line" id="L1324"><a href="#L1324"> 1324</a>                         memory.ptr().add(1).write_bytes(0x5a, 63);</span>
+<span class="line" id="L1325"><a href="#L1325"> 1325</a>                         AtomicU8::from_ptr(memory.ptr()).store(b&#x27;e&#x27;, Ordering::Release);</span>
+<span class="line" id="L1326"><a href="#L1326"> 1326</a>                     }</span>
+<span class="line" id="L1327"><a href="#L1327"> 1327</a>                 };</span>
+<span class="line" id="L1328"><a href="#L1328"> 1328</a>                 if std::thread::Builder::new()</span>
+<span class="line" id="L1329"><a href="#L1329"> 1329</a>                     .spawn_scoped(scope, write)</span>
+<span class="line" id="L1330"><a href="#L1330"> 1330</a>                     .is_err()</span>
+<span class="line" id="L1331"><a href="#L1331"> 1331</a>                 {</span>
+<span class="line" id="L1332"><a href="#L1332"> 1332</a>                     write();</span>
+<span class="line" id="L1333"><a href="#L1333"> 1333</a>                 }</span>
+<span class="line" id="L1334"><a href="#L1334"> 1334</a>                 let mut snapshot = [0; 64];</span>
+<span class="line" id="L1335"><a href="#L1335"> 1335</a>                 // SAFETY: the producer above follows the publication protocol.</span>
+<span class="line" id="L1336"><a href="#L1336"> 1336</a>                 unsafe {</span>
+<span class="line" id="L1337"><a href="#L1337"> 1337</a>                     copy_published_trailer(memory.ptr(), &amp;mut snapshot);</span>
+<span class="line" id="L1338"><a href="#L1338"> 1338</a>                 }</span>
+<span class="line" id="L1339"><a href="#L1339"> 1339</a>                 assert!(</span>
+<span class="line" id="L1340"><a href="#L1340"> 1340</a>                     snapshot == [0; 64] || (snapshot[0] == b&#x27;e&#x27; &amp;&amp; snapshot[1..] == [0x5a; 63])</span>
+<span class="line" id="L1341"><a href="#L1341"> 1341</a>                 );</span>
+<span class="line" id="L1342"><a href="#L1342"> 1342</a>             });</span>
+<span class="line" id="L1343"><a href="#L1343"> 1343</a>             let mut snapshot = [0; 64];</span>
+<span class="line" id="L1344"><a href="#L1344"> 1344</a>             // SAFETY: the writer has joined, and no other writes can occur.</span>
+<span class="line" id="L1345"><a href="#L1345"> 1345</a>             unsafe {</span>
+<span class="line" id="L1346"><a href="#L1346"> 1346</a>                 copy_published_trailer(memory.ptr(), &amp;mut snapshot);</span>
+<span class="line" id="L1347"><a href="#L1347"> 1347</a>             }</span>
+<span class="line" id="L1348"><a href="#L1348"> 1348</a>             assert_eq!(snapshot[0], b&#x27;e&#x27;);</span>
+<span class="line" id="L1349"><a href="#L1349"> 1349</a>             assert_eq!(snapshot[1..], [0x5a; 63]);</span>
+<span class="line" id="L1350"><a href="#L1350"> 1350</a>         }</span>
+<span class="line" id="L1351"><a href="#L1351"> 1351</a>     }</span>
+<span class="line" id="L1352"><a href="#L1352"> 1352</a> }</span></pre></html>

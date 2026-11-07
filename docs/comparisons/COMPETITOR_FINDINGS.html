@@ -1,0 +1,210 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bugs and issues found in other solvers (for the final report; the user will report them upstream) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../index.html">Home</a><a href="../guide/OVERVIEW.html">Learn</a><a href="index.html">Compare</a><a href="../performance/index.html">Performance</a><a href="../safety/index.html">Safety</a><a href="../history/index.html">History</a><a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="COMPETITOR_FINDINGS.md">Markdown source</a> · Offline document</p><details><summary>On this page</summary><ul><li><a href="#1-nissy-core-h11-table-slightly-inadmissible-generator-skips-the-last-hash-slot">1. nissy-core: h11 table slightly inadmissible (generator skips the last hash slot)</a></li><li><a href="#2-4-cube-solver-test-harness-issues-found-by-f1-while-extending-it">2–4. cube_solver_test harness issues (found by f1 while extending it)</a></li><li><a href="#5-6-huge-page-handling-performance-not-correctness">5–6. Huge-page handling (performance, not correctness)</a></li><li><a href="#f1-exact-locations-for-2-6-and-new-findings-7-10-f1-2026-11-04">f1: exact locations for #2-#6, and new findings #7-#10 (f1, 2026-11-04)</a></li><li><a href="#shm1-vcube-shared-memory-found-while-porting-shm-2026-11-05">shm1: vcube shared memory (found while porting --shm, 2026-11-05)</a></li><li><a href="#continuation-review-2026-11-05">Continuation review (2026-11-05)</a></li><li><a href="#pinned-source-links">Pinned source links</a></li></ul></details><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="bugs-and-issues-found-in-other-solvers-for-the-final-report-the-user-will-report-them-upstream">Bugs and issues found in other solvers (for the final report; the user will report them upstream)</h1>
+<p>Source commits read: nissy-core 1f7e8e9 (2026-09-17), vcube 9f5bc2c (2024-04-18), cube20src/nxopt f430921 (2025-07-18), cube_solver_test b9cca71 (2026-02-01); cubeopt30/cube48opt10 = the prebuilt binaries in ~/ (no source).</p>
+<p>Each entry: project, file:line at the commit we read, what is wrong, a repro or proof, impact, and a suggested fix.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>project</th><th>severity</th><th>summary</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>nissy-core (H48)</td><td>correctness (admissibility)</td><td>h11 generator skips the last hash-map slot: 11,546 h11 entries are one level too high</td></tr>
+<tr><td>2</td><td>cube_solver_test (h48cmd.py)</td><td>harness</td><td>per-cube lines are mis-paired (stdout is buffered, nissy logs to stderr); the Avg line is unaffected</td></tr>
+<tr><td>3</td><td>cube_solver_test (h48cmd.py)</td><td>harness / memory</td><td><code>bytearray(f.read())</code> holds the table twice (2x RAM); h48h8 does not fit in ~16 GiB free</td></tr>
+<tr><td>4</td><td>cube_solver_test (runtest.sh)</td><td>harness</td><td>passes <code>-g $ngroup</code> to cubeopt/cube48opt, but the published binaries accept only <code>-l -m -n -t -v</code> (no <code>-g</code>); the option is ignored</td></tr>
+<tr><td>5</td><td>vcube</td><td>performance</td><td>when MAP_HUGETLB (1G, then 2M) fails, falls back to a plain mmap with no madvise(MADV_HUGEPAGE): 4K pages, ~10% slower on THP=madvise systems</td></tr>
+<tr><td>6</td><td>nxopt</td><td>performance</td><td>the table is one malloc per corner row with no MADV_HUGEPAGE: 4K pages on THP=madvise systems, ~11% slower</td></tr>
+</tbody>
+</table></div>
+<h2 id="1-nissy-core-h11-table-slightly-inadmissible-generator-skips-the-last-hash-slot">1. nissy-core: h11 table slightly inadmissible (generator skips the last hash slot)</h2>
+<ul>
+<li><strong>Where:</strong> h48/gendata_h48.h:307-316 (<code>gendata_h48_runthread</code>) with h48/map.h:68-87 (<code>h48map_nextkvpair</code> post-increments the slot index).
+<ul>
+<li>Commit: nissy-core 1f7e8e9.</li>
+</ul>
+</li>
+<li><strong>What:</strong> the loop <code>kv = nextkvpair(map, next); if (*next == capacity) break;</code> breaks before processing the entry in the last slot (<code>capacity - 1</code>).
+<ul>
+<li>With the fixed capacity 10000019 and nissy's hash, that slot holds the depth-8 h11 entry 189880194105 (class 2675, no self-symmetry). Its 4-level DFS never runs: the loop visits 7,437,854 of 7,437,855 short entries.</li>
+<li>The same loop shape in <code>gendata_h48short</code> (gendata_h48.h:62-65) is harmless, because that entry's value is 8 (the last BFS level).</li>
+</ul>
+</li>
+<li><strong>Proof:</strong>
+<ul>
+<li>nissy's own depth-≤8 BFS equals ours per depth (1/1/4/34/333/3815/45382/548562/6839723).</li>
+<li>Modelling nissy's values in the 49,206 entries within 4 moves of the skipped root gives ours − nissy = [+159, +1689, +7691, −9539] per 2-bit code. That exactly matches the difference between our exact h11 distribution [1150763320, 12045847349, 91163441021, 136418085910] and nissy's checkdata.h.</li>
+<li>Scripts: /data/agents/x-h48/drv/{short,lastslot,skipped}.c.</li>
+</ul>
+</li>
+<li><strong>Impact:</strong> 11,546 entries are over-estimated by one level (159 true ≤10 coded 1, 1848 true 11 coded 2, 9539 true 12 coded 3). The table is therefore not admissible: a solve whose optimal path passes through one of these positions near the end could return a non-optimal solution. The probability is tiny on random cubes but nonzero.</li>
+<li><strong>Fix:</strong> after <code>h48map_nextkvpair</code>, test <code>kv.key == MAP_KEYMASK</code> while holding the mutex. That sentinel means the iterator is exhausted; every non-sentinel entry, including the last occupied slot, must be processed. Regenerate h11 and update checkdata.h.</li>
+<li><strong>To check in the final comparison:</strong> whether h9/h10 (other k) are affected; the length cross-check on h48h11 runs.</li>
+</ul>
+<h2 id="2-4-cube-solver-test-harness-issues-found-by-f1-while-extending-it">2–4. cube_solver_test harness issues (found by f1 while extending it)</h2>
+<ul>
+<li><strong>2. h48cmd.py output pairing.</strong> Python's stdout is block-buffered, while nissy prints its stats to stderr, so runtest.sh's awk pairs &quot;Nodes visited&quot; and &quot;Time&quot; lines from different cubes. Per-cube lines are wrong; totals and Avg are right. Fix: <code>flush=True</code> / <code>sys.stdout.flush()</code> after each solve. Patch in /data/agents/f1/cube_solver_test-cubeoptrs.patch.</li>
+<li><strong>3. h48cmd.py double table copy.</strong> <code>bytearray(f.read())</code> keeps the bytes object and the bytearray (2x the table) alive, so h48h8+ needs twice the RAM. Fix: <code>buf = bytearray(size); f.readinto(buf)</code>. Patch: same file.</li>
+<li><strong>4. runtest.sh <code>-g</code>.</strong> cubeopt()/cube48opt() pass <code>-g $ngroup</code>, but the published cubeopt30/cube48opt10 binaries parse only <code>-l -m -n -t -v</code> (from their disassembly), so ngroup has no effect. Either the binaries or the script are out of date.</li>
+</ul>
+<h2 id="5-6-huge-page-handling-performance-not-correctness">5–6. Huge-page handling (performance, not correctness)</h2>
+<ul>
+<li><strong>5. vcube</strong> (src/alloc.cpp): tries MAP_HUGETLB 1G, then 2M (both fail when the hugetlb pool has no free pages), then falls back to a plain mmap with no madvise. On THP=madvise systems the table ends up on 4K pages. Measured with an LD_PRELOAD madvise shim: 1T −10%, 48T −9% sec/solve.
+<ul>
+<li>Fix: <code>madvise(p, len, MADV_HUGEPAGE)</code> on the fallback mapping.</li>
+</ul>
+</li>
+<li><strong>6. nxopt</strong> (cube20src nxopt.w): one malloc per corner row (114 × 17.5 MiB + smaller), no madvise, so 4K pages on THP=madvise. With glibc.malloc.hugetlb=1 + mmap_threshold=32 MiB: 1T −11%, 48T −11%.
+<ul>
+<li>Fix: one aligned allocation for the whole table + MADV_HUGEPAGE.</li>
+</ul>
+</li>
+</ul>
+<h2 id="f1-exact-locations-for-2-6-and-new-findings-7-10-f1-2026-11-04">f1: exact locations for #2-#6, and new findings #7-#10 (f1, 2026-11-04)</h2>
+<p>Exact locations for the entries above (code as read; harness = ~/ref/cube_solver_test b9cca71):</p>
+<ul>
+<li><strong>#2:</strong> h48cmd.py:31 <code>print (scramble)</code> and :34 <code>print('Time: ...')</code> go to Python's stdout, which is block-buffered when piped. nissy's stats go to stderr: python/nissy_module.c:447-449 <code>log_stdout()</code> (misnamed) does <code>fprintf(stderr, ...)</code> and is installed at :455. runtest.sh:85 merges them with <code>2&gt;&amp;1</code>.
+<ul>
+<li>Mechanism, reproduced: <code>python3 -c 'import sys; [ (sys.stderr.write(&quot;Nodes visited: %d\n&quot; % i), print(&quot;Time: %d&quot; % i)) for i in range(2)]' 2&gt;&amp;1 | cat</code> prints both &quot;Nodes&quot; lines before both &quot;Time&quot; lines. runtest.sh's awk (h48(), runtest.sh:86-97) then pairs every Time with the last cube's nodes.</li>
+<li>Fix in our copy: <code>sys.stdout.flush()</code> after each cube.</li>
+</ul>
+</li>
+<li><strong>#3:</strong> h48cmd.py:17 <code>solver_data = bytearray(f.read())</code>.</li>
+<li><strong>#4:</strong> runtest.sh:124 <code>./cube$3$2 -t $nthread -g $ngroup -m $maxl -</code>.
+<ul>
+<li>Binaries: the option switch in main does <code>sub $0x6c,%eax; cmp $0xa,%al</code> (cube48opt10 at 0x2a79, cubeopt30 at 0x2a99), then a jump table (0x183f4 / 0x193f4). That table has cases only for l, m, n, t and v: <code>-l</code> scramble length (default 15), <code>-m</code> max depth (20), <code>-n</code> count (100), <code>-t</code> threads, <code>-v</code> debug.</li>
+<li><code>-g</code> is skipped; its value &quot;1&quot; briefly becomes the mode character, and the final &quot;-&quot; sets the stdin mode again. So <code>-g</code> is harmless but has no effect.</li>
+</ul>
+</li>
+<li><strong>#5:</strong> vcube src/alloc.cpp:45-57 (<code>alloc::huge_impl</code>: <code>map_huge(n, 30)</code> -&gt; <code>map_huge(n, 21)</code> -&gt; <code>map_huge(n, 0)</code>; <code>map_huge</code> at :36-43 adds no madvise). The SysV-shm path is at :77-89 (the <code>-S</code> option).
+<ul>
+<li>strace: <code>mmap(3072 MiB, MAP_HUGETLB) = -1</code>, <code>mmap(2484 MiB, MAP_HUGETLB) = -1</code>, then a plain 2482 MiB mmap.</li>
+<li>200-cube numbers: /data/agents/f1/final/results.md (phase A).</li>
+</ul>
+</li>
+<li><strong>#6:</strong> cube20src nxopt.w:749 <code>firstlevs[j].p = (unsigned int *)malloc(MEMSIZE * (size_t)siz);</code> (nxopt.cpp:837 after ctangle). It allocates one block per distinct corner row.
+<ul>
+<li>glibc serves each block with its own mmap: strace shows 114 mmaps of 17.5 MiB plus smaller ones, and no madvise.</li>
+<li><code>glibc.malloc.hugetlb=1</code> alone does not help: blocks under 2 MiB are separate small mmaps, and with 700 KiB blocks the test showed 0% THP.</li>
+<li>It also needs <code>glibc.malloc.mmap_threshold=33554432</code>, so that the rows come from the madvised heap.</li>
+</ul>
+</li>
+</ul>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>project</th><th>severity</th><th>summary</th></tr>
+</thead>
+<tbody>
+<tr><td>7</td><td>nissy-core (H48 solve)</td><td>nondeterminism (uninitialized read)</td><td>task <code>rank</code> is never initialized, so the depth &gt;= 16 task sort reads stack garbage; node counts (and times) vary between identical 1-thread runs</td></tr>
+<tr><td>8</td><td>nissy-core (python binding)</td><td>memory leak</td><td><code>gendata()</code> copies its PyMem_Malloc buffer into a new bytearray and never frees it: 2x the table, and the buffer leaks</td></tr>
+<tr><td>9</td><td>nissy-core (build.sh)</td><td>build pitfall</td><td>THREADS defaults to <code>nproc</code>, i.e. the CPUs of the build's affinity mask; a build under taskset/cpuset caps every later solve (and gendata) at that count, with only a log line</td></tr>
+<tr><td>10</td><td>nissy-core (H48 gendata)</td><td>performance (minor)</td><td>the progress logger sleeps a fixed ~10%-of-expected-time interval and joins only afterwards: up to ~3.5 min of idle wait after h48h7's workers finished (8 cores)</td></tr>
+</tbody>
+</table></div>
+<h3 id="7-nissy-core-uninitialized-task-rank-so-node-counts-are-nondeterministic">7. nissy-core: uninitialized task rank, so node counts are nondeterministic</h3>
+<ul>
+<li><strong>Where:</strong> src/solvers/h48/solve.h:578 <code>solve_h48_task_t tasks[H48_STARTING_CUBES];</code> is a stack array. <code>solve_h48_maketasks</code> (:487-:492) sets cube, pval, moves and tmask, but not <code>rank</code>.
+<ul>
+<li><code>rank</code> is written only after a task is searched (:443-446).</li>
+<li>From depth 16 (<code>H48_SORT_TASKS_MIN_DEPTH</code>) the tasks are sorted by rank (:688). Tasks skipped so far (<code>pval + 4 &gt; depth</code>, :419-421) still hold whatever was on the stack.</li>
+</ul>
+</li>
+<li><strong>Repro:</strong> the same h48h7 cube at <code>threads = 1</code>, in four runs (random_state #0): 38,739,453 / 38,726,886 / 38,725,684 / 38,726,886 nodes. Cube #1: 7,090,571 vs 7,090,825.
+<ul>
+<li>Solution lengths are unaffected: every depth is still searched completely before the next.</li>
+<li>What changes is when the first solution is found inside the last depth. That changes nodes and time.</li>
+</ul>
+</li>
+<li><strong>Fix:</strong> <code>tasks[*ntasks].rank = 0;</code> in maketasks (or zero the array).</li>
+</ul>
+<h3 id="8-nissy-core-python-binding-gendata-leaks-and-doubles-memory">8. nissy-core python binding: gendata leaks and doubles memory</h3>
+<ul>
+<li><strong>Where:</strong> python/nissy_module.c:247 <code>buf = PyMem_Malloc(size);</code> then :254 <code>return PyByteArray_FromStringAndSize((char *)buf, size);</code>. That call copies the buffer, and <code>buf</code> is never freed.</li>
+<li><strong>Impact:</strong> 2x the table during generation, and the original copy stays leaked: about 15 GB for h48h8 and 121 GB for h48h11.
+<ul>
+<li>The harness's h48cmd.py generates through this path when the table file is missing.</li>
+</ul>
+</li>
+<li><strong>Fix:</strong> allocate the bytearray first (<code>PyByteArray_FromStringAndSize(NULL, size)</code>) and generate into <code>PyByteArray_AS_STRING</code>. Or free <code>buf</code> after the copy.</li>
+<li><strong>Workaround used here:</strong> /data/agents/f1/tools/src/h48gen.c (one malloc, fwrite).</li>
+</ul>
+<h3 id="9-nissy-core-build-sh-thread-maximum-taken-from-the-affinity-mask">9. nissy-core build.sh: thread maximum taken from the affinity mask</h3>
+<ul>
+<li><strong>Where:</strong> build.sh:44 <code>THREADS=${THREADS-...}</code>, :61-65 <code>detectthreads</code> -&gt; <code>portable_nproc</code> -&gt; <code>nproc</code> (:50). <code>nproc</code> honours <code>sched_getaffinity</code>.
+<ul>
+<li>The value becomes the compile-time <code>-DTHREADS</code>.</li>
+<li>At solve time, src/nissy.c:349-353 clamps any larger request to it with only a LOG line.</li>
+</ul>
+</li>
+<li><strong>Repro:</strong> <code>taskset -c 0-7 ./build.sh python</code> gives THREADS=8. Then <code>nissy.solve(..., threads=48)</code> logs &quot;[solve] Selected number of threads (48) is above the maximum value (8), using 8 threads instead&quot;.
+<ul>
+<li>With runtest.sh's <code>2&gt;&amp;1 | awk</code> that line is never seen. Our 48T smoke runs of h48h7 ran on 8 threads.</li>
+<li>The final runs were rebuilt with THREADS=48, and init_h48.sh now passes <code>THREADS=$(nproc --all)</code>.</li>
+</ul>
+</li>
+<li><strong>Fix:</strong> <code>nproc --all</code> (or <code>getconf _NPROCESSORS_ONLN</code>), or a much larger default maximum: THREADS only sizes arrays.</li>
+</ul>
+<h3 id="10-nissy-core-gendata-progress-logger-delays-the-end">10. nissy-core gendata: progress logger delays the end</h3>
+<ul>
+<li><strong>Where:</strong> src/solvers/h48/gendata_h48.h:262-281.
+<ul>
+<li>The main thread sleeps <code>sleeptime = 100*(nshort - velocity)/velocity</code> ms between progress lines (about 10% of the expected total, estimated from the first second).</li>
+<li>It reaches <code>wrapthread_join</code> (:287) only after its current sleep.</li>
+</ul>
+</li>
+<li><strong>Observed:</strong> h48h7 on 8 cores. The workers finished, and h48gen sat in <code>hrtimer_nanosleep</code> with 1 thread and 0% CPU for about 3.5 min before writing. Wall 21.5 min against 17 min of compute (8144 s of CPU).</li>
+<li><strong>Fix:</strong> wait on the workers with a timed join or a condition variable, instead of a fixed sleep.</li>
+</ul>
+<h3 id="watch-list-no-bug-confirmed">Watch list (no bug confirmed)</h3>
+<ul>
+<li><strong>cubeopt30:</strong> its table-generating run solved its one cube (random_state #1, 18 moves, 33.3M nodes) in 10.36 s at <code>-t 48</code>, which is 311 ns/node. That is far slower than its README class. It may be first-touch or compaction right after generation; the 200-cube phase-A run will tell.
+<ul>
+<li>Note: its cube numbers start at 1 (&quot;Cube1&quot;).</li>
+</ul>
+</li>
+<li><strong>nissy h48h8 generation:</strong> at 48 threads it reached only ~15% after 5 min (3.5 CPU-h; ~21-24 CPU-h projected, ~30 min). h48h7 took 2.3 CPU-h. Base 10 (h8..h11) makes the depth-8 DFS ~10x more work.
+<ul>
+<li>Not a bug, but h48h9/h10/h11 generation will take &gt;= 30 min each at 48 threads.</li>
+</ul>
+</li>
+</ul>
+<h3 id="f1-update-2026-11-05-cubeopt30-watch-item-resolved">f1 update (2026-11-05): cubeopt30 watch item resolved</h3>
+<ul>
+<li>The 10.36 s for one cube came from the run that had just generated the table. In the 200-cube 48T run (table loaded from file), the same cube (Cube1) took 166.7 ms, and the mean was 0.250 s/cube on 1 GiB pages.</li>
+<li>No bug. It looks like a one-off cost right after generation (THP compaction / first touch).</li>
+</ul>
+<h2 id="shm1-vcube-shared-memory-found-while-porting-shm-2026-11-05">shm1: vcube shared memory (found while porting <code>--shm</code>, 2026-11-05)</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>project</th><th>severity</th><th>summary</th></tr>
+</thead>
+<tbody>
+<tr><td>11</td><td>vcube (<code>--shm</code>)</td><td>robustness (silent slow or stale table)</td><td>a <code>--shm</code> load that fails or is interrupted after creating the segment leaves it zero-filled or partly filled, and every later run attaches it with no check; the key names only the coordinate and base, so a regenerated table is also shadowed silently</td></tr>
+</tbody>
+</table></div>
+<h3 id="11-vcube-unchecked-sysv-shared-memory-segments">11. vcube: unchecked SysV shared-memory segments</h3>
+<ul>
+<li><strong>Where</strong> (vcube 9f5bc2c, as read; not run here):
+<ul>
+<li>src/nxprune.cpp:130-162 <code>prune_base::loadShared(key, filename)</code>: <code>alloc::shared(sz, key, true)</code> creates the segment (IPC_CREAT|IPC_EXCL), then <code>fopen</code> (:144), <code>fread</code> (:149) and the size check (:154). On any failure it returns <code>false</code> and the created segment stays, zero-filled or partly filled. Ctrl-C during the <code>fread</code> of a 23 GiB table does the same.</li>
+<li>src/vc-optimal.cpp:337 <code>if (!P.loadShared(shm_key))</code>: every run, with or without <code>--shm</code>, first attaches any segment under the key and uses it at once (<code>setPrune(mem)</code>, nxprune.cpp:159). There is no size, header or checksum check, and no &quot;load complete&quot; mark.</li>
+<li>src/vc-optimal.cpp:84-87 (<code>S()</code>): the key is <code>0x76630000 | Base &lt;&lt; 8 | (EP + 1) &lt;&lt; 4 | (EO + 1) * 4</code>. It names the coordinate and base, not the table, so a table regenerated after a generator fix (same file name) is shadowed by the old segment until <code>ipcrm</code> or reboot.</li>
+<li>src/alloc.cpp:77-89 <code>shared_impl</code>: the creating run keeps its read-write attachment for the search (no <code>SHM_RDONLY</code> re-attach).</li>
+</ul>
+</li>
+<li><strong>Impact:</strong> in a zero-filled segment every entry reads 0, so <code>fetch()</code> (nxprune.h:357-362) returns the stripe minimum 0 for every position. The bounds are still admissible, so solutions stay optimal, but the search is unpruned: in practice a hang for 17-20 move positions. A partly filled segment gives weaker bounds for the rest. Neither is reported.
+<ul>
+<li>vcube's README (&quot;Shared memory&quot;) mentions removing a segment &quot;which is corrupt because it was interrupted while loading&quot;, but nothing detects it. The user has to know to run <code>ipcrm</code>.</li>
+</ul>
+</li>
+<li><strong>Fix:</strong> write a small header after the data, last (the table's size and a checksum or generator version), and check it on every attach; remove the segment (IPC_RMID) when the load fails. egg-solver's <code>--shm</code> (shm1) writes the file's trailer last and compares it on every attach, and removes a segment whose loader died.</li>
+</ul>
+<h2 id="continuation-review-2026-11-05">Continuation review (2026-11-05)</h2>
+<p>The source mechanisms for #1–#3 and #5–#11 were checked again against the exact commits named above, using <code>git show</code> rather than the harness's modified working files. Source excerpts with full commit IDs are retained in <code>/data/agents/codex-resume/competitor-source-evidence.txt</code>. The performance numbers and the large-table numerical proof remain the original recorded measurements; this source review does not claim to have rerun those experiments. #4's harness invocation was rechecked; the binary option-switch evidence remains the original disassembly.</p>
+<p><strong>Correction to #1's suggested fix:</strong> changing <code>*next == capacity</code> to <code>*next &gt; capacity</code> is insufficient and can loop forever: <code>h48map_nextkvpair</code> stops advancing at <code>capacity</code>. In this source the exhausted iterator returns <code>kv.key == MAP_KEYMASK</code>; check that sentinel under the mutex, and process every non-sentinel entry, including the last occupied slot. Regenerate the table after fixing the loop.</p>
+<p>The distance-20 interference validation also requires serial nissy timings: h48h7 took 210.867 s/cube alone and 217.062 s/cube in the parallel block (+2.94%, above the agreed 2% limit). Parallel distance-20 timings are excluded from the final comparison and preserved as rejected evidence.</p>
+<h2 id="pinned-source-links">Pinned source links</h2>
+<ul>
+<li><a href="https://github.com/sebastianotronto/nissy-core/tree/1f7e8e937d0e71e7eb3b5deab38b34d0a0159d88">nissy-core source snapshot</a></li>
+<li><a href="https://github.com/Voltara/vcube/tree/9f5bc2cce18f29437879ace825f22917f6705378">vcube source snapshot</a></li>
+<li><a href="https://github.com/rokicki/cube20src/tree/f430921a48306874864b9f2ac8a059b43492fd3a">cube20src source snapshot</a></li>
+<li><a href="https://github.com/cs0x7f/cube_solver_test/tree/b9cca71cdf3f6e57bd3c7bfdc2491e5b806dda31">cube_solver_test source snapshot</a></li>
+</ul>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

@@ -1,0 +1,25 @@
+use sse, bmi2
+use huge page
+uniq_sym_states = 3393
+read pruning table from file h48prun31h1.dat
+ 0           43
+ 1           29
+ 2          111
+ 3          733
+ 4         6435
+ 5        48670
+ 6       395266
+ 7      3155073
+ 8     25865565
+ 9    196289112
+10    909157773
+11  11222950329
+12  64306616699
+13  43724582962
+Avg: 12.249, 120389068800 entry
+U2 L' U2 F2 L' R  D2 L2 B' D2 L  F' R' U' L  U2 F' D' R  B  
+Cube1 finished in 20, 327124079/282 node(s), tt=16236.986 ms, 49.64ns/node, 41.37ns/probe, 0.264 inv/node, 1.200 probe/node 273 split(s)
+F' L  B2 R  U' B' L  U2 D' F  L' R2 U2 D2 B2 R2 D  R2 L2 F2 
+Cube2 finished in 20, 330950711/223 node(s), tt=16049.751 ms, 48.50ns/node, 40.59ns/probe, 0.259 inv/node, 1.195 probe/node 274 split(s)
+U2 R2 D2 B  U2 B' F  D' B' R' D  U2 B2 F2 R' D' B  U' F' R2 
+Cube3 finished in 20, 284230902/264 node(s), tt=13838.599 ms, 48.69ns/node, 40.58ns/probe, 0.263 inv/node, 1.200 probe/node 249 split(s)

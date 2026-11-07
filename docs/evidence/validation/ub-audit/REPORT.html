@@ -1,0 +1,116 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Additional UB audit — 2026-11-07 — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../../index.html">Home</a><a href="../../../guide/OVERVIEW.html">Learn</a><a href="../../../comparisons/index.html">Compare</a><a href="../../../performance/index.html">Performance</a><a href="../../../safety/index.html">Safety</a><a href="../../../history/index.html">History</a><a href="../../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="REPORT.md">Markdown source</a> · Offline document</p><details><summary>On this page</summary><ul><li><a href="#reproduced-safe-public-api-failures">Reproduced safe-public-API failures</a></li><li><a href="#reproduced-search-publication-failure">Reproduced search-publication failure</a></li><li><a href="#manual-findings-and-invariant-hardening">Manual findings and invariant hardening</a></li><li><a href="#review-coverage-and-remaining-limits">Review coverage and remaining limits</a></li><li><a href="#validation-record">Validation record</a></li></ul></details><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="additional-ub-audit-2026-11-07">Additional UB audit — 2026-11-07</h1>
+<p>The baseline is candidate <code>988f289fed03f2490359fe660297d9f502363845</code>, frozen in
+<code>/data/agents/ub-audit/source</code>. Fixes are being validated in
+<code>/data/agents/ub-audit/fix</code>. They are not yet merged or certified by complete
+Miri runs. The superseded automatic integration and Miri supervisors are held;
+the authorized benchmark matrix completed at 06:53 UTC. Main integration
+still waits for complete validation of the new candidate.</p>
+<h2 id="reproduced-safe-public-api-failures">Reproduced safe-public-API failures</h2>
+<p>Every reproduction below calls the baseline library without an unsafe block.
+Both x86 AVX2/BMI2 and the portable backend failed. Debug checks sometimes
+abort at the unsafe precondition; release-profile Miri reports the underlying
+UB. Miri ignores optimization levels, so these are interpreter results, not
+execution of optimized native instructions. No Miri UB checks were disabled.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>Case</th><th>Trigger</th><th>Evidence</th><th>Candidate correction</th></tr>
+</thead>
+<tbody>
+<tr><td>Table index</td><td><code>H48Table::get(16384)</code> with a publicly constructible 4096-byte backing allocation</td><td><a href="x86-table_index.log">x86</a>, <a href="portable-table_index.log">portable</a></td><td>Checked getter returning <code>Option</code>, private table fields, checked constructor</td></tr>
+<tr><td>Symmetry index</td><td><code>edge_parts_sym(Cube::solved(), 48)</code></td><td><a href="release-x86-symmetry_index.log">x86</a>, <a href="release-portable-symmetry_index.log">portable</a></td><td>Checked public symmetry functions; internal unchecked helper is crate-private</td></tr>
+<tr><td>Malformed cube</td><td><code>edge_parts_sym(Cube::from_bytes([4;32]), 0)</code></td><td><a href="release-x86-malformed_cube_rank.log">x86</a>, <a href="release-portable-malformed_cube_rank.log">portable</a></td><td>Validate permutations and orientations, hide raw fields and mask selection; reject invalid coordinate constructors</td></tr>
+<tr><td>Reserved coordinate</td><td>Constructing a cube from edge key <code>0</code>, then taking its edge coordinate</td><td><a href="release-x86-malformed_coordinate.log">x86</a>, <a href="release-portable-malformed_coordinate.log">portable</a></td><td>The public constructor returns <code>None</code> for reserved slots and out-of-range ranks</td></tr>
+</tbody>
+</table></div>
+<p>The original <code>[255;32]</code> malformed-cube probe completed without a diagnostic.
+It was not evidence of general safety: the <code>[4;32]</code> case reaches an out-of-range
+rank-table lookup. Inputs and complete diagnostics remain in
+<a href="probes/Cargo.toml">the probe directory</a>.</p>
+<h2 id="reproduced-search-publication-failure">Reproduced search-publication failure</h2>
+<p>A new tracing regression test reproduced another UB diagnostic under Miri
+seed 15. <code>finish_build</code> published jobs, then passed <code>&amp;Inner</code> to <code>trace_build</code>.
+Another worker finished those jobs and entered <code>build</code>, obtaining <code>&amp;mut Inner</code>
+while the tracing argument remained protected. Miri rejected that overlap.
+The test enables real search tracing and adds a test-only scheduling delay
+immediately after publication; the delay changes scheduling, not the ownership
+protocol. This reproduction used the candidate before the tracing fix, rather
+than the untouched baseline used by the four public-input probes.</p>
+<p>The correction completes tracing before the Release publication. <code>start_sort</code>
+also no longer receives <code>&amp;mut Inner</code> as an argument: that function-entry borrow
+could otherwise stay protected across publication of its tasks. Its local
+setup borrow now ends before publication. The latter is a manual finding,
+not a separately reproduced diagnostic.</p>
+<p>Evidence: <a href="trace-before-fix.log">diagnostic</a>,
+<a href="trace-before-fix.rs.html">saved pre-fix source</a>,
+<a href="trace-reproduction.json">reproduction metadata</a>.</p>
+<h2 id="manual-findings-and-invariant-hardening">Manual findings and invariant hardening</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>Area</th><th>Finding and correction</th><th>Evidence limit</th></tr>
+</thead>
+<tbody>
+<tr><td>Cocsep</td><td>Public mutable entries could invalidate unchecked coordinate/class reads. Fields now have read-only accessors; packed-index access is internal.</td><td>Public-field corruption is blocked by compile-fail tests; not a full exhaustive proof of generated entries.</td></tr>
+<tr><td>Solver</td><td>Public table references could be replaced independently of cached pointers/metadata. Read-only accessors now preserve their relationship.</td><td>Defensive invariant closure; a dangling-pointer exploit was not demonstrated.</td></tr>
+<tr><td>Shared-memory trailer</td><td>The reader copied payload bytes even when an Acquire load saw the unpublished zero marker. It now copies only after seeing publication.</td><td>Manual race finding; a Miri-testable helper exercises the production publication read, but Miri does not execute SysV attachment.</td></tr>
+<tr><td>File-backed memory</td><td>Safe mapping APIs exposed memory that another file handle could mutate or truncate. Mapping-capable APIs now require an unsafe storage-lifetime contract; <code>open_copy</code> provides private RAM safely.</td><td>OS-level mapping behavior remains outside Miri. CLI map/shm modes retain the immutability requirement.</td></tr>
+<tr><td>Shared-memory inspection</td><td><code>loaded</code> and <code>remove</code> also inspect a mapped trailer. Their public and CLI entry points now carry the publication/immutability contract; attachment size is checked before any trailer pointer arithmetic.</td><td>No claim that arbitrary external writers can be made safe by an internal Acquire load.</td></tr>
+<tr><td>Trailer size</td><td><code>data_bytes + TRAILER_BYTES</code> could overflow before bounds validation. Checked arithmetic rejects this before mapping.</td><td>Regression added to the native file test.</td></tr>
+<tr><td>wasm32 size</td><td>A 3.6-GiB h7 block exceeded <code>isize::MAX</code>, while table reads use in-bounds pointer arithmetic. Allocation and attachment paths now reject oversized blocks.</td><td>wasm32 now supports h0–h6; 64-bit native h7–h11 are unaffected.</td></tr>
+<tr><td>Endianness</td><td>Packed little-endian corner bytes were decoded as native integers feeding unchecked indices. Big-endian targets are now explicitly rejected.</td><td>No big-endian runtime validation is claimed.</td></tr>
+<tr><td>ISA selection</td><td>256-bit AVX-512 byte blending requires both BW and VL. Its feature guard now checks both.</td><td>Native code and backend checks are separate from Miri's AVX2 path.</td></tr>
+<tr><td>Metadata and pointer construction</td><td>Validate generation metadata before allocation; reject null mappings; bound worker-count arithmetic.</td><td>Boundary hardening; no practical null-mapping or huge-worker exploit was reproduced.</td></tr>
+</tbody>
+</table></div>
+<p>File mappings' external-mutation risk is also documented by
+<a href="https://docs.rs/memmap2/latest/memmap2/struct.MmapOptions.html#safety">memmap2</a>.
+Rust's pointer-offset requirements include the signed-size bound used here:
+<a href="https://doc.rust-lang.org/std/primitive.pointer.html#method.add"><code>pointer::add</code></a>.</p>
+<h2 id="review-coverage-and-remaining-limits">Review coverage and remaining limits</h2>
+<p>Reviewed the public constructors feeding unchecked indexing; Memory ownership,
+alignment, slice lengths and mutation contracts; coordinate ranges; cached
+solver pointers; the lane stack's <code>MAX_TARGET &lt; MAXD</code> bound; move masks; job
+sorting indices; shared-search claims, publication, buffer ownership and
+mailboxes; parallel runner callbacks; platform vector/assembly entry points;
+and the WASM allocator and pointer-bearing ABI. This is a manual review, not a
+formal exhaustive audit of every execution or dependency.</p>
+<p>The custom parallel runner accepts safe <code>Fn + Sync</code> callbacks. Current internal
+callers either read disjoint/immutable slices or allocate work with atomic
+counters, so duplicate callback IDs were not established to cause UB. Its
+exactly-once behavior is a separate API-contract concern.</p>
+<p>WASM threads use a lifetime extension for a borrowed callback and wait for all
+workers before returning. Current shipped WASM builds abort on panic; unwinding
+or changes to the join protocol require a fresh audit. Foreign callers must
+respect pointer lifetime and immutable-input requirements.</p>
+<p>Tests remain finite. Native AVX-512/assembly, actual mmap/SysV operations,
+WASM host behavior, dependency code and all possible weak-memory executions
+are not covered by a universal proof. Full source-bound native/backend and
+Miri validation must finish before integration. Existing ignored tests must
+remain explicitly listed, not counted as passes.</p>
+<h2 id="validation-record">Validation record</h2>
+<p>The pre-tracing-fix source fingerprint
+<code>232607b4d60721c25c5a742fb7d642c87cf6a501d865bb1506f29ecc5a7140ec</code>
+passed the full native/backend check script, both hot-code comparisons, three
+new boundary/publication tests under strict-provenance Miri on both backends,
+16 publication seeds per backend, and native ThreadSanitizer checks of the
+shared-search and boundary tests. Those results are preserved in
+<code>before-trace-fix/</code> (historical reference: <code>/data/agents/ub-audit/before-trace-fix</code>). They do <strong>not</strong>
+certify later edits and demonstrably did not cover the tracing bug.</p>
+<p>The final candidate <code>316597f64a9bd749e8a01b67f96c108c03611e68</code>
+(source SHA-256 <code>93478bc5c45ba267255574f8cb466f02f006f1c7bf558fb8f9d088ec4307a4c9</code>)
+passed the full native/backend script, both hot-code comparisons, focused
+strict-provenance Miri checks on both backends and ThreadSanitizer. Evidence
+is recorded in
+<a href="FROZEN.json"><code>FROZEN.json</code></a>. Current certificates are
+accepted only if their source fingerprints match. An intermediate compile
+failure from missing unsafe blocks in test cleanup and a stale-source Miri
+run are preserved in
+<code>test-callsite-compile-failure/</code> (historical reference: <code>/data/agents/ub-audit/test-callsite-compile-failure</code>);
+neither is counted as a pass. Full x86 and portable Miri catalogues began
+concurrently at 07:07 UTC and remain a separate integration requirement.
+They include all four shared-search tests under 16 seeds per backend.
+The additional native AddressSanitizer run passed the library and integration
+tests, including native ISA and actual mapping paths omitted by Miri.
+Its source-bound certificate is <a href="asan-validation.json">asan-validation.json</a>.
+See <a href="current-status.json">current status</a> and
+<a href="../../../safety/NO_UB.html">NO_UB.md</a> for later source-bound completion.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

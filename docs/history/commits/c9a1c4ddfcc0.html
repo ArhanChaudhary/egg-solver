@@ -1,0 +1,50 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Merge work/s8: readability sweep (names, docs, clippy pedantic, std idioms, get_unchecked, gain comments) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="c9a1c4ddfcc0.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="merge-work-s8-readability-sweep-names-docs-clippy-pedantic-std-idioms-get-unchecked-gain-comments">Merge work/s8: readability sweep (names, docs, clippy pedantic, std idioms, get_unchecked, gain comments)</h1>
+<p>Commit <code>c9a1c4ddfcc0c0307caf8dab6b5a3ed52c63bcec</code> · 2026-11-04T10:32:43+00:00</p>
+<p>This commit is reachable from the released main history. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: Historical ancestor; no current branch tip</p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>Merge work/s8: readability sweep (names, docs, clippy pedantic, std idioms, get_unchecked, gain comments)</p>
+<p>The user asked for descriptive names and short inline docs a beginner
+to intermediate reader can follow (no walls of text), clippy pedantic,
+std APIs instead of C idioms, get_unchecked at the index instead of
+assert_unchecked + indexing, and a comment at every optimization with
+its measured gain. Ten commits (details and per-commit tables in each):</p>
+<ol>
+<li>lints: clippy::pedantic enforced via [lints.clippy] (inline_always
+allowed); std idioms (isolate_lowest_one, is_multiple_of,
+unbounded_shr masks, carrying_mul); three idioms that changed the
+asm keep the old form with a comment.
+2-5. cubie/coord, simd/tables/gen/lib, solver (search split into
+steps), bins/tests/examples: names and docs.
+6-8. lanes.rs: field/item names, local names, docs (share.rs updated
+mechanically on top of l6's names).</li>
+<li>get_unchecked at the index (resolve_other keeps assert_unchecked:
+with get_unchecked there the share loop had +39 instructions and was
+-1.6% at 1T, all 8 layout pairs negative). Stream loop 1468 -&gt; 1417
+instructions, 5 -&gt; 2 bounds checks; share loop 1285 -&gt; 1229, 3 -&gt; 0.</li>
+<li>inline gain comments (lanes, solver, coord, simd, tables, gen), every
+number from git history or notes, &quot;(not measured separately)&quot; where
+none exists.</li>
+</ol>
+<p>Rename map for agents' patches: $P/s8-rename-map.{md,sed},
+s8-lanes-locals-spec.py, s8-fnrename.py.</p>
+<p>Verified: check.sh at all 10 commits; verify.sh identical to main
+(3058198 / 2588380; depth18 3644301 / 3084160); stream and share loops
+instruction-identical for commits 1-8; .text byte-identical 5-8 and 9-10.</p>
+<p>Base 55e048e -&gt; this, every binary built in one folder:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>test</th><th>result</th></tr>
+</thead>
+<tbody>
+<tr><td>1T stream, layout-averaged (8 pairs)</td><td>median -0.20%, mean +0.17% (layout noise)</td></tr>
+<tr><td>1T share solve, layout-averaged</td><td>median -0.48%, mean -0.49% (noise ~1.6%)</td></tr>
+<tr><td>48T bench share (2 pairs)</td><td>940.1 -&gt; 938.7, 923.5 -&gt; 933.5 solves/s</td></tr>
+<tr><td>48T stream (on f2cb1f4, commit 8)</td><td>1083.2 -&gt; 1086.5 (+0.3%)</td></tr>
+<tr><td>48T solve -c 1 (5 pairs)</td><td>+11.2 +4.4 -2.0 +2.4 +0.8% (noisy measure)</td></tr>
+<tr><td>solve -c 0 / -c 1</td><td>BAD 0, per-cube lengths identical</td></tr>
+</tbody>
+</table></div>
+<p>Neutral within noise, as expected for a refactor whose hot loops are
+instruction-identical (commits 1-8) or shorter (commit 9).</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

@@ -1,0 +1,142 @@
+{
+  "bytes": {
+    "files": {
+      "/data/agents/pmu-opt/variants/bytes.patch": "b1c7f56f9583e62a222846f70483214dd532fda9a59268f2d5691661000737dd",
+      "/data/agents/pmu-opt/variants/bytes-solver.rs": "0747ecf5b6c0ae75bad4d42eb73edfe0347401b4fc44f7ba710014b483b7ab09",
+      "/data/agents/pmu-opt/variants/bytes-lanes.rs": "30c2e9b8d88e5e0b08c77a880d5fbee6993427bed9feefd98c08ffd7de37e79a",
+      "/data/agents/pmu-opt/logs/bytes-native-tests.log": "036f59170498442cd49305cee1f0042f8d6a4ce93fd18d833dfd3be6aff65801",
+      "/data/agents/pmu-opt/logs/bytes-clippy.log": "bedc1ddce01fcad241e8d1612796fc408287b003d179c3f8a3e9565950281184",
+      "/data/agents/pmu-opt/logs/bytes-miri-x86.log": "dbb68209a8e6c97a4f9d4c456d4be0cf4231264ce82f25a22de3c1eaca8d1e02",
+      "/data/agents/pmu-opt/logs/bytes-miri-portable.log": "2ced2f585d2ee64b302d6b15278017355a7a8e996f691893fc7c6b61b5ca2e34"
+    },
+    "binaries": [
+      {
+        "variant": "bytes",
+        "pad": 0,
+        "binary": "bench",
+        "path": "/data/agents/pmu-opt/bin/bytes-p0-bench",
+        "sha256": "639ad2ad0700638e48e46ec3785395edab44254b14fe8a3d01431805a6c25bf0"
+      },
+      {
+        "variant": "bytes",
+        "pad": 0,
+        "binary": "solve",
+        "path": "/data/agents/pmu-opt/bin/bytes-p0-solve",
+        "sha256": "5406a8d9a8a73f2c58f385a869580d9dd5d23f6b86d2622638559169832d461a"
+      },
+      {
+        "variant": "bytes",
+        "pad": 16,
+        "binary": "bench",
+        "path": "/data/agents/pmu-opt/bin/bytes-p16-bench",
+        "sha256": "b151565a865dfb839656dc2d31cd3ef757c9b9e53d043fa0236a406d5ba2b73c"
+      },
+      {
+        "variant": "bytes",
+        "pad": 16,
+        "binary": "solve",
+        "path": "/data/agents/pmu-opt/bin/bytes-p16-solve",
+        "sha256": "5406a8d9a8a73f2c58f385a869580d9dd5d23f6b86d2622638559169832d461a"
+      },
+      {
+        "variant": "bytes",
+        "pad": 32,
+        "binary": "bench",
+        "path": "/data/agents/pmu-opt/bin/bytes-p32-bench",
+        "sha256": "e5bfcfc117b745be262532d32d0edc1f3ec92b2caf5c92dea43889e1d8b3684d"
+      },
+      {
+        "variant": "bytes",
+        "pad": 32,
+        "binary": "solve",
+        "path": "/data/agents/pmu-opt/bin/bytes-p32-solve",
+        "sha256": "5406a8d9a8a73f2c58f385a869580d9dd5d23f6b86d2622638559169832d461a"
+      },
+      {
+        "variant": "bytes",
+        "pad": 48,
+        "binary": "bench",
+        "path": "/data/agents/pmu-opt/bin/bytes-p48-bench",
+        "sha256": "d022c3c06fbbd119470c6d0d79ecbb0983dcbf3a4c6fecbb536ae381fe8f941d"
+      },
+      {
+        "variant": "bytes",
+        "pad": 48,
+        "binary": "solve",
+        "path": "/data/agents/pmu-opt/bin/bytes-p48-solve",
+        "sha256": "5406a8d9a8a73f2c58f385a869580d9dd5d23f6b86d2622638559169832d461a"
+      }
+    ],
+    "performance_measured": false,
+    "full_source_miri": false
+  },
+  "outline": {
+    "files": {
+      "/data/agents/pmu-opt/variants/outline.patch": "dac6092b4b4805ce03e26e3df7fa6bc7ccf5e68a0d7fd1d1067827c37e1f8492",
+      "/data/agents/pmu-opt/variants/outline-solver.rs": "e4eb6b3cf6eb1b980b52b8b62f263bfd84129f6253e39e5fabc8866559a1aa25",
+      "/data/agents/pmu-opt/variants/outline-lanes.rs": "73952680a648b9ef15f6713118ffa7f71065edeca7cd73cded6dc44b2d38d098",
+      "/data/agents/pmu-opt/logs/outline-native-tests.log": "b6975d31e3992cbb8e74a72836370a23b8b722f48177a30c7f782ca2278f41bc",
+      "/data/agents/pmu-opt/logs/outline-clippy.log": "63e8c83930c99e7ef6983bcfc433ae88950b994ddba340ae717866f9f3a35ed6"
+    },
+    "binaries": [
+      {
+        "variant": "outline",
+        "pad": 0,
+        "binary": "bench",
+        "path": "/data/agents/pmu-opt/bin/outline-p0-bench",
+        "sha256": "0b5f6e4a3e3229672650c47de1945f271756928c3f0ee400323a1a95cb080325"
+      },
+      {
+        "variant": "outline",
+        "pad": 0,
+        "binary": "solve",
+        "path": "/data/agents/pmu-opt/bin/outline-p0-solve",
+        "sha256": "7c50a4a0043cbf94fb2f3b1d0f245ea376b57cf7b47618562a41c7941443ac0b"
+      },
+      {
+        "variant": "outline",
+        "pad": 16,
+        "binary": "bench",
+        "path": "/data/agents/pmu-opt/bin/outline-p16-bench",
+        "sha256": "241411822b759f29ba5b80e2dbc97397538f48cd6bf61e37cd491e60a8989f69"
+      },
+      {
+        "variant": "outline",
+        "pad": 16,
+        "binary": "solve",
+        "path": "/data/agents/pmu-opt/bin/outline-p16-solve",
+        "sha256": "7c50a4a0043cbf94fb2f3b1d0f245ea376b57cf7b47618562a41c7941443ac0b"
+      },
+      {
+        "variant": "outline",
+        "pad": 32,
+        "binary": "bench",
+        "path": "/data/agents/pmu-opt/bin/outline-p32-bench",
+        "sha256": "ac2b11c019d19f37353f52f527415a393d31f8ce2ba9bfc27ddafc5f94dfffc7"
+      },
+      {
+        "variant": "outline",
+        "pad": 32,
+        "binary": "solve",
+        "path": "/data/agents/pmu-opt/bin/outline-p32-solve",
+        "sha256": "7c50a4a0043cbf94fb2f3b1d0f245ea376b57cf7b47618562a41c7941443ac0b"
+      },
+      {
+        "variant": "outline",
+        "pad": 48,
+        "binary": "bench",
+        "path": "/data/agents/pmu-opt/bin/outline-p48-bench",
+        "sha256": "da49b0408fb67abe5633f4227848b9b503a3e82d9afd237339875ff839a6e588"
+      },
+      {
+        "variant": "outline",
+        "pad": 48,
+        "binary": "solve",
+        "path": "/data/agents/pmu-opt/bin/outline-p48-solve",
+        "sha256": "7c50a4a0043cbf94fb2f3b1d0f245ea376b57cf7b47618562a41c7941443ac0b"
+      }
+    ],
+    "performance_measured": false,
+    "full_source_miri": false
+  }
+}

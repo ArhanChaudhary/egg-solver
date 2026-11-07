@@ -1,0 +1,807 @@
+{
+  "base": {
+    "supported": true,
+    "spec": "{cycles:u,instructions:u}",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "cycles:u",
+        "count": 3825905.0,
+        "unit": "",
+        "counter_runtime_ns": 4871753.0,
+        "running_percent": 100.0
+      },
+      {
+        "event": "instructions:u",
+        "count": 2762376.0,
+        "unit": "",
+        "counter_runtime_ns": 4871753.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "branches:u": {
+    "supported": true,
+    "spec": "branches:u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "branches:u",
+        "count": 568699.0,
+        "unit": "",
+        "counter_runtime_ns": 4839018.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "branch-misses:u": {
+    "supported": true,
+    "spec": "branch-misses:u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "branch-misses:u",
+        "count": 29859.0,
+        "unit": "",
+        "counter_runtime_ns": 4994878.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "cache-references:u": {
+    "supported": true,
+    "spec": "cache-references:u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "cache-references:u",
+        "count": 38046.0,
+        "unit": "",
+        "counter_runtime_ns": 5296667.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "cache-misses:u": {
+    "supported": true,
+    "spec": "cache-misses:u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "cache-misses:u",
+        "count": 11206.0,
+        "unit": "",
+        "counter_runtime_ns": 4783951.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "ref-cycles:u": {
+    "supported": true,
+    "spec": "ref-cycles:u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "ref-cycles:u",
+        "count": 3642740.0,
+        "unit": "",
+        "counter_runtime_ns": 4973138.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "L1-dcache-loads:u": {
+    "supported": true,
+    "spec": "L1-dcache-loads:u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "L1-dcache-loads:u",
+        "count": 674362.0,
+        "unit": "",
+        "counter_runtime_ns": 4816080.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "L1-dcache-load-misses:u": {
+    "supported": true,
+    "spec": "L1-dcache-load-misses:u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "L1-dcache-load-misses:u",
+        "count": 35018.0,
+        "unit": "",
+        "counter_runtime_ns": 4836608.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "LLC-loads:u": {
+    "supported": true,
+    "spec": "LLC-loads:u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "LLC-loads:u",
+        "count": 14722.0,
+        "unit": "",
+        "counter_runtime_ns": 4945885.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "LLC-load-misses:u": {
+    "supported": true,
+    "spec": "LLC-load-misses:u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "LLC-load-misses:u",
+        "count": 4338.0,
+        "unit": "",
+        "counter_runtime_ns": 4802452.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "dTLB-loads:u": {
+    "supported": true,
+    "spec": "dTLB-loads:u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "dTLB-loads:u",
+        "count": 674253.0,
+        "unit": "",
+        "counter_runtime_ns": 4655118.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "dTLB-load-misses:u": {
+    "supported": true,
+    "spec": "dTLB-load-misses:u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "dTLB-load-misses:u",
+        "count": 4531.0,
+        "unit": "",
+        "counter_runtime_ns": 4817488.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "task-clock": {
+    "supported": true,
+    "spec": "task-clock",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "task-clock:u",
+        "count": 4.82,
+        "unit": "msec",
+        "counter_runtime_ns": 4817972.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "context-switches": {
+    "supported": true,
+    "spec": "context-switches",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "context-switches:u",
+        "count": 0.0,
+        "unit": "",
+        "counter_runtime_ns": 4748737.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "cpu-migrations": {
+    "supported": true,
+    "spec": "cpu-migrations",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "cpu-migrations:u",
+        "count": 0.0,
+        "unit": "",
+        "counter_runtime_ns": 4819933.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "page-faults": {
+    "supported": true,
+    "spec": "page-faults",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "page-faults:u",
+        "count": 513.0,
+        "unit": "",
+        "counter_runtime_ns": 4858815.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "UOPS_EXECUTED.PORT0": {
+    "supported": true,
+    "spec": "cpu/config=0x1b1,name=egp_uops_executed_port0/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_uops_executed_port0",
+        "count": 633137.0,
+        "unit": "",
+        "counter_runtime_ns": 4826293.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "UOPS_EXECUTED.PORT1": {
+    "supported": true,
+    "spec": "cpu/config=0x2b1,name=egp_uops_executed_port1/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_uops_executed_port1",
+        "count": 750754.0,
+        "unit": "",
+        "counter_runtime_ns": 4637287.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "UOPS_EXECUTED.PORT5": {
+    "supported": true,
+    "spec": "cpu/config=0x20b1,name=egp_uops_executed_port5/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_uops_executed_port5",
+        "count": 1120571.0,
+        "unit": "",
+        "counter_runtime_ns": 4710704.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "L1I.MISSES": {
+    "supported": true,
+    "spec": "cpu/config=0x280,name=egp_l1i_misses/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_l1i_misses",
+        "count": 78407.0,
+        "unit": "",
+        "counter_runtime_ns": 5074446.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "ARITH.CYCLES_DIV_BUSY": {
+    "supported": true,
+    "spec": "cpu/config=0x114,name=egp_arith_cycles_div_busy/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_arith_cycles_div_busy",
+        "count": 12740.0,
+        "unit": "",
+        "counter_runtime_ns": 4763471.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "SSEX_UOPS_RETIRED.VECTOR_INTEGER": {
+    "supported": true,
+    "spec": "cpu/config=0x10c7,name=egp_ssex_uops_retired_vector_integer/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_ssex_uops_retired_vector_integer",
+        "count": 51539.0,
+        "unit": "",
+        "counter_runtime_ns": 4952428.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "MEM_INST_RETIRED.LOADS": {
+    "supported": true,
+    "spec": "cpu/config=0x10b,name=egp_mem_inst_retired_loads/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_mem_inst_retired_loads",
+        "count": 674274.0,
+        "unit": "",
+        "counter_runtime_ns": 4688194.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "MEM_INST_RETIRED.STORES": {
+    "supported": true,
+    "spec": "cpu/config=0x20b,name=egp_mem_inst_retired_stores/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_mem_inst_retired_stores",
+        "count": 319870.0,
+        "unit": "",
+        "counter_runtime_ns": 4934171.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "MEM_LOAD_RETIRED.L1D_HIT": {
+    "supported": true,
+    "spec": "cpu/config=0x1cb,name=egp_mem_load_retired_l1d_hit/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_mem_load_retired_l1d_hit",
+        "count": 634440.0,
+        "unit": "",
+        "counter_runtime_ns": 4706021.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "MEM_LOAD_RETIRED.L2_HIT": {
+    "supported": true,
+    "spec": "cpu/config=0x2cb,name=egp_mem_load_retired_l2_hit/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_mem_load_retired_l2_hit",
+        "count": 6857.0,
+        "unit": "",
+        "counter_runtime_ns": 4907922.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "MEM_LOAD_RETIRED.LLC_UNSHARED_HIT": {
+    "supported": true,
+    "spec": "cpu/config=0x4cb,name=egp_mem_load_retired_llc_unshared_hit/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_mem_load_retired_llc_unshared_hit",
+        "count": 5852.0,
+        "unit": "",
+        "counter_runtime_ns": 4879753.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "MEM_LOAD_RETIRED.LLC_MISS": {
+    "supported": true,
+    "spec": "cpu/config=0x10cb,name=egp_mem_load_retired_llc_miss/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_mem_load_retired_llc_miss",
+        "count": 1782.0,
+        "unit": "",
+        "counter_runtime_ns": 5056353.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "MEM_LOAD_RETIRED.HIT_LFB": {
+    "supported": true,
+    "spec": "cpu/config=0x40cb,name=egp_mem_load_retired_hit_lfb/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_mem_load_retired_hit_lfb",
+        "count": 30118.0,
+        "unit": "",
+        "counter_runtime_ns": 4673990.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "MEM_LOAD_RETIRED.DTLB_MISS": {
+    "supported": true,
+    "spec": "cpu/config=0x80cb,name=egp_mem_load_retired_dtlb_miss/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_mem_load_retired_dtlb_miss",
+        "count": 2346.0,
+        "unit": "",
+        "counter_runtime_ns": 4796737.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "MEM_LOAD_RETIRED.OTHER_CORE_L2_HIT_HITM": {
+    "supported": true,
+    "spec": "cpu/config=0x8cb,name=egp_mem_load_retired_other_core_l2_hit_hitm/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_mem_load_retired_other_core_l2_hit_hitm",
+        "count": 664.0,
+        "unit": "",
+        "counter_runtime_ns": 4869919.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "L1D.REPL": {
+    "supported": true,
+    "spec": "cpu/config=0x151,name=egp_l1d_repl/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_l1d_repl",
+        "count": 34842.0,
+        "unit": "",
+        "counter_runtime_ns": 4782726.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "L2_RQSTS.LD_HIT": {
+    "supported": true,
+    "spec": "cpu/config=0x124,name=egp_l2_rqsts_ld_hit/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_l2_rqsts_ld_hit",
+        "count": 14635.0,
+        "unit": "",
+        "counter_runtime_ns": 4731656.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "L2_RQSTS.LD_MISS": {
+    "supported": true,
+    "spec": "cpu/config=0x224,name=egp_l2_rqsts_ld_miss/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_l2_rqsts_ld_miss",
+        "count": 14910.0,
+        "unit": "",
+        "counter_runtime_ns": 4790508.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "L2_RQSTS.PREFETCH_HIT": {
+    "supported": true,
+    "spec": "cpu/config=0x4024,name=egp_l2_rqsts_prefetch_hit/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_l2_rqsts_prefetch_hit",
+        "count": 6739.0,
+        "unit": "",
+        "counter_runtime_ns": 4779546.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "L2_RQSTS.PREFETCH_MISS": {
+    "supported": true,
+    "spec": "cpu/config=0x8024,name=egp_l2_rqsts_prefetch_miss/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_l2_rqsts_prefetch_miss",
+        "count": 16738.0,
+        "unit": "",
+        "counter_runtime_ns": 4783323.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "LOAD_HIT_PRE": {
+    "supported": true,
+    "spec": "cpu/config=0x14c,name=egp_load_hit_pre/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_load_hit_pre",
+        "count": 85.0,
+        "unit": "",
+        "counter_runtime_ns": 4979810.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "DTLB_LOAD_MISSES.ANY": {
+    "supported": true,
+    "spec": "cpu/config=0x108,name=egp_dtlb_load_misses_any/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_dtlb_load_misses_any",
+        "count": 4528.0,
+        "unit": "",
+        "counter_runtime_ns": 4839975.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "DTLB_LOAD_MISSES.STLB_HIT": {
+    "supported": true,
+    "spec": "cpu/config=0x1008,name=egp_dtlb_load_misses_stlb_hit/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_dtlb_load_misses_stlb_hit",
+        "count": 21960.0,
+        "unit": "",
+        "counter_runtime_ns": 4923296.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "DTLB_LOAD_MISSES.WALK_COMPLETED": {
+    "supported": true,
+    "spec": "cpu/config=0x208,name=egp_dtlb_load_misses_walk_completed/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_dtlb_load_misses_walk_completed",
+        "count": 2931.0,
+        "unit": "",
+        "counter_runtime_ns": 4776375.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "DTLB_LOAD_MISSES.WALK_CYCLES": {
+    "supported": true,
+    "spec": "cpu/config=0x408,name=egp_dtlb_load_misses_walk_cycles/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_dtlb_load_misses_walk_cycles",
+        "count": 67585.0,
+        "unit": "",
+        "counter_runtime_ns": 4828492.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "ITLB_MISSES.ANY": {
+    "supported": true,
+    "spec": "cpu/config=0x185,name=egp_itlb_misses_any/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_itlb_misses_any",
+        "count": 3883.0,
+        "unit": "",
+        "counter_runtime_ns": 4873436.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "ITLB_MISSES.WALK_CYCLES": {
+    "supported": true,
+    "spec": "cpu/config=0x485,name=egp_itlb_misses_walk_cycles/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_itlb_misses_walk_cycles",
+        "count": 92496.0,
+        "unit": "",
+        "counter_runtime_ns": 4794890.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "OFFCORE_REQUESTS_OUTSTANDING.DEMAND.READ_DATA": {
+    "supported": true,
+    "spec": "cpu/config=0x160,name=egp_offcore_requests_outstanding_demand_read_data/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_offcore_requests_outstanding_demand_read_data",
+        "count": 5179324.0,
+        "unit": "",
+        "counter_runtime_ns": 4622810.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "OFFCORE_REQUESTS_OUTSTANDING.DEMAND.READ_DATA_NOT_EMPTY": {
+    "supported": true,
+    "spec": "cpu/config=0x1000160,name=egp_offcore_requests_outstanding_demand_read_data_not_empty/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_offcore_requests_outstanding_demand_read_data_not_empty",
+        "count": 3112307.0,
+        "unit": "",
+        "counter_runtime_ns": 4573495.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "RESOURCE_STALLS.ANY": {
+    "supported": true,
+    "spec": "cpu/config=0x1a2,name=egp_resource_stalls_any/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_resource_stalls_any",
+        "count": 456774.0,
+        "unit": "",
+        "counter_runtime_ns": 4591014.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "RESOURCE_STALLS.LOAD": {
+    "supported": true,
+    "spec": "cpu/config=0x2a2,name=egp_resource_stalls_load/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_resource_stalls_load",
+        "count": 38290.0,
+        "unit": "",
+        "counter_runtime_ns": 5608756.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "RESOURCE_STALLS.STORE": {
+    "supported": true,
+    "spec": "cpu/config=0x8a2,name=egp_resource_stalls_store/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_resource_stalls_store",
+        "count": 27977.0,
+        "unit": "",
+        "counter_runtime_ns": 4964802.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "RESOURCE_STALLS.ROB_FULL": {
+    "supported": true,
+    "spec": "cpu/config=0x10a2,name=egp_resource_stalls_rob_full/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_resource_stalls_rob_full",
+        "count": 60742.0,
+        "unit": "",
+        "counter_runtime_ns": 4816023.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "RESOURCE_STALLS.RS_FULL": {
+    "supported": true,
+    "spec": "cpu/config=0x4a2,name=egp_resource_stalls_rs_full/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_resource_stalls_rs_full",
+        "count": 378741.0,
+        "unit": "",
+        "counter_runtime_ns": 4729951.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "UOPS_ISSUED.ANY": {
+    "supported": true,
+    "spec": "cpu/config=0x10e,name=egp_uops_issued_any/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_uops_issued_any",
+        "count": 3709660.0,
+        "unit": "",
+        "counter_runtime_ns": 4773696.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "UOPS_RETIRED.ANY": {
+    "supported": true,
+    "spec": "cpu/config=0x1c2,name=egp_uops_retired_any/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_uops_retired_any",
+        "count": 3257582.0,
+        "unit": "",
+        "counter_runtime_ns": 4749877.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "UOPS_RETIRED.RETIRE_SLOTS": {
+    "supported": true,
+    "spec": "cpu/config=0x2c2,name=egp_uops_retired_retire_slots/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_uops_retired_retire_slots",
+        "count": 2808488.0,
+        "unit": "",
+        "counter_runtime_ns": 4763180.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "ILD_STALL.ANY": {
+    "supported": true,
+    "spec": "cpu/config=0xf87,name=egp_ild_stall_any/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_ild_stall_any",
+        "count": 778077.0,
+        "unit": "",
+        "counter_runtime_ns": 4828090.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "ILD_STALL.LCP": {
+    "supported": true,
+    "spec": "cpu/config=0x187,name=egp_ild_stall_lcp/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_ild_stall_lcp",
+        "count": 289.0,
+        "unit": "",
+        "counter_runtime_ns": 4739614.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "OFFCORE_RESPONSE.DEMAND_DATA_RD.ALL_LOCAL_DRAM_AND_REMOTE_CACHE_HIT": {
+    "supported": true,
+    "spec": "cpu/config=0x1b7,name=egp_offcore_response_demand_data_rd_all_local_dram_and_remote_cache_hit,config1=0x5001/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_offcore_response_demand_data_rd_all_local_dram_and_remote_cache_hit",
+        "count": 4086.0,
+        "unit": "",
+        "counter_runtime_ns": 4798732.0,
+        "running_percent": 100.0
+      }
+    ]
+  },
+  "OFFCORE_RESPONSE.DEMAND_DATA_RD.REMOTE_DRAM": {
+    "supported": true,
+    "spec": "cpu/config=0x1b7,name=egp_offcore_response_demand_data_rd_remote_dram,config1=0x2001/u",
+    "exit_code": 0,
+    "records": [
+      {
+        "event": "egp_offcore_response_demand_data_rd_remote_dram",
+        "count": 91.0,
+        "unit": "",
+        "counter_runtime_ns": 4782045.0,
+        "running_percent": 100.0
+      }
+    ]
+  }
+}

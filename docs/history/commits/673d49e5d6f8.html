@@ -1,0 +1,117 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>tables, gen: any table size h0..h11 generated directly; self-describing table files — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="673d49e5d6f8.md">Markdown source</a> · Offline document</p><h1 id="tables-gen-any-table-size-h0-h11-generated-directly-self-describing-table-files">tables, gen: any table size h0..h11 generated directly; self-describing table files</h1>
+<p>Commit <code>673d49e5d6f829cda57495b158d8e7b51690deae</code> · 2026-11-04T15:49:46+00:00</p>
+<p>This commit is reachable from the released main history. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: Historical ancestor; no current branch tip</p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>tables, gen: any table size h0..h11 generated directly; self-describing table files</p>
+<p>User request: &quot;make your solver work with multiple pruning tables sizes so
+i dont need 62gb and can run it on my laptop&quot;. <code>gen &lt;k&gt; auto &lt;file&gt;</code> now
+builds hk for every k without h11, in about the table's own size of memory,
+and <code>solve</code>/<code>bench</code> open a table file from any file system.</p>
+<p>gen::dfs (new). For 0 &lt; k &lt; 11 the hk index is not a coset coordinate (the
+eo bits it drops are not those of a union of slices), so it cannot be BFS'd
+on its own indices: each entry is the minimum depth of the h11 cosets it
+covers (until now: derived during an h11 BFS, which needs the 58 GiB h11).
+The generator enumerates the h11 cosets up to depth base + 2 instead:</p>
+<ul>
+<li>a BFS on h11 entries in sorted vectors up to depth 8 (7.4M entries, its
+levels equal the h11 BFS log: 1/4/34/333/3815/45382/548562/6839723);</li>
+<li>one depth-first pass per further depth L from every depth-8 entry, one
+per self-symmetry orbit (symmetry at the root), over canonical move
+sequences; children of the roots that are in the prefix are pruned;</li>
+<li>leaves are marked &quot;set if unvisited&quot;: the passes run in increasing L, so
+an entry's first mark is its minimum and all marks of a pass write the
+same code (plain atomic ANDs, no CAS), through a 32-deep prefetched write
+ring per thread (batched prefetched writes);</li>
+<li>group minima of depths &lt;= base during the passes, the others (never read)
+in a final pass, which gives the BFS generators' tables byte for byte;</li>
+<li>--parts N generates N row ranges in turn (memory 1/N of the table, time
+up to N times: the DFS is shared, only leaves of other classes are cut).
+Cost depends on the base, not on k: ~2.6e11 leaves for base 10, 1/13 of
+that for base 9, 1/170 for base 8; ~9.5 ns per leaf per Zen 5 thread,
+nearly independent of the table size (h0 30 MB vs h5 970 MB: 3.0 vs 3.7 s
+for the same pass), so compute bound. h0 and h11 keep the scanning BFS
+(true coordinates; forward/backward per level).</li>
+</ul>
+<p>gen::collapse (new): hk from a larger k of the same base (min over the
+covered rows), and table comparison (<code>gen derive</code>, <code>gen compare</code>).</p>
+<p>Validation:</p>
+<ul>
+<li>full-size h0 base 8 by DFS == by BFS, byte for byte (incl. group minima);</li>
+<li>h7 base 9 (direct, no h11) vs /mnt/huge/h7 (made by the h11 BFS): all
+15,048,633,600 codes identical; group minima identical wherever read
+(18,506 unread ones differ: groups whose minimum is 12, which the
+h11-derived table records and a base-9 one leaves at 15);</li>
+<li>h8 base 10 in 2 parts (3.86 GiB peak) vs /mnt/huge/h8: byte-identical;</li>
+<li>h9 base 10 in 4 parts vs the collapse of /mnt/huge/h11: byte-identical
+(60,194,534,400 entries, all group minima);</li>
+<li>h7 base 10 (direct) vs the collapse of h11: byte-identical;</li>
+<li>h8 base 9 (2 parts): codes 0+1 and 2 = 1,051,580,076 and 8,136,022,157,
+exactly h8 base 10's codes 0 and 1; h4..h7 base 8 (direct), base 9 (from
+the direct h7) and base 10 (from h11) are consistent in the same way;</li>
+<li>random_state (500 cubes): per-cube optimal lengths with the direct h7 and
+h8 identical to h11's (stream mode);</li>
+<li>new tests: DFS h0 == BFS h0 for prefix depths 1, 2, 5; h2 vs brute force
+over all positions within 5 moves (codes, group minima, nothing too
+low); h3 in 3 and in 7 parts == h3; collapse h3 -&gt; h2 and h3 -&gt; h0;
+trailer round trip, bad layouts refused, the data never written,
+checksums from parts.</li>
+</ul>
+<p>Generation on this machine, 8 threads (one Zen 5 CCD, laptop-like), peak
+RSS, incl. writing to /data (~140 MB/s, synced as it goes):
+table base size      generation (passes)       total, written  peak RSS
+h0    8    29 MiB    BFS 1.8 s, DFS 4.4 s      -               0.03/0.26 GiB
+h4    8    0.45 GiB  5.2 s                     6.5 s           0.68 GiB
+h6    8    1.81 GiB  5.2 s                     18.2 s          2.04 GiB
+h7    8    3.62 GiB  5.3 s                     34.0 s          3.85 GiB
+h7    9    3.62 GiB  28.9 s                    ~57 s           3.86 GiB
+h7    10   3.62 GiB  286.5 s                   314.5 s         3.85 GiB
+h8    9    7.25 GiB  24.6 + 20.5 s (2 parts)   107.0 s         3.86 GiB
+h8    10   7.25 GiB  227.7 + 195.9 s (2 parts) 479.0 s         3.86 GiB
+(h8 base 10 in one part: ~271 s of passes, 7.5 GiB.)
+At 48 threads (exclusive machine): h7 base 9 in 7.6 s of passes (35.3 s
+written), h8 base 10 in 2 parts 54.5 + 41.3 s (150.7 s written). For
+comparison, the h11 BFS (with h8 and h7 derived) takes 262 s at 48 threads
+and 58 GiB. h9 base 10 in 4 parts (8 threads): 178.7 + 186.8 + 182.5 +
+145.8 s of passes, 804.0 s written, 3.86 GiB peak; a single part costs
+about h8's passes plus the writing (as h10).</p>
+<p>Table files (tables::file, new): the data at offset 0 (mappable as is), then
+a 4 KiB text trailer in the last 4 KiB of the file: <code>layout h48</code>, k, base,
+data bytes, code distribution, checksum (per-1 MiB-chunk hashes, so parts
+need no second pass). Unknown keys are ignored but another <code>layout</code> is
+refused (room for e.g. a parity-bit variant). The trailer fits in the slack
+of the existing hugetlbfs files (h11: 15 MB), so `gen stamp <path> <k></p>
+<base>` adds one in place (refuses to touch the data region, reads it
+back); `gen check` verifies distribution and checksum. Meta lookup: trailer,
+else `<path>.meta`, else the legacy build-dir `.hugemeta` (/mnt/huge, until
+stamped). Loading: hugetlbfs and /dev/shm mapped (as before); other files
+copied into anonymous THP memory (Linux default, now dropped from the page
+cache as copied) or mapped read-only with MADV_HUGEPAGE (default off Linux),
+`CUBEOPT_LOAD=auto|map|copy`, `CUBEOPT_PREFAULT=1|0` (map: fault it all in
+at open with parallel MADV_POPULATE_READ, or on first use).
+<p><code>bench &lt;table&gt; tune</code>: 1T and all-core stream sweeps over 8..48 lanes,
+saved to <code>&lt;table&gt;.tune</code>, read by <code>solve</code> and <code>bench</code> as their default
+lanes (else <code>tables::file::untuned_lanes(k)</code>).</p>
+<p>x86 search and speed unchanged: no hot code touched (with the next commit,
+the stream and share loops are instruction-identical to main f8a4919's,
+objdump with addresses normalized, and at the same 64-byte offsets);
+count.sh-style random:1000:2026 on h11: nodes/cube 3058198, lookups/cube
+2588380, lengths 15:1 16:35 17:270 18:662 19:32, as main.
+Speed of this stack (both commits) vs main 735dd25, bench stream on h11,
+24 lanes (main has since moved to 1f4c85a: share.rs only; this stack is
+rebased on it without conflicts):
+1 thread, layout-averaged (abl1t: 4 lld section-shuffle layouts x 5 paired
+runs, solves/s):
+layout  main 735dd25                                  this stack
+none    25.283 [23.767 25.367 24.550 25.317 25.283]   25.600 [24.867 25.567 25.850 25.600 25.733]
+1       25.217 [25.217 24.933 25.167 25.350 25.400]   25.483 [25.200 25.233 25.483 25.567 25.550]
+2       25.550 [25.617 25.600 25.550 25.217 25.333]   25.917 [25.917 25.950 25.600 25.250 25.950]
+3       24.583 [24.383 25.117 24.300 25.550 24.583]   25.367 [24.917 25.367 25.450 25.550 24.517]
+LAYOUT-AVERAGED B/A: median +1.12%, mean +1.52% over 20 pairs
+(min -0.27%, max +5.30%): with instruction-identical hot loops this is
+code placement, not a gain; neutral.
+48 threads (ab48, 5 runs, outside load &lt;= 0.2 cores, solves/s):
+main 735dd25  1083.467 [1091.200 1077.800 1093.533 1077.367 1083.467]
+this stack    1088.767 [1090.633 1080.300 1090.800 1088.767 1073.500]
+(+0.5%, within the 48T noise): neutral.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

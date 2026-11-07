@@ -1,0 +1,1191 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>cubie.rs — source evidence</title><style>body{font:15px system-ui;margin:2rem}pre{font:13px/1.6 monospace;overflow:auto}.line:target{background:#fff0a0}a{color:#42617a;text-decoration:none}</style><h1>cubie.rs</h1><p>Source evidence snapshot. Original file SHA-256: <code>7c530be6f56cd55ff3b7054d7d6a5c550d41d25109087af36372a8e847e8d72d</code>. <a href="cubie.rs">Raw source</a></p><pre><span class="line" id="L1"><a href="#L1">    1</a> //! Scalar (&quot;cubie level&quot;) cube model, derived from 3D geometry.</span>
+<span class="line" id="L2"><a href="#L2">    2</a> //!</span>
+<span class="line" id="L3"><a href="#L3">    3</a> //! A cube state is described piece by piece: which corner/edge piece sits in</span>
+<span class="line" id="L4"><a href="#L4">    4</a> //! each position, and how it is twisted (corners: 0..3) or flipped (edges:</span>
+<span class="line" id="L5"><a href="#L5">    5</a> //! 0..2). This module is not performance critical. It is the ground truth</span>
+<span class="line" id="L6"><a href="#L6">    6</a> //! from which the fast SIMD representation (`simd`), the move tables and the</span>
+<span class="line" id="L7"><a href="#L7">    7</a> //! 48 symmetries are derived, and against which they are tested.</span>
+<span class="line" id="L8"><a href="#L8">    8</a> //!</span>
+<span class="line" id="L9"><a href="#L9">    9</a> //! The derivation (`model`: moves and symmetries as rotations and</span>
+<span class="line" id="L10"><a href="#L10">   10</a> //! reflections of the 48 stickers) runs in build.rs, which writes the moves,</span>
+<span class="line" id="L11"><a href="#L11">   11</a> //! symmetries and facelet tables as constants for the library</span>
+<span class="line" id="L12"><a href="#L12">   12</a> //! (`cfg(cubie_generated)`), and in the tests.</span>
+<span class="line" id="L13"><a href="#L13">   13</a> //!</span>
+<span class="line" id="L14"><a href="#L14">   14</a> //! Piece numbering follows nissy so that cheap bit tricks give the H48</span>
+<span class="line" id="L15"><a href="#L15">   15</a> //! coordinates:</span>
+<span class="line" id="L16"><a href="#L16">   16</a> //! * corners `UFR UBL DFL DBR | UFL UBR DFR DBL` (bit 2 = tetrad),</span>
+<span class="line" id="L17"><a href="#L17">   17</a> //! * edges `UF UB DB DF | UR UL DL DR | FR FL BL BR` (bits 2-3 = slice).</span>
+<span class="line" id="L18"><a href="#L18">   18</a> //!</span>
+<span class="line" id="L19"><a href="#L19">   19</a> //! Axes: x points to R, y to U, z to F.</span>
+<span class="line" id="L20"><a href="#L20">   20</a> //!</span>
+<span class="line" id="L21"><a href="#L21">   21</a> //! Composition convention: `a.compose(&amp;b)` is &quot;a then b&quot;. `corner_perm[i]`</span>
+<span class="line" id="L22"><a href="#L22">   22</a> //! is the piece in position `i`, so</span>
+<span class="line" id="L23"><a href="#L23">   23</a> //! `a.compose(&amp;b).corner_perm[i] = a.corner_perm[b.corner_perm[i]]`.</span>
+<span class="line" id="L24"><a href="#L24">   24</a> </span>
+<span class="line" id="L25"><a href="#L25">   25</a> /// An integer 3D vector (positions, normals).</span>
+<span class="line" id="L26"><a href="#L26">   26</a> pub type Vec3 = [i32; 3];</span>
+<span class="line" id="L27"><a href="#L27">   27</a> </span>
+<span class="line" id="L28"><a href="#L28">   28</a> /// Centers of the 8 corner positions.</span>
+<span class="line" id="L29"><a href="#L29">   29</a> pub const CORNER_POSITIONS: [Vec3; 8] = [</span>
+<span class="line" id="L30"><a href="#L30">   30</a>     [1, 1, 1],    // UFR</span>
+<span class="line" id="L31"><a href="#L31">   31</a>     [-1, 1, -1],  // UBL</span>
+<span class="line" id="L32"><a href="#L32">   32</a>     [-1, -1, 1],  // DFL</span>
+<span class="line" id="L33"><a href="#L33">   33</a>     [1, -1, -1],  // DBR</span>
+<span class="line" id="L34"><a href="#L34">   34</a>     [-1, 1, 1],   // UFL</span>
+<span class="line" id="L35"><a href="#L35">   35</a>     [1, 1, -1],   // UBR</span>
+<span class="line" id="L36"><a href="#L36">   36</a>     [1, -1, 1],   // DFR</span>
+<span class="line" id="L37"><a href="#L37">   37</a>     [-1, -1, -1], // DBL</span>
+<span class="line" id="L38"><a href="#L38">   38</a> ];</span>
+<span class="line" id="L39"><a href="#L39">   39</a> </span>
+<span class="line" id="L40"><a href="#L40">   40</a> /// Centers of the 12 edge positions.</span>
+<span class="line" id="L41"><a href="#L41">   41</a> pub const EDGE_POSITIONS: [Vec3; 12] = [</span>
+<span class="line" id="L42"><a href="#L42">   42</a>     [0, 1, 1],   // UF</span>
+<span class="line" id="L43"><a href="#L43">   43</a>     [0, 1, -1],  // UB</span>
+<span class="line" id="L44"><a href="#L44">   44</a>     [0, -1, -1], // DB</span>
+<span class="line" id="L45"><a href="#L45">   45</a>     [0, -1, 1],  // DF</span>
+<span class="line" id="L46"><a href="#L46">   46</a>     [1, 1, 0],   // UR</span>
+<span class="line" id="L47"><a href="#L47">   47</a>     [-1, 1, 0],  // UL</span>
+<span class="line" id="L48"><a href="#L48">   48</a>     [-1, -1, 0], // DL</span>
+<span class="line" id="L49"><a href="#L49">   49</a>     [1, -1, 0],  // DR</span>
+<span class="line" id="L50"><a href="#L50">   50</a>     [1, 0, 1],   // FR</span>
+<span class="line" id="L51"><a href="#L51">   51</a>     [-1, 0, 1],  // FL</span>
+<span class="line" id="L52"><a href="#L52">   52</a>     [-1, 0, -1], // BL</span>
+<span class="line" id="L53"><a href="#L53">   53</a>     [1, 0, -1],  // BR</span>
+<span class="line" id="L54"><a href="#L54">   54</a> ];</span>
+<span class="line" id="L55"><a href="#L55">   55</a> </span>
+<span class="line" id="L56"><a href="#L56">   56</a> /// Outward normals of the faces in move order: U, D, R, L, F, B.</span>
+<span class="line" id="L57"><a href="#L57">   57</a> ///</span>
+<span class="line" id="L58"><a href="#L58">   58</a> /// Move `m` turns face `m / 3` clockwise by `m % 3 + 1` quarter turns (so</span>
+<span class="line" id="L59"><a href="#L59">   59</a> /// the moves are U U2 U&#x27; D D2 D&#x27; ... B&#x27;).</span>
+<span class="line" id="L60"><a href="#L60">   60</a> pub const FACE_NORMALS: [Vec3; 6] = [</span>
+<span class="line" id="L61"><a href="#L61">   61</a>     [0, 1, 0],</span>
+<span class="line" id="L62"><a href="#L62">   62</a>     [0, -1, 0],</span>
+<span class="line" id="L63"><a href="#L63">   63</a>     [1, 0, 0],</span>
+<span class="line" id="L64"><a href="#L64">   64</a>     [-1, 0, 0],</span>
+<span class="line" id="L65"><a href="#L65">   65</a>     [0, 0, 1],</span>
+<span class="line" id="L66"><a href="#L66">   66</a>     [0, 0, -1],</span>
+<span class="line" id="L67"><a href="#L67">   67</a> ];</span>
+<span class="line" id="L68"><a href="#L68">   68</a> /// Face letters in move order.</span>
+<span class="line" id="L69"><a href="#L69">   69</a> pub const FACE_NAMES: [char; 6] = [&#x27;U&#x27;, &#x27;D&#x27;, &#x27;R&#x27;, &#x27;L&#x27;, &#x27;F&#x27;, &#x27;B&#x27;];</span>
+<span class="line" id="L70"><a href="#L70">   70</a> </span>
+<span class="line" id="L71"><a href="#L71">   71</a> /// A cube state, piece by piece.</span>
+<span class="line" id="L72"><a href="#L72">   72</a> ///</span>
+<span class="line" id="L73"><a href="#L73">   73</a> /// Valid by construction: the fields are private to the crate, and every</span>
+<span class="line" id="L74"><a href="#L74">   74</a> /// way to make one (`SOLVED`, moves, `compose`, `inverse`, `random`,</span>
+<span class="line" id="L75"><a href="#L75">   75</a> /// `from_facelets`, the SIMD cube&#x27;s `to_cubie`) gives permutations of the</span>
+<span class="line" id="L76"><a href="#L76">   76</a> /// pieces and orientations in range, so the pieces index the tables below</span>
+<span class="line" id="L77"><a href="#L77">   77</a> /// in range.</span>
+<span class="line" id="L78"><a href="#L78">   78</a> #[derive(Clone, Copy, PartialEq, Eq, Debug, Hash)]</span>
+<span class="line" id="L79"><a href="#L79">   79</a> pub struct CubieCube {</span>
+<span class="line" id="L80"><a href="#L80">   80</a>     /// The corner piece in each corner position.</span>
+<span class="line" id="L81"><a href="#L81">   81</a>     pub(crate) corner_perm: [u8; 8],</span>
+<span class="line" id="L82"><a href="#L82">   82</a>     /// The twist of each corner position&#x27;s piece: by how many clockwise</span>
+<span class="line" id="L83"><a href="#L83">   83</a>     /// steps (0..3) its U/D sticker is turned away from the U/D face.</span>
+<span class="line" id="L84"><a href="#L84">   84</a>     pub(crate) corner_orient: [u8; 8],</span>
+<span class="line" id="L85"><a href="#L85">   85</a>     /// The edge piece in each edge position.</span>
+<span class="line" id="L86"><a href="#L86">   86</a>     pub(crate) edge_perm: [u8; 12],</span>
+<span class="line" id="L87"><a href="#L87">   87</a>     /// Whether each edge position&#x27;s piece is flipped (0 or 1).</span>
+<span class="line" id="L88"><a href="#L88">   88</a>     pub(crate) edge_orient: [u8; 12],</span>
+<span class="line" id="L89"><a href="#L89">   89</a> }</span>
+<span class="line" id="L90"><a href="#L90">   90</a> </span>
+<span class="line" id="L91"><a href="#L91">   91</a> impl CubieCube {</span>
+<span class="line" id="L92"><a href="#L92">   92</a>     pub const SOLVED: CubieCube = CubieCube {</span>
+<span class="line" id="L93"><a href="#L93">   93</a>         corner_perm: [0, 1, 2, 3, 4, 5, 6, 7],</span>
+<span class="line" id="L94"><a href="#L94">   94</a>         corner_orient: [0; 8],</span>
+<span class="line" id="L95"><a href="#L95">   95</a>         edge_perm: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],</span>
+<span class="line" id="L96"><a href="#L96">   96</a>         edge_orient: [0; 12],</span>
+<span class="line" id="L97"><a href="#L97">   97</a>     };</span>
+<span class="line" id="L98"><a href="#L98">   98</a> </span>
+<span class="line" id="L99"><a href="#L99">   99</a>     /// &quot;`self` then `other`&quot;.</span>
+<span class="line" id="L100"><a href="#L100">  100</a>     #[must_use]</span>
+<span class="line" id="L101"><a href="#L101">  101</a>     pub fn compose(&amp;self, other: &amp;CubieCube) -&gt; CubieCube {</span>
+<span class="line" id="L102"><a href="#L102">  102</a>         let mut result = CubieCube::SOLVED;</span>
+<span class="line" id="L103"><a href="#L103">  103</a>         for i in 0..8 {</span>
+<span class="line" id="L104"><a href="#L104">  104</a>             let from = usize::from(other.corner_perm[i]);</span>
+<span class="line" id="L105"><a href="#L105">  105</a>             result.corner_perm[i] = self.corner_perm[from];</span>
+<span class="line" id="L106"><a href="#L106">  106</a>             result.corner_orient[i] = (self.corner_orient[from] + other.corner_orient[i]) % 3;</span>
+<span class="line" id="L107"><a href="#L107">  107</a>         }</span>
+<span class="line" id="L108"><a href="#L108">  108</a>         for i in 0..12 {</span>
+<span class="line" id="L109"><a href="#L109">  109</a>             let from = usize::from(other.edge_perm[i]);</span>
+<span class="line" id="L110"><a href="#L110">  110</a>             result.edge_perm[i] = self.edge_perm[from];</span>
+<span class="line" id="L111"><a href="#L111">  111</a>             result.edge_orient[i] = (self.edge_orient[from] + other.edge_orient[i]) % 2;</span>
+<span class="line" id="L112"><a href="#L112">  112</a>         }</span>
+<span class="line" id="L113"><a href="#L113">  113</a>         result</span>
+<span class="line" id="L114"><a href="#L114">  114</a>     }</span>
+<span class="line" id="L115"><a href="#L115">  115</a> </span>
+<span class="line" id="L116"><a href="#L116">  116</a>     /// The state that undoes this one: `c.compose(&amp;c.inverse())` is solved.</span>
+<span class="line" id="L117"><a href="#L117">  117</a>     #[must_use]</span>
+<span class="line" id="L118"><a href="#L118">  118</a>     pub fn inverse(&amp;self) -&gt; CubieCube {</span>
+<span class="line" id="L119"><a href="#L119">  119</a>         let mut result = CubieCube::SOLVED;</span>
+<span class="line" id="L120"><a href="#L120">  120</a>         let corners = self.corner_perm.iter().zip(&amp;self.corner_orient);</span>
+<span class="line" id="L121"><a href="#L121">  121</a>         for (i, (&amp;piece, &amp;orient)) in (0..).zip(corners) {</span>
+<span class="line" id="L122"><a href="#L122">  122</a>             result.corner_perm[usize::from(piece)] = i;</span>
+<span class="line" id="L123"><a href="#L123">  123</a>             result.corner_orient[usize::from(piece)] = (3 - orient) % 3;</span>
+<span class="line" id="L124"><a href="#L124">  124</a>         }</span>
+<span class="line" id="L125"><a href="#L125">  125</a>         let edges = self.edge_perm.iter().zip(&amp;self.edge_orient);</span>
+<span class="line" id="L126"><a href="#L126">  126</a>         for (i, (&amp;piece, &amp;orient)) in (0..).zip(edges) {</span>
+<span class="line" id="L127"><a href="#L127">  127</a>             result.edge_perm[usize::from(piece)] = i;</span>
+<span class="line" id="L128"><a href="#L128">  128</a>             result.edge_orient[usize::from(piece)] = orient;</span>
+<span class="line" id="L129"><a href="#L129">  129</a>         }</span>
+<span class="line" id="L130"><a href="#L130">  130</a>         result</span>
+<span class="line" id="L131"><a href="#L131">  131</a>     }</span>
+<span class="line" id="L132"><a href="#L132">  132</a> </span>
+<span class="line" id="L133"><a href="#L133">  133</a>     /// Negate all corner twists (mod 3): a mirror reverses the turning</span>
+<span class="line" id="L134"><a href="#L134">  134</a>     /// direction (see `conjugate`).</span>
+<span class="line" id="L135"><a href="#L135">  135</a>     #[must_use]</span>
+<span class="line" id="L136"><a href="#L136">  136</a>     pub fn negate_corner_orient(&amp;self) -&gt; CubieCube {</span>
+<span class="line" id="L137"><a href="#L137">  137</a>         let mut result = *self;</span>
+<span class="line" id="L138"><a href="#L138">  138</a>         for orient in &amp;mut result.corner_orient {</span>
+<span class="line" id="L139"><a href="#L139">  139</a>             *orient = (3 - *orient) % 3;</span>
+<span class="line" id="L140"><a href="#L140">  140</a>         }</span>
+<span class="line" id="L141"><a href="#L141">  141</a>         result</span>
+<span class="line" id="L142"><a href="#L142">  142</a>     }</span>
+<span class="line" id="L143"><a href="#L143">  143</a> </span>
+<span class="line" id="L144"><a href="#L144">  144</a>     /// This state followed by move `mv`.</span>
+<span class="line" id="L145"><a href="#L145">  145</a>     #[cfg(cubie_generated)]</span>
+<span class="line" id="L146"><a href="#L146">  146</a>     #[must_use]</span>
+<span class="line" id="L147"><a href="#L147">  147</a>     pub fn apply_move(&amp;self, mv: Move) -&gt; CubieCube {</span>
+<span class="line" id="L148"><a href="#L148">  148</a>         self.compose(&amp;MOVE_CUBES[mv.index()])</span>
+<span class="line" id="L149"><a href="#L149">  149</a>     }</span>
+<span class="line" id="L150"><a href="#L150">  150</a> </span>
+<span class="line" id="L151"><a href="#L151">  151</a>     /// This state followed by a move sequence (moves numbered as `Move`),</span>
+<span class="line" id="L152"><a href="#L152">  152</a>     /// or `None` if a number is not a move.</span>
+<span class="line" id="L153"><a href="#L153">  153</a>     #[cfg(cubie_generated)]</span>
+<span class="line" id="L154"><a href="#L154">  154</a>     #[must_use]</span>
+<span class="line" id="L155"><a href="#L155">  155</a>     pub fn apply_moves(&amp;self, moves: &amp;[u8]) -&gt; Option&lt;CubieCube&gt; {</span>
+<span class="line" id="L156"><a href="#L156">  156</a>         moves.iter().try_fold(*self, |cube, &amp;mv| {</span>
+<span class="line" id="L157"><a href="#L157">  157</a>             Some(cube.apply_move(Move::from_index(usize::from(mv))?))</span>
+<span class="line" id="L158"><a href="#L158">  158</a>         })</span>
+<span class="line" id="L159"><a href="#L159">  159</a>     }</span>
+<span class="line" id="L160"><a href="#L160">  160</a> </span>
+<span class="line" id="L161"><a href="#L161">  161</a>     /// Parity (0 even, 1 odd) of the corner permutation.</span>
+<span class="line" id="L162"><a href="#L162">  162</a>     #[must_use]</span>
+<span class="line" id="L163"><a href="#L163">  163</a>     pub fn corner_parity(&amp;self) -&gt; u32 {</span>
+<span class="line" id="L164"><a href="#L164">  164</a>         permutation_parity(&amp;self.corner_perm)</span>
+<span class="line" id="L165"><a href="#L165">  165</a>     }</span>
+<span class="line" id="L166"><a href="#L166">  166</a> </span>
+<span class="line" id="L167"><a href="#L167">  167</a>     /// Parity (0 even, 1 odd) of the edge permutation.</span>
+<span class="line" id="L168"><a href="#L168">  168</a>     #[must_use]</span>
+<span class="line" id="L169"><a href="#L169">  169</a>     pub fn edge_parity(&amp;self) -&gt; u32 {</span>
+<span class="line" id="L170"><a href="#L170">  170</a>         permutation_parity(&amp;self.edge_perm)</span>
+<span class="line" id="L171"><a href="#L171">  171</a>     }</span>
+<span class="line" id="L172"><a href="#L172">  172</a> </span>
+<span class="line" id="L173"><a href="#L173">  173</a>     /// Is this a reachable cube position? (Valid permutations, total twist</span>
+<span class="line" id="L174"><a href="#L174">  174</a>     /// and flip 0, equal corner and edge parities.)</span>
+<span class="line" id="L175"><a href="#L175">  175</a>     #[must_use]</span>
+<span class="line" id="L176"><a href="#L176">  176</a>     pub fn is_solvable(&amp;self) -&gt; bool {</span>
+<span class="line" id="L177"><a href="#L177">  177</a>         let mut seen_corners = [false; 8];</span>
+<span class="line" id="L178"><a href="#L178">  178</a>         let mut seen_edges = [false; 12];</span>
+<span class="line" id="L179"><a href="#L179">  179</a>         for &amp;piece in &amp;self.corner_perm {</span>
+<span class="line" id="L180"><a href="#L180">  180</a>             match seen_corners.get_mut(usize::from(piece)) {</span>
+<span class="line" id="L181"><a href="#L181">  181</a>                 Some(seen @ false) =&gt; *seen = true,</span>
+<span class="line" id="L182"><a href="#L182">  182</a>                 _ =&gt; return false,</span>
+<span class="line" id="L183"><a href="#L183">  183</a>             }</span>
+<span class="line" id="L184"><a href="#L184">  184</a>         }</span>
+<span class="line" id="L185"><a href="#L185">  185</a>         for &amp;piece in &amp;self.edge_perm {</span>
+<span class="line" id="L186"><a href="#L186">  186</a>             match seen_edges.get_mut(usize::from(piece)) {</span>
+<span class="line" id="L187"><a href="#L187">  187</a>                 Some(seen @ false) =&gt; *seen = true,</span>
+<span class="line" id="L188"><a href="#L188">  188</a>                 _ =&gt; return false,</span>
+<span class="line" id="L189"><a href="#L189">  189</a>             }</span>
+<span class="line" id="L190"><a href="#L190">  190</a>         }</span>
+<span class="line" id="L191"><a href="#L191">  191</a>         let total = |orients: &amp;[u8]| orients.iter().map(|&amp;x| u32::from(x)).sum::&lt;u32&gt;();</span>
+<span class="line" id="L192"><a href="#L192">  192</a>         total(&amp;self.corner_orient).is_multiple_of(3)</span>
+<span class="line" id="L193"><a href="#L193">  193</a>             &amp;&amp; total(&amp;self.edge_orient).is_multiple_of(2)</span>
+<span class="line" id="L194"><a href="#L194">  194</a>             &amp;&amp; self.corner_parity() == self.edge_parity()</span>
+<span class="line" id="L195"><a href="#L195">  195</a>     }</span>
+<span class="line" id="L196"><a href="#L196">  196</a> </span>
+<span class="line" id="L197"><a href="#L197">  197</a>     /// Uniformly random reachable position.</span>
+<span class="line" id="L198"><a href="#L198">  198</a>     pub fn random(rng: &amp;mut Rng) -&gt; CubieCube {</span>
+<span class="line" id="L199"><a href="#L199">  199</a>         loop {</span>
+<span class="line" id="L200"><a href="#L200">  200</a>             let mut cube = CubieCube::SOLVED;</span>
+<span class="line" id="L201"><a href="#L201">  201</a>             // (Fisher-Yates shuffles.)</span>
+<span class="line" id="L202"><a href="#L202">  202</a>             for i in (1..8).rev() {</span>
+<span class="line" id="L203"><a href="#L203">  203</a>                 let j = rng.below_usize(i + 1);</span>
+<span class="line" id="L204"><a href="#L204">  204</a>                 cube.corner_perm.swap(i, j);</span>
+<span class="line" id="L205"><a href="#L205">  205</a>             }</span>
+<span class="line" id="L206"><a href="#L206">  206</a>             for i in (1..12).rev() {</span>
+<span class="line" id="L207"><a href="#L207">  207</a>                 let j = rng.below_usize(i + 1);</span>
+<span class="line" id="L208"><a href="#L208">  208</a>                 cube.edge_perm.swap(i, j);</span>
+<span class="line" id="L209"><a href="#L209">  209</a>             }</span>
+<span class="line" id="L210"><a href="#L210">  210</a>             // The last twist and flip make the totals valid.</span>
+<span class="line" id="L211"><a href="#L211">  211</a>             let mut twist = 0;</span>
+<span class="line" id="L212"><a href="#L212">  212</a>             for i in 0..7 {</span>
+<span class="line" id="L213"><a href="#L213">  213</a>                 cube.corner_orient[i] = rng.below_u8(3);</span>
+<span class="line" id="L214"><a href="#L214">  214</a>                 twist += cube.corner_orient[i];</span>
+<span class="line" id="L215"><a href="#L215">  215</a>             }</span>
+<span class="line" id="L216"><a href="#L216">  216</a>             cube.corner_orient[7] = (3 - twist % 3) % 3;</span>
+<span class="line" id="L217"><a href="#L217">  217</a>             let mut flip = 0;</span>
+<span class="line" id="L218"><a href="#L218">  218</a>             for i in 0..11 {</span>
+<span class="line" id="L219"><a href="#L219">  219</a>                 cube.edge_orient[i] = rng.below_u8(2);</span>
+<span class="line" id="L220"><a href="#L220">  220</a>                 flip += cube.edge_orient[i];</span>
+<span class="line" id="L221"><a href="#L221">  221</a>             }</span>
+<span class="line" id="L222"><a href="#L222">  222</a>             cube.edge_orient[11] = flip % 2;</span>
+<span class="line" id="L223"><a href="#L223">  223</a>             // Half of all such states have mismatched parities: retry.</span>
+<span class="line" id="L224"><a href="#L224">  224</a>             if cube.corner_parity() == cube.edge_parity() {</span>
+<span class="line" id="L225"><a href="#L225">  225</a>                 return cube;</span>
+<span class="line" id="L226"><a href="#L226">  226</a>             }</span>
+<span class="line" id="L227"><a href="#L227">  227</a>         }</span>
+<span class="line" id="L228"><a href="#L228">  228</a>     }</span>
+<span class="line" id="L229"><a href="#L229">  229</a> }</span>
+<span class="line" id="L230"><a href="#L230">  230</a> </span>
+<span class="line" id="L231"><a href="#L231">  231</a> /// Parity of a permutation (0 even, 1 odd): that of its number of</span>
+<span class="line" id="L232"><a href="#L232">  232</a> /// inversions.</span>
+<span class="line" id="L233"><a href="#L233">  233</a> fn permutation_parity(perm: &amp;[u8]) -&gt; u32 {</span>
+<span class="line" id="L234"><a href="#L234">  234</a>     let mut parity = 0;</span>
+<span class="line" id="L235"><a href="#L235">  235</a>     for (i, &amp;a) in perm.iter().enumerate() {</span>
+<span class="line" id="L236"><a href="#L236">  236</a>         for &amp;b in perm.iter().skip(i + 1) {</span>
+<span class="line" id="L237"><a href="#L237">  237</a>             if a &gt; b {</span>
+<span class="line" id="L238"><a href="#L238">  238</a>                 parity ^= 1;</span>
+<span class="line" id="L239"><a href="#L239">  239</a>             }</span>
+<span class="line" id="L240"><a href="#L240">  240</a>         }</span>
+<span class="line" id="L241"><a href="#L241">  241</a>     }</span>
+<span class="line" id="L242"><a href="#L242">  242</a>     parity</span>
+<span class="line" id="L243"><a href="#L243">  243</a> }</span>
+<span class="line" id="L244"><a href="#L244">  244</a> </span>
+<span class="line" id="L245"><a href="#L245">  245</a> /// Small deterministic PRNG (splitmix64), so benchmarks are reproducible.</span>
+<span class="line" id="L246"><a href="#L246">  246</a> pub struct Rng(pub u64);</span>
+<span class="line" id="L247"><a href="#L247">  247</a> impl Rng {</span>
+<span class="line" id="L248"><a href="#L248">  248</a>     pub fn next_u64(&amp;mut self) -&gt; u64 {</span>
+<span class="line" id="L249"><a href="#L249">  249</a>         self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);</span>
+<span class="line" id="L250"><a href="#L250">  250</a>         let mut z = self.0;</span>
+<span class="line" id="L251"><a href="#L251">  251</a>         z = (z ^ (z &gt;&gt; 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);</span>
+<span class="line" id="L252"><a href="#L252">  252</a>         z = (z ^ (z &gt;&gt; 27)).wrapping_mul(0x94D0_49BB_1331_11EB);</span>
+<span class="line" id="L253"><a href="#L253">  253</a>         z ^ (z &gt;&gt; 31)</span>
+<span class="line" id="L254"><a href="#L254">  254</a>     }</span>
+<span class="line" id="L255"><a href="#L255">  255</a> </span>
+<span class="line" id="L256"><a href="#L256">  256</a>     /// Uniform in `0..n`: the high half of the 128-bit product of a</span>
+<span class="line" id="L257"><a href="#L257">  257</a>     /// random `u64` and `n` (no division).</span>
+<span class="line" id="L258"><a href="#L258">  258</a>     pub fn below(&amp;mut self, n: u64) -&gt; u64 {</span>
+<span class="line" id="L259"><a href="#L259">  259</a>         self.next_u64().carrying_mul(n, 0).1</span>
+<span class="line" id="L260"><a href="#L260">  260</a>     }</span>
+<span class="line" id="L261"><a href="#L261">  261</a> </span>
+<span class="line" id="L262"><a href="#L262">  262</a>     /// `below` for small numbers (moves, orientations).</span>
+<span class="line" id="L263"><a href="#L263">  263</a>     #[expect(clippy::cast_possible_truncation, reason = &quot;below n, a u8&quot;)]</span>
+<span class="line" id="L264"><a href="#L264">  264</a>     pub fn below_u8(&amp;mut self, n: u8) -&gt; u8 {</span>
+<span class="line" id="L265"><a href="#L265">  265</a>         self.below(n.into()) as u8</span>
+<span class="line" id="L266"><a href="#L266">  266</a>     }</span>
+<span class="line" id="L267"><a href="#L267">  267</a> </span>
+<span class="line" id="L268"><a href="#L268">  268</a>     /// `below` for indices.</span>
+<span class="line" id="L269"><a href="#L269">  269</a>     #[expect(clippy::cast_possible_truncation, reason = &quot;below n, a usize&quot;)]</span>
+<span class="line" id="L270"><a href="#L270">  270</a>     pub fn below_usize(&amp;mut self, n: usize) -&gt; usize {</span>
+<span class="line" id="L271"><a href="#L271">  271</a>         self.below(n as u64) as usize</span>
+<span class="line" id="L272"><a href="#L272">  272</a>     }</span>
+<span class="line" id="L273"><a href="#L273">  273</a> }</span>
+<span class="line" id="L274"><a href="#L274">  274</a> </span>
+<span class="line" id="L275"><a href="#L275">  275</a> // (`below_usize` widens a `usize` to `u64`.)</span>
+<span class="line" id="L276"><a href="#L276">  276</a> const _: () = assert!(usize::BITS &lt;= u64::BITS);</span>
+<span class="line" id="L277"><a href="#L277">  277</a> </span>
+<span class="line" id="L278"><a href="#L278">  278</a> /// Number of moves (turns of 90, 180 and 270 degrees of the 6 faces).</span>
+<span class="line" id="L279"><a href="#L279">  279</a> pub const N_MOVES: usize = 18;</span>
+<span class="line" id="L280"><a href="#L280">  280</a> </span>
+<span class="line" id="L281"><a href="#L281">  281</a> /// A move: face `index / 3` (U D R L F B) turned clockwise by `index % 3 +</span>
+<span class="line" id="L282"><a href="#L282">  282</a> /// 1` quarter turns; `X3` is X&#x27;. Only the 18 moves exist, so a `Move`</span>
+<span class="line" id="L283"><a href="#L283">  283</a> /// indexes the 18-entry move tables without a check.</span>
+<span class="line" id="L284"><a href="#L284">  284</a> #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]</span>
+<span class="line" id="L285"><a href="#L285">  285</a> #[repr(u8)]</span>
+<span class="line" id="L286"><a href="#L286">  286</a> pub enum Move {</span>
+<span class="line" id="L287"><a href="#L287">  287</a>     U,</span>
+<span class="line" id="L288"><a href="#L288">  288</a>     U2,</span>
+<span class="line" id="L289"><a href="#L289">  289</a>     U3,</span>
+<span class="line" id="L290"><a href="#L290">  290</a>     D,</span>
+<span class="line" id="L291"><a href="#L291">  291</a>     D2,</span>
+<span class="line" id="L292"><a href="#L292">  292</a>     D3,</span>
+<span class="line" id="L293"><a href="#L293">  293</a>     R,</span>
+<span class="line" id="L294"><a href="#L294">  294</a>     R2,</span>
+<span class="line" id="L295"><a href="#L295">  295</a>     R3,</span>
+<span class="line" id="L296"><a href="#L296">  296</a>     L,</span>
+<span class="line" id="L297"><a href="#L297">  297</a>     L2,</span>
+<span class="line" id="L298"><a href="#L298">  298</a>     L3,</span>
+<span class="line" id="L299"><a href="#L299">  299</a>     F,</span>
+<span class="line" id="L300"><a href="#L300">  300</a>     F2,</span>
+<span class="line" id="L301"><a href="#L301">  301</a>     F3,</span>
+<span class="line" id="L302"><a href="#L302">  302</a>     B,</span>
+<span class="line" id="L303"><a href="#L303">  303</a>     B2,</span>
+<span class="line" id="L304"><a href="#L304">  304</a>     B3,</span>
+<span class="line" id="L305"><a href="#L305">  305</a> }</span>
+<span class="line" id="L306"><a href="#L306">  306</a> </span>
+<span class="line" id="L307"><a href="#L307">  307</a> impl Move {</span>
+<span class="line" id="L308"><a href="#L308">  308</a>     /// All moves, in order of their numbers.</span>
+<span class="line" id="L309"><a href="#L309">  309</a>     pub const ALL: [Move; N_MOVES] = [</span>
+<span class="line" id="L310"><a href="#L310">  310</a>         Move::U,</span>
+<span class="line" id="L311"><a href="#L311">  311</a>         Move::U2,</span>
+<span class="line" id="L312"><a href="#L312">  312</a>         Move::U3,</span>
+<span class="line" id="L313"><a href="#L313">  313</a>         Move::D,</span>
+<span class="line" id="L314"><a href="#L314">  314</a>         Move::D2,</span>
+<span class="line" id="L315"><a href="#L315">  315</a>         Move::D3,</span>
+<span class="line" id="L316"><a href="#L316">  316</a>         Move::R,</span>
+<span class="line" id="L317"><a href="#L317">  317</a>         Move::R2,</span>
+<span class="line" id="L318"><a href="#L318">  318</a>         Move::R3,</span>
+<span class="line" id="L319"><a href="#L319">  319</a>         Move::L,</span>
+<span class="line" id="L320"><a href="#L320">  320</a>         Move::L2,</span>
+<span class="line" id="L321"><a href="#L321">  321</a>         Move::L3,</span>
+<span class="line" id="L322"><a href="#L322">  322</a>         Move::F,</span>
+<span class="line" id="L323"><a href="#L323">  323</a>         Move::F2,</span>
+<span class="line" id="L324"><a href="#L324">  324</a>         Move::F3,</span>
+<span class="line" id="L325"><a href="#L325">  325</a>         Move::B,</span>
+<span class="line" id="L326"><a href="#L326">  326</a>         Move::B2,</span>
+<span class="line" id="L327"><a href="#L327">  327</a>         Move::B3,</span>
+<span class="line" id="L328"><a href="#L328">  328</a>     ];</span>
+<span class="line" id="L329"><a href="#L329">  329</a> </span>
+<span class="line" id="L330"><a href="#L330">  330</a>     /// The move numbered `index`, if there is one (`index &lt; 18`).</span>
+<span class="line" id="L331"><a href="#L331">  331</a>     #[must_use]</span>
+<span class="line" id="L332"><a href="#L332">  332</a>     #[inline(always)]</span>
+<span class="line" id="L333"><a href="#L333">  333</a>     pub fn from_index(index: usize) -&gt; Option&lt;Move&gt; {</span>
+<span class="line" id="L334"><a href="#L334">  334</a>         Move::ALL.get(index).copied()</span>
+<span class="line" id="L335"><a href="#L335">  335</a>     }</span>
+<span class="line" id="L336"><a href="#L336">  336</a> </span>
+<span class="line" id="L337"><a href="#L337">  337</a>     /// The lowest move of a move mask (bit `m` for move `m`), or `None` if</span>
+<span class="line" id="L338"><a href="#L338">  338</a>     /// it has none. (For masks of moves only, as the search&#x27;s are: then</span>
+<span class="line" id="L339"><a href="#L339">  339</a>     /// `while let Some(mv) = Move::lowest(mask)` visits all of them.)</span>
+<span class="line" id="L340"><a href="#L340">  340</a>     #[must_use]</span>
+<span class="line" id="L341"><a href="#L341">  341</a>     #[inline(always)]</span>
+<span class="line" id="L342"><a href="#L342">  342</a>     pub fn lowest(mask: u32) -&gt; Option&lt;Move&gt; {</span>
+<span class="line" id="L343"><a href="#L343">  343</a>         Move::from_index(mask.trailing_zeros() as usize)</span>
+<span class="line" id="L344"><a href="#L344">  344</a>     }</span>
+<span class="line" id="L345"><a href="#L345">  345</a> </span>
+<span class="line" id="L346"><a href="#L346">  346</a>     /// Its number (0..18).</span>
+<span class="line" id="L347"><a href="#L347">  347</a>     #[must_use]</span>
+<span class="line" id="L348"><a href="#L348">  348</a>     #[inline(always)]</span>
+<span class="line" id="L349"><a href="#L349">  349</a>     pub const fn index(self) -&gt; usize {</span>
+<span class="line" id="L350"><a href="#L350">  350</a>         self as usize</span>
+<span class="line" id="L351"><a href="#L351">  351</a>     }</span>
+<span class="line" id="L352"><a href="#L352">  352</a> }</span>
+<span class="line" id="L353"><a href="#L353">  353</a> </span>
+<span class="line" id="L354"><a href="#L354">  354</a> // (A `Move` is its number: `index` is the identity.)</span>
+<span class="line" id="L355"><a href="#L355">  355</a> const _: () = {</span>
+<span class="line" id="L356"><a href="#L356">  356</a>     let mut i = 0;</span>
+<span class="line" id="L357"><a href="#L357">  357</a>     while i &lt; N_MOVES {</span>
+<span class="line" id="L358"><a href="#L358">  358</a>         assert!(Move::ALL[i] as usize == i);</span>
+<span class="line" id="L359"><a href="#L359">  359</a>         i += 1;</span>
+<span class="line" id="L360"><a href="#L360">  360</a>     }</span>
+<span class="line" id="L361"><a href="#L361">  361</a> };</span>
+<span class="line" id="L362"><a href="#L362">  362</a> </span>
+<span class="line" id="L363"><a href="#L363">  363</a> // ---------------------------------------------------------------------------</span>
+<span class="line" id="L364"><a href="#L364">  364</a> // Facelet strings</span>
+<span class="line" id="L365"><a href="#L365">  365</a> // ---------------------------------------------------------------------------</span>
+<span class="line" id="L366"><a href="#L366">  366</a> </span>
+<span class="line" id="L367"><a href="#L367">  367</a> /// The face letters of a facelet string, in its order of faces (U R F D L</span>
+<span class="line" id="L368"><a href="#L368">  368</a> /// B, as in Kociemba&#x27;s solvers).</span>
+<span class="line" id="L369"><a href="#L369">  369</a> const FACELET_LETTERS: [char; 6] = [&#x27;U&#x27;, &#x27;R&#x27;, &#x27;F&#x27;, &#x27;D&#x27;, &#x27;L&#x27;, &#x27;B&#x27;];</span>
+<span class="line" id="L370"><a href="#L370">  370</a> </span>
+<span class="line" id="L371"><a href="#L371">  371</a> /// Why a facelet string is not a cube (`CubieCube::from_facelets`).</span>
+<span class="line" id="L372"><a href="#L372">  372</a> #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]</span>
+<span class="line" id="L373"><a href="#L373">  373</a> #[non_exhaustive]</span>
+<span class="line" id="L374"><a href="#L374">  374</a> pub enum FaceletError {</span>
+<span class="line" id="L375"><a href="#L375">  375</a>     /// Not 54 stickers (whitespace aside).</span>
+<span class="line" id="L376"><a href="#L376">  376</a>     #[error(&quot;{0} stickers, a cube has 54&quot;)]</span>
+<span class="line" id="L377"><a href="#L377">  377</a>     StickerCount(usize),</span>
+<span class="line" id="L378"><a href="#L378">  378</a>     /// Two centers of one color.</span>
+<span class="line" id="L379"><a href="#L379">  379</a>     #[error(&quot;two centers are {0:?}&quot;)]</span>
+<span class="line" id="L380"><a href="#L380">  380</a>     SameCenters(char),</span>
+<span class="line" id="L381"><a href="#L381">  381</a>     /// A sticker (numbered from 1) of a color that no center has.</span>
+<span class="line" id="L382"><a href="#L382">  382</a>     #[error(&quot;sticker {sticker} is {color:?}, no center&#x27;s color&quot;)]</span>
+<span class="line" id="L383"><a href="#L383">  383</a>     UnknownColor { sticker: usize, color: char },</span>
+<span class="line" id="L384"><a href="#L384">  384</a>     /// The stickers at a corner position are no corner&#x27;s colors.</span>
+<span class="line" id="L385"><a href="#L385">  385</a>     #[error(&quot;corner {0}: no such piece&quot;)]</span>
+<span class="line" id="L386"><a href="#L386">  386</a>     NoSuchCorner(usize),</span>
+<span class="line" id="L387"><a href="#L387">  387</a>     /// The stickers at an edge position are no edge&#x27;s colors.</span>
+<span class="line" id="L388"><a href="#L388">  388</a>     #[error(&quot;edge {0}: no such piece&quot;)]</span>
+<span class="line" id="L389"><a href="#L389">  389</a>     NoSuchEdge(usize),</span>
+<span class="line" id="L390"><a href="#L390">  390</a>     /// Pieces of a cube, but in a position no face turns reach.</span>
+<span class="line" id="L391"><a href="#L391">  391</a>     #[error(</span>
+<span class="line" id="L392"><a href="#L392">  392</a>         &quot;not a reachable position (a piece twice, a twisted corner, a flipped edge or two pieces swapped)&quot;</span>
+<span class="line" id="L393"><a href="#L393">  393</a>     )]</span>
+<span class="line" id="L394"><a href="#L394">  394</a>     Unreachable,</span>
+<span class="line" id="L395"><a href="#L395">  395</a> }</span>
+<span class="line" id="L396"><a href="#L396">  396</a> </span>
+<span class="line" id="L397"><a href="#L397">  397</a> // (Every facelet number in the tables is below 54, so the tables index a</span>
+<span class="line" id="L398"><a href="#L398">  398</a> // facelet string, and a facelet number / 9 the faces, in range.)</span>
+<span class="line" id="L399"><a href="#L399">  399</a> #[cfg(cubie_generated)]</span>
+<span class="line" id="L400"><a href="#L400">  400</a> const _: () = {</span>
+<span class="line" id="L401"><a href="#L401">  401</a>     let mut i = 0;</span>
+<span class="line" id="L402"><a href="#L402">  402</a>     while i &lt; 8 * 3 {</span>
+<span class="line" id="L403"><a href="#L403">  403</a>         assert!(CORNER_FACELETS[i / 3][i % 3] &lt; 54);</span>
+<span class="line" id="L404"><a href="#L404">  404</a>         i += 1;</span>
+<span class="line" id="L405"><a href="#L405">  405</a>     }</span>
+<span class="line" id="L406"><a href="#L406">  406</a>     let mut i = 0;</span>
+<span class="line" id="L407"><a href="#L407">  407</a>     while i &lt; 12 * 2 {</span>
+<span class="line" id="L408"><a href="#L408">  408</a>         assert!(EDGE_FACELETS[i / 2][i % 2] &lt; 54);</span>
+<span class="line" id="L409"><a href="#L409">  409</a>         i += 1;</span>
+<span class="line" id="L410"><a href="#L410">  410</a>     }</span>
+<span class="line" id="L411"><a href="#L411">  411</a> };</span>
+<span class="line" id="L412"><a href="#L412">  412</a> </span>
+<span class="line" id="L413"><a href="#L413">  413</a> #[cfg(cubie_generated)]</span>
+<span class="line" id="L414"><a href="#L414">  414</a> impl CubieCube {</span>
+<span class="line" id="L415"><a href="#L415">  415</a>     /// The cube of a facelet string: 54 stickers, face by face in the order</span>
+<span class="line" id="L416"><a href="#L416">  416</a>     /// U R F D L B, each face row by row as seen from outside (U with B at</span>
+<span class="line" id="L417"><a href="#L417">  417</a>     /// the top, D with F at the top, the others with U at the top), as in</span>
+<span class="line" id="L418"><a href="#L418">  418</a>     /// Kociemba&#x27;s solvers. Any six symbols can stand for the colors: a face&#x27;s</span>
+<span class="line" id="L419"><a href="#L419">  419</a>     /// color is the one of its center. Whitespace is ignored.</span>
+<span class="line" id="L420"><a href="#L420">  420</a>     ///</span>
+<span class="line" id="L421"><a href="#L421">  421</a>     /// # Errors</span>
+<span class="line" id="L422"><a href="#L422">  422</a>     /// If the string is not 54 stickers of six colors, one per center, or</span>
+<span class="line" id="L423"><a href="#L423">  423</a>     /// does not describe pieces of a cube, or a position that can be reached</span>
+<span class="line" id="L424"><a href="#L424">  424</a>     /// by turning faces (e.g. a single twisted corner).</span>
+<span class="line" id="L425"><a href="#L425">  425</a>     pub fn from_facelets(text: &amp;str) -&gt; Result&lt;CubieCube, FaceletError&gt; {</span>
+<span class="line" id="L426"><a href="#L426">  426</a>         let colors: Vec&lt;char&gt; = text.chars().filter(|c| !c.is_whitespace()).collect();</span>
+<span class="line" id="L427"><a href="#L427">  427</a>         let colors: [char; 54] = colors</span>
+<span class="line" id="L428"><a href="#L428">  428</a>             .try_into()</span>
+<span class="line" id="L429"><a href="#L429">  429</a>             .map_err(|colors: Vec&lt;char&gt;| FaceletError::StickerCount(colors.len()))?;</span>
+<span class="line" id="L430"><a href="#L430">  430</a>         // The face of each color, from the centers (each face&#x27;s fifth sticker).</span>
+<span class="line" id="L431"><a href="#L431">  431</a>         let mut centers = [&#x27;\0&#x27;; 6];</span>
+<span class="line" id="L432"><a href="#L432">  432</a>         for (center, face) in centers.iter_mut().zip(colors.as_chunks::&lt;9&gt;().0) {</span>
+<span class="line" id="L433"><a href="#L433">  433</a>             *center = face[4];</span>
+<span class="line" id="L434"><a href="#L434">  434</a>         }</span>
+<span class="line" id="L435"><a href="#L435">  435</a>         for (face, center) in centers.iter().enumerate() {</span>
+<span class="line" id="L436"><a href="#L436">  436</a>             if centers.iter().take(face).any(|c| c == center) {</span>
+<span class="line" id="L437"><a href="#L437">  437</a>                 return Err(FaceletError::SameCenters(*center));</span>
+<span class="line" id="L438"><a href="#L438">  438</a>             }</span>
+<span class="line" id="L439"><a href="#L439">  439</a>         }</span>
+<span class="line" id="L440"><a href="#L440">  440</a>         // The face (in facelet order) of the color of facelet `facelet`.</span>
+<span class="line" id="L441"><a href="#L441">  441</a>         let face_of = |facelet: u8| -&gt; Result&lt;u8, FaceletError&gt; {</span>
+<span class="line" id="L442"><a href="#L442">  442</a>             let color = colors[usize::from(facelet)];</span>
+<span class="line" id="L443"><a href="#L443">  443</a>             (0..)</span>
+<span class="line" id="L444"><a href="#L444">  444</a>                 .zip(&amp;centers)</span>
+<span class="line" id="L445"><a href="#L445">  445</a>                 .find(|&amp;(_, &amp;center)| center == color)</span>
+<span class="line" id="L446"><a href="#L446">  446</a>                 .map(|(face, _)| face)</span>
+<span class="line" id="L447"><a href="#L447">  447</a>                 .ok_or(FaceletError::UnknownColor {</span>
+<span class="line" id="L448"><a href="#L448">  448</a>                     sticker: usize::from(facelet) + 1,</span>
+<span class="line" id="L449"><a href="#L449">  449</a>                     color,</span>
+<span class="line" id="L450"><a href="#L450">  450</a>                 })</span>
+<span class="line" id="L451"><a href="#L451">  451</a>         };</span>
+<span class="line" id="L452"><a href="#L452">  452</a>         let mut cube = CubieCube::SOLVED;</span>
+<span class="line" id="L453"><a href="#L453">  453</a>         let corners = cube.corner_perm.iter_mut().zip(&amp;mut cube.corner_orient);</span>
+<span class="line" id="L454"><a href="#L454">  454</a>         for (position, ((perm, orient), facelets)) in corners.zip(&amp;CORNER_FACELETS).enumerate() {</span>
+<span class="line" id="L455"><a href="#L455">  455</a>             let [first, second, third] = facelets.map(face_of);</span>
+<span class="line" id="L456"><a href="#L456">  456</a>             let seen = [first?, second?, third?];</span>
+<span class="line" id="L457"><a href="#L457">  457</a>             // The piece whose stickers&#x27; faces are these, turned by `twist`</span>
+<span class="line" id="L458"><a href="#L458">  458</a>             // (the faces of a piece&#x27;s stickers: those of its home facelets).</span>
+<span class="line" id="L459"><a href="#L459">  459</a>             let found = (0u8..).zip(&amp;CORNER_FACELETS).find_map(|(piece, home)| {</span>
+<span class="line" id="L460"><a href="#L460">  460</a>                 (0u8..3)</span>
+<span class="line" id="L461"><a href="#L461">  461</a>                     .find(|&amp;twist| {</span>
+<span class="line" id="L462"><a href="#L462">  462</a>                         (0..3).all(|j| seen[(usize::from(twist) + j) % 3] == home[j] / 9)</span>
+<span class="line" id="L463"><a href="#L463">  463</a>                     })</span>
+<span class="line" id="L464"><a href="#L464">  464</a>                     .map(|twist| (piece, twist))</span>
+<span class="line" id="L465"><a href="#L465">  465</a>             });</span>
+<span class="line" id="L466"><a href="#L466">  466</a>             (*perm, *orient) = found.ok_or(FaceletError::NoSuchCorner(position))?;</span>
+<span class="line" id="L467"><a href="#L467">  467</a>         }</span>
+<span class="line" id="L468"><a href="#L468">  468</a>         let edges = cube.edge_perm.iter_mut().zip(&amp;mut cube.edge_orient);</span>
+<span class="line" id="L469"><a href="#L469">  469</a>         for (position, ((perm, orient), facelets)) in edges.zip(&amp;EDGE_FACELETS).enumerate() {</span>
+<span class="line" id="L470"><a href="#L470">  470</a>             let [first, second] = facelets.map(face_of);</span>
+<span class="line" id="L471"><a href="#L471">  471</a>             let seen = [first?, second?];</span>
+<span class="line" id="L472"><a href="#L472">  472</a>             let found = (0u8..).zip(&amp;EDGE_FACELETS).find_map(|(piece, home)| {</span>
+<span class="line" id="L473"><a href="#L473">  473</a>                 (0u8..2)</span>
+<span class="line" id="L474"><a href="#L474">  474</a>                     .find(|&amp;flip| (0..2).all(|j| seen[(usize::from(flip) + j) % 2] == home[j] / 9))</span>
+<span class="line" id="L475"><a href="#L475">  475</a>                     .map(|flip| (piece, flip))</span>
+<span class="line" id="L476"><a href="#L476">  476</a>             });</span>
+<span class="line" id="L477"><a href="#L477">  477</a>             (*perm, *orient) = found.ok_or(FaceletError::NoSuchEdge(position))?;</span>
+<span class="line" id="L478"><a href="#L478">  478</a>         }</span>
+<span class="line" id="L479"><a href="#L479">  479</a>         if cube.is_solvable() {</span>
+<span class="line" id="L480"><a href="#L480">  480</a>             Ok(cube)</span>
+<span class="line" id="L481"><a href="#L481">  481</a>         } else {</span>
+<span class="line" id="L482"><a href="#L482">  482</a>             Err(FaceletError::Unreachable)</span>
+<span class="line" id="L483"><a href="#L483">  483</a>         }</span>
+<span class="line" id="L484"><a href="#L484">  484</a>     }</span>
+<span class="line" id="L485"><a href="#L485">  485</a> </span>
+<span class="line" id="L486"><a href="#L486">  486</a>     /// The facelet string of the cube (see `from_facelets`), with the face</span>
+<span class="line" id="L487"><a href="#L487">  487</a>     /// letters U R F D L B as colors.</span>
+<span class="line" id="L488"><a href="#L488">  488</a>     #[must_use]</span>
+<span class="line" id="L489"><a href="#L489">  489</a>     pub fn to_facelets(self) -&gt; String {</span>
+<span class="line" id="L490"><a href="#L490">  490</a>         // (Every facelet is written: the centers, then each corner&#x27;s and</span>
+<span class="line" id="L491"><a href="#L491">  491</a>         // edge&#x27;s stickers.)</span>
+<span class="line" id="L492"><a href="#L492">  492</a>         let mut letters = [&#x27; &#x27;; 54];</span>
+<span class="line" id="L493"><a href="#L493">  493</a>         for (face, &amp;letter) in letters</span>
+<span class="line" id="L494"><a href="#L494">  494</a>             .as_chunks_mut::&lt;9&gt;()</span>
+<span class="line" id="L495"><a href="#L495">  495</a>             .0</span>
+<span class="line" id="L496"><a href="#L496">  496</a>             .iter_mut()</span>
+<span class="line" id="L497"><a href="#L497">  497</a>             .zip(&amp;FACELET_LETTERS)</span>
+<span class="line" id="L498"><a href="#L498">  498</a>         {</span>
+<span class="line" id="L499"><a href="#L499">  499</a>             face[4] = letter;</span>
+<span class="line" id="L500"><a href="#L500">  500</a>         }</span>
+<span class="line" id="L501"><a href="#L501">  501</a>         // The letter of the face of a home facelet.</span>
+<span class="line" id="L502"><a href="#L502">  502</a>         let letter = |facelet: u8| FACELET_LETTERS[usize::from(facelet / 9)];</span>
+<span class="line" id="L503"><a href="#L503">  503</a>         let corners = self.corner_perm.iter().zip(&amp;self.corner_orient);</span>
+<span class="line" id="L504"><a href="#L504">  504</a>         for ((&amp;piece, &amp;twist), facelets) in corners.zip(&amp;CORNER_FACELETS) {</span>
+<span class="line" id="L505"><a href="#L505">  505</a>             let home = CORNER_FACELETS[usize::from(piece)];</span>
+<span class="line" id="L506"><a href="#L506">  506</a>             for (k, &amp;facelet) in facelets.iter().enumerate() {</span>
+<span class="line" id="L507"><a href="#L507">  507</a>                 letters[usize::from(facelet)] = letter(home[(k + 3 - usize::from(twist)) % 3]);</span>
+<span class="line" id="L508"><a href="#L508">  508</a>             }</span>
+<span class="line" id="L509"><a href="#L509">  509</a>         }</span>
+<span class="line" id="L510"><a href="#L510">  510</a>         let edges = self.edge_perm.iter().zip(&amp;self.edge_orient);</span>
+<span class="line" id="L511"><a href="#L511">  511</a>         for ((&amp;piece, &amp;flip), facelets) in edges.zip(&amp;EDGE_FACELETS) {</span>
+<span class="line" id="L512"><a href="#L512">  512</a>             let home = EDGE_FACELETS[usize::from(piece)];</span>
+<span class="line" id="L513"><a href="#L513">  513</a>             for (k, &amp;facelet) in facelets.iter().enumerate() {</span>
+<span class="line" id="L514"><a href="#L514">  514</a>                 letters[usize::from(facelet)] = letter(home[(k + usize::from(flip)) % 2]);</span>
+<span class="line" id="L515"><a href="#L515">  515</a>             }</span>
+<span class="line" id="L516"><a href="#L516">  516</a>         }</span>
+<span class="line" id="L517"><a href="#L517">  517</a>         letters.iter().collect()</span>
+<span class="line" id="L518"><a href="#L518">  518</a>     }</span>
+<span class="line" id="L519"><a href="#L519">  519</a> }</span>
+<span class="line" id="L520"><a href="#L520">  520</a> </span>
+<span class="line" id="L521"><a href="#L521">  521</a> // ---------------------------------------------------------------------------</span>
+<span class="line" id="L522"><a href="#L522">  522</a> // Moves and symmetries</span>
+<span class="line" id="L523"><a href="#L523">  523</a> // ---------------------------------------------------------------------------</span>
+<span class="line" id="L524"><a href="#L524">  524</a> </span>
+<span class="line" id="L525"><a href="#L525">  525</a> /// The cube state of each move.</span>
+<span class="line" id="L526"><a href="#L526">  526</a> #[cfg(cubie_generated)]</span>
+<span class="line" id="L527"><a href="#L527">  527</a> #[must_use]</span>
+<span class="line" id="L528"><a href="#L528">  528</a> pub fn move_cubes() -&gt; &amp;&#x27;static [CubieCube; N_MOVES] {</span>
+<span class="line" id="L529"><a href="#L529">  529</a>     &amp;MOVE_CUBES</span>
+<span class="line" id="L530"><a href="#L530">  530</a> }</span>
+<span class="line" id="L531"><a href="#L531">  531</a> </span>
+<span class="line" id="L532"><a href="#L532">  532</a> /// Singmaster name of a move (numbered as `Move`): `U`, `U2`, `U&#x27;`, ...</span>
+<span class="line" id="L533"><a href="#L533">  533</a> /// (`?` for a number that is not a move).</span>
+<span class="line" id="L534"><a href="#L534">  534</a> #[must_use]</span>
+<span class="line" id="L535"><a href="#L535">  535</a> pub fn move_name(mv: u8) -&gt; String {</span>
+<span class="line" id="L536"><a href="#L536">  536</a>     let mut name = String::with_capacity(2);</span>
+<span class="line" id="L537"><a href="#L537">  537</a>     push_move_name(&amp;mut name, mv);</span>
+<span class="line" id="L538"><a href="#L538">  538</a>     name</span>
+<span class="line" id="L539"><a href="#L539">  539</a> }</span>
+<span class="line" id="L540"><a href="#L540">  540</a> </span>
+<span class="line" id="L541"><a href="#L541">  541</a> /// Appends the Singmaster name of `mv` to `text` (`?` if it is no move).</span>
+<span class="line" id="L542"><a href="#L542">  542</a> fn push_move_name(text: &amp;mut String, mv: u8) {</span>
+<span class="line" id="L543"><a href="#L543">  543</a>     let Some(&amp;face) = FACE_NAMES.get(usize::from(mv / 3)) else {</span>
+<span class="line" id="L544"><a href="#L544">  544</a>         text.push(&#x27;?&#x27;);</span>
+<span class="line" id="L545"><a href="#L545">  545</a>         return;</span>
+<span class="line" id="L546"><a href="#L546">  546</a>     };</span>
+<span class="line" id="L547"><a href="#L547">  547</a>     text.push(face);</span>
+<span class="line" id="L548"><a href="#L548">  548</a>     match mv % 3 {</span>
+<span class="line" id="L549"><a href="#L549">  549</a>         0 =&gt; {}</span>
+<span class="line" id="L550"><a href="#L550">  550</a>         1 =&gt; text.push(&#x27;2&#x27;),</span>
+<span class="line" id="L551"><a href="#L551">  551</a>         _ =&gt; text.push(&#x27;\&#x27;&#x27;),</span>
+<span class="line" id="L552"><a href="#L552">  552</a>     }</span>
+<span class="line" id="L553"><a href="#L553">  553</a> }</span>
+<span class="line" id="L554"><a href="#L554">  554</a> </span>
+<span class="line" id="L555"><a href="#L555">  555</a> /// The move that undoes `mv` (same face, opposite direction).</span>
+<span class="line" id="L556"><a href="#L556">  556</a> #[must_use]</span>
+<span class="line" id="L557"><a href="#L557">  557</a> pub fn inverse_move(mv: u8) -&gt; u8 {</span>
+<span class="line" id="L558"><a href="#L558">  558</a>     3 * (mv / 3) + 2 - mv % 3</span>
+<span class="line" id="L559"><a href="#L559">  559</a> }</span>
+<span class="line" id="L560"><a href="#L560">  560</a> </span>
+<span class="line" id="L561"><a href="#L561">  561</a> /// Parse &quot;R U2 F&#x27; D3 B1&quot; style sequences (both Singmaster and 1/2/3</span>
+<span class="line" id="L562"><a href="#L562">  562</a> /// suffixes) into move numbers (as `Move`, so each below 18).</span>
+<span class="line" id="L563"><a href="#L563">  563</a> #[must_use]</span>
+<span class="line" id="L564"><a href="#L564">  564</a> pub fn parse_moves(text: &amp;str) -&gt; Option&lt;Vec&lt;u8&gt;&gt; {</span>
+<span class="line" id="L565"><a href="#L565">  565</a>     let mut moves = Vec::new();</span>
+<span class="line" id="L566"><a href="#L566">  566</a>     let mut chars = text.chars().peekable();</span>
+<span class="line" id="L567"><a href="#L567">  567</a>     while let Some(letter) = chars.next() {</span>
+<span class="line" id="L568"><a href="#L568">  568</a>         if letter.is_whitespace() {</span>
+<span class="line" id="L569"><a href="#L569">  569</a>             continue;</span>
+<span class="line" id="L570"><a href="#L570">  570</a>         }</span>
+<span class="line" id="L571"><a href="#L571">  571</a>         let face = FACE_NAMES.iter().zip(0..).find(|&amp;(&amp;c, _)| c == letter)?.1;</span>
+<span class="line" id="L572"><a href="#L572">  572</a>         // An optional suffix right after the letter.</span>
+<span class="line" id="L573"><a href="#L573">  573</a>         let quarter_turns = match chars.next_if(|c| matches!(c, &#x27;1&#x27; | &#x27;2&#x27; | &#x27;3&#x27; | &#x27;\&#x27;&#x27;)) {</span>
+<span class="line" id="L574"><a href="#L574">  574</a>             Some(&#x27;2&#x27;) =&gt; 2,</span>
+<span class="line" id="L575"><a href="#L575">  575</a>             Some(&#x27;3&#x27; | &#x27;\&#x27;&#x27;) =&gt; 3,</span>
+<span class="line" id="L576"><a href="#L576">  576</a>             _ =&gt; 1,</span>
+<span class="line" id="L577"><a href="#L577">  577</a>         };</span>
+<span class="line" id="L578"><a href="#L578">  578</a>         moves.push(3 * face + quarter_turns - 1);</span>
+<span class="line" id="L579"><a href="#L579">  579</a>     }</span>
+<span class="line" id="L580"><a href="#L580">  580</a>     Some(moves)</span>
+<span class="line" id="L581"><a href="#L581">  581</a> }</span>
+<span class="line" id="L582"><a href="#L582">  582</a> </span>
+<span class="line" id="L583"><a href="#L583">  583</a> /// A move sequence in Singmaster notation, separated by spaces.</span>
+<span class="line" id="L584"><a href="#L584">  584</a> #[must_use]</span>
+<span class="line" id="L585"><a href="#L585">  585</a> pub fn format_moves(moves: &amp;[u8]) -&gt; String {</span>
+<span class="line" id="L586"><a href="#L586">  586</a>     // (One String, not a String per move, a Vec and a join: `solve -c 1`</span>
+<span class="line" id="L587"><a href="#L587">  587</a>     // allocates 6.5 instead of 25.2 times per cube.)</span>
+<span class="line" id="L588"><a href="#L588">  588</a>     let mut text = String::with_capacity(3 * moves.len());</span>
+<span class="line" id="L589"><a href="#L589">  589</a>     for (i, &amp;mv) in moves.iter().enumerate() {</span>
+<span class="line" id="L590"><a href="#L590">  590</a>         if i &gt; 0 {</span>
+<span class="line" id="L591"><a href="#L591">  591</a>             text.push(&#x27; &#x27;);</span>
+<span class="line" id="L592"><a href="#L592">  592</a>         }</span>
+<span class="line" id="L593"><a href="#L593">  593</a>         push_move_name(&amp;mut text, mv);</span>
+<span class="line" id="L594"><a href="#L594">  594</a>     }</span>
+<span class="line" id="L595"><a href="#L595">  595</a>     text</span>
+<span class="line" id="L596"><a href="#L596">  596</a> }</span>
+<span class="line" id="L597"><a href="#L597">  597</a> </span>
+<span class="line" id="L598"><a href="#L598">  598</a> /// A 3x3 integer matrix (rotations and reflections), row major.</span>
+<span class="line" id="L599"><a href="#L599">  599</a> pub type Matrix = [[i32; 3]; 3];</span>
+<span class="line" id="L600"><a href="#L600">  600</a> </span>
+<span class="line" id="L601"><a href="#L601">  601</a> /// A symmetry of the cube: one of the 48 rotations and reflections that map</span>
+<span class="line" id="L602"><a href="#L602">  602</a> /// the cube onto itself.</span>
+<span class="line" id="L603"><a href="#L603">  603</a> #[derive(Clone, Debug)]</span>
+<span class="line" id="L604"><a href="#L604">  604</a> pub struct Symmetry {</span>
+<span class="line" id="L605"><a href="#L605">  605</a>     pub matrix: Matrix,</span>
+<span class="line" id="L606"><a href="#L606">  606</a>     /// Whether it is a reflection (it reverses the turning direction).</span>
+<span class="line" id="L607"><a href="#L607">  607</a>     pub mirror: bool,</span>
+<span class="line" id="L608"><a href="#L608">  608</a>     /// Cubie &quot;cube&quot; `T` such that conjugation is `T * c * T^-1`</span>
+<span class="line" id="L609"><a href="#L609">  609</a>     /// (followed by negating the corner twists for mirrors).</span>
+<span class="line" id="L610"><a href="#L610">  610</a>     pub cube: CubieCube,</span>
+<span class="line" id="L611"><a href="#L611">  611</a>     pub cube_inverse: CubieCube,</span>
+<span class="line" id="L612"><a href="#L612">  612</a>     /// Image of each move under conjugation.</span>
+<span class="line" id="L613"><a href="#L613">  613</a>     pub move_map: [u8; N_MOVES],</span>
+<span class="line" id="L614"><a href="#L614">  614</a> }</span>
+<span class="line" id="L615"><a href="#L615">  615</a> </span>
+<span class="line" id="L616"><a href="#L616">  616</a> /// All 48 symmetries; index 0 is the identity.</span>
+<span class="line" id="L617"><a href="#L617">  617</a> #[cfg(cubie_generated)]</span>
+<span class="line" id="L618"><a href="#L618">  618</a> #[must_use]</span>
+<span class="line" id="L619"><a href="#L619">  619</a> pub fn symmetries() -&gt; &amp;&#x27;static [Symmetry] {</span>
+<span class="line" id="L620"><a href="#L620">  620</a>     &amp;SYMMETRIES</span>
+<span class="line" id="L621"><a href="#L621">  621</a> }</span>
+<span class="line" id="L622"><a href="#L622">  622</a> </span>
+<span class="line" id="L623"><a href="#L623">  623</a> /// Conjugate `cube` by `sym` at the cubie level: `T c T^-1` (corner twists</span>
+<span class="line" id="L624"><a href="#L624">  624</a> /// negated for mirrors). The result is the same position seen through the</span>
+<span class="line" id="L625"><a href="#L625">  625</a> /// symmetry, so it is as far from solved.</span>
+<span class="line" id="L626"><a href="#L626">  626</a> #[must_use]</span>
+<span class="line" id="L627"><a href="#L627">  627</a> pub fn conjugate(cube: &amp;CubieCube, sym: &amp;Symmetry) -&gt; CubieCube {</span>
+<span class="line" id="L628"><a href="#L628">  628</a>     let result = sym.cube.compose(cube).compose(&amp;sym.cube_inverse);</span>
+<span class="line" id="L629"><a href="#L629">  629</a>     if sym.mirror {</span>
+<span class="line" id="L630"><a href="#L630">  630</a>         result.negate_corner_orient()</span>
+<span class="line" id="L631"><a href="#L631">  631</a>     } else {</span>
+<span class="line" id="L632"><a href="#L632">  632</a>         result</span>
+<span class="line" id="L633"><a href="#L633">  633</a>     }</span>
+<span class="line" id="L634"><a href="#L634">  634</a> }</span>
+<span class="line" id="L635"><a href="#L635">  635</a> </span>
+<span class="line" id="L636"><a href="#L636">  636</a> /// Index of the inverse of each symmetry.</span>
+<span class="line" id="L637"><a href="#L637">  637</a> #[cfg(cubie_generated)]</span>
+<span class="line" id="L638"><a href="#L638">  638</a> #[must_use]</span>
+<span class="line" id="L639"><a href="#L639">  639</a> pub fn symmetry_inverses() -&gt; &amp;&#x27;static [u8; 48] {</span>
+<span class="line" id="L640"><a href="#L640">  640</a>     &amp;SYMMETRY_INVERSES</span>
+<span class="line" id="L641"><a href="#L641">  641</a> }</span>
+<span class="line" id="L642"><a href="#L642">  642</a> </span>
+<span class="line" id="L643"><a href="#L643">  643</a> // The moves (`MOVE_CUBES`), symmetries (`SYMMETRIES`, `SYMMETRY_INVERSES`)</span>
+<span class="line" id="L644"><a href="#L644">  644</a> // and the facelets of each piece&#x27;s stickers (`CORNER_FACELETS`,</span>
+<span class="line" id="L645"><a href="#L645">  645</a> // `EDGE_FACELETS`), derived from the sticker model by build.rs.</span>
+<span class="line" id="L646"><a href="#L646">  646</a> #[cfg(cubie_generated)]</span>
+<span class="line" id="L647"><a href="#L647">  647</a> include!(concat!(env!(&quot;OUT_DIR&quot;), &quot;/cubie_consts.rs&quot;));</span>
+<span class="line" id="L648"><a href="#L648">  648</a> </span>
+<span class="line" id="L649"><a href="#L649">  649</a> /// The sticker model: moves and symmetries are rotations and reflections of</span>
+<span class="line" id="L650"><a href="#L650">  650</a> /// the 48 stickers; the cubie-level moves, symmetries and facelet tables are</span>
+<span class="line" id="L651"><a href="#L651">  651</a> /// read off from them. Run by build.rs (which writes them as constants for</span>
+<span class="line" id="L652"><a href="#L652">  652</a> /// the library) and the tests. Every step returns `None` on a bug in the</span>
+<span class="line" id="L653"><a href="#L653">  653</a> /// model instead of panicking (the build then fails with a message).</span>
+<span class="line" id="L654"><a href="#L654">  654</a> #[cfg(any(test, not(cubie_generated)))]</span>
+<span class="line" id="L655"><a href="#L655">  655</a> pub(crate) mod model {</span>
+<span class="line" id="L656"><a href="#L656">  656</a>     use super::{</span>
+<span class="line" id="L657"><a href="#L657">  657</a>         CubieCube, Matrix, Symmetry, Vec3, CORNER_POSITIONS, EDGE_POSITIONS, FACE_NORMALS, N_MOVES,</span>
+<span class="line" id="L658"><a href="#L658">  658</a>     };</span>
+<span class="line" id="L659"><a href="#L659">  659</a> </span>
+<span class="line" id="L660"><a href="#L660">  660</a>     /// A sticker location: a cubie position vector and the outward normal.</span>
+<span class="line" id="L661"><a href="#L661">  661</a>     #[derive(Clone, Copy, PartialEq, Eq, Debug)]</span>
+<span class="line" id="L662"><a href="#L662">  662</a>     struct Sticker {</span>
+<span class="line" id="L663"><a href="#L663">  663</a>         position: Vec3,</span>
+<span class="line" id="L664"><a href="#L664">  664</a>         normal: Vec3,</span>
+<span class="line" id="L665"><a href="#L665">  665</a>     }</span>
+<span class="line" id="L666"><a href="#L666">  666</a> </span>
+<span class="line" id="L667"><a href="#L667">  667</a>     /// The unit vector `sign` along `axis`.</span>
+<span class="line" id="L668"><a href="#L668">  668</a>     fn axis_vector(axis: usize, sign: i32) -&gt; Vec3 {</span>
+<span class="line" id="L669"><a href="#L669">  669</a>         std::array::from_fn(|a| if a == axis { sign } else { 0 })</span>
+<span class="line" id="L670"><a href="#L670">  670</a>     }</span>
+<span class="line" id="L671"><a href="#L671">  671</a> </span>
+<span class="line" id="L672"><a href="#L672">  672</a>     /// Determinant of the matrix with rows `a`, `b`, `c`.</span>
+<span class="line" id="L673"><a href="#L673">  673</a>     fn determinant(a: Vec3, b: Vec3, c: Vec3) -&gt; i32 {</span>
+<span class="line" id="L674"><a href="#L674">  674</a>         a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0])</span>
+<span class="line" id="L675"><a href="#L675">  675</a>             + a[2] * (b[0] * c[1] - b[1] * c[0])</span>
+<span class="line" id="L676"><a href="#L676">  676</a>     }</span>
+<span class="line" id="L677"><a href="#L677">  677</a> </span>
+<span class="line" id="L678"><a href="#L678">  678</a>     /// Stickers of the corner at `position` in clockwise order, starting</span>
+<span class="line" id="L679"><a href="#L679">  679</a>     /// from the U/D one.</span>
+<span class="line" id="L680"><a href="#L680">  680</a>     fn corner_stickers(position: Vec3) -&gt; [Sticker; 3] {</span>
+<span class="line" id="L681"><a href="#L681">  681</a>         let up_down = axis_vector(1, position[1]);</span>
+<span class="line" id="L682"><a href="#L682">  682</a>         let a = axis_vector(0, position[0]);</span>
+<span class="line" id="L683"><a href="#L683">  683</a>         let b = axis_vector(2, position[2]);</span>
+<span class="line" id="L684"><a href="#L684">  684</a>         // (Clockwise seen from outside: a positive determinant.)</span>
+<span class="line" id="L685"><a href="#L685">  685</a>         let (second, third) = if determinant(up_down, a, b) &gt; 0 {</span>
+<span class="line" id="L686"><a href="#L686">  686</a>             (a, b)</span>
+<span class="line" id="L687"><a href="#L687">  687</a>         } else {</span>
+<span class="line" id="L688"><a href="#L688">  688</a>             (b, a)</span>
+<span class="line" id="L689"><a href="#L689">  689</a>         };</span>
+<span class="line" id="L690"><a href="#L690">  690</a>         [up_down, second, third].map(|normal| Sticker { position, normal })</span>
+<span class="line" id="L691"><a href="#L691">  691</a>     }</span>
+<span class="line" id="L692"><a href="#L692">  692</a> </span>
+<span class="line" id="L693"><a href="#L693">  693</a>     /// Stickers of the edge at `position`, the reference (U/D, else F/B)</span>
+<span class="line" id="L694"><a href="#L694">  694</a>     /// one first.</span>
+<span class="line" id="L695"><a href="#L695">  695</a>     fn edge_stickers(position: Vec3) -&gt; [Sticker; 2] {</span>
+<span class="line" id="L696"><a href="#L696">  696</a>         let (reference, other) = if position[1] != 0 {</span>
+<span class="line" id="L697"><a href="#L697">  697</a>             let other = if position[0] != 0 {</span>
+<span class="line" id="L698"><a href="#L698">  698</a>                 axis_vector(0, position[0])</span>
+<span class="line" id="L699"><a href="#L699">  699</a>             } else {</span>
+<span class="line" id="L700"><a href="#L700">  700</a>                 axis_vector(2, position[2])</span>
+<span class="line" id="L701"><a href="#L701">  701</a>             };</span>
+<span class="line" id="L702"><a href="#L702">  702</a>             (axis_vector(1, position[1]), other)</span>
+<span class="line" id="L703"><a href="#L703">  703</a>         } else {</span>
+<span class="line" id="L704"><a href="#L704">  704</a>             (axis_vector(2, position[2]), axis_vector(0, position[0]))</span>
+<span class="line" id="L705"><a href="#L705">  705</a>         };</span>
+<span class="line" id="L706"><a href="#L706">  706</a>         [reference, other].map(|normal| Sticker { position, normal })</span>
+<span class="line" id="L707"><a href="#L707">  707</a>     }</span>
+<span class="line" id="L708"><a href="#L708">  708</a> </span>
+<span class="line" id="L709"><a href="#L709">  709</a>     /// All 48 stickers: 3 per corner position, then 2 per edge position.</span>
+<span class="line" id="L710"><a href="#L710">  710</a>     fn all_stickers() -&gt; Vec&lt;Sticker&gt; {</span>
+<span class="line" id="L711"><a href="#L711">  711</a>         let corners = CORNER_POSITIONS.iter().flat_map(|&amp;p| corner_stickers(p));</span>
+<span class="line" id="L712"><a href="#L712">  712</a>         let edges = EDGE_POSITIONS.iter().flat_map(|&amp;p| edge_stickers(p));</span>
+<span class="line" id="L713"><a href="#L713">  713</a>         corners.chain(edges).collect()</span>
+<span class="line" id="L714"><a href="#L714">  714</a>     }</span>
+<span class="line" id="L715"><a href="#L715">  715</a> </span>
+<span class="line" id="L716"><a href="#L716">  716</a>     /// Index of a sticker in `all_stickers()`.</span>
+<span class="line" id="L717"><a href="#L717">  717</a>     fn sticker_index(all: &amp;[Sticker], sticker: Sticker) -&gt; Option&lt;u8&gt; {</span>
+<span class="line" id="L718"><a href="#L718">  718</a>         let index = all.iter().position(|&amp;x| x == sticker)?;</span>
+<span class="line" id="L719"><a href="#L719">  719</a>         u8::try_from(index).ok()</span>
+<span class="line" id="L720"><a href="#L720">  720</a>     }</span>
+<span class="line" id="L721"><a href="#L721">  721</a> </span>
+<span class="line" id="L722"><a href="#L722">  722</a>     /// `m` times the column vector `v`.</span>
+<span class="line" id="L723"><a href="#L723">  723</a>     fn matrix_apply(m: &amp;Matrix, v: Vec3) -&gt; Vec3 {</span>
+<span class="line" id="L724"><a href="#L724">  724</a>         m.map(|row| row[0] * v[0] + row[1] * v[1] + row[2] * v[2])</span>
+<span class="line" id="L725"><a href="#L725">  725</a>     }</span>
+<span class="line" id="L726"><a href="#L726">  726</a> </span>
+<span class="line" id="L727"><a href="#L727">  727</a>     fn matrix_determinant(m: &amp;Matrix) -&gt; i32 {</span>
+<span class="line" id="L728"><a href="#L728">  728</a>         determinant(m[0], m[1], m[2])</span>
+<span class="line" id="L729"><a href="#L729">  729</a>     }</span>
+<span class="line" id="L730"><a href="#L730">  730</a> </span>
+<span class="line" id="L731"><a href="#L731">  731</a>     fn matrix_product(a: &amp;Matrix, b: &amp;Matrix) -&gt; Matrix {</span>
+<span class="line" id="L732"><a href="#L732">  732</a>         a.map(|row| std::array::from_fn(|j| row.iter().zip(b).map(|(x, b_row)| x * b_row[j]).sum()))</span>
+<span class="line" id="L733"><a href="#L733">  733</a>     }</span>
+<span class="line" id="L734"><a href="#L734">  734</a> </span>
+<span class="line" id="L735"><a href="#L735">  735</a>     /// The image of a sticker under `m`.</span>
+<span class="line" id="L736"><a href="#L736">  736</a>     fn matrix_apply_sticker(m: &amp;Matrix, sticker: Sticker) -&gt; Sticker {</span>
+<span class="line" id="L737"><a href="#L737">  737</a>         Sticker {</span>
+<span class="line" id="L738"><a href="#L738">  738</a>             position: matrix_apply(m, sticker.position),</span>
+<span class="line" id="L739"><a href="#L739">  739</a>             normal: matrix_apply(m, sticker.normal),</span>
+<span class="line" id="L740"><a href="#L740">  740</a>         }</span>
+<span class="line" id="L741"><a href="#L741">  741</a>     }</span>
+<span class="line" id="L742"><a href="#L742">  742</a> </span>
+<span class="line" id="L743"><a href="#L743">  743</a>     /// Rotation by -90 degrees about unit axis `u` (clockwise seen from</span>
+<span class="line" id="L744"><a href="#L744">  744</a>     /// outside).</span>
+<span class="line" id="L745"><a href="#L745">  745</a>     fn quarter_turn_matrix(u: Vec3) -&gt; Matrix {</span>
+<span class="line" id="L746"><a href="#L746">  746</a>         // Column j is the image of the unit vector e_j: R v = -(u x v) + u (u.v).</span>
+<span class="line" id="L747"><a href="#L747">  747</a>         let columns: [Vec3; 3] = std::array::from_fn(|j| {</span>
+<span class="line" id="L748"><a href="#L748">  748</a>             let v = axis_vector(j, 1);</span>
+<span class="line" id="L749"><a href="#L749">  749</a>             let cross = [</span>
+<span class="line" id="L750"><a href="#L750">  750</a>                 u[1] * v[2] - u[2] * v[1],</span>
+<span class="line" id="L751"><a href="#L751">  751</a>                 u[2] * v[0] - u[0] * v[2],</span>
+<span class="line" id="L752"><a href="#L752">  752</a>                 u[0] * v[1] - u[1] * v[0],</span>
+<span class="line" id="L753"><a href="#L753">  753</a>             ];</span>
+<span class="line" id="L754"><a href="#L754">  754</a>             let dot = u[0] * v[0] + u[1] * v[1] + u[2] * v[2];</span>
+<span class="line" id="L755"><a href="#L755">  755</a>             std::array::from_fn(|i| -cross[i] + u[i] * dot)</span>
+<span class="line" id="L756"><a href="#L756">  756</a>         });</span>
+<span class="line" id="L757"><a href="#L757">  757</a>         std::array::from_fn(|i| columns.map(|column| column[i]))</span>
+<span class="line" id="L758"><a href="#L758">  758</a>     }</span>
+<span class="line" id="L759"><a href="#L759">  759</a> </span>
+<span class="line" id="L760"><a href="#L760">  760</a>     /// A sticker state: `self.0[location]` is the identity (home location</span>
+<span class="line" id="L761"><a href="#L761">  761</a>     /// index) of the sticker at `location`.</span>
+<span class="line" id="L762"><a href="#L762">  762</a>     #[derive(Clone, PartialEq, Eq, Debug)]</span>
+<span class="line" id="L763"><a href="#L763">  763</a>     pub(crate) struct StickerCube(pub(crate) [u8; 48]);</span>
+<span class="line" id="L764"><a href="#L764">  764</a> </span>
+<span class="line" id="L765"><a href="#L765">  765</a>     impl StickerCube {</span>
+<span class="line" id="L766"><a href="#L766">  766</a>         pub(crate) fn solved() -&gt; StickerCube {</span>
+<span class="line" id="L767"><a href="#L767">  767</a>             let mut stickers = [0u8; 48];</span>
+<span class="line" id="L768"><a href="#L768">  768</a>             for (x, i) in stickers.iter_mut().zip(0..) {</span>
+<span class="line" id="L769"><a href="#L769">  769</a>                 *x = i;</span>
+<span class="line" id="L770"><a href="#L770">  770</a>             }</span>
+<span class="line" id="L771"><a href="#L771">  771</a>             StickerCube(stickers)</span>
+<span class="line" id="L772"><a href="#L772">  772</a>         }</span>
+<span class="line" id="L773"><a href="#L773">  773</a> </span>
+<span class="line" id="L774"><a href="#L774">  774</a>         /// Apply a face move (`face` in 0..6, clockwise quarter turns).</span>
+<span class="line" id="L775"><a href="#L775">  775</a>         pub(crate) fn apply_face(&amp;self, face: usize, quarter_turns: usize) -&gt; Option&lt;StickerCube&gt; {</span>
+<span class="line" id="L776"><a href="#L776">  776</a>             let all = all_stickers();</span>
+<span class="line" id="L777"><a href="#L777">  777</a>             let axis = *FACE_NORMALS.get(face)?;</span>
+<span class="line" id="L778"><a href="#L778">  778</a>             let turn = quarter_turn_matrix(axis);</span>
+<span class="line" id="L779"><a href="#L779">  779</a>             let mut current = self.clone();</span>
+<span class="line" id="L780"><a href="#L780">  780</a>             for _ in 0..quarter_turns {</span>
+<span class="line" id="L781"><a href="#L781">  781</a>                 let mut next = current.clone();</span>
+<span class="line" id="L782"><a href="#L782">  782</a>                 for (&amp;sticker, &amp;identity) in all.iter().zip(&amp;current.0) {</span>
+<span class="line" id="L783"><a href="#L783">  783</a>                     // (The face&#x27;s layer: the stickers on its side of the center.)</span>
+<span class="line" id="L784"><a href="#L784">  784</a>                     let p = sticker.position;</span>
+<span class="line" id="L785"><a href="#L785">  785</a>                     if p[0] * axis[0] + p[1] * axis[1] + p[2] * axis[2] &gt; 0 {</span>
+<span class="line" id="L786"><a href="#L786">  786</a>                         let to = sticker_index(&amp;all, matrix_apply_sticker(&amp;turn, sticker))?;</span>
+<span class="line" id="L787"><a href="#L787">  787</a>                         *next.0.get_mut(usize::from(to))? = identity;</span>
+<span class="line" id="L788"><a href="#L788">  788</a>                     }</span>
+<span class="line" id="L789"><a href="#L789">  789</a>                 }</span>
+<span class="line" id="L790"><a href="#L790">  790</a>                 current = next;</span>
+<span class="line" id="L791"><a href="#L791">  791</a>             }</span>
+<span class="line" id="L792"><a href="#L792">  792</a>             Some(current)</span>
+<span class="line" id="L793"><a href="#L793">  793</a>         }</span>
+<span class="line" id="L794"><a href="#L794">  794</a> </span>
+<span class="line" id="L795"><a href="#L795">  795</a>         /// Conjugate by a spatial symmetry `m`: `out[m(L)] = m(self[L])`.</span>
+<span class="line" id="L796"><a href="#L796">  796</a>         #[cfg(test)]</span>
+<span class="line" id="L797"><a href="#L797">  797</a>         pub(crate) fn conjugate(&amp;self, m: &amp;Matrix) -&gt; Option&lt;StickerCube&gt; {</span>
+<span class="line" id="L798"><a href="#L798">  798</a>             let all = all_stickers();</span>
+<span class="line" id="L799"><a href="#L799">  799</a>             let map = |index: u8| -&gt; Option&lt;u8&gt; {</span>
+<span class="line" id="L800"><a href="#L800">  800</a>                 sticker_index(&amp;all, matrix_apply_sticker(m, *all.get(usize::from(index))?))</span>
+<span class="line" id="L801"><a href="#L801">  801</a>             };</span>
+<span class="line" id="L802"><a href="#L802">  802</a>             let mut out = [0u8; 48];</span>
+<span class="line" id="L803"><a href="#L803">  803</a>             for (location, &amp;identity) in (0..).zip(&amp;self.0) {</span>
+<span class="line" id="L804"><a href="#L804">  804</a>                 *out.get_mut(usize::from(map(location)?))? = map(identity)?;</span>
+<span class="line" id="L805"><a href="#L805">  805</a>             }</span>
+<span class="line" id="L806"><a href="#L806">  806</a>             Some(StickerCube(out))</span>
+<span class="line" id="L807"><a href="#L807">  807</a>         }</span>
+<span class="line" id="L808"><a href="#L808">  808</a> </span>
+<span class="line" id="L809"><a href="#L809">  809</a>         /// State with `self[L] = m(L)`: the cubie-level &quot;cube&quot; of a symmetry.</span>
+<span class="line" id="L810"><a href="#L810">  810</a>         fn symmetry_state(m: &amp;Matrix) -&gt; Option&lt;StickerCube&gt; {</span>
+<span class="line" id="L811"><a href="#L811">  811</a>             let all = all_stickers();</span>
+<span class="line" id="L812"><a href="#L812">  812</a>             let mut out = [0u8; 48];</span>
+<span class="line" id="L813"><a href="#L813">  813</a>             for (x, &amp;sticker) in out.iter_mut().zip(&amp;all) {</span>
+<span class="line" id="L814"><a href="#L814">  814</a>                 *x = sticker_index(&amp;all, matrix_apply_sticker(m, sticker))?;</span>
+<span class="line" id="L815"><a href="#L815">  815</a>             }</span>
+<span class="line" id="L816"><a href="#L816">  816</a>             Some(StickerCube(out))</span>
+<span class="line" id="L817"><a href="#L817">  817</a>         }</span>
+<span class="line" id="L818"><a href="#L818">  818</a> </span>
+<span class="line" id="L819"><a href="#L819">  819</a>         /// The cubie state of this sticker state (which must be one).</span>
+<span class="line" id="L820"><a href="#L820">  820</a>         pub(crate) fn to_cubie(&amp;self) -&gt; Option&lt;CubieCube&gt; {</span>
+<span class="line" id="L821"><a href="#L821">  821</a>             let mut cube = CubieCube::SOLVED;</span>
+<span class="line" id="L822"><a href="#L822">  822</a>             let (corners, edges) = self.0.split_first_chunk::&lt;24&gt;()?;</span>
+<span class="line" id="L823"><a href="#L823">  823</a>             let corner_slots = cube.corner_perm.iter_mut().zip(&amp;mut cube.corner_orient);</span>
+<span class="line" id="L824"><a href="#L824">  824</a>             for ((perm, orient), stickers) in corner_slots.zip(corners.as_chunks::&lt;3&gt;().0) {</span>
+<span class="line" id="L825"><a href="#L825">  825</a>                 // The piece&#x27;s reference sticker is 3 * piece; where it is gives</span>
+<span class="line" id="L826"><a href="#L826">  826</a>                 // the twist.</span>
+<span class="line" id="L827"><a href="#L827">  827</a>                 let piece = stickers[0] / 3;</span>
+<span class="line" id="L828"><a href="#L828">  828</a>                 *perm = piece;</span>
+<span class="line" id="L829"><a href="#L829">  829</a>                 *orient = (0..).zip(stickers).find(|&amp;(_, &amp;x)| x == 3 * piece)?.0;</span>
+<span class="line" id="L830"><a href="#L830">  830</a>             }</span>
+<span class="line" id="L831"><a href="#L831">  831</a>             let edge_slots = cube.edge_perm.iter_mut().zip(&amp;mut cube.edge_orient);</span>
+<span class="line" id="L832"><a href="#L832">  832</a>             for ((perm, orient), stickers) in edge_slots.zip(edges.as_chunks::&lt;2&gt;().0) {</span>
+<span class="line" id="L833"><a href="#L833">  833</a>                 let identity = stickers[0].checked_sub(24)?;</span>
+<span class="line" id="L834"><a href="#L834">  834</a>                 *perm = identity / 2;</span>
+<span class="line" id="L835"><a href="#L835">  835</a>                 *orient = identity % 2;</span>
+<span class="line" id="L836"><a href="#L836">  836</a>             }</span>
+<span class="line" id="L837"><a href="#L837">  837</a>             Some(cube)</span>
+<span class="line" id="L838"><a href="#L838">  838</a>         }</span>
+<span class="line" id="L839"><a href="#L839">  839</a> </span>
+<span class="line" id="L840"><a href="#L840">  840</a>         #[cfg(test)]</span>
+<span class="line" id="L841"><a href="#L841">  841</a>         pub(crate) fn from_cubie(cube: &amp;CubieCube) -&gt; StickerCube {</span>
+<span class="line" id="L842"><a href="#L842">  842</a>             let mut stickers = [0u8; 48];</span>
+<span class="line" id="L843"><a href="#L843">  843</a>             let (corners, edges) = stickers.split_at_mut(24);</span>
+<span class="line" id="L844"><a href="#L844">  844</a>             let corner_pieces = cube.corner_perm.iter().zip(&amp;cube.corner_orient);</span>
+<span class="line" id="L845"><a href="#L845">  845</a>             for ((&amp;piece, &amp;twist), slots) in corner_pieces.zip(corners.as_chunks_mut::&lt;3&gt;().0) {</span>
+<span class="line" id="L846"><a href="#L846">  846</a>                 for (k, slot) in (0..).zip(slots) {</span>
+<span class="line" id="L847"><a href="#L847">  847</a>                     // piece sticker j sits at position sticker (twist + j) % 3</span>
+<span class="line" id="L848"><a href="#L848">  848</a>                     *slot = 3 * piece + (k + 3 - twist) % 3;</span>
+<span class="line" id="L849"><a href="#L849">  849</a>                 }</span>
+<span class="line" id="L850"><a href="#L850">  850</a>             }</span>
+<span class="line" id="L851"><a href="#L851">  851</a>             let edge_pieces = cube.edge_perm.iter().zip(&amp;cube.edge_orient);</span>
+<span class="line" id="L852"><a href="#L852">  852</a>             for ((&amp;piece, &amp;flip), slots) in edge_pieces.zip(edges.as_chunks_mut::&lt;2&gt;().0) {</span>
+<span class="line" id="L853"><a href="#L853">  853</a>                 for (k, slot) in (0..).zip(slots) {</span>
+<span class="line" id="L854"><a href="#L854">  854</a>                     *slot = 24 + 2 * piece + (k + flip) % 2;</span>
+<span class="line" id="L855"><a href="#L855">  855</a>                 }</span>
+<span class="line" id="L856"><a href="#L856">  856</a>             }</span>
+<span class="line" id="L857"><a href="#L857">  857</a>             StickerCube(stickers)</span>
+<span class="line" id="L858"><a href="#L858">  858</a>         }</span>
+<span class="line" id="L859"><a href="#L859">  859</a>     }</span>
+<span class="line" id="L860"><a href="#L860">  860</a> </span>
+<span class="line" id="L861"><a href="#L861">  861</a>     /// The cube state of each move.</span>
+<span class="line" id="L862"><a href="#L862">  862</a>     pub(crate) fn move_cubes() -&gt; Option&lt;[CubieCube; N_MOVES]&gt; {</span>
+<span class="line" id="L863"><a href="#L863">  863</a>         let mut moves = [CubieCube::SOLVED; N_MOVES];</span>
+<span class="line" id="L864"><a href="#L864">  864</a>         for (mv, cube) in moves.iter_mut().enumerate() {</span>
+<span class="line" id="L865"><a href="#L865">  865</a>             *cube = StickerCube::solved()</span>
+<span class="line" id="L866"><a href="#L866">  866</a>                 .apply_face(mv / 3, mv % 3 + 1)?</span>
+<span class="line" id="L867"><a href="#L867">  867</a>                 .to_cubie()?;</span>
+<span class="line" id="L868"><a href="#L868">  868</a>         }</span>
+<span class="line" id="L869"><a href="#L869">  869</a>         Some(moves)</span>
+<span class="line" id="L870"><a href="#L870">  870</a>     }</span>
+<span class="line" id="L871"><a href="#L871">  871</a> </span>
+<span class="line" id="L872"><a href="#L872">  872</a>     /// All 48 symmetries; index 0 is the identity.</span>
+<span class="line" id="L873"><a href="#L873">  873</a>     pub(crate) fn symmetries() -&gt; Option&lt;Vec&lt;Symmetry&gt;&gt; {</span>
+<span class="line" id="L874"><a href="#L874">  874</a>         // Signed permutation matrices: each axis maps to some axis, either way.</span>
+<span class="line" id="L875"><a href="#L875">  875</a>         let axis_perms = [</span>
+<span class="line" id="L876"><a href="#L876">  876</a>             [0, 1, 2],</span>
+<span class="line" id="L877"><a href="#L877">  877</a>             [0, 2, 1],</span>
+<span class="line" id="L878"><a href="#L878">  878</a>             [1, 0, 2],</span>
+<span class="line" id="L879"><a href="#L879">  879</a>             [1, 2, 0],</span>
+<span class="line" id="L880"><a href="#L880">  880</a>             [2, 0, 1],</span>
+<span class="line" id="L881"><a href="#L881">  881</a>             [2, 1, 0],</span>
+<span class="line" id="L882"><a href="#L882">  882</a>         ];</span>
+<span class="line" id="L883"><a href="#L883">  883</a>         let mut matrices: Vec&lt;Matrix&gt; = Vec::with_capacity(48);</span>
+<span class="line" id="L884"><a href="#L884">  884</a>         for perm in axis_perms {</span>
+<span class="line" id="L885"><a href="#L885">  885</a>             for signs in 0..8 {</span>
+<span class="line" id="L886"><a href="#L886">  886</a>                 let sign = |i: usize| if signs &gt;&gt; i &amp; 1 == 1 { -1 } else { 1 };</span>
+<span class="line" id="L887"><a href="#L887">  887</a>                 matrices.push(std::array::from_fn(|i| {</span>
+<span class="line" id="L888"><a href="#L888">  888</a>                     std::array::from_fn(|j| if perm[i] == j { sign(i) } else { 0 })</span>
+<span class="line" id="L889"><a href="#L889">  889</a>                 }));</span>
+<span class="line" id="L890"><a href="#L890">  890</a>             }</span>
+<span class="line" id="L891"><a href="#L891">  891</a>         }</span>
+<span class="line" id="L892"><a href="#L892">  892</a>         // identity first</span>
+<span class="line" id="L893"><a href="#L893">  893</a>         let identity = [[1, 0, 0], [0, 1, 0], [0, 0, 1]];</span>
+<span class="line" id="L894"><a href="#L894">  894</a>         let pos = matrices.iter().position(|m| *m == identity)?;</span>
+<span class="line" id="L895"><a href="#L895">  895</a>         matrices.swap(0, pos);</span>
+<span class="line" id="L896"><a href="#L896">  896</a>         matrices</span>
+<span class="line" id="L897"><a href="#L897">  897</a>             .iter()</span>
+<span class="line" id="L898"><a href="#L898">  898</a>             .map(|m| {</span>
+<span class="line" id="L899"><a href="#L899">  899</a>                 let mirror = matrix_determinant(m) &lt; 0;</span>
+<span class="line" id="L900"><a href="#L900">  900</a>                 let cube = StickerCube::symmetry_state(m)?.to_cubie()?;</span>
+<span class="line" id="L901"><a href="#L901">  901</a>                 let mut move_map = [0u8; N_MOVES];</span>
+<span class="line" id="L902"><a href="#L902">  902</a>                 let faces = move_map.as_chunks_mut::&lt;3&gt;().0;</span>
+<span class="line" id="L903"><a href="#L903">  903</a>                 for (face_moves, &amp;normal) in faces.iter_mut().zip(&amp;FACE_NORMALS) {</span>
+<span class="line" id="L904"><a href="#L904">  904</a>                     let image = matrix_apply(m, normal);</span>
+<span class="line" id="L905"><a href="#L905">  905</a>                     let image_face = FACE_NORMALS.iter().zip(0..).find(|&amp;(&amp;x, _)| x == image)?.1;</span>
+<span class="line" id="L906"><a href="#L906">  906</a>                     for (turns, image_move) in (0..).zip(face_moves) {</span>
+<span class="line" id="L907"><a href="#L907">  907</a>                         // (A mirror turns clockwise into counterclockwise.)</span>
+<span class="line" id="L908"><a href="#L908">  908</a>                         let image_turns = if mirror { 2 - turns } else { turns };</span>
+<span class="line" id="L909"><a href="#L909">  909</a>                         *image_move = 3 * image_face + image_turns;</span>
+<span class="line" id="L910"><a href="#L910">  910</a>                     }</span>
+<span class="line" id="L911"><a href="#L911">  911</a>                 }</span>
+<span class="line" id="L912"><a href="#L912">  912</a>                 Some(Symmetry {</span>
+<span class="line" id="L913"><a href="#L913">  913</a>                     matrix: *m,</span>
+<span class="line" id="L914"><a href="#L914">  914</a>                     mirror,</span>
+<span class="line" id="L915"><a href="#L915">  915</a>                     cube,</span>
+<span class="line" id="L916"><a href="#L916">  916</a>                     cube_inverse: cube.inverse(),</span>
+<span class="line" id="L917"><a href="#L917">  917</a>                     move_map,</span>
+<span class="line" id="L918"><a href="#L918">  918</a>                 })</span>
+<span class="line" id="L919"><a href="#L919">  919</a>             })</span>
+<span class="line" id="L920"><a href="#L920">  920</a>             .collect()</span>
+<span class="line" id="L921"><a href="#L921">  921</a>     }</span>
+<span class="line" id="L922"><a href="#L922">  922</a> </span>
+<span class="line" id="L923"><a href="#L923">  923</a>     /// Index of the inverse of each symmetry of `syms` (`symmetries()`).</span>
+<span class="line" id="L924"><a href="#L924">  924</a>     pub(crate) fn symmetry_inverses(syms: &amp;[Symmetry]) -&gt; Option&lt;[u8; 48]&gt; {</span>
+<span class="line" id="L925"><a href="#L925">  925</a>         let identity = syms.first()?.matrix;</span>
+<span class="line" id="L926"><a href="#L926">  926</a>         let mut inverses = [0u8; 48];</span>
+<span class="line" id="L927"><a href="#L927">  927</a>         for (inverse, sym) in inverses.iter_mut().zip(syms) {</span>
+<span class="line" id="L928"><a href="#L928">  928</a>             *inverse = (0..)</span>
+<span class="line" id="L929"><a href="#L929">  929</a>                 .zip(syms)</span>
+<span class="line" id="L930"><a href="#L930">  930</a>                 .find(|(_, other)| matrix_product(&amp;sym.matrix, &amp;other.matrix) == identity)?</span>
+<span class="line" id="L931"><a href="#L931">  931</a>                 .0;</span>
+<span class="line" id="L932"><a href="#L932">  932</a>         }</span>
+<span class="line" id="L933"><a href="#L933">  933</a>         Some(inverses)</span>
+<span class="line" id="L934"><a href="#L934">  934</a>     }</span>
+<span class="line" id="L935"><a href="#L935">  935</a> </span>
+<span class="line" id="L936"><a href="#L936">  936</a>     /// The faces of a facelet string in its order (U R F D L B), each as its</span>
+<span class="line" id="L937"><a href="#L937">  937</a>     /// outward normal and the directions of &quot;right&quot; and &quot;down&quot; as the face</span>
+<span class="line" id="L938"><a href="#L938">  938</a>     /// is seen from outside: U with B at the top, D with F at the top, the</span>
+<span class="line" id="L939"><a href="#L939">  939</a>     /// side faces with U at the top.</span>
+<span class="line" id="L940"><a href="#L940">  940</a>     const FACELET_FACES: [(Vec3, Vec3, Vec3); 6] = [</span>
+<span class="line" id="L941"><a href="#L941">  941</a>         ([0, 1, 0], [1, 0, 0], [0, 0, 1]),</span>
+<span class="line" id="L942"><a href="#L942">  942</a>         ([1, 0, 0], [0, 0, -1], [0, -1, 0]),</span>
+<span class="line" id="L943"><a href="#L943">  943</a>         ([0, 0, 1], [1, 0, 0], [0, -1, 0]),</span>
+<span class="line" id="L944"><a href="#L944">  944</a>         ([0, -1, 0], [1, 0, 0], [0, 0, -1]),</span>
+<span class="line" id="L945"><a href="#L945">  945</a>         ([-1, 0, 0], [0, 0, 1], [0, -1, 0]),</span>
+<span class="line" id="L946"><a href="#L946">  946</a>         ([0, 0, -1], [-1, 0, 0], [0, -1, 0]),</span>
+<span class="line" id="L947"><a href="#L947">  947</a>     ];</span>
+<span class="line" id="L948"><a href="#L948">  948</a> </span>
+<span class="line" id="L949"><a href="#L949">  949</a>     /// The facelet (0..54: 9 per face, row by row) of a sticker.</span>
+<span class="line" id="L950"><a href="#L950">  950</a>     fn facelet(sticker: Sticker) -&gt; Option&lt;u8&gt; {</span>
+<span class="line" id="L951"><a href="#L951">  951</a>         let facelets = FACELET_FACES.iter().flat_map(|&amp;(normal, right, down)| {</span>
+<span class="line" id="L952"><a href="#L952">  952</a>             (-1..=1).flat_map(move |row| {</span>
+<span class="line" id="L953"><a href="#L953">  953</a>                 (-1..=1).map(move |column| Sticker {</span>
+<span class="line" id="L954"><a href="#L954">  954</a>                     position: std::array::from_fn(|a| {</span>
+<span class="line" id="L955"><a href="#L955">  955</a>                         normal[a] + column * right[a] + row * down[a]</span>
+<span class="line" id="L956"><a href="#L956">  956</a>                     }),</span>
+<span class="line" id="L957"><a href="#L957">  957</a>                     normal,</span>
+<span class="line" id="L958"><a href="#L958">  958</a>                 })</span>
+<span class="line" id="L959"><a href="#L959">  959</a>             })</span>
+<span class="line" id="L960"><a href="#L960">  960</a>         });</span>
+<span class="line" id="L961"><a href="#L961">  961</a>         (0..)</span>
+<span class="line" id="L962"><a href="#L962">  962</a>             .zip(facelets)</span>
+<span class="line" id="L963"><a href="#L963">  963</a>             .find(|&amp;(_, x)| x == sticker)</span>
+<span class="line" id="L964"><a href="#L964">  964</a>             .map(|(i, _)| i)</span>
+<span class="line" id="L965"><a href="#L965">  965</a>     }</span>
+<span class="line" id="L966"><a href="#L966">  966</a> </span>
+<span class="line" id="L967"><a href="#L967">  967</a>     /// The facelet of each sticker of each corner position (in</span>
+<span class="line" id="L968"><a href="#L968">  968</a>     /// `corner_stickers` order).</span>
+<span class="line" id="L969"><a href="#L969">  969</a>     pub(crate) fn corner_facelets() -&gt; Option&lt;[[u8; 3]; 8]&gt; {</span>
+<span class="line" id="L970"><a href="#L970">  970</a>         let mut table = [[0; 3]; 8];</span>
+<span class="line" id="L971"><a href="#L971">  971</a>         for (row, &amp;position) in table.iter_mut().zip(&amp;CORNER_POSITIONS) {</span>
+<span class="line" id="L972"><a href="#L972">  972</a>             for (x, sticker) in row.iter_mut().zip(corner_stickers(position)) {</span>
+<span class="line" id="L973"><a href="#L973">  973</a>                 *x = facelet(sticker)?;</span>
+<span class="line" id="L974"><a href="#L974">  974</a>             }</span>
+<span class="line" id="L975"><a href="#L975">  975</a>         }</span>
+<span class="line" id="L976"><a href="#L976">  976</a>         Some(table)</span>
+<span class="line" id="L977"><a href="#L977">  977</a>     }</span>
+<span class="line" id="L978"><a href="#L978">  978</a> </span>
+<span class="line" id="L979"><a href="#L979">  979</a>     /// The facelet of each sticker of each edge position (in</span>
+<span class="line" id="L980"><a href="#L980">  980</a>     /// `edge_stickers` order).</span>
+<span class="line" id="L981"><a href="#L981">  981</a>     pub(crate) fn edge_facelets() -&gt; Option&lt;[[u8; 2]; 12]&gt; {</span>
+<span class="line" id="L982"><a href="#L982">  982</a>         let mut table = [[0; 2]; 12];</span>
+<span class="line" id="L983"><a href="#L983">  983</a>         for (row, &amp;position) in table.iter_mut().zip(&amp;EDGE_POSITIONS) {</span>
+<span class="line" id="L984"><a href="#L984">  984</a>             for (x, sticker) in row.iter_mut().zip(edge_stickers(position)) {</span>
+<span class="line" id="L985"><a href="#L985">  985</a>                 *x = facelet(sticker)?;</span>
+<span class="line" id="L986"><a href="#L986">  986</a>             }</span>
+<span class="line" id="L987"><a href="#L987">  987</a>         }</span>
+<span class="line" id="L988"><a href="#L988">  988</a>         Some(table)</span>
+<span class="line" id="L989"><a href="#L989">  989</a>     }</span>
+<span class="line" id="L990"><a href="#L990">  990</a> </span>
+<span class="line" id="L991"><a href="#L991">  991</a>     /// Reference conjugation through the sticker model (slow; for tests).</span>
+<span class="line" id="L992"><a href="#L992">  992</a>     #[cfg(test)]</span>
+<span class="line" id="L993"><a href="#L993">  993</a>     pub(crate) fn conjugate_by_stickers(cube: &amp;CubieCube, sym: &amp;Symmetry) -&gt; Option&lt;CubieCube&gt; {</span>
+<span class="line" id="L994"><a href="#L994">  994</a>         StickerCube::from_cubie(cube)</span>
+<span class="line" id="L995"><a href="#L995">  995</a>             .conjugate(&amp;sym.matrix)?</span>
+<span class="line" id="L996"><a href="#L996">  996</a>             .to_cubie()</span>
+<span class="line" id="L997"><a href="#L997">  997</a>     }</span>
+<span class="line" id="L998"><a href="#L998">  998</a> }</span>
+<span class="line" id="L999"><a href="#L999">  999</a> </span>
+<span class="line" id="L1000"><a href="#L1000"> 1000</a> #[cfg(test)]</span>
+<span class="line" id="L1001"><a href="#L1001"> 1001</a> mod tests {</span>
+<span class="line" id="L1002"><a href="#L1002"> 1002</a>     use super::*;</span>
+<span class="line" id="L1003"><a href="#L1003"> 1003</a> </span>
+<span class="line" id="L1004"><a href="#L1004"> 1004</a>     /// Facelet strings: known ones (solved, U, R, the superflip as in</span>
+<span class="line" id="L1005"><a href="#L1005"> 1005</a>     /// Kociemba&#x27;s examples), round trips with any color symbols, and</span>
+<span class="line" id="L1006"><a href="#L1006"> 1006</a>     /// rejected non-positions.</span>
+<span class="line" id="L1007"><a href="#L1007"> 1007</a>     #[test]</span>
+<span class="line" id="L1008"><a href="#L1008"> 1008</a>     fn facelets() {</span>
+<span class="line" id="L1009"><a href="#L1009"> 1009</a>         let cube_of = |moves: &amp;str| {</span>
+<span class="line" id="L1010"><a href="#L1010"> 1010</a>             CubieCube::SOLVED</span>
+<span class="line" id="L1011"><a href="#L1011"> 1011</a>                 .apply_moves(&amp;parse_moves(moves).unwrap())</span>
+<span class="line" id="L1012"><a href="#L1012"> 1012</a>                 .unwrap()</span>
+<span class="line" id="L1013"><a href="#L1013"> 1013</a>         };</span>
+<span class="line" id="L1014"><a href="#L1014"> 1014</a>         let known = [</span>
+<span class="line" id="L1015"><a href="#L1015"> 1015</a>             (&quot;&quot;, &quot;UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB&quot;),</span>
+<span class="line" id="L1016"><a href="#L1016"> 1016</a>             (</span>
+<span class="line" id="L1017"><a href="#L1017"> 1017</a>                 &quot;U&quot;,</span>
+<span class="line" id="L1018"><a href="#L1018"> 1018</a>                 &quot;UUUUUUUUUBBBRRRRRRRRRFFFFFFDDDDDDDDDFFFLLLLLLLLLBBBBBB&quot;,</span>
+<span class="line" id="L1019"><a href="#L1019"> 1019</a>             ),</span>
+<span class="line" id="L1020"><a href="#L1020"> 1020</a>             (</span>
+<span class="line" id="L1021"><a href="#L1021"> 1021</a>                 &quot;R&quot;,</span>
+<span class="line" id="L1022"><a href="#L1022"> 1022</a>                 &quot;UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB&quot;,</span>
+<span class="line" id="L1023"><a href="#L1023"> 1023</a>             ),</span>
+<span class="line" id="L1024"><a href="#L1024"> 1024</a>             (</span>
+<span class="line" id="L1025"><a href="#L1025"> 1025</a>                 &quot;U R2 F B R B2 R U2 L B2 R U&#x27; D&#x27; R2 F R&#x27; L B2 U2 F2&quot;,</span>
+<span class="line" id="L1026"><a href="#L1026"> 1026</a>                 &quot;UBULURUFURURFRBRDRFUFLFRFDFDFDLDRDBDLULBLFLDLBUBRBLBDB&quot;,</span>
+<span class="line" id="L1027"><a href="#L1027"> 1027</a>             ),</span>
+<span class="line" id="L1028"><a href="#L1028"> 1028</a>         ];</span>
+<span class="line" id="L1029"><a href="#L1029"> 1029</a>         for (moves, facelets) in known {</span>
+<span class="line" id="L1030"><a href="#L1030"> 1030</a>             assert_eq!(cube_of(moves).to_facelets(), facelets, &quot;{moves}&quot;);</span>
+<span class="line" id="L1031"><a href="#L1031"> 1031</a>             assert_eq!(CubieCube::from_facelets(facelets), Ok(cube_of(moves)));</span>
+<span class="line" id="L1032"><a href="#L1032"> 1032</a>         }</span>
+<span class="line" id="L1033"><a href="#L1033"> 1033</a>         let mut rng = Rng(4);</span>
+<span class="line" id="L1034"><a href="#L1034"> 1034</a>         for _ in 0..100 {</span>
+<span class="line" id="L1035"><a href="#L1035"> 1035</a>             let cube = CubieCube::random(&amp;mut rng);</span>
+<span class="line" id="L1036"><a href="#L1036"> 1036</a>             let facelets = cube.to_facelets();</span>
+<span class="line" id="L1037"><a href="#L1037"> 1037</a>             assert_eq!(CubieCube::from_facelets(&amp;facelets), Ok(cube));</span>
+<span class="line" id="L1038"><a href="#L1038"> 1038</a>             let recolored: String = facelets</span>
+<span class="line" id="L1039"><a href="#L1039"> 1039</a>                 .chars()</span>
+<span class="line" id="L1040"><a href="#L1040"> 1040</a>                 .map(|c| match c {</span>
+<span class="line" id="L1041"><a href="#L1041"> 1041</a>                     &#x27;U&#x27; =&gt; &#x27;W&#x27;,</span>
+<span class="line" id="L1042"><a href="#L1042"> 1042</a>                     &#x27;D&#x27; =&gt; &#x27;Y&#x27;,</span>
+<span class="line" id="L1043"><a href="#L1043"> 1043</a>                     &#x27;F&#x27; =&gt; &#x27;G&#x27;,</span>
+<span class="line" id="L1044"><a href="#L1044"> 1044</a>                     &#x27;B&#x27; =&gt; &#x27;B&#x27;,</span>
+<span class="line" id="L1045"><a href="#L1045"> 1045</a>                     &#x27;R&#x27; =&gt; &#x27;R&#x27;,</span>
+<span class="line" id="L1046"><a href="#L1046"> 1046</a>                     _ =&gt; &#x27;O&#x27;,</span>
+<span class="line" id="L1047"><a href="#L1047"> 1047</a>                 })</span>
+<span class="line" id="L1048"><a href="#L1048"> 1048</a>                 .collect();</span>
+<span class="line" id="L1049"><a href="#L1049"> 1049</a>             assert_eq!(CubieCube::from_facelets(&amp;recolored), Ok(cube));</span>
+<span class="line" id="L1050"><a href="#L1050"> 1050</a>         }</span>
+<span class="line" id="L1051"><a href="#L1051"> 1051</a>         let solved = CubieCube::SOLVED.to_facelets();</span>
+<span class="line" id="L1052"><a href="#L1052"> 1052</a>         let with = |changes: &amp;[(usize, char)]| {</span>
+<span class="line" id="L1053"><a href="#L1053"> 1053</a>             let mut stickers: Vec&lt;char&gt; = solved.chars().collect();</span>
+<span class="line" id="L1054"><a href="#L1054"> 1054</a>             for &amp;(i, c) in changes {</span>
+<span class="line" id="L1055"><a href="#L1055"> 1055</a>                 stickers[i] = c;</span>
+<span class="line" id="L1056"><a href="#L1056"> 1056</a>             }</span>
+<span class="line" id="L1057"><a href="#L1057"> 1057</a>             stickers.into_iter().collect::&lt;String&gt;()</span>
+<span class="line" id="L1058"><a href="#L1058"> 1058</a>         };</span>
+<span class="line" id="L1059"><a href="#L1059"> 1059</a>         // No such corner (U9 = F), two R centers, a lone twisted corner (URF:</span>
+<span class="line" id="L1060"><a href="#L1060"> 1060</a>         // U9 R1 F3), a lone flipped edge (UF: U8 F2), two edges swapped (UF</span>
+<span class="line" id="L1061"><a href="#L1061"> 1061</a>         // and UR, by their F2 and R2), too few stickers.</span>
+<span class="line" id="L1062"><a href="#L1062"> 1062</a>         for bad in [</span>
+<span class="line" id="L1063"><a href="#L1063"> 1063</a>             with(&amp;[(8, &#x27;F&#x27;)]),</span>
+<span class="line" id="L1064"><a href="#L1064"> 1064</a>             with(&amp;[(4, &#x27;R&#x27;)]),</span>
+<span class="line" id="L1065"><a href="#L1065"> 1065</a>             with(&amp;[(8, &#x27;F&#x27;), (9, &#x27;U&#x27;), (20, &#x27;R&#x27;)]),</span>
+<span class="line" id="L1066"><a href="#L1066"> 1066</a>             with(&amp;[(7, &#x27;F&#x27;), (19, &#x27;U&#x27;)]),</span>
+<span class="line" id="L1067"><a href="#L1067"> 1067</a>             with(&amp;[(19, &#x27;R&#x27;), (10, &#x27;F&#x27;)]),</span>
+<span class="line" id="L1068"><a href="#L1068"> 1068</a>             solved[1..].to_string(),</span>
+<span class="line" id="L1069"><a href="#L1069"> 1069</a>         ] {</span>
+<span class="line" id="L1070"><a href="#L1070"> 1070</a>             assert!(CubieCube::from_facelets(&amp;bad).is_err(), &quot;{bad}&quot;);</span>
+<span class="line" id="L1071"><a href="#L1071"> 1071</a>         }</span>
+<span class="line" id="L1072"><a href="#L1072"> 1072</a>     }</span>
+<span class="line" id="L1073"><a href="#L1073"> 1073</a> </span>
+<span class="line" id="L1074"><a href="#L1074"> 1074</a>     #[test]</span>
+<span class="line" id="L1075"><a href="#L1075"> 1075</a>     fn sticker_roundtrip() {</span>
+<span class="line" id="L1076"><a href="#L1076"> 1076</a>         let mut rng = Rng(1);</span>
+<span class="line" id="L1077"><a href="#L1077"> 1077</a>         for _ in 0..100 {</span>
+<span class="line" id="L1078"><a href="#L1078"> 1078</a>             let cube = CubieCube::random(&amp;mut rng);</span>
+<span class="line" id="L1079"><a href="#L1079"> 1079</a>             assert_eq!(model::StickerCube::from_cubie(&amp;cube).to_cubie(), Some(cube));</span>
+<span class="line" id="L1080"><a href="#L1080"> 1080</a>         }</span>
+<span class="line" id="L1081"><a href="#L1081"> 1081</a>     }</span>
+<span class="line" id="L1082"><a href="#L1082"> 1082</a> </span>
+<span class="line" id="L1083"><a href="#L1083"> 1083</a>     #[test]</span>
+<span class="line" id="L1084"><a href="#L1084"> 1084</a>     fn moves_match_sticker_model() {</span>
+<span class="line" id="L1085"><a href="#L1085"> 1085</a>         let mut rng = Rng(2);</span>
+<span class="line" id="L1086"><a href="#L1086"> 1086</a>         for _ in 0..50 {</span>
+<span class="line" id="L1087"><a href="#L1087"> 1087</a>             let mut stickers = model::StickerCube::solved();</span>
+<span class="line" id="L1088"><a href="#L1088"> 1088</a>             let mut cube = CubieCube::SOLVED;</span>
+<span class="line" id="L1089"><a href="#L1089"> 1089</a>             for _ in 0..30 {</span>
+<span class="line" id="L1090"><a href="#L1090"> 1090</a>                 let mv = rng.below_usize(N_MOVES);</span>
+<span class="line" id="L1091"><a href="#L1091"> 1091</a>                 stickers = stickers.apply_face(mv / 3, mv % 3 + 1).unwrap();</span>
+<span class="line" id="L1092"><a href="#L1092"> 1092</a>                 cube = cube.apply_move(Move::ALL[mv]);</span>
+<span class="line" id="L1093"><a href="#L1093"> 1093</a>                 assert_eq!(stickers.to_cubie(), Some(cube));</span>
+<span class="line" id="L1094"><a href="#L1094"> 1094</a>                 assert!(cube.is_solvable());</span>
+<span class="line" id="L1095"><a href="#L1095"> 1095</a>             }</span>
+<span class="line" id="L1096"><a href="#L1096"> 1096</a>         }</span>
+<span class="line" id="L1097"><a href="#L1097"> 1097</a>     }</span>
+<span class="line" id="L1098"><a href="#L1098"> 1098</a> </span>
+<span class="line" id="L1099"><a href="#L1099"> 1099</a>     #[test]</span>
+<span class="line" id="L1100"><a href="#L1100"> 1100</a>     fn move_orders() {</span>
+<span class="line" id="L1101"><a href="#L1101"> 1101</a>         for mv in 0..N_MOVES {</span>
+<span class="line" id="L1102"><a href="#L1102"> 1102</a>             let move_cube = move_cubes()[mv];</span>
+<span class="line" id="L1103"><a href="#L1103"> 1103</a>             let mut cube = CubieCube::SOLVED;</span>
+<span class="line" id="L1104"><a href="#L1104"> 1104</a>             for _ in 0..4 {</span>
+<span class="line" id="L1105"><a href="#L1105"> 1105</a>                 cube = cube.compose(&amp;move_cube);</span>
+<span class="line" id="L1106"><a href="#L1106"> 1106</a>             }</span>
+<span class="line" id="L1107"><a href="#L1107"> 1107</a>             assert_eq!(cube, CubieCube::SOLVED);</span>
+<span class="line" id="L1108"><a href="#L1108"> 1108</a>             let inverse = inverse_move(u8::try_from(mv).unwrap());</span>
+<span class="line" id="L1109"><a href="#L1109"> 1109</a>             assert_eq!(move_cube.inverse(), move_cubes()[usize::from(inverse)]);</span>
+<span class="line" id="L1110"><a href="#L1110"> 1110</a>         }</span>
+<span class="line" id="L1111"><a href="#L1111"> 1111</a>         // R moves FR edge to UR (front to top).</span>
+<span class="line" id="L1112"><a href="#L1112"> 1112</a>         let r = move_cubes()[6];</span>
+<span class="line" id="L1113"><a href="#L1113"> 1113</a>         assert_eq!(r.edge_perm[4], 8);</span>
+<span class="line" id="L1114"><a href="#L1114"> 1114</a>     }</span>
+<span class="line" id="L1115"><a href="#L1115"> 1115</a> </span>
+<span class="line" id="L1116"><a href="#L1116"> 1116</a>     #[test]</span>
+<span class="line" id="L1117"><a href="#L1117"> 1117</a>     fn sexy_move_order_6() {</span>
+<span class="line" id="L1118"><a href="#L1118"> 1118</a>         let seq = parse_moves(&quot;R U R&#x27; U&#x27;&quot;).unwrap();</span>
+<span class="line" id="L1119"><a href="#L1119"> 1119</a>         let mut cube = CubieCube::SOLVED;</span>
+<span class="line" id="L1120"><a href="#L1120"> 1120</a>         for _ in 0..6 {</span>
+<span class="line" id="L1121"><a href="#L1121"> 1121</a>             cube = cube.apply_moves(&amp;seq).unwrap();</span>
+<span class="line" id="L1122"><a href="#L1122"> 1122</a>         }</span>
+<span class="line" id="L1123"><a href="#L1123"> 1123</a>         assert_eq!(cube, CubieCube::SOLVED);</span>
+<span class="line" id="L1124"><a href="#L1124"> 1124</a>     }</span>
+<span class="line" id="L1125"><a href="#L1125"> 1125</a> </span>
+<span class="line" id="L1126"><a href="#L1126"> 1126</a>     #[test]</span>
+<span class="line" id="L1127"><a href="#L1127"> 1127</a>     fn parse_and_format() {</span>
+<span class="line" id="L1128"><a href="#L1128"> 1128</a>         let moves = parse_moves(&quot;R U2 F&#x27; D3 B1 L&quot;).unwrap();</span>
+<span class="line" id="L1129"><a href="#L1129"> 1129</a>         assert_eq!(format_moves(&amp;moves), &quot;R U2 F&#x27; D&#x27; B L&quot;);</span>
+<span class="line" id="L1130"><a href="#L1130"> 1130</a>         assert_eq!(parse_moves(&quot;R X&quot;), None);</span>
+<span class="line" id="L1131"><a href="#L1131"> 1131</a>         // (A suffix must follow its letter.)</span>
+<span class="line" id="L1132"><a href="#L1132"> 1132</a>         assert_eq!(parse_moves(&quot;R 2&quot;), None);</span>
+<span class="line" id="L1133"><a href="#L1133"> 1133</a>     }</span>
+<span class="line" id="L1134"><a href="#L1134"> 1134</a> </span>
+<span class="line" id="L1135"><a href="#L1135"> 1135</a>     #[test]</span>
+<span class="line" id="L1136"><a href="#L1136"> 1136</a>     fn symmetry_conjugation_matches_stickers() {</span>
+<span class="line" id="L1137"><a href="#L1137"> 1137</a>         let mut rng = Rng(3);</span>
+<span class="line" id="L1138"><a href="#L1138"> 1138</a>         let syms = symmetries();</span>
+<span class="line" id="L1139"><a href="#L1139"> 1139</a>         assert_eq!(syms.len(), 48);</span>
+<span class="line" id="L1140"><a href="#L1140"> 1140</a>         for sym in syms {</span>
+<span class="line" id="L1141"><a href="#L1141"> 1141</a>             for _ in 0..20 {</span>
+<span class="line" id="L1142"><a href="#L1142"> 1142</a>                 let cube = CubieCube::random(&amp;mut rng);</span>
+<span class="line" id="L1143"><a href="#L1143"> 1143</a>                 assert_eq!(</span>
+<span class="line" id="L1144"><a href="#L1144"> 1144</a>                     Some(conjugate(&amp;cube, sym)),</span>
+<span class="line" id="L1145"><a href="#L1145"> 1145</a>                     model::conjugate_by_stickers(&amp;cube, sym)</span>
+<span class="line" id="L1146"><a href="#L1146"> 1146</a>                 );</span>
+<span class="line" id="L1147"><a href="#L1147"> 1147</a>             }</span>
+<span class="line" id="L1148"><a href="#L1148"> 1148</a>             for mv in 0..N_MOVES {</span>
+<span class="line" id="L1149"><a href="#L1149"> 1149</a>                 assert_eq!(</span>
+<span class="line" id="L1150"><a href="#L1150"> 1150</a>                     conjugate(&amp;move_cubes()[mv], sym),</span>
+<span class="line" id="L1151"><a href="#L1151"> 1151</a>                     move_cubes()[usize::from(sym.move_map[mv])]</span>
+<span class="line" id="L1152"><a href="#L1152"> 1152</a>                 );</span>
+<span class="line" id="L1153"><a href="#L1153"> 1153</a>             }</span>
+<span class="line" id="L1154"><a href="#L1154"> 1154</a>         }</span>
+<span class="line" id="L1155"><a href="#L1155"> 1155</a>         let inverses = symmetry_inverses();</span>
+<span class="line" id="L1156"><a href="#L1156"> 1156</a>         for (sym, &amp;inverse) in syms.iter().zip(inverses) {</span>
+<span class="line" id="L1157"><a href="#L1157"> 1157</a>             let cube = CubieCube::random(&amp;mut rng);</span>
+<span class="line" id="L1158"><a href="#L1158"> 1158</a>             let back = conjugate(&amp;conjugate(&amp;cube, sym), &amp;syms[usize::from(inverse)]);</span>
+<span class="line" id="L1159"><a href="#L1159"> 1159</a>             assert_eq!(cube, back);</span>
+<span class="line" id="L1160"><a href="#L1160"> 1160</a>         }</span>
+<span class="line" id="L1161"><a href="#L1161"> 1161</a>     }</span>
+<span class="line" id="L1162"><a href="#L1162"> 1162</a> </span>
+<span class="line" id="L1163"><a href="#L1163"> 1163</a>     /// The constants from build.rs are the sticker model&#x27;s.</span>
+<span class="line" id="L1164"><a href="#L1164"> 1164</a>     #[test]</span>
+<span class="line" id="L1165"><a href="#L1165"> 1165</a>     fn generated_constants_match_model() {</span>
+<span class="line" id="L1166"><a href="#L1166"> 1166</a>         assert_eq!(model::move_cubes().as_ref(), Some(move_cubes()));</span>
+<span class="line" id="L1167"><a href="#L1167"> 1167</a>         let syms = model::symmetries().unwrap();</span>
+<span class="line" id="L1168"><a href="#L1168"> 1168</a>         assert_eq!(syms.len(), symmetries().len());</span>
+<span class="line" id="L1169"><a href="#L1169"> 1169</a>         for (a, b) in syms.iter().zip(symmetries()) {</span>
+<span class="line" id="L1170"><a href="#L1170"> 1170</a>             assert_eq!(</span>
+<span class="line" id="L1171"><a href="#L1171"> 1171</a>                 (a.matrix, a.mirror, a.cube, a.cube_inverse, a.move_map),</span>
+<span class="line" id="L1172"><a href="#L1172"> 1172</a>                 (b.matrix, b.mirror, b.cube, b.cube_inverse, b.move_map)</span>
+<span class="line" id="L1173"><a href="#L1173"> 1173</a>             );</span>
+<span class="line" id="L1174"><a href="#L1174"> 1174</a>         }</span>
+<span class="line" id="L1175"><a href="#L1175"> 1175</a>         assert_eq!(</span>
+<span class="line" id="L1176"><a href="#L1176"> 1176</a>             model::symmetry_inverses(&amp;syms).as_ref(),</span>
+<span class="line" id="L1177"><a href="#L1177"> 1177</a>             Some(symmetry_inverses())</span>
+<span class="line" id="L1178"><a href="#L1178"> 1178</a>         );</span>
+<span class="line" id="L1179"><a href="#L1179"> 1179</a>         assert_eq!(model::corner_facelets(), Some(CORNER_FACELETS));</span>
+<span class="line" id="L1180"><a href="#L1180"> 1180</a>         assert_eq!(model::edge_facelets(), Some(EDGE_FACELETS));</span>
+<span class="line" id="L1181"><a href="#L1181"> 1181</a>         for (mv, index) in Move::ALL.iter().zip(0..) {</span>
+<span class="line" id="L1182"><a href="#L1182"> 1182</a>             assert_eq!(mv.index(), index);</span>
+<span class="line" id="L1183"><a href="#L1183"> 1183</a>             assert_eq!(Move::from_index(index), Some(*mv));</span>
+<span class="line" id="L1184"><a href="#L1184"> 1184</a>             assert_eq!(Move::lowest(1 &lt;&lt; index | 1 &lt;&lt; 17), Some(*mv));</span>
+<span class="line" id="L1185"><a href="#L1185"> 1185</a>         }</span>
+<span class="line" id="L1186"><a href="#L1186"> 1186</a>         assert_eq!(Move::from_index(N_MOVES), None);</span>
+<span class="line" id="L1187"><a href="#L1187"> 1187</a>         assert_eq!(Move::lowest(0), None);</span>
+<span class="line" id="L1188"><a href="#L1188"> 1188</a>         assert_eq!(CubieCube::SOLVED.apply_moves(&amp;[0, 18]), None);</span>
+<span class="line" id="L1189"><a href="#L1189"> 1189</a>         assert_eq!(format_moves(&amp;[0, 18, 17]), &quot;U ? B&#x27;&quot;);</span>
+<span class="line" id="L1190"><a href="#L1190"> 1190</a>     }</span>
+<span class="line" id="L1191"><a href="#L1191"> 1191</a> }</span></pre></html>

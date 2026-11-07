@@ -1,0 +1,32 @@
+[
+  {
+    "run": "nxopt22_1T_distance20_random10_from2_1_1g_pgo",
+    "old_wall_s": 400.1,
+    "new_timeout_s": 840,
+    "reason": "Previous remaining-hold deadline was 390\u2013410 seconds; retry once with a fresh 870-second hold."
+  },
+  {
+    "run": "nxopt22_1T_distance20_random10_from4_1_1g_pgo",
+    "old_wall_s": 410.09,
+    "new_timeout_s": 840,
+    "reason": "Previous remaining-hold deadline was 390\u2013410 seconds; retry once with a fresh 870-second hold."
+  },
+  {
+    "run": "nxopt22_1T_distance20_random10_from5_1_1g_pgo",
+    "old_wall_s": 390.09,
+    "new_timeout_s": 840,
+    "reason": "Previous remaining-hold deadline was 390\u2013410 seconds; retry once with a fresh 870-second hold."
+  },
+  {
+    "run": "nxopt22_1T_distance20_random10_from6_1_1g_pgo",
+    "old_wall_s": 390.09,
+    "new_timeout_s": 840,
+    "reason": "Previous remaining-hold deadline was 390\u2013410 seconds; retry once with a fresh 870-second hold."
+  },
+  {
+    "run": "nxopt22_1T_distance20_random10_from7_1_1g_pgo",
+    "old_wall_s": 390.09,
+    "new_timeout_s": 840,
+    "reason": "Previous remaining-hold deadline was 390\u2013410 seconds; retry once with a fresh 870-second hold."
+  }
+]

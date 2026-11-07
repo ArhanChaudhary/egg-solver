@@ -25,12 +25,12 @@
 //! `BAD <index>` and makes the exit status 1. With `--json`, the same as
 //! JSON lines (`Line`).
 //!
-//! `solve --fast [SCRAMBLE]...` solves one scramble as fast as this machine
-//! can (what fast.sh did): the largest table found, all threads on the one
-//! cube (`-c 1`), a warm-up cube first; see `run_fast`.
+//! `solve --fast --table TABLE [SCRAMBLE]...` uses all selected threads on
+//! one cube. Without arguments it reads one scramble from stdin. Warm-up
+//! solves are optional; see `run_fast`.
 //!
 //! `solve --shm-load TABLE` loads a table into a shared memory segment that
-//! later runs attach at once (`--shm`; README.md "Shared memory"), `solve
+//! later runs attach at once (`--shm`; `docs/reference/USER_GUIDE.md` "Shared memory"), `solve
 //! --shm-remove TABLE` removes it.
 
 // No intentional panics in shipped code (user request; asserts, which no
@@ -48,15 +48,13 @@
 )]
 
 use anyhow::Context as _;
-use clap::Parser;
+use clap::{parser::ValueSource, CommandFactory as _, FromArgMatches as _, Parser};
 use egg_solver::cli::{self, BadInput, LoadArgs, Verbosity};
-use egg_solver::cubie::{format_moves, parse_moves, CubieCube, Rng};
+use egg_solver::cubie::{format_moves, parse_moves, CubieCube};
 use egg_solver::lanes::share::Pool;
 use egg_solver::solver::{Solver, Stats};
 use egg_solver::tables::Cocsep;
-use std::hash::{Hash as _, Hasher as _};
-use std::io::{BufRead, Write};
-use std::path::Path;
+use std::io::{BufRead, IsTerminal as _, Write};
 use std::process::ExitCode;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Mutex, PoisonError};
@@ -125,8 +123,8 @@ fn solve_all_pinned(
 #[derive(Parser, Debug)]
 #[command(name = "solve", version, after_long_help = OUTPUT_HELP)]
 struct Args {
-    /// The table file (made by `gen`, e.g. `gen 8 auto h8`) [with --fast:
-    /// the largest found].
+    /// The table file (made by `gen`, e.g. `gen 8 auto h8`). With --fast,
+    /// this position starts the scramble instead; supply --table explicitly.
     #[arg(required_unless_present_any = [
         "completions",
         "fast",
@@ -168,20 +166,17 @@ struct Args {
     /// one object).
     #[arg(long)]
     json: bool,
-    /// Solve one scramble (the arguments, or a random 25-move one) as fast
-    /// as this machine can and show the time: the largest table found (hK,
-    /// K from 11 down, in /mnt/huge, /data2/tables, /data/tables, ./tables),
-    /// all threads on the one cube (-c 1), after a warm-up cube; the time
-    /// is the cube's own (table load excluded). Don't run it beside other
-    /// heavy jobs: they share the cores and the time.
-    #[arg(long, conflicts_with_all = ["concurrency", "count"])]
+    /// Solve one scramble from arguments or stdin with all selected threads.
+    /// Requires an explicit --table. Time excludes table loading and any
+    /// optional --warmup solve.
+    #[arg(long, requires = "table_flag", conflicts_with_all = ["concurrency", "count"])]
     fast: bool,
     /// With --fast: the scramble (moves as arguments, or one quoted
-    /// string) [default: a random 25-move scramble].
+    /// string). If omitted, read exactly one nonblank line from stdin.
     #[arg(value_name = "SCRAMBLE", requires = "fast")]
     scramble: Vec<String>,
     /// With --fast: the cube solved first, to warm up threads, caches and
-    /// TLBs ("" for none) [default: a fixed 25-move scramble].
+    /// TLBs. No warm-up solve by default.
     #[arg(long, value_name = "SCRAMBLE", requires = "fast")]
     warmup: Option<String>,
     #[command(flatten)]
@@ -266,10 +261,17 @@ fn print_json(value: &impl serde::Serialize) -> anyhow::Result<()> {
 }
 
 fn main() -> ExitCode {
-    let args = Args::parse();
+    let matches = Args::command().get_matches();
+    let args = Args::from_arg_matches(&matches).unwrap_or_else(|error| error.exit());
     if let Some(shell) = args.completions {
         cli::print_completions::<Args>(shell);
         return ExitCode::SUCCESS;
+    }
+    if args.fast && matches.value_source("table_flag") != Some(ValueSource::CommandLine) {
+        return cli::exit_status(
+            "solve",
+            Err(BadInput("--fast requires an explicit --table PATH".into()).into()),
+        );
     }
     args.verbosity.init_logging();
     let result = if let Some(path) = &args.shm_load {
@@ -289,6 +291,9 @@ fn main() -> ExitCode {
 /// The cubes of the scrambles on stdin, one per line (blank lines
 /// skipped), at most `count`.
 fn read_scrambles(count: usize) -> anyhow::Result<Vec<CubieCube>> {
+    if std::io::stdin().is_terminal() {
+        return Err(BadInput("provide scrambles on stdin, one per line".into()).into());
+    }
     let mut cubes = Vec::new();
     for (n, line) in std::io::stdin().lock().lines().enumerate() {
         let line = line.context("cannot read stdin")?;
@@ -312,6 +317,9 @@ fn run(args: &Args) -> anyhow::Result<ExitCode> {
         .or(args.table_flag.as_deref())
         .context("no table")?;
     let cubes = read_scrambles(args.count.unwrap_or(usize::MAX))?;
+    if cubes.is_empty() {
+        return Err(BadInput("no scrambles on stdin".into()).into());
+    }
     let corners = Cocsep::generate()?;
     // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
     let table = unsafe { args.load.open(path) }?;
@@ -403,54 +411,39 @@ fn run(args: &Args) -> anyhow::Result<ExitCode> {
     })
 }
 
-/// `--fast`'s warm-up cube (fast.sh's).
-const WARMUP: &str = "R U2 F' L D2 B R' U F2 D' L2 B' U R2 F D L' B2 U' R F' D2 L B U2";
-
-/// Where `--fast` looks for tables (for each K, from 11 down).
-const TABLE_DIRS: [&str; 4] = ["/mnt/huge", "/data2/tables", "/data/tables", "tables"];
-
-/// The largest table: hK of the largest K in `TABLE_DIRS`.
-fn largest_table() -> Option<String> {
-    (0..=11).rev().find_map(|k| {
-        TABLE_DIRS
+/// Read one explicit scramble, rejecting empty or multi-cube input before
+/// loading a table. An explicitly supplied empty argument represents the
+/// solved cube; a blank stdin line is ignored, as in batch mode.
+fn fast_scramble(args: &Args) -> anyhow::Result<String> {
+    if args.table.is_some() || !args.scramble.is_empty() {
+        return Ok(args
+            .table
             .iter()
-            .map(|dir| format!("{dir}/h{k}"))
-            .find(|path| Path::new(path).is_file())
-    })
-}
-
-/// A random scramble of `length` moves: no face twice in a row, and no X Y X
-/// with Y opposite X (e.g. U D U, which is U2 D).
-fn random_scramble(rng: &mut Rng, length: usize) -> String {
-    // (Opposite faces have the same index mod 3: U D, R L, F B.)
-    const FACES: [char; 6] = ['U', 'R', 'F', 'D', 'L', 'B'];
-    const SUFFIXES: [&str; 3] = ["", "2", "'"];
-    let below = |rng: &mut Rng, n: usize| rng.below_usize(n);
-    let (mut previous, mut before) = (None, None);
-    let mut moves = Vec::with_capacity(length);
-    for _ in 0..length {
-        let face = loop {
-            let face = below(rng, 6);
-            let opposite_return =
-                previous.is_some_and(|p: usize| p % 3 == face % 3) && before == Some(face);
-            if previous != Some(face) && !opposite_return {
-                break face;
-            }
-        };
-        moves.push(format!("{}{}", FACES[face], SUFFIXES[below(rng, 3)]));
-        (before, previous) = (previous, Some(face));
+            .chain(&args.scramble)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(" "));
     }
-    moves.join(" ")
-}
-
-/// A seed from the clock and the process id. (The monotonic clock: reading
-/// `SystemTime` would change the code of the worker threads' `Instant::now`
-/// calls, which then pass the clock id instead of having it folded in.)
-fn time_seed() -> u64 {
-    let mut hasher = std::hash::DefaultHasher::new();
-    std::time::Instant::now().hash(&mut hasher);
-    std::process::id().hash(&mut hasher);
-    hasher.finish()
+    if std::io::stdin().is_terminal() {
+        return Err(BadInput("provide a scramble as arguments or on stdin".into()).into());
+    }
+    let mut scramble = None;
+    for line in std::io::stdin().lock().lines() {
+        let line = line.context("cannot read stdin")?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        if scramble.is_some() {
+            return Err(BadInput(
+                "--fast accepts exactly one scramble; use batch mode for multiple lines".into(),
+            )
+            .into());
+        }
+        scramble = Some(line);
+    }
+    scramble.ok_or_else(|| {
+        BadInput("no scramble provided; pass one as arguments or on stdin".into()).into()
+    })
 }
 
 /// `--fast`'s JSON object.
@@ -469,36 +462,22 @@ struct FastReport<'a> {
     nodes_per_second: f64,
 }
 
-/// `solve --fast`: one scramble as fast as this machine can (fast.sh, as a
-/// flag): the largest table, all threads on the one cube (`-c 1`), a
-/// warm-up cube first in the same process (threads, page tables and TLBs
-/// are hot when the scramble starts). Prints fast.sh's lines; the time is
-/// the scramble's own solve time.
+/// Solve the supplied scramble with all selected threads. Table loading
+/// and an explicitly requested warm-up are excluded from the reported time.
 #[expect(clippy::cast_precision_loss, reason = "statistics")]
 fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
-    // (A first argument that is a move, not a file, starts the scramble.)
-    let mut words = args.scramble.clone();
-    let mut table_arg = args.table.clone();
-    if let Some(first) =
-        table_arg.take_if(|first| !Path::new(first).is_file() && parse_moves(first).is_some())
-    {
-        words.insert(0, first);
-    }
-    let path = (table_arg.or_else(|| args.table_flag.clone()))
-        .or_else(largest_table)
-        .context("no table found; generate one, e.g.: target/release/gen 8 auto tables/h8")?;
-    let scramble = if words.is_empty() {
-        random_scramble(&mut Rng(time_seed()), 25)
-    } else {
-        words.join(" ")
-    };
+    let path = args
+        .table_flag
+        .as_deref()
+        .context("--fast requires --table PATH")?;
+    let scramble = fast_scramble(args)?;
     let parse = |text: &str| {
         parse_moves(text)
             .and_then(|moves| CubieCube::SOLVED.apply_moves(&moves))
             .ok_or_else(|| BadInput(format!("cannot parse {text:?}")))
     };
     let mut cubes = Vec::new();
-    let warmup = args.warmup.as_deref().unwrap_or(WARMUP);
+    let warmup = args.warmup.as_deref().unwrap_or("");
     if !warmup.trim().is_empty() {
         cubes.push(parse(warmup)?);
     }
@@ -511,8 +490,8 @@ fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
     }
     let corners = Cocsep::generate()?;
     // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
-    let table = unsafe { args.load.open(&path) }?;
-    let lanes = cli::lanes(args.lanes, &path, table.meta().k, threads);
+    let table = unsafe { args.load.open(path) }?;
+    let lanes = cli::lanes(args.lanes, path, table.meta().k, threads);
     let solver = Solver::new(&corners, &table);
     let get = |i: usize| cubes.get(i).copied();
     // (The scramble, after the warm-up cube if any.)
@@ -537,7 +516,7 @@ fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
         "BAD: {} does not solve the scramble",
         format_moves(&solution)
     );
-    // (The seconds of solve's line, as fast.sh read them.)
+    // Match the precision of the plain-text solve output.
     let seconds: f64 = format!("{seconds:.6}").parse()?;
     let rate = if seconds > 0.0 {
         stats.nodes as f64 / seconds
@@ -546,7 +525,7 @@ fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
     };
     if args.json {
         print_json(&FastReport {
-            table: &path,
+            table: path,
             threads,
             lanes,
             scramble: &scramble,
@@ -569,29 +548,4 @@ fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
         );
     }
     Ok(ExitCode::SUCCESS)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{random_scramble, Rng};
-    use egg_solver::cubie::parse_moves;
-
-    /// 25 moves, no face twice in a row, no X Y X on opposite faces.
-    #[test]
-    fn random_scrambles() {
-        let mut rng = Rng(7);
-        for _ in 0..1000 {
-            let scramble = random_scramble(&mut rng, 25);
-            let moves = parse_moves(&scramble).unwrap();
-            assert_eq!(moves.len(), 25, "{scramble}");
-            let faces: Vec<u8> = moves.iter().map(|m| m / 3).collect();
-            for w in faces.windows(2) {
-                assert_ne!(w[0], w[1], "{scramble}");
-            }
-            for w in faces.windows(3) {
-                let opposite = w[0] / 2 == w[1] / 2;
-                assert!(!(opposite && w[0] == w[2]), "{scramble}");
-            }
-        }
-    }
 }
