@@ -1,0 +1,39 @@
+   Compiling cfg-if v1.0.5
+   Compiling smallvec v1.16.4
+   Compiling libc v0.2.191
+   Compiling parking_lot_core v0.9.12
+   Compiling scopeguard v1.2.0
+   Compiling thiserror v2.0.21
+   Compiling crossbeam-utils v0.8.23
+   Compiling foldhash v0.2.0
+   Compiling allocator-api2 v0.2.21
+   Compiling equivalent v1.0.3
+   Compiling lock_api v0.4.14
+   Compiling egg-solver v0.1.0 (/data/agents/ub-audit/source)
+   Compiling hashbrown v0.16.1
+   Compiling parking_lot v0.12.5
+   Compiling egg-solver-ub-audit-probes v0.0.0 (/data/agents/ub-audit/probes)
+    Finished `release` profile [optimized] target(s) in 1.46s
+     Running `/home/super/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/bin/cargo-miri runner /data/agents/ub-audit/target/miri/x86_64-unknown-linux-gnu/release/symmetry_index`
+warning: Miri does not support optimizations: the opt-level is ignored. The only effect of selecting a Cargo profile that enables optimizations (such as --release) is to apply its remaining settings, such as whether debug assertions and overflow checks are enabled.
+
+error: Undefined Behavior: `assume` called with `false`
+   --> /data/agents/ub-audit/source/src/portable/coord.rs:104:25
+    |
+104 |     let line = unsafe { tabs.sym_edges.get_unchecked(sym) };
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Undefined Behavior occurred here
+    |
+    = help: this indicates a bug in the program: it performed an invalid operation, and caused Undefined Behavior
+    = help: see https://doc.rust-lang.org/nightly/reference/behavior-considered-undefined.html for further information
+    = note: stack backtrace:
+            0: egg_solver::simd::coord::edge_parts_sym_raw
+                at /data/agents/ub-audit/source/src/portable/coord.rs:104:25: 104:58
+            1: egg_solver::coord::edge_parts_sym
+                at /data/agents/ub-audit/source/src/coord.rs:336:36: 336:65
+            2: main
+                at src/bin/symmetry_index.rs:3:26: 3:67
+
+note: some details are omitted, run with `MIRIFLAGS=-Zmiri-backtrace=full` for a verbose backtrace
+
+error: aborting due to 1 previous error; 1 warning emitted
+

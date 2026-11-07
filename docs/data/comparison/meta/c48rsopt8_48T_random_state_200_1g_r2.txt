@@ -1,0 +1,16 @@
+status 0
+run c48rsopt8 48 random_state 200 1g shipped 2
+pagemode hugetlb arena 8589934592 only c48rs-opt8,c48rs-opt8-nat,c48rs-opt8-pgo,c48rs-opt8,c48rs-opt8-nat,c48rs-opt8-pgo-pgo
+start 2026-11-05 22:07:02
+wall_s 66.92
+cpu_s 248.70 1.71
+maxrss_kb 32740
+gate_wait_s 0
+ext_cores 0.0
+pages 8422984 34376 31432 0 8388608 593515 c48rs-opt8
+free_1g_pages 58 58
+memfree_gib_at_start 15.3
+thpwarm_pct -
+table /mnt/egg/super/xcr/cube48opt-rust/opt8/h48prun31h8.dat 7782727680
+thp always [madvise] never defrag always defer defer+madvise [madvise] never
+par 0 slot -

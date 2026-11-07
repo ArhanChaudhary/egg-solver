@@ -1,0 +1,15 @@
+status 0
+run cubeoptrsh7 1 random_state_from50 50 1g shipped 1
+pagemode none arena 0 only -
+start 2026-11-05 14:26:33
+wall_s 28.99
+cpu_s 28.96 0.02
+maxrss_kb 12516
+gate_wait_s 0
+ext_cores 0.0
+pages 4204176 9872 6896 2048 4194304 2916587 solve
+free_1g_pages 0 0
+memfree_gib_at_start 14.5
+thpwarm_pct -
+table /mnt/huge/h7 4294967296
+thp always [madvise] never defrag always defer defer+madvise [madvise] never

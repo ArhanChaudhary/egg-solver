@@ -1,0 +1,36 @@
+{
+  "status": "REVIEW_COMPLETE",
+  "completed_at": "2026-11-07T09:27:06.174858+00:00",
+  "screen_sha256": "bf67d6248f990b3eed9494a5d6b5fcbee60e399b8ae4e0c9fe5eb4e4b5fa7c32",
+  "native_candidates": [
+    {
+      "candidate": "bytes",
+      "decision": "REJECT_FOR_RELEASE",
+      "pairs": 12,
+      "median_ratio": 0.9917403411267792,
+      "per_pad": {
+        "0": 0.9919512195121952,
+        "16": 0.9918406527477802,
+        "32": 0.9921109251733207,
+        "48": 0.9877059257437916
+      }
+    },
+    {
+      "candidate": "outline",
+      "decision": "REJECT_FOR_RELEASE",
+      "pairs": 12,
+      "median_ratio": 0.9256427001276946,
+      "per_pad": {
+        "0": 0.9139414802065404,
+        "16": 0.9280057595392369,
+        "32": 0.9244561319627063,
+        "48": 0.9226059270144501
+      }
+    }
+  ],
+  "westmere": {
+    "decision": "UNMERGED_EXPERIMENT_EXCLUDED_FROM_RELEASE",
+    "reason": "Target-host performance and complete candidate validation are not established; the existing native backend is unchanged."
+  },
+  "adopted_optimization": null
+}

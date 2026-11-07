@@ -1,0 +1,2300 @@
+555555a87000-555555ad4000 rw-p 00000000 00:00 0                          [heap]
+Size:                308 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                 208 kB
+Pss:                 208 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:       208 kB
+Referenced:          208 kB
+Anonymous:           208 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f8660000000-7f8663fd3000 rw-p 00000000 00:00 0 
+Size:              65356 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:               63100 kB
+Pss:               63100 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:     63100 kB
+Referenced:        63100 kB
+Anonymous:         63100 kB
+LazyFree:              0 kB
+AnonHugePages:     16384 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           1
+VmFlags: rd wr mr mw me ac sd 
+7f8663fd3000-7f8664000000 ---p 00000000 00:00 0 
+Size:                180 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: mr mw me sd 
+7f8664000000-7f8664119000 rw-p 00000000 00:00 0 
+Size:               1124 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                 896 kB
+Pss:                 896 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:       896 kB
+Referenced:          896 kB
+Anonymous:           896 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f8664119000-7f8668000000 ---p 00000000 00:00 0 
+Size:              64412 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           1
+VmFlags: mr mw me sd 
+7f8668000000-7f8668021000 rw-p 00000000 00:00 0 
+Size:                132 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   4 kB
+Pss:                   4 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         4 kB
+Referenced:            4 kB
+Anonymous:             4 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f8668021000-7f866c000000 ---p 00000000 00:00 0 
+Size:              65404 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           1
+VmFlags: mr mw me sd 
+7f866c000000-7f866c021000 rw-p 00000000 00:00 0 
+Size:                132 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   4 kB
+Pss:                   4 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         4 kB
+Referenced:            4 kB
+Anonymous:             4 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f866c021000-7f8670000000 ---p 00000000 00:00 0 
+Size:              65404 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           1
+VmFlags: mr mw me sd 
+7f8670000000-7f8670021000 rw-p 00000000 00:00 0 
+Size:                132 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   4 kB
+Pss:                   4 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         4 kB
+Referenced:            4 kB
+Anonymous:             4 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f8670021000-7f8674000000 ---p 00000000 00:00 0 
+Size:              65404 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           1
+VmFlags: mr mw me sd 
+7f8674000000-7f8674021000 rw-p 00000000 00:00 0 
+Size:                132 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   4 kB
+Pss:                   4 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         4 kB
+Referenced:            4 kB
+Anonymous:             4 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f8674021000-7f8678000000 ---p 00000000 00:00 0 
+Size:              65404 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           1
+VmFlags: mr mw me sd 
+7f8678000000-7f8678021000 rw-p 00000000 00:00 0 
+Size:                132 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   4 kB
+Pss:                   4 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         4 kB
+Referenced:            4 kB
+Anonymous:             4 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f8678021000-7f867c000000 ---p 00000000 00:00 0 
+Size:              65404 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           1
+VmFlags: mr mw me sd 
+7f867c000000-7f867c021000 rw-p 00000000 00:00 0 
+Size:                132 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f867c021000-7f8680000000 ---p 00000000 00:00 0 
+Size:              65404 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           1
+VmFlags: mr mw me sd 
+7f8680000000-7f8680021000 rw-p 00000000 00:00 0 
+Size:                132 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   4 kB
+Pss:                   4 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         4 kB
+Referenced:            4 kB
+Anonymous:             4 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f8680021000-7f8684000000 ---p 00000000 00:00 0 
+Size:              65404 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           1
+VmFlags: mr mw me sd 
+7f8684000000-7f8684021000 rw-p 00000000 00:00 0 
+Size:                132 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   4 kB
+Pss:                   4 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         4 kB
+Referenced:            4 kB
+Anonymous:             4 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f8684021000-7f8688000000 ---p 00000000 00:00 0 
+Size:              65404 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           1
+VmFlags: mr mw me sd 
+7f8688000000-7f8688021000 rw-p 00000000 00:00 0 
+Size:                132 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   4 kB
+Pss:                   4 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         4 kB
+Referenced:            4 kB
+Anonymous:             4 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f8688021000-7f868c000000 ---p 00000000 00:00 0 
+Size:              65404 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           1
+VmFlags: mr mw me sd 
+7f868c000000-7f868c021000 rw-p 00000000 00:00 0 
+Size:                132 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   4 kB
+Pss:                   4 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         4 kB
+Referenced:            4 kB
+Anonymous:             4 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f868c021000-7f8690000000 ---p 00000000 00:00 0 
+Size:              65404 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           1
+VmFlags: mr mw me sd 
+7f8690000000-7f8690021000 rw-p 00000000 00:00 0 
+Size:                132 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   4 kB
+Pss:                   4 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         4 kB
+Referenced:            4 kB
+Anonymous:             4 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f8690021000-7f8694000000 ---p 00000000 00:00 0 
+Size:              65404 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           1
+VmFlags: mr mw me sd 
+7f8694000000-7f8694021000 rw-p 00000000 00:00 0 
+Size:                132 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   4 kB
+Pss:                   4 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         4 kB
+Referenced:            4 kB
+Anonymous:             4 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f8694021000-7f8698000000 ---p 00000000 00:00 0 
+Size:              65404 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           1
+VmFlags: mr mw me sd 
+7f8698000000-7f8698021000 rw-p 00000000 00:00 0 
+Size:                132 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   4 kB
+Pss:                   4 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         4 kB
+Referenced:            4 kB
+Anonymous:             4 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f8698021000-7f869c000000 ---p 00000000 00:00 0 
+Size:              65404 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           1
+VmFlags: mr mw me sd 
+7f869c000000-7f869c021000 rw-p 00000000 00:00 0 
+Size:                132 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   4 kB
+Pss:                   4 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         4 kB
+Referenced:            4 kB
+Anonymous:             4 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f869c021000-7f86a0000000 ---p 00000000 00:00 0 
+Size:              65404 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           1
+VmFlags: mr mw me sd 
+7f86a0000000-7f86a0021000 rw-p 00000000 00:00 0 
+Size:                132 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   4 kB
+Pss:                   4 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         4 kB
+Referenced:            4 kB
+Anonymous:             4 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f86a0021000-7f86a4000000 ---p 00000000 00:00 0 
+Size:              65404 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           1
+VmFlags: mr mw me sd 
+7f86a6e67000-7f86a6e68000 ---p 00000000 00:00 0 
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: mr mw me sd nh 
+7f86a6e68000-7f86a7068000 rw-p 00000000 00:00 0 
+Size:               2048 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                  28 kB
+Pss:                  28 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:        28 kB
+Referenced:           28 kB
+Anonymous:            28 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd nh 
+7f86a7068000-7f86a7069000 ---p 00000000 00:00 0 
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: mr mw me sd nh 
+7f86a7069000-7f86a7269000 rw-p 00000000 00:00 0 
+Size:               2048 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd nh 
+7f86a7269000-7f86a726a000 ---p 00000000 00:00 0 
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: mr mw me sd nh 
+7f86a726a000-7f86a746a000 rw-p 00000000 00:00 0 
+Size:               2048 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd nh 
+7f86a746a000-7f86a746b000 ---p 00000000 00:00 0 
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: mr mw me sd nh 
+7f86a746b000-7f86a766b000 rw-p 00000000 00:00 0 
+Size:               2048 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd nh 
+7f86a766b000-7f86a766c000 ---p 00000000 00:00 0 
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: mr mw me sd nh 
+7f86a766c000-7f86a786c000 rw-p 00000000 00:00 0 
+Size:               2048 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd nh 
+7f86a786c000-7f86a786d000 ---p 00000000 00:00 0 
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: mr mw me sd nh 
+7f86a786d000-7f86a7a6d000 rw-p 00000000 00:00 0 
+Size:               2048 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd nh 
+7f86a7a6d000-7f86a7a6e000 ---p 00000000 00:00 0 
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: mr mw me sd nh 
+7f86a7a6e000-7f86a7c6e000 rw-p 00000000 00:00 0 
+Size:               2048 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd nh 
+7f86a7c6e000-7f86a7c6f000 ---p 00000000 00:00 0 
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: mr mw me sd nh 
+7f86a7c6f000-7f86a7e6f000 rw-p 00000000 00:00 0 
+Size:               2048 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd nh 
+7f86a7e6f000-7f86a7e70000 ---p 00000000 00:00 0 
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: mr mw me sd nh 
+7f86a7e70000-7f86a8070000 rw-p 00000000 00:00 0 
+Size:               2048 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd nh 
+7f86a8070000-7f86a8071000 ---p 00000000 00:00 0 
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: mr mw me sd nh 
+7f86a8071000-7f86a8271000 rw-p 00000000 00:00 0 
+Size:               2048 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd nh 
+7f86a8271000-7f86a8272000 ---p 00000000 00:00 0 
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: mr mw me sd nh 
+7f86a8272000-7f86a8472000 rw-p 00000000 00:00 0 
+Size:               2048 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd nh 
+7f86a8472000-7f86a8473000 ---p 00000000 00:00 0 
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: mr mw me sd nh 
+7f86a8473000-7f86a8673000 rw-p 00000000 00:00 0 
+Size:               2048 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd nh 
+7f86a8673000-7f86a8674000 ---p 00000000 00:00 0 
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: mr mw me sd nh 
+7f86a8674000-7f86a8874000 rw-p 00000000 00:00 0 
+Size:               2048 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd nh 
+7f86a8874000-7f871ca00000 rw-p 00000000 00:00 0 
+Size:            1902128 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:             1902128 kB
+Pss:             1902128 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:   1902128 kB
+Referenced:      1902128 kB
+Anonymous:       1902128 kB
+LazyFree:              0 kB
+AnonHugePages:   1900544 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           1
+VmFlags: rd wr mr mw me nr sd hg 
+7f871caaf000-7f871cb45000 rw-p 00000000 00:00 0 
+Size:                600 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                 600 kB
+Pss:                 600 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:       600 kB
+Referenced:          600 kB
+Anonymous:           600 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f871cbfd000-7f871cbfe000 ---p 00000000 00:00 0 
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: mr mw me sd nh 
+7f871cbfe000-7f871cdfe000 rw-p 00000000 00:00 0 
+Size:               2048 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd nh 
+7f871cdfe000-7f871cdff000 ---p 00000000 00:00 0 
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: mr mw me sd nh 
+7f871cdff000-7f871cfff000 rw-p 00000000 00:00 0 
+Size:               2048 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd nh 
+7f871cfff000-7f871d000000 ---p 00000000 00:00 0 
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: mr mw me sd nh 
+7f871d000000-7f871d200000 rw-p 00000000 00:00 0 
+Size:               2048 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd nh 
+7f871d200000-7f871d228000 r--p 00000000 fd:08 100663440                  /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/runtime/libc.so.6
+Size:                160 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                 160 kB
+Pss:                  80 kB
+Shared_Clean:        160 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:          160 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd mr mw me sd 
+7f871d228000-7f871d3b1000 r-xp 00028000 fd:08 100663440                  /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/runtime/libc.so.6
+Size:               1572 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                1312 kB
+Pss:                 720 kB
+Shared_Clean:       1184 kB
+Shared_Dirty:          0 kB
+Private_Clean:       128 kB
+Private_Dirty:         0 kB
+Referenced:         1312 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd ex mr mw me sd 
+7f871d3b1000-7f871d400000 r--p 001b1000 fd:08 100663440                  /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/runtime/libc.so.6
+Size:                316 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                 188 kB
+Pss:                  94 kB
+Shared_Clean:        188 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:          188 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd mr mw me sd 
+7f871d400000-7f871d404000 r--p 001ff000 fd:08 100663440                  /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/runtime/libc.so.6
+Size:                 16 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                  16 kB
+Pss:                  16 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:        16 kB
+Referenced:           16 kB
+Anonymous:            16 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd mr mw me ac sd 
+7f871d404000-7f871d406000 rw-p 00203000 fd:08 100663440                  /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/runtime/libc.so.6
+Size:                  8 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f871d406000-7f871d413000 rw-p 00000000 00:00 0 
+Size:                 52 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                  20 kB
+Pss:                  20 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:        20 kB
+Referenced:           20 kB
+Anonymous:            20 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f871d420000-7f871d421000 ---p 00000000 00:00 0 
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: mr mw me sd nh 
+7f871d421000-7f871d423000 rw-p 00000000 00:00 0 
+Size:                  8 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd nh 
+7f871d423000-7f871d424000 ---p 00000000 00:00 0 
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: mr mw me sd nh 
+7f871d424000-7f871d426000 rw-p 00000000 00:00 0 
+Size:                  8 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd nh 
+7f871d426000-7f871d429000 rw-p 00000000 00:00 0 
+Size:                 12 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f871d429000-7f871d42d000 r--p 00000000 fd:08 100663451                  /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/runtime/libgcc_s.so.1
+Size:                 16 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                  16 kB
+Pss:                   8 kB
+Shared_Clean:         16 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:           16 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd mr mw me sd 
+7f871d42d000-7f871d451000 r-xp 00004000 fd:08 100663451                  /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/runtime/libgcc_s.so.1
+Size:                144 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                  64 kB
+Pss:                  32 kB
+Shared_Clean:         64 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:           64 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd ex mr mw me sd 
+7f871d451000-7f871d455000 r--p 00028000 fd:08 100663451                  /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/runtime/libgcc_s.so.1
+Size:                 16 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                  16 kB
+Pss:                   8 kB
+Shared_Clean:         16 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:           16 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd mr mw me sd 
+7f871d455000-7f871d456000 r--p 0002b000 fd:08 100663451                  /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/runtime/libgcc_s.so.1
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   4 kB
+Pss:                   4 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         4 kB
+Referenced:            4 kB
+Anonymous:             4 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd mr mw me ac sd 
+7f871d456000-7f871d457000 rw-p 0002c000 fd:08 100663451                  /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/runtime/libgcc_s.so.1
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   4 kB
+Pss:                   4 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         4 kB
+Referenced:            4 kB
+Anonymous:             4 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f871d457000-7f871d459000 rw-p 00000000 00:00 0 
+Size:                  8 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f871d459000-7f871d499000 r--p 00000000 fd:08 137                        /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/libexec/bench
+Size:                256 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                 220 kB
+Pss:                 220 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:       220 kB
+Private_Dirty:         0 kB
+Referenced:          220 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd mr mw me sd 
+7f871d499000-7f871d49a000 ---p 00040000 fd:08 137                        /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/libexec/bench
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: mr mw me sd 
+7f871d49a000-7f871d5b1000 r-xp 00040000 fd:08 137                        /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/libexec/bench
+Size:               1116 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                1116 kB
+Pss:                1116 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:      1116 kB
+Private_Dirty:         0 kB
+Referenced:         1116 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd ex mr mw me sd 
+7f871d5b1000-7f871d5b8000 r--p 00156000 fd:08 137                        /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/libexec/bench
+Size:                 28 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                  28 kB
+Pss:                  28 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:        28 kB
+Referenced:           28 kB
+Anonymous:            28 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd mr mw me ac sd 
+7f871d5b8000-7f871d5ba000 rw-p 0015c000 fd:08 137                        /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/libexec/bench
+Size:                  8 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7f871d5ba000-7f871d5bb000 r--p 00000000 fd:08 100663433                  /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/runtime/ld-linux-x86-64.so.2
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   4 kB
+Pss:                   2 kB
+Shared_Clean:          4 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            4 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd mr mw me sd 
+7f871d5bb000-7f871d5e6000 r-xp 00001000 fd:08 100663433                  /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/runtime/ld-linux-x86-64.so.2
+Size:                172 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                 172 kB
+Pss:                  86 kB
+Shared_Clean:        172 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:          172 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd ex mr mw me sd 
+7f871d5e6000-7f871d5f0000 r--p 0002c000 fd:08 100663433                  /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/runtime/ld-linux-x86-64.so.2
+Size:                 40 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                  40 kB
+Pss:                  20 kB
+Shared_Clean:         40 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:           40 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd mr mw me sd 
+7f871d5f0000-7f871d5f2000 r--p 00036000 fd:08 100663433                  /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/runtime/ld-linux-x86-64.so.2
+Size:                  8 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd mr mw me ac sd 
+7f871d5f2000-7f871d5f4000 rw-p 00038000 fd:08 100663433                  /home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/runtime/ld-linux-x86-64.so.2
+Size:                  8 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   8 kB
+Pss:                   8 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         8 kB
+Referenced:            8 kB
+Anonymous:             8 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me ac sd 
+7ffe1801d000-7ffe1803f000 rw-p 00000000 00:00 0                          [stack]
+Size:                136 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                  32 kB
+Pss:                  32 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:        32 kB
+Referenced:           32 kB
+Anonymous:            32 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd wr mr mw me gd ac 
+7ffe181c9000-7ffe181cd000 r--p 00000000 00:00 0                          [vvar]
+Size:                 16 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd mr pf io de dd sd 
+7ffe181cd000-7ffe181cf000 r-xp 00000000 00:00 0                          [vdso]
+Size:                  8 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   4 kB
+Pss:                   0 kB
+Shared_Clean:          4 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            4 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: rd ex mr mw me de sd 
+ffffffffff600000-ffffffffff601000 --xp 00000000 00:00 0                  [vsyscall]
+Size:                  4 kB
+KernelPageSize:        4 kB
+MMUPageSize:           4 kB
+Rss:                   0 kB
+Pss:                   0 kB
+Shared_Clean:          0 kB
+Shared_Dirty:          0 kB
+Private_Clean:         0 kB
+Private_Dirty:         0 kB
+Referenced:            0 kB
+Anonymous:             0 kB
+LazyFree:              0 kB
+AnonHugePages:         0 kB
+ShmemPmdMapped:        0 kB
+FilePmdMapped:         0 kB
+Shared_Hugetlb:        0 kB
+Private_Hugetlb:       0 kB
+Swap:                  0 kB
+SwapPss:               0 kB
+Locked:                0 kB
+THPeligible:           0
+VmFlags: ex 

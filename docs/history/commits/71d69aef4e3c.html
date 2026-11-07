@@ -1,0 +1,113 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>share: names, docs and pedantic lints — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="71d69aef4e3c.md">Markdown source</a> · Offline document</p><h1 id="share-names-docs-and-pedantic-lints">share: names, docs and pedantic lints</h1>
+<p>Commit <code>71d69aef4e3c622efc90f8050996714237d536e4</code> · 2026-11-04T08:03:30+00:00</p>
+<p>This commit is reachable from the released main history. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: Historical ancestor; no current branch tip</p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>share: names, docs and pedantic lints</p>
+<p>A readability pass over share.rs. Behaviour is unchanged.</p>
+<ul>
+<li>Descriptive names for cryptic fields, constants and locals: <code>nf</code> -&gt;
+<code>feasible</code>; <code>ext_off</code>, <code>ext_lev</code> -&gt; <code>child_offsets</code>,
+<code>extension_moves</code>; <code>bids</code>, <code>hist</code>, <code>groups</code>, <code>tmp_ptr</code> -&gt;
+<code>key_buckets</code>, <code>bucket_counts</code>, <code>bucket_starts</code>, <code>keys_tmp_ptr</code>;
+<code>tlog</code> -&gt; <code>task_log</code>; <code>Rare</code>/<code>rare</code> -&gt;
+<code>RarelyWritten</code>/<code>rarely_written</code> (<code>exhausted</code> -&gt; <code>claims_ran_out_ns</code>,
+<code>it_*</code> -&gt; <code>iteration_*</code>); <code>direct</code> -&gt; <code>stats_from_atomics</code>; <code>n0</code>, <code>k0</code>
+-&gt; <code>nodes_at_start</code>, <code>lookups_at_start</code>; <code>nactive</code> -&gt; <code>active_lanes</code>;
+<code>nopen</code> -&gt; <code>open_count</code>; <code>tids</code> -&gt; <code>next_thread_id</code>; a cube's
+<code>root_c</code>, <code>root_ci</code> -&gt; <code>root</code>, <code>root_inverse</code>; <code>t0</code>, <code>t1</code>, <code>t2</code>, <code>ts</code>
+-&gt; <code>build_started</code>, <code>extended</code>, <code>published</code>, <code>sort_stages_ended</code>;
+<code>SLane</code> and its <code>l</code> -&gt; <code>SharedLane</code> and <code>lane</code>; <code>NONE</code> -&gt; <code>NO_SLOT</code>;
+<code>count</code> -&gt; <code>counts</code>. The solver, scratch lane, stage, task, bucket,
+key and node parameters and locals of the build, sort, split and
+donation code also get full names.</li>
+<li>Why-comments: the claim word (one <code>fetch_add</code> claims a chunk, and the
+count in the same word tells a late claimer that it got nothing), the
+iteration barrier (<code>outstanding</code>: the thread that brings it to 0
+builds the next iteration), the mailbox states (one writer of the
+piece slot, ordered by the state), <code>Inner::feasible</code>, and the worker's
+fields.</li>
+<li>Clean under <code>clippy::pedantic</code>, apart from <code>inline_always</code>. The packed
+claim and task words are decoded by <code>claim_fields</code> and <code>task_fields</code>.
+The casts that remain (radix digits, bucket indices, task counts, and
+ratios in the trace and counters) have function-level <code>#[expect]</code>s
+with reasons. Stage numbers and lane slots are <code>usize</code>. The trace
+output moved to the cold <code>trace_iteration</code> and <code>trace_build</code>, which
+replace a 400-column <code>eprintln!</code>. <code>get_disjoint_mut</code> replaces
+<code>two_mut</code>. <code>Pool::run</code> and <code>Pool::counters</code> accept a poisoned counters
+lock instead of panicking. The rest is <code>From</code> conversions,
+<code>Instant::elapsed</code>, <code>sort_unstable</code> and named imports.</li>
+</ul>
+<p>Measured on main 595e424 (before c8's abce87c, which changes only
+lanes.rs; the share.rs diff is the same), h11 table, random_state =
+cube_solver_test dataset/random_state.txt (500 cubes), every binary
+built in the same folder. 48 threads: paired, i.e. 7 exclusive holds,
+each running every binary of the series back to back after the quiet
+gate (outside load 0.0-0.6 cores); bench share with 24 lanes (the
+default). 1 thread: 6 runs; the binaries of a run ran at once in L3
+slots, launch order rotated. Every solution was verified, and bench
+share gave lengths 15:1 16:35 17:270 18:662 19:32 in every run. Values
+per run, and medians (solve -c 1 at 48T has +-10% outliers even between
+identical binaries):</p>
+<p>48 threads                                 parent -&gt; this
+solve -c 0 (500), ms/cube    median   1.110 -&gt;   1.106  (-0.4%)
+runs before: 1.114 1.122 1.102 1.107 1.110 1.121 1.106
+runs after:  1.106 1.117 1.055 1.099 1.118 1.108 1.104
+solve -c 1 -n 50, ms/cube    median   2.051 -&gt;   2.070  (+0.9%)
+runs before: 2.054 2.051 2.290 2.010 2.026 2.023 2.075
+runs after:  2.098 2.074 2.019 2.071 2.070 2.052 2.014
+bench share 1000, solves/s   median   968.4 -&gt;   963.1  (-0.5%)
+runs before: 966.7 962.4 960.8 968.4 968.7 970.0 968.4
+runs after:  965.5 962.7 960.6 967.4 963.1 959.1 966.7
+1 thread
+solve -c 0 -n 100, ms/cube   median   45.57 -&gt;   45.30  (-0.6%)
+runs before: 45.41 46.11 45.92 45.40 44.05 45.72
+runs after:  45.38 45.76 46.41 45.09 43.86 45.22
+solve -c 1 -n 10, ms/cube    median   35.50 -&gt;   35.19  (-0.9%)
+runs before: 35.67 35.64 35.43 33.88 33.81 35.57
+runs after:  35.60 35.62 35.45 33.94 33.96 34.94</p>
+<p>The two code commits of this series together (595e424 -&gt; this), same
+runs, and layout-averaged: 4 linker layouts (lld --shuffle-sections,
+seeds none 1 2 3) of each side, paired per layout. bench's stream_thread
+is byte-identical before and after.</p>
+<p>48 threads                                595e424 -&gt; this
+solve -c 0 (500), ms/cube    median   1.107 -&gt;   1.106  (-0.1%)
+runs before: 1.098 1.090 1.105 1.107 1.117 1.108 1.121
+runs after:  1.106 1.117 1.055 1.099 1.118 1.108 1.104
+solve -c 1 -n 50, ms/cube    median   2.032 -&gt;   2.070  (+1.9%)
+runs before: 2.035 2.032 2.028 2.016 2.067 2.027 2.054
+runs after:  2.098 2.074 2.019 2.071 2.070 2.052 2.014
+bench share 1000, solves/s   median   970.8 -&gt;   963.1  (-0.8%)
+runs before: 969.6 973.3 963.0 971.4 970.8 973.8 968.9
+runs after:  965.5 962.7 960.6 967.4 963.1 959.1 966.7
+1 thread
+solve -c 0 -n 100, ms/cube   median   45.68 -&gt;   45.30  (-0.8%)
+runs before: 45.76 46.05 46.30 45.60 43.88 45.31
+runs after:  45.38 45.76 46.41 45.09 43.86 45.22
+solve -c 1 -n 10, ms/cube    median   35.36 -&gt;   35.19  (-0.5%)
+runs before: 35.65 35.36 35.63 33.92 33.74 35.36
+runs after:  35.60 35.62 35.45 33.94 33.96 34.94
+48 threads, stream (3 paired holds of bench stream 10 20 48 24):
+bench stream (48T, 24 lanes), solves/s  median  1081.7 -&gt;  1075.9  (-0.5%)
+runs before: 1081.7 1081.7 1076.4
+runs after:  1075.5 1075.9 1084.0
+per hold: -0.6% -0.5% +0.7%  (outside load &lt;= 0.1 cores)
+Layout-averaged, 48 threads (3 rounds x 4 layouts, paired holds):
+solve -c 1 -n 50, ms/cube: median -0.57% mean -0.18% over 12 pairs (min -3.25%, max +2.85%)
+solve -c 0, ms/cube: median +0.32% mean -0.55% over 12 pairs (min -6.68%, max +4.91%)
+bench share, solves/s: median -0.50% mean -0.49% over 12 pairs (min -2.25%, max +1.11%)
+Layout-averaged, 1 thread (3 pairs x 4 layouts):
+bench stream, solves/s: median +1.26% mean +1.65% over 12 pairs (min +0.14%, max +3.21%)
+(bench's stream code is byte-identical on both sides, so this is
+placement: per layout 24.50 24.92 24.92 25.23 -&gt; 24.93 25.28 25.70
+25.57; two copies of one binary gave +0.1% with the same tool)
+solve -c 0 -n 100, ms/cube (order alternating): median -0.58% mean -0.53% over 12 pairs (min -1.38%, max +0.49%)
+solve -c 1 -n 10, ms/cube (order alternating): median -0.36% mean -0.06% over 12 pairs (min -0.67%, max +1.24%)</p>
+<p>The search is unchanged: on abce87c, verify.sh gives main's numbers
+(nodes/cube 3058198 lookups/cube 2588380, lengths 15:1 16:35 17:270
+18:662 19:32; nodes/cube 3644301 lookups/cube 3084160, lengths 18:100).
+solve -c 0 and -c 1 on random_state give lengths 16:15 17:126 18:339
+19:20 (no BAD), and bench share depth18 gives 18:100. check.sh passes
+on every commit, on abce87c. Miri (strict provenance) passes on the
+share tests.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

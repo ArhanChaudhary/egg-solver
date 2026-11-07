@@ -1,0 +1,16 @@
+status 0
+run h48h11 48 random_state 200 1g shipped 2
+pagemode hugetlb arena 61203283968 only python3,python3-pgo
+start 2026-11-05 21:13:43
+wall_s 484.06
+cpu_s 112.66 15.46
+maxrss_kb 15036
+gate_wait_s 0
+ext_cores 0.5
+pages 59785872 17040 10012 0 59768832 279134 python3
+free_1g_pages 58 58
+memfree_gib_at_start 17.2
+thpwarm_pct -
+table /data2/competitors/h48/h48h11 60670567784
+thp always [madvise] never defrag always defer defer+madvise [madvise] never
+par 0 slot -

@@ -1,0 +1,15 @@
+[package]
+name = "egg-solver-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "egg-solver as a WebAssembly module with a C ABI (see wasm/egg-solver.mjs)"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+egg-solver = { path = "..", default-features = false }
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }

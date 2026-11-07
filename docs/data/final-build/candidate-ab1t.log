@@ -1,0 +1,10 @@
+run 1: measured-bench=4.133 candidate-bench=4.067
+run 2: measured-bench=4.133 candidate-bench=4.050
+run 3: measured-bench=4.167 candidate-bench=4.150
+run 4: measured-bench=3.983 candidate-bench=3.900
+run 5: measured-bench=3.933 candidate-bench=3.883
+run 6: measured-bench=3.883 candidate-bench=3.833
+run 7: measured-bench=3.833 candidate-bench=3.817
+run 8: measured-bench=3.883 candidate-bench=3.833
+MEDIAN threads=1 measured-bench 3.933 [ 4.133 4.133 4.167 3.983 3.933 3.883 3.833 3.883 ]
+MEDIAN threads=1 candidate-bench 3.883 [ 4.067 4.050 4.150 3.900 3.883 3.833 3.817 3.833 ]

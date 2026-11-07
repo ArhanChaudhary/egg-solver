@@ -1,0 +1,547 @@
+{
+  "status": "SCREEN_COMPLETE",
+  "table": "/mnt/huge/h8",
+  "threads": 1,
+  "lanes": 24,
+  "warmup": 10,
+  "window": 60,
+  "repeats_per_pad": 3,
+  "waves": [
+    {
+      "wave": 0,
+      "repeat": 1,
+      "pad": 0,
+      "records": [
+        {
+          "variant": "base",
+          "pad": 0,
+          "slot": 1,
+          "throughput": 4.1,
+          "log": "/data/agents/pmu-opt/logs/screen-w0-base.log"
+        },
+        {
+          "variant": "bytes",
+          "pad": 0,
+          "slot": 2,
+          "throughput": 4.117,
+          "log": "/data/agents/pmu-opt/logs/screen-w0-bytes.log"
+        },
+        {
+          "variant": "outline",
+          "pad": 0,
+          "slot": 3,
+          "throughput": 3.867,
+          "log": "/data/agents/pmu-opt/logs/screen-w0-outline.log"
+        },
+        {
+          "variant": "control",
+          "pad": 16,
+          "slot": 4,
+          "throughput": 4.15,
+          "log": "/data/agents/pmu-opt/logs/screen-w0-control.log"
+        }
+      ]
+    },
+    {
+      "wave": 1,
+      "repeat": 1,
+      "pad": 16,
+      "records": [
+        {
+          "variant": "bytes",
+          "pad": 16,
+          "slot": 2,
+          "throughput": 4.133,
+          "log": "/data/agents/pmu-opt/logs/screen-w1-bytes.log"
+        },
+        {
+          "variant": "outline",
+          "pad": 16,
+          "slot": 3,
+          "throughput": 3.867,
+          "log": "/data/agents/pmu-opt/logs/screen-w1-outline.log"
+        },
+        {
+          "variant": "base",
+          "pad": 16,
+          "slot": 4,
+          "throughput": 4.167,
+          "log": "/data/agents/pmu-opt/logs/screen-w1-base.log"
+        }
+      ]
+    },
+    {
+      "wave": 2,
+      "repeat": 1,
+      "pad": 32,
+      "records": [
+        {
+          "variant": "outline",
+          "pad": 32,
+          "slot": 3,
+          "throughput": 3.75,
+          "log": "/data/agents/pmu-opt/logs/screen-w2-outline.log"
+        },
+        {
+          "variant": "control",
+          "pad": 16,
+          "slot": 4,
+          "throughput": 4.117,
+          "log": "/data/agents/pmu-opt/logs/screen-w2-control.log"
+        },
+        {
+          "variant": "base",
+          "pad": 32,
+          "slot": 5,
+          "throughput": 4.083,
+          "log": "/data/agents/pmu-opt/logs/screen-w2-base.log"
+        },
+        {
+          "variant": "bytes",
+          "pad": 32,
+          "slot": 1,
+          "throughput": 4.067,
+          "log": "/data/agents/pmu-opt/logs/screen-w2-bytes.log"
+        }
+      ]
+    },
+    {
+      "wave": 3,
+      "repeat": 1,
+      "pad": 48,
+      "records": [
+        {
+          "variant": "control",
+          "pad": 16,
+          "slot": 4,
+          "throughput": 4.117,
+          "log": "/data/agents/pmu-opt/logs/screen-w3-control.log"
+        },
+        {
+          "variant": "base",
+          "pad": 48,
+          "slot": 5,
+          "throughput": 4.1,
+          "log": "/data/agents/pmu-opt/logs/screen-w3-base.log"
+        },
+        {
+          "variant": "bytes",
+          "pad": 48,
+          "slot": 1,
+          "throughput": 4.033,
+          "log": "/data/agents/pmu-opt/logs/screen-w3-bytes.log"
+        },
+        {
+          "variant": "outline",
+          "pad": 48,
+          "slot": 2,
+          "throughput": 3.8,
+          "log": "/data/agents/pmu-opt/logs/screen-w3-outline.log"
+        }
+      ]
+    },
+    {
+      "wave": 4,
+      "repeat": 2,
+      "pad": 48,
+      "records": [
+        {
+          "variant": "base",
+          "pad": 48,
+          "slot": 5,
+          "throughput": 4.083,
+          "log": "/data/agents/pmu-opt/logs/screen-w4-base.log"
+        },
+        {
+          "variant": "bytes",
+          "pad": 48,
+          "slot": 1,
+          "throughput": 4.033,
+          "log": "/data/agents/pmu-opt/logs/screen-w4-bytes.log"
+        },
+        {
+          "variant": "outline",
+          "pad": 48,
+          "slot": 2,
+          "throughput": 3.767,
+          "log": "/data/agents/pmu-opt/logs/screen-w4-outline.log"
+        },
+        {
+          "variant": "control",
+          "pad": 16,
+          "slot": 3,
+          "throughput": 4.033,
+          "log": "/data/agents/pmu-opt/logs/screen-w4-control.log"
+        }
+      ]
+    },
+    {
+      "wave": 5,
+      "repeat": 2,
+      "pad": 32,
+      "records": [
+        {
+          "variant": "bytes",
+          "pad": 32,
+          "slot": 1,
+          "throughput": 4.033,
+          "log": "/data/agents/pmu-opt/logs/screen-w5-bytes.log"
+        },
+        {
+          "variant": "outline",
+          "pad": 32,
+          "slot": 2,
+          "throughput": 3.783,
+          "log": "/data/agents/pmu-opt/logs/screen-w5-outline.log"
+        },
+        {
+          "variant": "control",
+          "pad": 16,
+          "slot": 3,
+          "throughput": 4.1,
+          "log": "/data/agents/pmu-opt/logs/screen-w5-control.log"
+        },
+        {
+          "variant": "base",
+          "pad": 32,
+          "slot": 4,
+          "throughput": 4.067,
+          "log": "/data/agents/pmu-opt/logs/screen-w5-base.log"
+        }
+      ]
+    },
+    {
+      "wave": 6,
+      "repeat": 2,
+      "pad": 16,
+      "records": [
+        {
+          "variant": "base",
+          "pad": 16,
+          "slot": 2,
+          "throughput": 4.05,
+          "log": "/data/agents/pmu-opt/logs/screen-w6-base.log"
+        },
+        {
+          "variant": "bytes",
+          "pad": 16,
+          "slot": 3,
+          "throughput": 4.05,
+          "log": "/data/agents/pmu-opt/logs/screen-w6-bytes.log"
+        },
+        {
+          "variant": "outline",
+          "pad": 16,
+          "slot": 4,
+          "throughput": 3.85,
+          "log": "/data/agents/pmu-opt/logs/screen-w6-outline.log"
+        }
+      ]
+    },
+    {
+      "wave": 7,
+      "repeat": 2,
+      "pad": 0,
+      "records": [
+        {
+          "variant": "control",
+          "pad": 16,
+          "slot": 3,
+          "throughput": 4.083,
+          "log": "/data/agents/pmu-opt/logs/screen-w7-control.log"
+        },
+        {
+          "variant": "base",
+          "pad": 0,
+          "slot": 4,
+          "throughput": 4.1,
+          "log": "/data/agents/pmu-opt/logs/screen-w7-base.log"
+        },
+        {
+          "variant": "bytes",
+          "pad": 0,
+          "slot": 5,
+          "throughput": 4.067,
+          "log": "/data/agents/pmu-opt/logs/screen-w7-bytes.log"
+        },
+        {
+          "variant": "outline",
+          "pad": 0,
+          "slot": 1,
+          "throughput": 3.717,
+          "log": "/data/agents/pmu-opt/logs/screen-w7-outline.log"
+        }
+      ]
+    },
+    {
+      "wave": 8,
+      "repeat": 3,
+      "pad": 0,
+      "records": [
+        {
+          "variant": "base",
+          "pad": 0,
+          "slot": 4,
+          "throughput": 4.067,
+          "log": "/data/agents/pmu-opt/logs/screen-w8-base.log"
+        },
+        {
+          "variant": "bytes",
+          "pad": 0,
+          "slot": 5,
+          "throughput": 4.033,
+          "log": "/data/agents/pmu-opt/logs/screen-w8-bytes.log"
+        },
+        {
+          "variant": "outline",
+          "pad": 0,
+          "slot": 1,
+          "throughput": 3.717,
+          "log": "/data/agents/pmu-opt/logs/screen-w8-outline.log"
+        },
+        {
+          "variant": "control",
+          "pad": 16,
+          "slot": 2,
+          "throughput": 4.033,
+          "log": "/data/agents/pmu-opt/logs/screen-w8-control.log"
+        }
+      ]
+    },
+    {
+      "wave": 9,
+      "repeat": 3,
+      "pad": 16,
+      "records": [
+        {
+          "variant": "base",
+          "pad": 16,
+          "slot": 5,
+          "throughput": 4.1,
+          "log": "/data/agents/pmu-opt/logs/screen-w9-base.log"
+        },
+        {
+          "variant": "bytes",
+          "pad": 16,
+          "slot": 1,
+          "throughput": 4.033,
+          "log": "/data/agents/pmu-opt/logs/screen-w9-bytes.log"
+        },
+        {
+          "variant": "outline",
+          "pad": 16,
+          "slot": 2,
+          "throughput": 3.8,
+          "log": "/data/agents/pmu-opt/logs/screen-w9-outline.log"
+        }
+      ]
+    },
+    {
+      "wave": 10,
+      "repeat": 3,
+      "pad": 32,
+      "records": [
+        {
+          "variant": "outline",
+          "pad": 32,
+          "slot": 1,
+          "throughput": 3.867,
+          "log": "/data/agents/pmu-opt/logs/screen-w10-outline.log"
+        },
+        {
+          "variant": "control",
+          "pad": 16,
+          "slot": 2,
+          "throughput": 4.183,
+          "log": "/data/agents/pmu-opt/logs/screen-w10-control.log"
+        },
+        {
+          "variant": "base",
+          "pad": 32,
+          "slot": 3,
+          "throughput": 4.183,
+          "log": "/data/agents/pmu-opt/logs/screen-w10-base.log"
+        },
+        {
+          "variant": "bytes",
+          "pad": 32,
+          "slot": 4,
+          "throughput": 4.15,
+          "log": "/data/agents/pmu-opt/logs/screen-w10-bytes.log"
+        }
+      ]
+    },
+    {
+      "wave": 11,
+      "repeat": 3,
+      "pad": 48,
+      "records": [
+        {
+          "variant": "control",
+          "pad": 16,
+          "slot": 2,
+          "throughput": 4.067,
+          "log": "/data/agents/pmu-opt/logs/screen-w11-control.log"
+        },
+        {
+          "variant": "base",
+          "pad": 48,
+          "slot": 3,
+          "throughput": 4.067,
+          "log": "/data/agents/pmu-opt/logs/screen-w11-base.log"
+        },
+        {
+          "variant": "bytes",
+          "pad": 48,
+          "slot": 4,
+          "throughput": 4.017,
+          "log": "/data/agents/pmu-opt/logs/screen-w11-bytes.log"
+        },
+        {
+          "variant": "outline",
+          "pad": 48,
+          "slot": 5,
+          "throughput": 3.733,
+          "log": "/data/agents/pmu-opt/logs/screen-w11-outline.log"
+        }
+      ]
+    }
+  ],
+  "same_pad_ratios": {
+    "bytes": {
+      "0": [
+        1.0041463414634146,
+        0.9919512195121952,
+        0.9916400295057782
+      ],
+      "16": [
+        0.9918406527477802,
+        1.0,
+        0.9836585365853661
+      ],
+      "32": [
+        0.9960813127602253,
+        0.9916400295057782,
+        0.9921109251733207
+      ],
+      "48": [
+        0.9836585365853661,
+        0.9877541023757042,
+        0.9877059257437916
+      ]
+    },
+    "outline": {
+      "0": [
+        0.9431707317073171,
+        0.9065853658536587,
+        0.9139414802065404
+      ],
+      "16": [
+        0.9280057595392369,
+        0.9506172839506174,
+        0.926829268292683
+      ],
+      "32": [
+        0.9184423218221895,
+        0.9301696582247356,
+        0.9244561319627063
+      ],
+      "48": [
+        0.926829268292683,
+        0.9226059270144501,
+        0.9178755839685272
+      ]
+    }
+  },
+  "control_normalized": {
+    "base": {
+      "0": [
+        0.9879518072289155,
+        1.0041636051922604,
+        1.0084304487974212
+      ],
+      "16": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "32": [
+        0.9917415593879039,
+        0.9919512195121952,
+        1.0
+      ],
+      "48": [
+        0.9958707796939518,
+        1.012397718819737,
+        1.0
+      ]
+    },
+    "bytes": {
+      "0": [
+        0.9920481927710842,
+        0.9960813127602253,
+        1.0
+      ],
+      "16": [
+        0.9918406527477802,
+        1.0,
+        0.9836585365853661
+      ],
+      "32": [
+        0.9878552343939763,
+        0.9836585365853661,
+        0.9921109251733207
+      ],
+      "48": [
+        0.9795967937818801,
+        1.0,
+        0.9877059257437916
+      ]
+    },
+    "outline": {
+      "0": [
+        0.9318072289156626,
+        0.9103600293901543,
+        0.921646417059261
+      ],
+      "16": [
+        0.9280057595392369,
+        0.9506172839506174,
+        0.926829268292683
+      ],
+      "32": [
+        0.9108574204517853,
+        0.9226829268292683,
+        0.9244561319627063
+      ],
+      "48": [
+        0.923002186057809,
+        0.9340441358789981,
+        0.9178755839685272
+      ]
+    }
+  },
+  "candidates": {
+    "bytes": {
+      "median_all_pads": 0.9917403411267792,
+      "per_pad": {
+        "0": 0.9919512195121952,
+        "16": 0.9918406527477802,
+        "32": 0.9921109251733207,
+        "48": 0.9877059257437916
+      },
+      "best_pad": 0
+    },
+    "outline": {
+      "median_all_pads": 0.9256427001276946,
+      "per_pad": {
+        "0": 0.9139414802065404,
+        "16": 0.9280057595392369,
+        "32": 0.9244561319627063,
+        "48": 0.9226059270144501
+      },
+      "best_pad": 16
+    }
+  },
+  "base_best_pad": 0
+}

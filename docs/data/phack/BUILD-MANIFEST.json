@@ -1,0 +1,20 @@
+{
+  "source": "935cb7fa369248161244507b7c13aa9c405f9ff1",
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "rustflags": "-C target-cpu=westmere -C link-arg=-Wl,--build-id=sha1",
+  "features": [
+    "scalar"
+  ],
+  "backend": "portable scalar",
+  "validation": "Westmere QEMU shallow solves; native software-counter end-to-end collection/aggregation/archive",
+  "hardware_counters_tested_on_vm": false,
+  "binaries": {
+    "numactl": "f3944bcd7848d64424f8daf27f350b03d7f3281b2fb9be5eaaba0ddd0e72efb8",
+    "perf": "706e3ea95326218a8ca5ed78e70dfb353411e318954a1bef5589b7afb1944cb7",
+    "gen": "34aae11a299fe657613610b58b3ad1a4546fca09c2d7fe1379613a86f52079ec",
+    "solve": "87cd103905a1446aede5ae108c0486214ae4058ad5747a7d95010349e48160b2",
+    "addr2line": "a116f9e176f9f1ef6e2ab31ad41bacb9d2571b479725ebdfe10fb9cb70aa9e53",
+    "objdump": "325c4205a4c658a9d1e1ebc469ae55975a2b897a3d3c1e79d9b158612d37f745",
+    "bench": "19aeb4917630fef81a8b62b3211f5a7be3d6335875de8839305e3a9f8a0a4395"
+  }
+}

@@ -1,0 +1,160 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>xcr: cube48opt-rust technique inventory vs cube-opt — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../../history/index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="x-cube48opt-rust-inventory.md">Markdown source</a> · Offline document</p><details><summary>On this page</summary><ul><li><a href="#a-tables-coordinates-generation">A. Tables, coordinates, generation</a></li><li><a href="#b-lookup-pipeline-prefetch-and-memory">B. Lookup pipeline, prefetch and memory</a></li><li><a href="#c-search-rules">C. Search rules</a></li><li><a href="#d-ordering-and-parallelism">D. Ordering and parallelism</a></li><li><a href="#e-low-level">E. Low level</a></li><li><a href="#f-corner96-research-line-corner-only-bounds-feature-corner-research">F. Corner96 research line (corner-only bounds; feature corner-research)</a></li><li><a href="#measurements">Measurements</a></li><li><a href="#benchmark-facts-for-f1">Benchmark facts (for f1)</a></li></ul></details><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="xcr-cube48opt-rust-technique-inventory-vs-cube-opt">xcr: cube48opt-rust technique inventory vs cube-opt</h1>
+<p>Reference: github.com/2017YANR02/cuberoot.me <code>solver/experiments/cube48opt-rust</code> at 1effb34 (2026-11-05), fetched to <code>/data/agents/xcr/src/cuberoot.me/solver/experiments/cube48opt-rust</code>. Ours: <code>~/cube-opt</code> main 18c4a66.</p>
+<p>Paths in cube48opt-rust are relative to its folder. &quot;lanes&quot;, &quot;share&quot;, &quot;solver&quot;, &quot;tables&quot;, &quot;coord&quot; and &quot;simd&quot; mean our <code>src/lanes.rs</code>, <code>src/lanes/share.rs</code>, <code>src/solver.rs</code>, <code>src/tables.rs</code>, <code>src/coord.rs</code> and <code>src/simd.rs</code>.</p>
+<p>What it is:</p>
+<ul>
+<li>A Rust reconstruction of Chen Shuang's cube48opt1..9 WASM. It was rebuilt from the decompiled WAT (&quot;functions 36-44, 47&quot;, <code>src/search.rs:1-8</code>) and checked against the WASM's behaviour.</li>
+<li>It is MIT for the cube48opt-derived parts and GPL-3.0-or-later for the nissy H48 port (<code>LICENSE</code>, <code>SOURCES.md</code>). The crate as a whole is GPL-3.0-or-later (<code>Cargo.toml:7</code>).</li>
+<li>It has three backends:
+<ul>
+<li><strong>Opt1-9:</strong> the original cube48opt tables <code>h48prunNN.dat</code>, read from the WASM generator's output, plus a <code>small-memory.bin</code> snapshot dumped from the WASM.</li>
+<li><strong>Opt10:</strong> their own EO10 table with a 1 KiB header, generated by a native generator.</li>
+<li><strong>H0-H10:</strong> nissy-core's <code>h48hN</code> files.</li>
+</ul>
+</li>
+<li>Around the Rust sources are about 30 research notes and Node/TS benchmark guards. Every number in them comes from a Mac (M5 Pro, 16 threads, WCA 1000, a single unpaired pass) or a shared Linux Xeon (4 threads).</li>
+<li>The author gave permission to copy code (user, 2026-11-05). No win came out of it, so no adopted code is delivered. The two negative branches carry &quot;adapted from cube48opt-rust … with the author's permission&quot; credits (search.rs:710-739 <code>reject_backward_coset</code>; the projection idea of search.rs:1261-1275).</li>
+</ul>
+<p>Two subagent readings of the notes were cross-checked against the code. The corner96 line is section F; the Opt8-11/H10 notes are spread through the tables.</p>
+<p>Verdict codes:</p>
+<ul>
+<li><strong>HAVE</strong>: we do the same.</li>
+<li><strong>BETTER</strong>: we do more, with a measured gain.</li>
+<li><strong>GAP</strong>: missing and applicable.</li>
+<li><strong>N/A</strong>: missing, but it does not apply.</li>
+<li><strong>MEASURED-NO</strong>: missing, measured, and it doesn't pay. The measurement is ours unless it says &quot;theirs&quot;.</li>
+</ul>
+<h2 id="a-tables-coordinates-generation">A. Tables, coordinates, generation</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>cube48opt-rust (file:line)</th><th>what it does</th><th>ours (file:line)</th><th>applicable / why</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>A1</td><td>cube48opt table layout</td><td><code>src/table.rs:205-256</code>; <code>coordinate-variants.md:118-128</code></td><td>2-bit cells. A 16-byte block holds a 4-bit block minimum in cells 0-1, and the last cell of each 512-cell row is padding. Index = ((class·70+msplit) &lt;&lt; (9+k)) | ((eo11 &gt;&gt; (11-k)) &lt;&lt; 9) | eslot. Code 0 means block min; otherwise max_bound-3+code.</td><td>tables.rs:575-640 (same layout, same bases <code>default_base</code>)</td><td>Same layout, sizes and bases, but <strong>not the same index order</strong>: our h7/h8 XOR checksums (0x99293616, 0xb2955b38) differ from the WASM's Opt7/Opt8 (0xe6843b35, 0x6c7d5866), and f1's step 2c shows h10 vs cube48opt10 differs in 95.7% of bytes with unequal code histograms (a different dropped EO bit / class order). Tables can't be shared; Opt7/8 were generated with their <code>init</code> (SHA = upstream).</td><td>HAVE</td></tr>
+<tr><td>A2</td><td>Corner bound folded into code 0 / corner precheck</td><td>Opt1-9: <strong>none</strong>. Code 0 decodes to the block min only (<code>src/table.rs:247-255</code>), and there is no cocsep test in <code>prepare</code> (<code>src/lib.rs:255-262</code>). H48 backend: cocsep precheck in <code>prepare</code> (<code>src/lib.rs:309-321</code>), code 0 → max(line min, eoesep) (<code>:331-341</code>).</td><td>Prunes on corners before the big lookup.</td><td>solver.rs:177-217 (cocsep in the index computation, <code>max(group min, corner)</code> on code 0); lanes.rs:1450-1468</td><td>ours</td><td>BETTER</td></tr>
+<tr><td>A3</td><td>Opt10: their own EO10 table</td><td><code>src/eo_table.rs:1-147, 389-430</code>; <code>src/opt10.rs:1-14</code>; <code>src/coord.rs:189-205</code> (index = Opt9 parts with BITS=10, i.e. the same family as A1)</td><td>31,130,910,720-byte payload plus a 1 KiB header (magic, SHA-256 of the payload and of the Opt9 snapshot, distribution). The block min is capped at the base (<code>eo_table.rs:166-176, 199-206, 634-638</code>).</td><td>tables.rs h10 (/data2/tables/h10: same payload size + 4 KiB trailer)</td><td>Same layout, different index order (A1). <strong>Their official Opt10 payload = cube48opt10's <code>h48prun31h1.dat</code> with the unread block minima (15) written as 10</strong>: SHA-256 of that stream = 2ce3d57d… = their published hash (xcr, one streamed read).</td><td>HAVE</td></tr>
+<tr><td>A4</td><td>Opt10 generator: BFS on exact EO11 orbit keys to depth 8, then 4-move suffixes to depth 12, atomic-min writes of all stabilizer projections</td><td><code>src/opt10_generate.rs</code>; <code>opt10-development.md:155-168</code> (16 threads, 3061.8 s, 31.4 GB peak)</td><td>Builds EO10 without a full BFS of the coordinate.</td><td>gen.rs (full BFS with forward/backward switching, hN as min-collapses of h11)</td><td>ours is exact and faster (h11+h8+h7 in ~2 min)</td><td>BETTER</td></tr>
+<tr><td>A5</td><td>Validation on load: exact size + XOR checksum + full distribution; Opt10 also SHA-256</td><td><code>src/table.rs:205-243</code>; <code>src/eo_table.rs:389-430</code>; <code>.verified</code> cache <code>src/table_validation_cache.rs</code></td><td>Detects corrupt tables, and costs a full scan at each start (Opt10 ~108 s on the Mac).</td><td>tables.rs:860-935 (trailer with distribution and optional checksum)</td><td>integrity only</td><td>HAVE</td></tr>
+<tr><td>A6</td><td>Opt11 (EO11 = h11) source only</td><td><code>src/opt11*.rs</code>; <code>opt11-*.md</code></td><td>Never compiled or run (<code>opt11-optimization.md:5-9</code>).</td><td>h11</td><td>ours exists</td><td>N/A</td></tr>
+<tr><td>A7</td><td>&quot;H ternary&quot;: base-3 rank of the edge groups through a 346 KiB LUT</td><td><code>opt9-native-experiments.md:131,142,147</code></td><td>A microbenchmark was 1.2× faster; the full solve was +9% slower (theirs).</td><td>coord.rs pext/LUT path</td><td>ours is pext</td><td>MEASURED-NO (theirs)</td></tr>
+<tr><td>A8</td><td>PEXT/BMI2 instead of the complement LUT + shuffle</td><td><code>x86-simd.md:318-347</code></td><td>+8.3% slower for them (one pass, inside their 26% noise band).</td><td>coord.rs (pext; m1/m4/m6)</td><td>ours measured better</td><td>BETTER</td></tr>
+</tbody>
+</table></div>
+<h2 id="b-lookup-pipeline-prefetch-and-memory">B. Lookup pipeline, prefetch and memory</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>cube48opt-rust (file:line)</th><th>what it does</th><th>ours (file:line)</th><th>applicable / why</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>B1</td><td>8 interleaved DFS &quot;contexts&quot; per thread, processed stage by stage: inverse coordinates → inverse reads → normal coordinates for survivors → normal reads → reject/plan → split idle contexts → one move each</td><td><code>src/search.rs:1301-1747</code></td><td>Overlaps misses across contexts by OoO, and with an optional prefetch in <code>prepare</code>.</td><td>lanes.rs:1-28 (24 lanes, one explicit prefetch and yield per lookup; 24 vs 20 lanes +3.3% at 48T)</td><td>ours: 3× more misses in flight and an explicit prefetch</td><td>BETTER</td></tr>
+<tr><td>B2</td><td>Prefetch hint T0 (Opt8 x86 <code>prefetch_opt8</code>, Opt9 <code>prefetch_opt9</code>, Opt1-7/Opt10 optional and unmeasured); on ARM <code>prfm pldl1keep</code></td><td><code>src/table.rs:302-357</code>; <code>src/prefetch.rs:16-29</code>; <code>x86-simd.md:208-255</code> (Opt8 Linux: −9..−20% time)</td><td></td><td>solver.rs:219-226 (NTA; T0 measured −1.0% at 1T, neg/m6-prefetch-t0-t1)</td><td>ours measured</td><td>BETTER</td></tr>
+<tr><td>B3</td><td>Batched probes: read all slots' words, then decode</td><td><code>src/eo_table.rs:432-452</code>; <code>src/table.rs:72-77</code></td><td>+18.4% slower on Opt10 (theirs).</td><td>lanes (one lookup per lane visit)</td><td></td><td>MEASURED-NO (theirs; also ours neg/m4-pair-lookups, neg/grouped-scheduler)</td></tr>
+<tr><td>B4</td><td>Table memory: <code>Vec&lt;u32&gt;</code> read from the file (Opt1-10); read-only <code>mmap</code> (H48). No huge pages except an optional Opt8 <code>MADV_HUGEPAGE</code> that is off by default (−12.7/−6.3/+2.1% paired on Linux, kept off).</td><td><code>src/table.rs:33-70, 141-166</code>; <code>src/h48_table.rs:476-510</code>; <code>x86-simd.md:165-224</code></td><td></td><td>tables.rs:374-500 (1 GiB hugetlbfs file, THP copy with <code>MADV_HUGEPAGE</code>)</td><td>ours</td><td>BETTER</td></tr>
+<tr><td>B5</td><td>Bounds-checked decoders with <code>assert!</code> per lookup</td><td><code>src/eo_table.rs:433-443</code> (<code>assert!(valid_index)</code>), <code>src/h48_table.rs:317-323</code></td><td></td><td>solver.rs:201-217 (unchecked)</td><td>ours</td><td>BETTER</td></tr>
+</tbody>
+</table></div>
+<h2 id="c-search-rules">C. Search rules</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>cube48opt-rust (file:line)</th><th>what it does</th><th>ours (file:line)</th><th>applicable / why</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>C1</td><td>Two-sided search (NISS) with side choice by move count, tie by bound (<code>count·64 + opposite bound</code>)</td><td><code>src/search.rs:455-486</code></td><td>Expands the side with fewer moves; on a tie the side whose opposite bound is smaller... (cube48opt's rule).</td><td>lanes.rs:1702-1716, solver.rs:417-420 (count only, ties to normal)</td><td>a2 measured the tie-break: −0.07% nodes, reverse +2.1%</td><td>MEASURED-NO (neg/a2-side-tiebreak)</td></tr>
+<tr><td>C2</td><td>&quot;G niss&quot;: reverse tie-break</td><td><code>src/search.rs:470-471</code>; <code>opt9-native-experiments.md:130,141,147</code> (theirs: nodes −2.4%, time +5.7%)</td><td></td><td></td><td>a2 measured the reverse: +2.1% nodes</td><td>MEASURED-NO (neg/a2-side-tiebreak)</td></tr>
+<tr><td>C3</td><td>Tight bound → no half turns on the other side</td><td><code>src/search.rs:458-463</code></td><td></td><td>lanes.rs:1696-1701, solver.rs:456-461</td><td></td><td>HAVE</td></tr>
+<tr><td>C4</td><td>X2 child inherits the other side's bound</td><td><code>src/search.rs:518-523</code></td><td></td><td>lanes.rs:1412-1429</td><td></td><td>HAVE</td></tr>
+<tr><td>C5</td><td>&quot;Quarter&quot; pruning: the inverse bound of gF and gF′ is the same coset, so a rejection of gF also removes gF′ (at excess 1; larger excess removes the face)</td><td><code>src/search.rs:595-617, 1647-1650</code> (feature <code>opt9-native-quarter</code>); Opt9 D −16.4% (theirs)</td><td></td><td>lanes.rs:83-103, 1500-1509 (<code>twin_values</code>, <code>skip_xprime</code>: −29% lookups, +10% at 48T when added)</td><td>ours shares the value at any excess</td><td>HAVE</td></tr>
+<tr><td>C6</td><td>Success-query cache for the quarter twin (&quot;E cached&quot;)</td><td><code>src/search.rs:619-646</code> (<code>opt9-native-quarter-cache</code>); <code>opt9-native-experiments.md:98-105</code> (lookups −10%, time +2.7%)</td><td></td><td>lanes.rs <code>twin_values</code> (the passed X value is stored for X′)</td><td>ours already does it</td><td>HAVE</td></tr>
+<tr><td>C7</td><td>BPMX parent propagation: pop ⌊(excess−1)/2⌋ ancestors at once</td><td><code>src/search.rs:819-829</code></td><td></td><td>lanes.rs:1296-1340 (back-jump on <code>lower_bound &gt; remaining</code>), solver.rs:404-520</td><td></td><td>HAVE</td></tr>
+<tr><td>C8</td><td>Same-face sibling cut at excess ≥ 2</td><td><code>src/search.rs:830-842</code></td><td></td><td>lanes.rs:1489-1500 (<code>note_value</code>)</td><td></td><td>HAVE</td></tr>
+<tr><td>C9</td><td><strong>Backward coset certificate</strong> (<code>opt10-native-coset</code>, official Opt10): a moved-side child value v = r+2 (excess exactly 2) proves the parent's moved side tight (D_H(g) ≥ v−1 = budget), so the parent's remaining other-side half turns are removed</td><td><code>src/search.rs:710-739, 1640-1643</code>; <code>opt10-native-experiments.md:138-152</code> (Opt10: 25.145 → 24.591 s, nodes +0.13%; Opt8 WASM +18.9% slower, nodes −0.0086%)</td><td>Sound: H48 values are left-H-invariant and right-1-Lipschitz.</td><td><strong>no</strong></td><td>We derive <code>lower_bound</code> from children (lanes.rs:1489-1500) but never use it to restrict half turns. This rule does use the side's own coset value (x-nx M4 had judged that impossible).</td><td>MEASURED-NO (M1: +0.03% nodes; neg/xcr-backward-coset)</td></tr>
+<tr><td>C10</td><td>&quot;coset-chain&quot;: carry the certificate through ancestors (right edge −2, opposite half turn −1, a quarter turn ends it)</td><td><code>src/search.rs:741-817</code>; theirs: +3.6%, 12,418 strengthenings in 141.7M checks</td><td></td><td>no</td><td>Follows from C9; even rarer.</td><td>MEASURED-NO (theirs; C9 is already zero for us)</td></tr>
+<tr><td>C11</td><td>&quot;axis&quot;: for commuting opposite faces A,B, b(gA²B) = b(gB) and b(gAB) = b(gA′B) = …, so a grandchild's inverse rejection removes the grandparent's B/B′</td><td><code>src/search.rs:648-684, 530-537</code> (<code>opt9-native-axis</code>); theirs: nodes −0.88%, time +5.5%</td><td></td><td>xnx shares the same values instead (−2.4% lookups, −5.6..−15.6% at 1T: spills)</td><td>The pruning form saves nodes too, but needs grandparent state in the hot loop, as xnx's did.</td><td>MEASURED-NO (theirs; ours neg/xnx-axis-inheritance)</td></tr>
+<tr><td>C12</td><td>&quot;dual&quot;: re-probe the other side of an inverse-rejected node, hoping for a parent cut</td><td><code>src/search.rs:686-708, 1585-1622</code>; theirs +10.7%</td><td>Adds probes.</td><td>no</td><td></td><td>MEASURED-NO (theirs)</td></tr>
+<tr><td>C13</td><td>&quot;lookahead&quot;: h⁺(g) = max(h(g), h(gA)−1) for one right half turn A, picked so that the hidden EO pair becomes visible</td><td><code>src/search.rs:1242-1259, 1502-1544</code>; <code>src/opt10.rs</code> <code>lookahead_move</code>; theirs +11.6%</td><td>An extra probe per survivor. With h11 there are no hidden EO bits.</td><td>no</td><td></td><td>MEASURED-NO (theirs) / N/A at h11</td></tr>
+<tr><td>C14</td><td>&quot;projection&quot;: max over a second stabilizer frame for self-symmetric corner classes</td><td><code>src/search.rs:1261-1275, 1546-1579</code>; theirs: nodes −1.2%, time +3.7% (Opt10)</td><td>Only differs from the first frame when EO bits are dropped (hN &lt; 11). Our generator writes all stabilizer images (gen.rs <code>for_each_index</code>), so at h11 every frame holds the same value.</td><td>no</td><td></td><td>MEASURED-NO (M2: free upper bound −1.0% nodes h8, −2.7% h7, at ≥1 extra probe per self-symmetric lookup; neg/xcr-projection-max)</td></tr>
+<tr><td>C15</td><td>Root bound: start at max(h(g), h(g⁻¹))</td><td><code>src/native_parallel.rs:136-168</code>; <code>src/search.rs:1775-1798</code></td><td></td><td>solver.rs:325 (<code>target = max(nb, ib, 1)</code>), lanes.rs:472</td><td></td><td>HAVE</td></tr>
+<tr><td>C16</td><td>Root-symmetry reduction of the first moves (stabilizer of the input, extended move by move)</td><td><code>src/search.rs:902-951</code></td><td></td><td>symstart.rs (<code>SymFilter</code>, fe055f2: also antisymmetric)</td><td>ours</td><td>HAVE / BETTER</td></tr>
+<tr><td>C17</td><td>Canonical sequences: no repeated face; opposite faces in one order</td><td><code>src/search.rs:26-28</code></td><td></td><td>solver.rs:30-50</td><td></td><td>HAVE</td></tr>
+</tbody>
+</table></div>
+<h2 id="d-ordering-and-parallelism">D. Ordering and parallelism</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>cube48opt-rust (file:line)</th><th>what it does</th><th>ours (file:line)</th><th>applicable / why</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>D1</td><td>Prefix jobs of length min(d−M, 4), sorted by Σ (2^M &gt;&gt; bound) over both sides × face factor 47525/58206</td><td><code>src/search.rs:1070-1150, 1466, 1495</code></td><td></td><td>lanes.rs:99-147 (same statistic and face factors, radix sort), c7 per-child cross-job ordering, c8 unseen code</td><td>ours adds c7/c8</td><td>BETTER</td></tr>
+<tr><td>D2</td><td>Single-cube threads (<code>CUBEOPT_SEARCH_THREADS</code>, max 18) with a depth barrier. Static shards (base-18 prefix code mod threads) in default builds; atomic prefix claims (<code>opt9-native-dynamic</code>) in the Opt8 production, Opt9 F and Opt10 builds. Idle contexts split the earliest pending frame of another context.</td><td><code>src/native_parallel.rs:13, 170-334</code>; <code>src/search.rs:960-1056, 1152-1197, 852-879</code></td><td></td><td>share.rs:1-53 (dynamic chunked claims, no depth barrier on the first pass, staged builds, cross-thread donation, 48 threads)</td><td>ours</td><td>BETTER</td></tr>
+<tr><td>D3</td><td>Batch threads (<code>CUBEOPT_SOLVE_THREADS</code>): one cube per thread</td><td><code>src/batch.rs:6-36</code>; <code>src/main.rs:277-304</code></td><td></td><td>stream mode / share batch</td><td></td><td>HAVE</td></tr>
+<tr><td>D4</td><td>&quot;J ranked&quot;: global previous-depth weight per prefix shared by all workers</td><td><code>src/search.rs:964-1056</code>; theirs +6.7%</td><td></td><td>share.rs (one shared job list per cube, statistics merged)</td><td>ours is shared by construction</td><td>HAVE</td></tr>
+<tr><td>D5</td><td>Static shard key <code>key % threads</code> (base-18 prefix code): with 18 threads the shard is the prefix's last move</td><td><code>src/search.rs:1166-1174</code></td><td>Only in builds without dynamic claims (the Opt1-7 default build, H48 backend).</td><td>n/a</td><td>Smoke: 17 threads not slower than 18 (0.178 vs 0.182 s/cube, 10 cubes), so no measurable harm. Noted in the bench entry.</td><td>—</td></tr>
+</tbody>
+</table></div>
+<h2 id="e-low-level">E. Low level</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>cube48opt-rust (file:line)</th><th>what it does</th><th>ours (file:line)</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>E1</td><td>Paired normal+inverse move with AVX2 (one 256-bit edge shuffle) or 4×128-bit AVX-512BW; <code>auto</code> picks AVX2; runtime dispatch (<code>CUBEOPT_SIMD</code>)</td><td><code>src/cube_x86.rs</code>, <code>src/coord_x86.rs</code>, <code>src/x86_simd.rs</code>; <code>x86-simd.md:10-142</code></td><td></td><td>simd.rs (AVX-512/VBMI specialized moves, compile-time <code>target-cpu</code>; NEON and scalar backends)</td><td>BETTER</td></tr>
+<tr><td>E2</td><td>Fixed context count as a const generic (<code>opt9-native-fixed-contexts</code>, Opt9 F)</td><td><code>src/search.rs:1286-1313</code></td><td></td><td>lanes (const lane count in the hot loop; neg/k11-specialize for k)</td><td>HAVE</td></tr>
+<tr><td>E3</td><td>20-byte cube in the search frame; &quot;Cube24&quot; padding was negative (theirs)</td><td><code>src/search.rs:392-420</code></td><td></td><td>simd.rs (vector registers; Node 128 B)</td><td>N/A</td></tr>
+</tbody>
+</table></div>
+<h2 id="f-corner96-research-line-corner-only-bounds-feature-corner-research">F. Corner96 research line (corner-only bounds; feature <code>corner-research</code>)</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>file:line</th><th>what it does</th><th>measured (theirs)</th><th>for us</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>F1</td><td>Proof that the H48 key can't be folded by inversion (96-symmetry)</td><td><code>corner96-research.md:62-130</code>; <code>corner96-coarsening.md:104-259</code></td><td>Witness: an edge 3-cycle with 2 flips has the solved key, while its inverse does not.</td><td>theory</td><td>matches x-h48's §4 &quot;96-way merge impossible&quot;</td><td>N/A</td></tr>
+<tr><td>F2</td><td><code>u</code>: left-half-turn corner coset table H_C\C (918,540 states, max 10). cocsep refined 6× (K_C → H_C); half-turn invariant, so it may be max'ed into the side bound</td><td><code>src/corner_coset.rs:27-188, 278-327</code></td><td>Stronger corner bound than cocsep.</td><td>Opt8: nodes −0.085%; time +96.6% (early) / +1.15% (deferred)</td><td>Corner prechecks prune few lookups at h11 (x-h48: the corner fold matters only on code 0, ~12K lookups/cube at r ≤ 9).</td><td>MEASURED-NO (theirs)</td></tr>
+<tr><td>F3</td><td>ell4/ell5 analytic floors (K_C but not H_C ⇒ ≥ 5 moves)</td><td><code>src/corner_coset.rs:228-274</code></td><td></td><td>not benchmarked alone; dominated by u</td><td></td><td>N/A</td></tr>
+<tr><td>F4</td><td>Exact full-corner distance reduced by 96 (48 × inversion), built by a 36-successor BFS</td><td><code>src/corner_symmetry.rs:174-244, 565-622</code></td><td></td><td>934,778 orbits, max 11</td><td>not half-turn invariant: only a separate &quot;L ≤ D&quot; prune</td><td>N/A</td></tr>
+<tr><td>F5</td><td>Dense factored symmetry index: 654 permutation orbits × 2187 twists, an affine orientation transport per permutation, inversion folded in (1.9 MB, ~17 ns/lookup)</td><td><code>src/corner_symmetry/dense.rs:94-314, 551-597</code></td><td></td><td>equal over all 88,179,840 states</td><td>a nice layout, but corner bounds don't pay (F2, F6)</td><td>N/A</td></tr>
+<tr><td>F6</td><td>Distance-only rejection channel (<code>distance_only_bound</code>), early or after the main probe</td><td><code>src/search.rs:41-58, 1389-1400, 1660-1672</code>; <code>src/corner_oracle.rs:328-417</code></td><td></td><td>early +54%, late −6.3% with nodes −0.046% (single pass; noise)</td><td></td><td>MEASURED-NO (theirs)</td></tr>
+<tr><td>F7</td><td>EO-distance table (2048 states) / EO-weight bound</td><td><code>src/corner_oracle/eo.rs:31-190</code></td><td></td><td>only with h &lt; 11; only measured inside &quot;combined&quot; (+3.8%)</td><td>N/A at h11</td><td>N/A</td></tr>
+<tr><td>F8</td><td>Double-coset bound v (907 classes)</td><td><code>src/corner_symmetry.rs:420-544</code></td><td></td><td>weaker than u, never searched with</td><td></td><td>N/A</td></tr>
+<tr><td>F9</td><td>Joint corners-mod-rotation × 1 or 2 tracked edges (88 MB / 485 MB, distance-only)</td><td><code>src/corner_joint.rs</code>; <code>corner96-validation.md:212-326</code></td><td></td><td>prunes at remaining 9-10 only, nothing at 11-12; no timing</td><td>96.7% of their nodes are at r = 10-12</td><td>N/A</td></tr>
+</tbody>
+</table></div>
+<h2 id="measurements">Measurements</h2>
+<p>All counts: count.sh-style, 8 threads of one CCD, random:1000:2026 (h11 is off /mnt/huge in phase 2, so h8/h7). Lengths identical in every run (15:1 16:35 17:270 18:662 19:32).</p>
+<h3 id="m1-backward-coset-certificate-c9-measured-no">M1. Backward coset certificate (C9): MEASURED-NO</h3>
+<p>Implemented in lanes.rs (stream kernel) as <code>other_moves &amp;= QUARTER_TURNS</code> when a moved-side child value (lookup or corner bound) is exactly <code>remaining + 1</code> of the node (child over by 2). Branch <code>neg/xcr-backward-coset</code> (on 0b5b5a6), <code>$P/xcr/neg-backward-coset.patch</code>.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>h8</th><th align="right">nodes/cube</th><th align="right">lookups/cube</th></tr>
+</thead>
+<tbody>
+<tr><td>main 18c4a66</td><td align="right">22,986,834</td><td align="right">19,752,820</td></tr>
+<tr><td>backward coset</td><td align="right">22,994,497 (+0.03%)</td><td align="right">19,758,988 (+0.03%)</td></tr>
+</tbody>
+</table></div>
+<p>Why nothing: it is redundant. A later sibling gM′ has D_H(gM′) ≥ D_H(g) − 1 = its own remaining depth; with exact codes 1..3 its own table value already says so, and its <code>child_node</code> removes the same half turns (C3). Only code-0 (inexact) values can differ, at remaining ≤ base, where few nodes are. Theirs agrees: Opt10 nodes +0.13% (the −2.2% time was one unpaired pass), Opt8 WASM nodes −0.0086%, time +18.9%. Not timed (node counts decide).</p>
+<h3 id="m2-max-over-stabilizer-frames-c14-measured-no">M2. Max over stabilizer frames (C14): MEASURED-NO</h3>
+<p>Upper bound of the gain: <code>Solver::index</code> takes, among all stabilizer frames of a self-symmetric corner class, the one with the largest table value, with every extra frame's value free. Branch <code>neg/xcr-projection-max</code>, <code>$P/xcr/neg-projection-max.patch</code>.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th></th><th align="right">nodes/cube</th><th align="right">lookups/cube</th></tr>
+</thead>
+<tbody>
+<tr><td>h8 main</td><td align="right">22,986,834</td><td align="right">19,752,820</td></tr>
+<tr><td>h8 max over frames (free)</td><td align="right">22,753,385 (−1.02%)</td><td align="right">19,530,198 (−1.13%)</td></tr>
+<tr><td>h7 main</td><td align="right">45,720,884</td><td align="right">38,915,093</td></tr>
+<tr><td>h7 max over frames (free)</td><td align="right">44,505,601 (−2.66%)</td><td align="right">37,846,963 (−2.75%)</td></tr>
+</tbody>
+</table></div>
+<p>A real implementation pays at least one extra probe (DRAM miss) and one more index computation per lookup of a self-symmetric class : measured 5.48% of index computations at h7 and 5.52% at h8 (sampled 1/1024, random:200:2026; XCR_COUNT counter on the same branch). That is more extra lookups than the at most 2.75% (h7) / 1.13% (h8) it could save, so net lookups rise by ≥ 2.7% / 4.4%. At h11 the gain is zero (exact table, all frames written by gen.rs). Theirs: Opt10 nodes −1.2%, time +3.7%.</p>
+<h2 id="benchmark-facts-for-f1">Benchmark facts (for f1)</h2>
+<p>See <code>$P/xcr-bench-entry.md</code>. Points that affect running it fairly, all handled there:</p>
+<ul>
+<li><strong>18-thread cap</strong> for one-cube search (<code>native_parallel.rs:13</code>).</li>
+<li><strong>4K pages</strong> natively: tables in a malloc'd Vec, no madvise. Use hugeshim thp/hugetlb.</li>
+<li><strong>Opt10 file format:</strong> a 1 KiB header and minima ≤ 10, while cube48opt10's raw table stores 15 in unread minima. Handled by a loader-only shim on f1's file; the bytes are proven identical to their official table by SHA-256.</li>
+<li><strong>No x86 prefetch in the official Opt10 feature set:</strong> screen the <code>pf</code> build.</li>
+<li><strong><code>CUBEOPT_SIMD=auto</code> picks AVX2:</strong> AVX-512 is equal here.</li>
+<li><strong>Opt10 loads ~4 min per run.</strong></li>
+</ul>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

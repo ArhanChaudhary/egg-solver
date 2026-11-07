@@ -1,0 +1,90 @@
+{
+  "name": "events-one-39-r2",
+  "config": {
+    "cpus": [
+      1
+    ],
+    "threads": 1,
+    "memory_policy": "local"
+  },
+  "lanes": 24,
+  "page_request": "thp",
+  "mode": "stream",
+  "aux": "DTLB_LOAD_MISSES.WALK_CYCLES",
+  "isolated_event": false,
+  "command": [
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/numactl",
+    "--physcpubind=1",
+    "--membind=1",
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/perf",
+    "stat",
+    "--no-big-num",
+    "-x",
+    ";",
+    "--delay=-1",
+    "--control=fifo:/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/.ctl-events-one-39-r2,/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/.ack-events-one-39-r2",
+    "-o",
+    "/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/stat/events-one-39-r2.csv",
+    "-e",
+    "{cycles:u,instructions:u,cpu/config=0x408,name=egp_dtlb_load_misses_walk_cycles/u}",
+    "--",
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/bench",
+    "stream",
+    "/home/arhan/tmp/egg-solver-perf-work/tables/h6",
+    "--warmup",
+    "8.0",
+    "--window",
+    "20.0",
+    "--threads",
+    "1",
+    "--lanes",
+    "24",
+    "--seed",
+    "2026",
+    "--load",
+    "copy",
+    "--json"
+  ],
+  "exit_code": 0,
+  "valid": true,
+  "wall_seconds": 34.527011456433684,
+  "counted_window_seconds": 20.0001684,
+  "benchmark": {
+    "type": "stream",
+    "threads": 1,
+    "lanes": 24,
+    "window": 20.0,
+    "share": null,
+    "cubes": 3,
+    "throughput": 0.15,
+    "nodes_per_cube": 5145132.0,
+    "lookups_per_cube": 4366999.666666667,
+    "lengths": {
+      "17": 3
+    }
+  },
+  "counters": [
+    {
+      "event": "cycles:u",
+      "count": 60659660528.0,
+      "unit": "",
+      "counter_runtime_ns": 19992598357.0,
+      "running_percent": 100.0
+    },
+    {
+      "event": "instructions:u",
+      "count": 106987005275.0,
+      "unit": "",
+      "counter_runtime_ns": 19992598357.0,
+      "running_percent": 100.0
+    },
+    {
+      "event": "egp_dtlb_load_misses_walk_cycles",
+      "count": 3902853017.0,
+      "unit": "",
+      "counter_runtime_ns": 19992598357.0,
+      "running_percent": 100.0
+    }
+  ],
+  "record": false
+}

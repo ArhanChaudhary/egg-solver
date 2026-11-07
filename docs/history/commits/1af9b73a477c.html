@@ -1,0 +1,49 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEG lanes: sort_jobs and sort_runs by radsort — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="1af9b73a477c.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="neg-lanes-sort-jobs-and-sort-runs-by-radsort">NEG lanes: sort_jobs and sort_runs by radsort</h1>
+<p>Commit <code>1af9b73a477cc565885219699ebe40a4396ae53c</code> · 2026-11-05T05:18:58+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>neg/d1-radsort</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>NEG lanes: sort_jobs and sort_runs by radsort</p>
+<p>sort_jobs (LSD radix sort of (key, index) pairs, 3 passes of 11/11/10
+bits that skip uniform digits, then a gather) and sort_runs (one counting
+pass, counts fused into the loop that builds the entries) replaced by
+radsort::sort_by_key (stable LSD radix sort, 8-bit digits, a fresh scratch
+buffer per call). Same order (checked in the micro-benchmark). Rejected:
+2.2-2.6x slower per sort, -1.5% 1T stream throughput.</p>
+<p>Micro-benchmark (d1-x/sortbench, 1T slot, median of 300; voracious_radix_sort
+1.2 voracious_stable_sort with Radixable impls for comparison; identical
+output for all three):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>sort</th><th>n</th><th>ours</th><th>radsort</th><th>voracious</th></tr>
+</thead>
+<tbody>
+<tr><td>sort_jobs</td><td>43254</td><td>158 us</td><td>418 us (2.6x)</td><td>560 us (3.5x)</td></tr>
+<tr><td>sort_jobs</td><td>3240</td><td>15.0 us</td><td>22.7 us (1.5x)</td><td>33.0 us (2.2x)</td></tr>
+<tr><td>sort_runs</td><td>120000</td><td>78.7 us</td><td>109 us (1.4x)</td><td>158 us (2.0x)</td></tr>
+<tr><td>sort_runs</td><td>20000</td><td>12.3 us</td><td>17.3 us (1.4x)</td><td>25.6 us (2.1x)</td></tr>
+<tr><td>sort_runs</td><td>2000</td><td>1.4 us</td><td>1.9 us (1.4x)</td><td>3.3 us (2.4x)</td></tr>
+<tr><td>(sort_runs &quot;ours&quot; includes a separate counting pass here; in lanes.rs the</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>counts are fused into the producer loop: 51.9 vs 112 us at 120000 without</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>it.) radsort sorts the 12-byte jobs in place through 4 byte passes; ours</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>moves 8-byte keys in 3 passes and gathers the jobs once.</td><td></td><td></td><td></td><td></td></tr>
+</tbody>
+</table></div>
+<p>1T stream (ab1t.sh, stream 10 60 1 24, paired, start order alternating):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>run</th><th>7608a28</th><th>radsort</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>26.183</td><td>25.65</td></tr>
+<tr><td>2</td><td>24.5</td><td>24.317</td></tr>
+<tr><td>3</td><td>24.283</td><td>24.15</td></tr>
+<tr><td>4</td><td>24.567</td><td>24.65</td></tr>
+<tr><td>5</td><td>24.583</td><td>24.117</td></tr>
+<tr><td>6</td><td>24.65</td><td>24.083</td></tr>
+<tr><td>7</td><td>24.633</td><td>24.367</td></tr>
+<tr><td>8</td><td>24.817</td><td>24.3</td></tr>
+<tr><td>median</td><td>24.608</td><td>24.3085 (-1.2%; pairs -2.04 -0.75 -0.55 +0.34 -1.90 -2.30 -1.08 -2.08; median pair -1.49%)</td></tr>
+</tbody>
+</table></div>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

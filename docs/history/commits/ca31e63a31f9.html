@@ -1,0 +1,99 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>wasm: Bun instead of Node for the JavaScript tooling (Bun 1.4.4) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="ca31e63a31f9.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="wasm-bun-instead-of-node-for-the-javascript-tooling-bun-1-4-4">wasm: Bun instead of Node for the JavaScript tooling (Bun 1.4.4)</h1>
+<p>Commit <code>ca31e63a31f95154e7772c737af36ef87b778b0b</code> · 2026-11-05T05:16:45+00:00</p>
+<p>This commit is reachable from the released main history. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>port/bun</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>wasm: Bun instead of Node for the JavaScript tooling (Bun 1.4.4)</p>
+<p>User request: &quot;use bun instead of node&quot;. The tools in wasm/ now run in Bun
+(1.4.4, 38afee6c8, in /data/tools/bin). The browser code stays plain web
+JavaScript. No x86 code changes. The diff is wasm/*.mjs, wasm/build.sh,
+check.sh, README.md, and one doc line in wasm/src/lib.rs.</p>
+<ul>
+<li>cubeopt.mjs (the entry point for both Bun and browsers) uses web APIs
+only: Worker, fetch, Blob, Atomics, navigator.hardwareConcurrency. The one
+exception is <code>localFile</code>, which turns a local path or <code>file:</code> URL into
+<code>Bun.file(...)</code>. A table file is then streamed into the module's memory,
+as a fetch or a File already were. The <code>node:</code> imports and
+worker_threads paths are gone.</li>
+<li>cubeopt-thread.mjs (pool worker): <code>self.onmessage</code> / <code>postMessage</code>. A
+thread that traps prints its error and ends the process with
+<code>process.kill</code> (Bun) instead of hanging.</li>
+<li>demo.mjs reads stdin with <code>Bun.stdin</code>.</li>
+<li>serve.mjs is now a <code>Bun.serve</code> static server with the COOP/COEP headers,
+the table folder at /tables/, and paths kept inside their folder.</li>
+<li>test.mjs runs in Bun.</li>
+<li>check.sh: <code>timeout -s KILL 300 bun wasm/test.mjs</code>. If bun is missing it
+skips with a note; there is no node fallback.</li>
+<li>The V8 warm-up (<code>warmUp</code>) is skipped in Bun. JavaScriptCore moves a
+running loop to optimized code, so the warm-up does not help there. h6, 100
+depth-17 cubes, 1 thread, paired:
+<ul>
+<li>without the warm-up: 126.5 s and 127.2 s;</li>
+<li>with it: 127.0 s and 127.9 s.
+It stays for browsers: Chrome is V8, where it took the same set from
+187.7 s to 129.5 s.</li>
+</ul>
+</li>
+<li>README &quot;WebAssembly&quot;: run commands for Bun, what runs in browsers, and the
+Bun numbers next to the V8 ones.</li>
+</ul>
+<p>The threads build on JavaScriptCore works with nothing changed:</p>
+<ul>
+<li>shared wasm memory with all 4 GiB imported at start-up;</li>
+<li><code>Atomics.wait</code> in workers, and on Bun's main thread inside wasm (joins);</li>
+<li>the <code>_initialize</code> reactor init;</li>
+<li>the pool of threads that never exit;</li>
+<li>the fatal path: a minimal repro has a worker print and <code>process.kill</code>
+while the main thread blocks in <code>Atomics.wait</code>; the message shows and the
+process ends with status 143 after 0.5 s.</li>
+</ul>
+<p>Stress in Bun. Each chunk ran under locked.sh (LOCK_TIMEOUT=2400) on CPUs
+0-7 with 4 to 6 processes at a time; every run had a 300 s kill timeout:</p>
+<ul>
+<li><code>bun wasm/test.mjs</code>: 200 runs before the warm-up skip and 200 after, all
+ok;</li>
+<li>t.mjs (threads module: h0 with 3 threads, 20 rounds of 6 share-mode
+solves and a batch): 100 runs, all ok;</li>
+<li>the threads demo path (<code>bun demo.mjs --table h4 --threads 4</code>, one at a
+time and <code>--batch</code>): 40 runs, all ok.
+0 hangs, 0 failures.</li>
+</ul>
+<p>Browsers: headless Chromium 141 against <code>bun serve.mjs</code> runs index.html
+with the new cubeopt.mjs:</p>
+<ul>
+<li>1 thread: h0 generated;</li>
+<li>8 threads: h6 fetched; a random state solved in 0.63 s, the same solution
+as before.</li>
+</ul>
+<p>Speed on one Zen 5 core, h6 with 100 depth-17 cubes (14.8M nodes each), 40
+lanes, batch; node counts identical everywhere:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>engine</th><th>1 thread</th><th>8 threads (one L3 domain)</th></tr>
+</thead>
+<tbody>
+<tr><td>Bun 1.4.4 (JSC)</td><td>126.5-127.9 s</td><td>33.7 s</td></tr>
+<tr><td>V8 (Node 26)</td><td>124 s</td><td>40.3 s</td></tr>
+<tr><td>wasmtime</td><td>122 s</td><td></td></tr>
+<tr><td>native x86</td><td>21.7 s</td><td>10.65 s</td></tr>
+</tbody>
+</table></div>
+<p>(With 100 cubes on 8 threads x 40 lanes, the batch's tail dominates the
+8-thread times.)</p>
+<p>Random states one at a time, 10 cubes, seed 1, mean and median per cube:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>table</th><th>Bun, 1 thread</th><th>Bun, 8 threads</th><th>V8, 1 thread</th><th>V8, 8 threads</th></tr>
+</thead>
+<tbody>
+<tr><td>h6</td><td>12.2 s, 4.9 s</td><td>1.6 s, 0.65 s</td><td>12.6 s, 5.0 s</td><td>1.6 s, 0.65 s</td></tr>
+<tr><td>h7</td><td>6.5 s, 2.9 s</td><td>0.91 s, 0.44 s</td><td>6.7 s, 2.9 s</td><td>0.93 s, 0.44 s</td></tr>
+</tbody>
+</table></div>
+<p>x86 unchanged: no source of the x86 binaries changed (the only Rust edit
+is a doc comment in wasm/src/lib.rs, a crate x86 builds do not include), so
+the binaries, verify.sh results and hot code are those of main 3a9a50a.
+check.sh passes with /data/tools/bin on PATH: the wasm library tests under
+wasmtime, and <code>bun wasm/test.mjs</code>. One earlier run hit the known scalar
+Worker::release flake (r8).</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

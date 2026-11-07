@@ -1,0 +1,16 @@
+status 0
+run nxopt31 1 distance20_random10_from1 1 1g pgo 1
+pagemode hugetlb arena 3221225472 only nxopt31,nxopt31-pgo
+start 2026-11-06 05:39:09
+wall_s 619.66
+cpu_s 602.65 0.24
+maxrss_kb 7324
+gate_wait_s 0
+ext_cores 3.9
+pages 3150136 4408 688 0 3145728 1080007 nxopt31-pgo
+free_1g_pages 58 46
+memfree_gib_at_start 8.9
+thpwarm_pct -
+table /data/competitors/nxopt/nxopth31b.dat 2603089924
+thp always [madvise] never defrag always defer defer+madvise [madvise] never
+par 5 slot 16-23

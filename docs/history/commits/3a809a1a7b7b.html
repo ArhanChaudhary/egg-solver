@@ -1,0 +1,33 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>lanes: compute only the looked-up side's child cube — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="3a809a1a7b7b.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="lanes-compute-only-the-looked-up-side-s-child-cube">lanes: compute only the looked-up side's child cube</h1>
+<p>Commit <code>3a809a1a7b7bb1450c5dad8425c6b4172aa40f5b</code> · 2026-11-03T20:14:07+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>neg/m6-lazy-child-cube</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>lanes: compute only the looked-up side's child cube</p>
+<p>NEGATIVE. Against 27c4a34 (round-6 stack after
+nofmax+tabs+cptr, on 9caf0e2).</p>
+<p>advance computes only the cube of the side looked up first (X: the other
+side, X2/X': the moved side) as one composition of k-mask-blended
+operands (Cube::child_side) instead of both cubes and a blend; the moved
+side's cube is computed in resolve_other (from the node) and the other
+side's on a push. Search identical (verify OK).</p>
+<p>It saves ~3 instructions per generated child on the native build, but
+puts the move-kind mask (m -&gt; m % 3 -&gt; sbb -&gt; kmovd) at the head of the
+child -&gt; cocsep -&gt; index chain, and recomputes cubes on the pass and push
+paths.</p>
+<p>48T (stream 20 30 48 20, solves/s, interleaved):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>build</th><th>runs</th><th>median</th></tr>
+</thead>
+<tbody>
+<tr><td>cptr (before)</td><td>960.633 965.733 963.933</td><td>963.933</td></tr>
+<tr><td>lazy</td><td>881.533* 953.633 949.600</td><td>949.600 (-1.5%)</td></tr>
+<tr><td>(* run disturbed by a concurrent test build.)</td><td></td><td></td></tr>
+<tr><td>Second round, with the child-node patch on both sides:</td><td></td><td></td></tr>
+<tr><td>nl-child (no lazy)</td><td>972.633 973.700 969.033</td><td>972.633</td></tr>
+<tr><td>a-child (lazy)</td><td>959.800 957.800 954.900</td><td>957.800 (-1.5%)</td></tr>
+<tr><td>Cachegrind (x86-64-v3, no k-masks): 155.09 -&gt; 155.95 Ir/node.</td><td></td><td></td></tr>
+</tbody>
+</table></div>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

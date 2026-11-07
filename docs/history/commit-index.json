@@ -1,0 +1,4763 @@
+[
+  {
+    "commit": "ec7e133a181b620dbfe5f8cccf5d64f947389f16",
+    "date": "2026-11-02T22:01:02+00:00",
+    "subject": "Baseline H48-style optimal solver",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/ec7e133a181b.md",
+    "original_message_sha256": "7c68bd82b2386310f1e694d3f67d327842bd9515371e73906bcfff2ae46f6d20"
+  },
+  {
+    "commit": "9090310aa36a3029a06fd999f9167da71988ba7c",
+    "date": "2026-11-02T22:20:17+00:00",
+    "subject": "Use cube48opt's table layout: E-slice placement innermost, 16-byte groups",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/9090310aa36a.md",
+    "original_message_sha256": "3b908d00b2b8453b1dec9d09f65451b007b78809f1809c7725eb5a3bca2e9798"
+  },
+  {
+    "commit": "046c33faf7eee671a007f693c6568ce2ae4343fe",
+    "date": "2026-11-02T22:20:17+00:00",
+    "subject": "Merge opt/eslice-groups: cube48opt table layout",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/046c33faf7ee.md",
+    "original_message_sha256": "e16fd1836a902570dc73f4a1c4c3c559d48af3f926067b3a3e34ef2bc0cc2241"
+  },
+  {
+    "commit": "dc2626676ebb1f85eea439019087d58673773750",
+    "date": "2026-11-02T22:20:37+00:00",
+    "subject": "Fix clippy lint; add check.sh (fmt + clippy -D warnings + tests)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/dc2626676ebb.md",
+    "original_message_sha256": "c319f3be58707194e2ad94b32cdd4ea69feaaf9182e79621da2d32c8d9e038f0"
+  },
+  {
+    "commit": "9f9a4d3b57bf46e2134479fa2fd99699b90a330a",
+    "date": "2026-11-02T22:22:20+00:00",
+    "subject": "Order final-iteration traversal by previous-iteration statistics (jobs)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/9f9a4d3b57bf.md",
+    "original_message_sha256": "dac8e52d34c9119dfb1c79fdc5ffb6218627d875392f7a83f4e31cf579ecf582"
+  },
+  {
+    "commit": "7bce67d5847f9aeb8b03a0762850d3c75e073214",
+    "date": "2026-11-02T22:22:20+00:00",
+    "subject": "Merge opt/job-order: final-iteration job ordering",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/7bce67d5847f.md",
+    "original_message_sha256": "d7b0ea12ef1628e34aa41008415f17eecf1d8158404f0c0840df65faee5e222c"
+  },
+  {
+    "commit": "0c48355271f0e75c9980ce325b459bbcbf30851f",
+    "date": "2026-11-02T22:26:40+00:00",
+    "subject": "Sibling-face pruning and back-jumps from learned child bounds",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/0c48355271f0.md",
+    "original_message_sha256": "587731f1f011ef2aea2c26e5e2d3d3794bd58e11cc5f2288010481c77a42eb13"
+  },
+  {
+    "commit": "22713550ddaff7449191de3e12e30f945155b6ac",
+    "date": "2026-11-02T22:26:40+00:00",
+    "subject": "Merge opt/sibling-prune: sibling-face pruning and back-jumps",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/22713550ddaf.md",
+    "original_message_sha256": "059f23ca51828e494415b9ee86496d16d26f85ec83d5cf69e5b60ae372da7955"
+  },
+  {
+    "commit": "c52cb63096e271eb47d1846fbd02bf2725611b27",
+    "date": "2026-11-02T22:28:06+00:00",
+    "subject": "Compute job-root bounds once per job, with batched prefetch",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/c52cb63096e2.md",
+    "original_message_sha256": "45c510e75a163d800eb83112d0cb7c92f1dfd6c566cc131f7779ca73c583776b"
+  },
+  {
+    "commit": "31c28787884fd9ee26191be58f564edd09318424",
+    "date": "2026-11-02T22:28:06+00:00",
+    "subject": "Merge opt/job-bounds: cached prefetched job bounds",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/31c28787884f.md",
+    "original_message_sha256": "2fcf0bee3e2ecd63ac27b32573500ad0a3ee2a159a46a807d7d36b1cb8a38e36"
+  },
+  {
+    "commit": "2bb148d5026e57387d745a05cdb65db3f213b8d9",
+    "date": "2026-11-02T22:48:54+00:00",
+    "subject": "Lane-interleaved explicit-stack IDA* for throughput; streaming benchmark",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/2bb148d5026e.md",
+    "original_message_sha256": "f47c18b13de0525557ecc62bb0b2e5b74df5485a4cc0827c97abd2c32d02f628"
+  },
+  {
+    "commit": "a0681ad582cc2e83e9afdbb14fd8a0b031efbc65",
+    "date": "2026-11-02T22:48:55+00:00",
+    "subject": "Merge opt/lanes: lane-interleaved search and streaming benchmark",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/a0681ad582cc.md",
+    "original_message_sha256": "2fb00507e447fad9560ea8d103c794f659b8d8d877103dd561c7f1df836185f6"
+  },
+  {
+    "commit": "0b65adffa5726bd01b2812a4a4403b7408973795",
+    "date": "2026-11-02T23:04:11+00:00",
+    "subject": "Share the other-side lookup between the X and X' children of a face",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/0b65adffa572.md",
+    "original_message_sha256": "2f8325b0c9d79c275e5e527664b8aed59f55802ae9adfc566234f58e8ec02491"
+  },
+  {
+    "commit": "d2674d58734649ca57fb8b919f0384e58b2252ad",
+    "date": "2026-11-02T23:04:11+00:00",
+    "subject": "Merge opt/twin-lookup: share X/X' other-side lookups",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/d2674d587346.md",
+    "original_message_sha256": "aa960da80d0f91147af93fe8d48ecfd6f17423b12ea85e533b1a05591d726ed5"
+  },
+  {
+    "commit": "aa43192f11bc2c8349a94e3d55bbaa61dceac4d9",
+    "date": "2026-11-02T23:15:30+00:00",
+    "subject": "Steeper job statistic: sum of 8^(16-h) instead of 2^(12-h)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/aa43192f11bc.md",
+    "original_message_sha256": "e745603c11745d81b890fb9b59be3e43c29a94fa845300d7e309806458e5c9ff"
+  },
+  {
+    "commit": "d63535bf026b62ad2b60765d476b4d2ff7275dee",
+    "date": "2026-11-02T23:15:30+00:00",
+    "subject": "Merge opt/stat-weight: steeper job statistic",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/d63535bf026b.md",
+    "original_message_sha256": "a9ed14963b43d84915d05915179efd0e1e92dacc006af771217db8d4b831e851"
+  },
+  {
+    "commit": "5cea944d0141182e5ca4cd027a0c2aad1c6ee60b",
+    "date": "2026-11-02T23:42:39+00:00",
+    "subject": "Single-pass round-robin lane scheduler; 16 lanes by default",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/5cea944d0141.md",
+    "original_message_sha256": "f789428f6c9ab0c4912ce89ba5e5a74de884371dfa559dde7ef3dc9f98306294"
+  },
+  {
+    "commit": "59ce1454e9795ae81a7430b830ee4b33dc7817c5",
+    "date": "2026-11-02T23:42:39+00:00",
+    "subject": "Merge opt/single-pass: single-pass lane scheduler",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/59ce1454e979.md",
+    "original_message_sha256": "3b102ec9dfa3455bd2c8d8f4645aeb713907addb9c556ee580e1712a570d2f93"
+  },
+  {
+    "commit": "ae66c99341c3683a2c4242708f8b6c7a0f25f474",
+    "date": "2026-11-02T23:46:44+00:00",
+    "subject": "Batch the other-side lookups of a node (REGRESSION, not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/opt/batch-other"
+    ],
+    "record": "history/commits/ae66c99341c3.md",
+    "original_message_sha256": "587e6a288524e737d87f7c620ad233c12e63a062a9ef51ed1345304ce779db2c"
+  },
+  {
+    "commit": "42a7c98a66a2c652a2dc559a289568272968c42f",
+    "date": "2026-11-03T01:41:14+00:00",
+    "subject": "Edge-only symmetry conjugation for the table index",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/42a7c98a66a2.md",
+    "original_message_sha256": "abdcdefc8fca51bd841d82ce8330ca2ade6725a893b194f62b5162ba31adc5af"
+  },
+  {
+    "commit": "ae4fc49e94793d2dfcb3bae7234bbcf756129054",
+    "date": "2026-11-03T01:41:15+00:00",
+    "subject": "Merge opt/edge-conj: edge-only symmetry conjugation (+5.5%)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/ae4fc49e9479.md",
+    "original_message_sha256": "a02f1b0073a1d5bfcd346045907df048a4fcd79fb829896eda88db637680e0bf"
+  },
+  {
+    "commit": "f99ebc4a84ba2c4f4acaa16b266be3bf21defbf6",
+    "date": "2026-11-03T01:47:35+00:00",
+    "subject": "Packed 3-byte cocsep entries on a huge page; shorter index chain",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/f99ebc4a84ba.md",
+    "original_message_sha256": "3c0c7747526c91ef45be4b1ef569a6f7c7521cdffaf49291e74ee43b8cfac521"
+  },
+  {
+    "commit": "3957bbc75f4439785a5402ccef48cf05af2d92ea",
+    "date": "2026-11-03T01:47:35+00:00",
+    "subject": "Merge opt/packed-cocsep: packed cocsep on a huge page (+2.8%)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/3957bbc75f44.md",
+    "original_message_sha256": "1b2b4e606252166d3ba128fc3290af129c314f660ead4b66c3752019efdc020f"
+  },
+  {
+    "commit": "ebd6c20eee78be7c581e01b0bf66f91ed3cfee14",
+    "date": "2026-11-03T01:56:11+00:00",
+    "subject": "Prefetch table lines with the NTA hint",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/ebd6c20eee78.md",
+    "original_message_sha256": "9c9ac3237ad09bd64ec10754fe39ea74a9283de439aa822096f002d9a3e8f882"
+  },
+  {
+    "commit": "5b0f6ab452696880f97428a34b44f6ac80d03fda",
+    "date": "2026-11-03T01:56:11+00:00",
+    "subject": "Merge opt/prefetch-nta: NTA prefetch hint (+2.6%)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/5b0f6ab45269.md",
+    "original_message_sha256": "1ff33aaa9171b641f053bdc847aad69fce27215b99ca6e43df874ca1a546ee6e"
+  },
+  {
+    "commit": "e9d751ece525957f20ef774de9419f78c868d9f1",
+    "date": "2026-11-03T02:03:35+00:00",
+    "subject": "Index-path micro-optimisations: cocsep LUT, vpmovmskb, lighter compose, cached table pointer",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/e9d751ece525.md",
+    "original_message_sha256": "8f47cbbd3a8adfc20ee9535c874eaf21105ef27e06292edacafe088c34a82eea"
+  },
+  {
+    "commit": "6d265ddf8ddf5b5bf6ae6edcc5f89cff3e1c7b3d",
+    "date": "2026-11-03T02:03:35+00:00",
+    "subject": "Merge opt/m1-micro: index-path micro-optimisations (+2.2%)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/6d265ddf8ddf.md",
+    "original_message_sha256": "45d8c03b91d517b56148a805fc281cc1ada1060434e6be2f76d30e6325b6ac86"
+  },
+  {
+    "commit": "c736b5b5bf3fadb0467adb169554b9f868b3e1b3",
+    "date": "2026-11-03T02:04:00+00:00",
+    "subject": "Branchless value() (rejected: -4%)",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/opt/value-branchless"
+    ],
+    "record": "history/commits/c736b5b5bf3f.md",
+    "original_message_sha256": "c827e233512a11c795ef52ea22bceaaeaf712fce081912638295af226d1f0f06"
+  },
+  {
+    "commit": "79975e23b9fb69fe832c6aae891bd75a84c55dad",
+    "date": "2026-11-03T02:04:00+00:00",
+    "subject": "Prefetch the moved-side cocsep entry early (rejected: -3%)",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/opt/cocsep-prefetch-lanes"
+    ],
+    "record": "history/commits/79975e23b9fb.md",
+    "original_message_sha256": "adcff758d4513a8f258790022745ed255ebf2181cb5f187b2d6e3f0041810361"
+  },
+  {
+    "commit": "794508e9347b91712dc7f78ef3cf92d1b8892890",
+    "date": "2026-11-03T02:04:00+00:00",
+    "subject": "Additive cocsep coordinate (rejected: neutral)",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/opt/cocsep-additive"
+    ],
+    "record": "history/commits/794508e9347b.md",
+    "original_message_sha256": "f2b8c73fd079473ef8702f17e6bc354e5019b2dac3b52973902642e3a089fbab"
+  },
+  {
+    "commit": "d708f1c713c7328307a56a3c3357ccfe3997d1eb",
+    "date": "2026-11-03T02:35:17+00:00",
+    "subject": "Job handling: radix sort, shared inverse lookups, pipelined extension, job prefetch",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/d708f1c713c7.md",
+    "original_message_sha256": "600e7279500e3d12ec2d4a48251dd26eaae77a6b9bd3c4ba4808e601a3bcfbf7"
+  },
+  {
+    "commit": "814ae96a6977929257ee8ed4802daac4bfec7a74",
+    "date": "2026-11-03T02:35:17+00:00",
+    "subject": "Merge opt/m2-jobs: faster job handling (+4.3%)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/814ae96a6977.md",
+    "original_message_sha256": "221cb5c1384cdacba18efe5fccb5c456e141f49c9fabf1f2bdfb896653818a8a"
+  },
+  {
+    "commit": "042f13c8e83dec123571d8fd030594fbe97fa784",
+    "date": "2026-11-03T02:40:44+00:00",
+    "subject": "Remove bounds checks from the lane hot loop",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/042f13c8e83d.md",
+    "original_message_sha256": "ec5a55e3f36d3bc35a8b22019a6ca059c0c1469d7bc4931a5f9f49d214291264"
+  },
+  {
+    "commit": "fe587403e381e1cda0e049c15f097924f08e9d86",
+    "date": "2026-11-03T02:40:44+00:00",
+    "subject": "Merge opt/m2-nobc: no bounds checks in the lane loop (+1.1%)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/fe587403e381.md",
+    "original_message_sha256": "8ffede5b31214f6b4ff433c358863f071a2b3b40d948a5a6911727123833aa6f"
+  },
+  {
+    "commit": "f190cb97bdec0bb7d33083c951dcf98d22e1f815",
+    "date": "2026-11-03T02:41:08+00:00",
+    "subject": "Twin-bound prune saving with the original branch structure (rejected: neutral)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/twinlate"
+    ],
+    "record": "history/commits/f190cb97bdec.md",
+    "original_message_sha256": "7b3a1ab5a3459b9b9d156f986faf5920aafc5cb499a706d22e8d3dad4835c034"
+  },
+  {
+    "commit": "7a34de5111bb896d67da456fb7a9735874085ea3",
+    "date": "2026-11-03T02:41:08+00:00",
+    "subject": "Hoist the X' twin-bound prune before cube computation (rejected: -2.5%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/twinearly"
+    ],
+    "record": "history/commits/7a34de5111bb.md",
+    "original_message_sha256": "781c9163cb9b272d11cb317068536867e55bc2365bbed5ffe01c3ee1c0b44010"
+  },
+  {
+    "commit": "627a5bc8e37b0bf4a93052fb426c77149555dfd2",
+    "date": "2026-11-03T02:41:08+00:00",
+    "subject": "Prefetch the next lane's header and top node (rejected: no gain)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/next-lane-prefetch"
+    ],
+    "record": "history/commits/627a5bc8e37b.md",
+    "original_message_sha256": "796b2bbe4aaabf41933f4244102fb6290cac2a8c677198db0d798d2bc173b209"
+  },
+  {
+    "commit": "835e64cc928abd2277bfe94724d0789193ee9d58",
+    "date": "2026-11-03T02:41:08+00:00",
+    "subject": "Merge the X2/X'/X index/prefetch sites (rejected: -1.6%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/merged-tails"
+    ],
+    "record": "history/commits/835e64cc928a.md",
+    "original_message_sha256": "77f39a2be8386d158c74aab1c9e4318ec76692d8b0f8611aaa14123c52ea7e3c"
+  },
+  {
+    "commit": "220e8fe51f20bfea8f5b29469e39bb163ef9e054",
+    "date": "2026-11-03T02:41:08+00:00",
+    "subject": "Compute only the cube needed for the next lookup (rejected: ~-1%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/lazy-cube"
+    ],
+    "record": "history/commits/220e8fe51f20.md",
+    "original_message_sha256": "b79e62c8a5eb843e2bb947a35a9117e86f25d37320212142f789333a623d3e8d"
+  },
+  {
+    "commit": "02cd085fe01bb5b3fac8b7aca6a1307716ee7e5c",
+    "date": "2026-11-03T02:41:08+00:00",
+    "subject": "Grouped lane scheduler: step W lanes, then batch their index computations (rejected: -9%/-12%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/grouped-scheduler"
+    ],
+    "record": "history/commits/02cd085fe01b.md",
+    "original_message_sha256": "9b248bdc08b454bf2da6c81a3a455eecae8856fc0dce44ae6ad59d1a555551db"
+  },
+  {
+    "commit": "6a46cfb959481b4d345d5713f6b7fdcaa2c5c03c",
+    "date": "2026-11-03T02:41:08+00:00",
+    "subject": "Eager pruning on top of jobs+nobc (rejected: -1.3%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/eager-prune"
+    ],
+    "record": "history/commits/6a46cfb95948.md",
+    "original_message_sha256": "1dfba2f2c258e5071f586db153b8e79f58428681ee313b1c192cbd906404da35"
+  },
+  {
+    "commit": "f191b81217aa619594b158559f392e25fe91c430",
+    "date": "2026-11-03T02:41:08+00:00",
+    "subject": "#[cold]/#[inline(never)] on setup_job, start_iteration, reconstruct (rejected: ~-1.5%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/cold-paths"
+    ],
+    "record": "history/commits/f191b81217aa.md",
+    "original_message_sha256": "6a761b78e2644fc68a4e9e6699318d189f6bade6932fd62d5d0a01bcc34055a8"
+  },
+  {
+    "commit": "69e0069f1ce4a6f520fb70f7d03417d42652b1eb",
+    "date": "2026-11-03T02:41:08+00:00",
+    "subject": "Eager sibling pruning + branchless advance (rejected: -2%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/advance-v4"
+    ],
+    "record": "history/commits/69e0069f1ce4.md",
+    "original_message_sha256": "0c79d598d21050f9c2a5fd9f9e5c3452192aa9390df206b3dcbfeae9546f23b5"
+  },
+  {
+    "commit": "7a173a125caae07c8312f4b5afda4327f007371b",
+    "date": "2026-11-03T05:27:40+00:00",
+    "subject": "Eager sibling-face pruning, X' skip mask, branch-free child setup",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/7a173a125caa.md",
+    "original_message_sha256": "e4c2dfac2975bf4f602c2ac59c53a655d7493500078a36040c0995b1f9625b43"
+  },
+  {
+    "commit": "b90b706ac23a2accac3e0ff4c2cd9e73bb12d903",
+    "date": "2026-11-03T05:27:40+00:00",
+    "subject": "Merge opt/skip-sibling: branch-free sibling pruning (+13.6%)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/b90b706ac23a.md",
+    "original_message_sha256": "ffc0c362ccd922c7896846f3bcbade5673a1084351de0e8b1361e7afb201c045"
+  },
+  {
+    "commit": "8b59999b6c1d39681cc82d1606bd22f44a849605",
+    "date": "2026-11-03T05:28:05+00:00",
+    "subject": "Unified resolve without the phase dispatch (rejected: -3.3%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/unified-resolve"
+    ],
+    "record": "history/commits/8b59999b6c1d.md",
+    "original_message_sha256": "d811e27b205a22fec44c80c41f6b6521bce987d6e45c079b6d15710f27177182"
+  },
+  {
+    "commit": "b7d3bc0d90a7061af53580ab951d9abf4c36dc8a",
+    "date": "2026-11-03T05:28:05+00:00",
+    "subject": "Branch-free skip guard plus a single pop branch (rejected: -8%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/skip-cmov-guard"
+    ],
+    "record": "history/commits/b7d3bc0d90a7.md",
+    "original_message_sha256": "89fd58003551d2d822fafb486b7fea288a35808b63710027dd42f914ff1e3222"
+  },
+  {
+    "commit": "b4e64c3cf8851080cb0750b47c48cd0b4b3d029e",
+    "date": "2026-11-03T05:28:05+00:00",
+    "subject": "Read-ahead: resolve the next lane's value one visit early (rejected: -4.4%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/readahead"
+    ],
+    "record": "history/commits/b4e64c3cf885.md",
+    "original_message_sha256": "792ec3ce2bd7808f284c016a8d170ffc526813629e89531e4aa03df52b2b9b28"
+  },
+  {
+    "commit": "a4add2a1ee372f9576be441492541de307030cc0",
+    "date": "2026-11-03T05:28:05+00:00",
+    "subject": "Node stores the chosen-side cubes, 96-byte node (rejected: -2.9%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/node-ab-layout"
+    ],
+    "record": "history/commits/a4add2a1ee37.md",
+    "original_message_sha256": "a754644f695ef818dc8f0d6ea58bd63f37c41feda51ae7a4937a90ba0350efaf"
+  },
+  {
+    "commit": "1265bc2d316ef58477a6dc26cf34c6f1e62d85cf",
+    "date": "2026-11-03T05:28:05+00:00",
+    "subject": "Early pop via a k_last flag (rejected: neutral)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/neutral-early-pop"
+    ],
+    "record": "history/commits/1265bc2d316e.md",
+    "original_message_sha256": "12548bf0266355ac1cae681ad345151d6f21360670eb07e9e641312b70a8a03d"
+  },
+  {
+    "commit": "079a095236594aae0ef4274d077782e31792ffdf",
+    "date": "2026-11-03T05:28:05+00:00",
+    "subject": "Cached cocsep pointer plus merged node counting (rejected: neutral)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/neutral-cptr-mergedcount"
+    ],
+    "record": "history/commits/079a09523659.md",
+    "original_message_sha256": "4a7139442e916183a98fe959a5bd7d26fb6b827bcade9548d82cadbfd6ff4d0c"
+  },
+  {
+    "commit": "cfe7854b31859b6c5c7bdf761f053fdd42a1bb83",
+    "date": "2026-11-03T05:28:05+00:00",
+    "subject": "Branchless moved-side resolution (rejected: -2.2%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/moved-push-branchless"
+    ],
+    "record": "history/commits/cfe7854b3185.md",
+    "original_message_sha256": "ac76f5b0cf04b203d9aeb4797f34ceb450b607002f176d7bc42ce216ac783b4d"
+  },
+  {
+    "commit": "63147742a36e3d6a19af8df648c9a8edd1377fb1",
+    "date": "2026-11-03T06:05:59+00:00",
+    "subject": "Per-child final-iteration ordering (neutral: -4..6% nodes, +0.3% throughput)",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/opt/childorder"
+    ],
+    "record": "history/commits/63147742a36e.md",
+    "original_message_sha256": "1797d54071736989c47f24e657768ca7aef1e08b7a0393c8c2c732a7ec3ac3a1"
+  },
+  {
+    "commit": "640e28f42f5a93c8b9bd063c4159340a6466d00e",
+    "date": "2026-11-03T06:05:59+00:00",
+    "subject": "Side choice tie-break by bound (rejected: no effect)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/side-tiebreak"
+    ],
+    "record": "history/commits/640e28f42f5a.md",
+    "original_message_sha256": "74df2a9ab6aa73bd81008d69f3083fe62944255c7da27cfddd14d95ca1dc70e3"
+  },
+  {
+    "commit": "10ba66c54767daef7074b0b8f22e6fa12e142975",
+    "date": "2026-11-03T06:05:59+00:00",
+    "subject": "Opposite-face half-turn rule on tight bounds (rejected: no effect)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/opp-tight"
+    ],
+    "record": "history/commits/10ba66c54767.md",
+    "original_message_sha256": "937dfb57ae35b05a40ce064505974cd76ca1d62c9d0be73c212729e65b8c4959"
+  },
+  {
+    "commit": "106cb0a7413d156037b8a525287cbf49a353427a",
+    "date": "2026-11-03T06:05:59+00:00",
+    "subject": "Job statistic = best child instead of sum (rejected: +0.3% nodes)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/jobstat-max"
+    ],
+    "record": "history/commits/106cb0a7413d.md",
+    "original_message_sha256": "6705cb0c5f04f597e400ebda032a6f11f40deb35f112499fc9a714e377e7cdbd"
+  },
+  {
+    "commit": "b2ed0952334941fd080c09dbd0491af43b9eed8e",
+    "date": "2026-11-03T06:23:11+00:00",
+    "subject": "index on (no branch): b90b706 Merge opt/skip-sibling: branch-free sibling pruning (+13.6%)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/b2ed09523349.md",
+    "original_message_sha256": "77b60f3d5656fd850a295b02ad0d1600ace9594e0fd950a1546ec7906085b802"
+  },
+  {
+    "commit": "abc8c0d775610accc3204dca225adcaa894c44bc",
+    "date": "2026-11-03T06:23:11+00:00",
+    "subject": "WIP on (no branch): b90b706 Merge opt/skip-sibling: branch-free sibling pruning (+13.6%)",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/stash-b90b706"
+    ],
+    "record": "history/commits/abc8c0d77561.md",
+    "original_message_sha256": "72f24866443efe48d300fad25e8b8976ed39fcd2550c494b44a18c8bba13e8ff"
+  },
+  {
+    "commit": "8b2cf71011e31e5627d852ec0ad97e37d52c39a5",
+    "date": "2026-11-03T07:56:46+00:00",
+    "subject": "Load the pending value before the phase dispatch; select po; one static for hot tables",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/8b2cf71011e3.md",
+    "original_message_sha256": "7702b7f6689930b0120d44b367023a037379f0bbafdce6453d762a20663b8f94"
+  },
+  {
+    "commit": "70567ff0c99222fcaf59197c1518d27f9855dec1",
+    "date": "2026-11-03T07:56:47+00:00",
+    "subject": "Merge opt/m3-hht: pending value before dispatch, hot tables in one static (+3.5%)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/70567ff0c992.md",
+    "original_message_sha256": "ac6e3c27a8b8c37d74a0e7a5e7656c3e733dfffe04bba39496268552ddfb8438"
+  },
+  {
+    "commit": "45a5a0bb2d3ea3c0620dcc6145a449737afe70a2",
+    "date": "2026-11-03T07:57:15+00:00",
+    "subject": "cargo fmt (the m3-hht merge skipped a failing fmt check)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/45a5a0bb2d3e.md",
+    "original_message_sha256": "d686d24723cf4204a5e259663a407154e4cf10d84869c668938960a1892bd318"
+  },
+  {
+    "commit": "18ef7f037d9ae14f5d885a1c0d415d4119581d60",
+    "date": "2026-11-03T08:13:03+00:00",
+    "subject": "Default to 20 lanes per thread",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/18ef7f037d9a.md",
+    "original_message_sha256": "40612eb58bff346a4b442f97077c1bfdcd06bbc490b0e90b470a23d25dd93505"
+  },
+  {
+    "commit": "ff2b7a455786f22d4b5de235bf1b019fc5ae3d0c",
+    "date": "2026-11-03T08:13:03+00:00",
+    "subject": "Merge opt/lanes20: 20 lanes per thread (+2.9%)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/ff2b7a455786.md",
+    "original_message_sha256": "14d953c2e955ec4b8e2a918f13c4e67322460a71790f76bdff69fce395c53f89"
+  },
+  {
+    "commit": "51f5b2a856fc7485e9f5b2af9352caf51c8e8563",
+    "date": "2026-11-03T08:13:23+00:00",
+    "subject": "Branch-free side selection in push_child (rejected: -4%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/push-select"
+    ],
+    "record": "history/commits/51f5b2a856fc.md",
+    "original_message_sha256": "ede988a13ecb9a749e19127d3cebee6069022a76a48f9c6f8cc5a786415e13ad"
+  },
+  {
+    "commit": "7439b4709661ff05933c57e99a85ba42c23e21f2",
+    "date": "2026-11-03T08:13:23+00:00",
+    "subject": "Merged node counting in advance (rejected: -1%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/merged-node-count"
+    ],
+    "record": "history/commits/7439b4709661.md",
+    "original_message_sha256": "12e9ba093073a2cff6b910eb8be520e717f648d94ad5241b7d2a4fb4fdc43414"
+  },
+  {
+    "commit": "63f5d3f03b32798373d825e860c57c6010bc81a7",
+    "date": "2026-11-03T08:13:23+00:00",
+    "subject": "Compile-time k = 11 copy of the lane engine (rejected: -2%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/k11-specialize"
+    ],
+    "record": "history/commits/63f5d3f03b32.md",
+    "original_message_sha256": "d5105e5f39b9df3987635f20dc96f498f3d1da054d1565136c58db62def8bd1a"
+  },
+  {
+    "commit": "2f2b2626196fce7dd122cfb4ba7eb2a6b6290b09",
+    "date": "2026-11-03T08:13:29+00:00",
+    "subject": "PGO measurement (rejected: -1 to -1.5%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/pgo"
+    ],
+    "record": "history/commits/2f2b2626196f.md",
+    "original_message_sha256": "1794abc7b43b8428c7807fc740afb85d5a1010b0cea08786016dd6d80c0ee38a"
+  },
+  {
+    "commit": "e2e9af390cde55d2956d704b0ada2072edb0861a",
+    "date": "2026-11-03T08:16:48+00:00",
+    "subject": "Per-child final-iteration ordering (neutral: -4..6% nodes, +0.3% throughput)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/e2e9af390cde.md",
+    "original_message_sha256": "1797d54071736989c47f24e657768ca7aef1e08b7a0393c8c2c732a7ec3ac3a1"
+  },
+  {
+    "commit": "3e6f88995acabe93a8c67348a43faa61c583b5ab",
+    "date": "2026-11-03T08:33:57+00:00",
+    "subject": "WIP c4 v1",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/3e6f88995aca.md",
+    "original_message_sha256": "9f9a4a4e68628c181afc968eec548f09252231604f69e2b28b2bafbbecae16cb"
+  },
+  {
+    "commit": "93e4566a11e807cd057c9a04eb27792540043b60",
+    "date": "2026-11-03T08:37:50+00:00",
+    "subject": "WIP c4 v2: prefetch fix, extend without fill",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/93e4566a11e8.md",
+    "original_message_sha256": "d0f932d76990eabfb621865fa96e30d4e5dc625730ca299615cde687abd29544"
+  },
+  {
+    "commit": "ca6fe95757165f226011fd70a0f0cad03393c48a",
+    "date": "2026-11-03T09:10:32+00:00",
+    "subject": "WIP v5: knobs (pj, fb, force normal), whole-by-max INV, coverage test",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/ca6fe9575716.md",
+    "original_message_sha256": "e96603a1ece36cb060e391504f0e01a8e1c3674360ec51846d3128b25b1ce948"
+  },
+  {
+    "commit": "27db4441dcc6da30ec00d1102483e4ab810c47eb",
+    "date": "2026-11-03T09:14:39+00:00",
+    "subject": "WIP v6/v7: normal-side job roots, unified runs, pj3, face bias in quant18",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/27db4441dcc6.md",
+    "original_message_sha256": "cdf07245f414cd45854b68aeb9658be89155061a4d0ac050ac75216c1fed800f"
+  },
+  {
+    "commit": "cb3099900eaad035ce5b3814cd432efc25dc96ad",
+    "date": "2026-11-03T09:24:43+00:00",
+    "subject": "WIP v8: job copy in lane, group knob",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/cb3099900eaa.md",
+    "original_message_sha256": "64f748fd134c06ef70ddbac553045e8d76c5c96b1eeb02cb7fc5ab588f8af3a7"
+  },
+  {
+    "commit": "c914d66a706ff882bef9ffceda42d40a812d4ba8",
+    "date": "2026-11-03T11:01:30+00:00",
+    "subject": "m4: lane-loop",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/c914d66a706f.md",
+    "original_message_sha256": "c68034132359a3fbd55d5272879bf7c91e672d8a11f239ba0e890cc3f1a31959"
+  },
+  {
+    "commit": "496b09620f521305ce13f17250148ba4c8cb65e4",
+    "date": "2026-11-03T11:01:30+00:00",
+    "subject": "m4: node-roles",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/496b09620f52.md",
+    "original_message_sha256": "6bb221ae98792e307c6d09e20f327fee3f31e8db1e72d8b484f67c6da417a323"
+  },
+  {
+    "commit": "1326046beeaa92dbadfedd4872b36ee9ba90cda6",
+    "date": "2026-11-03T11:01:30+00:00",
+    "subject": "m4: rare-check",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/1326046beeaa.md",
+    "original_message_sha256": "fc90b392406ea066b10e604383d9a97fdf35dd3d36e29b2277a0d56bd27d3bf8"
+  },
+  {
+    "commit": "60153a79f7561e714497fb059b8dce46e45fdcad",
+    "date": "2026-11-03T11:01:30+00:00",
+    "subject": "m4: heur-pair",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/60153a79f756.md",
+    "original_message_sha256": "db0fd80e2816798db4db5a4ce46719f4b94389e162fa71116c4c811fc7f24ec5"
+  },
+  {
+    "commit": "eee343250739237ffa0a97379be2eaf8a5cce09a",
+    "date": "2026-11-03T11:01:30+00:00",
+    "subject": "m4: index-pext",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/eee343250739.md",
+    "original_message_sha256": "98f5f1d2a6ca3ed4a6b04f16846e3a755b679380c95fb62a11e02ec2333f41b1"
+  },
+  {
+    "commit": "a741d66f5c8271d0a8efab22e2d8cf43054d51cc",
+    "date": "2026-11-03T11:01:30+00:00",
+    "subject": "m4: resolve-face",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/a741d66f5c82.md",
+    "original_message_sha256": "8018b8b9bbd41a330bc098aef58ff0abe54748749616ecea611d16214a39dfb9"
+  },
+  {
+    "commit": "c509dd1dd3425a6c98e2640375554669c6a8cf4a",
+    "date": "2026-11-03T11:01:30+00:00",
+    "subject": "m4: phase-encoding",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/c509dd1dd342.md",
+    "original_message_sha256": "eb98b724254fde89c1448a59acd8863eafae3c978debae014c136fa57d697814"
+  },
+  {
+    "commit": "35c608c3d8871394db67e8ff8f821c6d19772213",
+    "date": "2026-11-03T11:18:57+00:00",
+    "subject": "Merge opt/m4-micro: micro round 4, 7 patches (+7.7%)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/35c608c3d887.md",
+    "original_message_sha256": "8f2dc0fbb08dc2ee5a6d6017a8a5c9c6c32b9dfab0f5e6db669d65be40eb59c4"
+  },
+  {
+    "commit": "2e39cf6053ffd977fe8e439f27880ef62a0e9f9d",
+    "date": "2026-11-03T11:38:23+00:00",
+    "subject": "bench: pin worker thread i to CPU i (negative, -0.4%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/pin-threads"
+    ],
+    "record": "history/commits/2e39cf6053ff.md",
+    "original_message_sha256": "b792c14bed792268c99aad06b9b2b510dd4c4943c1f6be80b8661d5960b9f89b"
+  },
+  {
+    "commit": "d7b1f9fb63f438358b2b22e116d693dd689ff8c7",
+    "date": "2026-11-03T12:34:55+00:00",
+    "subject": "Notes added by 'git notes add'",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/d7b1f9fb63f4.md",
+    "original_message_sha256": "9881f0b70e29a93f099fc0f0d6c09086ce085ea8b9ed2f372ed2b88cb1b526f0"
+  },
+  {
+    "commit": "11e1de09204b0a6d4f0fd2204b3917d3d6b6d769",
+    "date": "2026-11-03T12:43:25+00:00",
+    "subject": "Per-child job ordering, paid only in iterations on unchanged jobs (c4)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c4-childorder"
+    ],
+    "record": "history/commits/11e1de09204b.md",
+    "original_message_sha256": "51511bf07f8ea9554d3fffabf28008dbd3574667be63af746bd80abfc62df69b"
+  },
+  {
+    "commit": "97f62182d91983368a62e43cff1009d1b205c296",
+    "date": "2026-11-03T12:43:31+00:00",
+    "subject": "Notes added by 'git notes add'",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/97f62182d919.md",
+    "original_message_sha256": "9881f0b70e29a93f099fc0f0d6c09086ce085ea8b9ed2f372ed2b88cb1b526f0"
+  },
+  {
+    "commit": "431e46a687d613088bfe296439e34618da638193",
+    "date": "2026-11-03T14:20:04+00:00",
+    "subject": "lanes: keep the depth and the top node's bounds in registers in advance",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/431e46a687d6.md",
+    "original_message_sha256": "6c7e943d9834dd33ef9f06f95416ec26eeb9ba7e916e68e2e16b2833c9f8db4e"
+  },
+  {
+    "commit": "236bf33e883dc7f664a327b80954e1197945fdd8",
+    "date": "2026-11-03T14:20:04+00:00",
+    "subject": "lanes: generate a pushed child's first child from registers",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/236bf33e883d.md",
+    "original_message_sha256": "a9aa6431299dc76235289f3e5f6f62169222caf0a86ab4033a245e0657bd6618"
+  },
+  {
+    "commit": "ee186533eabbc9f66154a203981625032c195676",
+    "date": "2026-11-03T14:20:04+00:00",
+    "subject": "lanes: no Idle phase",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/ee186533eabb.md",
+    "original_message_sha256": "e0bc692851c0e4e5f39ad7dbcc53ca436d09435ac2aae80d4c79f1348e5112a8"
+  },
+  {
+    "commit": "68dfaf653ca60c29e5ec6a0b19c0467946a82f79",
+    "date": "2026-11-03T14:20:04+00:00",
+    "subject": "lanes: count advance's nodes in a local",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/68dfaf653ca6.md",
+    "original_message_sha256": "449ca2d488d93c9523e8520aa5b32b88587447a28d04938e522a5b6bb858b3e4"
+  },
+  {
+    "commit": "9caf0e2b186ae6dd48311634d41058c91749f619",
+    "date": "2026-11-03T14:37:17+00:00",
+    "subject": "Merge opt/p5-sched: hot-loop latency, 4 patches (+3.2% 48T, +1.6% 1T)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/9caf0e2b186a.md",
+    "original_message_sha256": "5fb0f30001386c5fdd65ae936f48e521f630f3eb4b138660b7ae79133ebedfb0"
+  },
+  {
+    "commit": "7855793d27383e165163f99f30a8013a41524daf",
+    "date": "2026-11-03T14:55:55+00:00",
+    "subject": "lanes: drop Node::fmax (wip)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/7855793d2738.md",
+    "original_message_sha256": "54b2dd1b8166bc2e824e9d1cb8a5ce8cdb4bfb521b50d69b0c124c1657c3134b"
+  },
+  {
+    "commit": "c00276975e6f81ffc147b80c3f550abe7fb33e6b",
+    "date": "2026-11-03T14:58:16+00:00",
+    "subject": "lanes: small tables in TABS (wip)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/c00276975e6f.md",
+    "original_message_sha256": "2f70a360666abfd73b6920fdd2b7d99cba0a21e43635ccc92b5b4cf9500cef57"
+  },
+  {
+    "commit": "27c4a3401d56d8dbd3195b3064e22d0a6ef096d9",
+    "date": "2026-11-03T14:59:42+00:00",
+    "subject": "solver: cache the packed cocsep pointer (wip)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/27c4a3401d56.md",
+    "original_message_sha256": "895ea7237595375641f1021a1fdc9dcf0cb11f719d325a0d32e2dfd148200568"
+  },
+  {
+    "commit": "82ff5c811694fbf7fff521a1edf52cb8bfba95b1",
+    "date": "2026-11-03T15:00:41+00:00",
+    "subject": "lanes: work-sharing batch and latency mode (lanes::share)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/82ff5c811694.md",
+    "original_message_sha256": "d351f8abdb61673cd3e046fa89f72e41a7953f156e1013ad1883af0b0ae115d9"
+  },
+  {
+    "commit": "4911370d388afdc05adc6efeaa7cf7a78e92cdc4",
+    "date": "2026-11-03T15:00:41+00:00",
+    "subject": "bench: share[:C] option for the work-sharing mode",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/4911370d388a.md",
+    "original_message_sha256": "2465d6ad725c162a594d7419061158f439ec4854e8294728977a6657da889a49"
+  },
+  {
+    "commit": "5c3efa92b940e8cf1e0cae274a9cd3de9d6ccc07",
+    "date": "2026-11-03T15:00:41+00:00",
+    "subject": "solve: optimal solver CLI for cube_solver_test-style input",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/5c3efa92b940.md",
+    "original_message_sha256": "f8a0bf65dfb3d0bbb40fb6a81d7b68155d547ae59b8fc10be26836e0136e0fa5"
+  },
+  {
+    "commit": "d3867e0cae82b5f1cf735042e99f60f56271e5c7",
+    "date": "2026-11-03T15:09:12+00:00",
+    "subject": "lanes: skip count with bzhi; test live moves directly (wip)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/d3867e0cae82.md",
+    "original_message_sha256": "4898150bf49d1ae67b54a6131b6765b9e6669800acf00845585db225e1520c43"
+  },
+  {
+    "commit": "b08cdc37933ce8a66f608e8c6b952b392edc928a",
+    "date": "2026-11-03T15:09:33+00:00",
+    "subject": "lanes: child node in moved/other terms (wip)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/b08cdc37933c.md",
+    "original_message_sha256": "ed4f354ca8a72244cf38196575594bdda65487b74fff9f0c805dfd6e8501409f"
+  },
+  {
+    "commit": "d719c38029e26e65aa5242237e12eb973ff229ae",
+    "date": "2026-11-03T15:13:22+00:00",
+    "subject": "coord: complemented eslot table, 32-bit pext (wip)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/d719c38029e2.md",
+    "original_message_sha256": "6ab7347ecd4e62ac39604518baf3b92de3fcc353bed57cc7d284e17954da3b9c"
+  },
+  {
+    "commit": "993ca97b13887659b0b318d181d3708d9162ff8a",
+    "date": "2026-11-03T15:17:38+00:00",
+    "subject": "lanes: write tw only for an X child that passes (wip)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/993ca97b1388.md",
+    "original_message_sha256": "0276c47285fd54e1ba5296fa093eadccdf774b1ecf7750ee589908ea4c3cc876"
+  },
+  {
+    "commit": "f4d206a2ac5d06f656f085ef15e3a4958bf4448f",
+    "date": "2026-11-03T15:21:10+00:00",
+    "subject": "lanes: lb update as a signed max (wip)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/f4d206a2ac5d.md",
+    "original_message_sha256": "ded49e5d537a176b5cc759f793fd981093c6cf55b07486ac94c8ab7a789ce425"
+  },
+  {
+    "commit": "78ce33e418f43b75684160ef84eaeea0d754d5d5",
+    "date": "2026-11-03T15:36:53+00:00",
+    "subject": "Merge opt/l5-share: work-sharing batch/latency mode and solve CLI",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/78ce33e418f4.md",
+    "original_message_sha256": "b5730f158e6648a8b5bb55472f98a065b148d254f5cfa458680fa317a2568687"
+  },
+  {
+    "commit": "7797c0b472dbc6dc62c26d4eb1c80eb285d42ed8",
+    "date": "2026-11-03T16:07:04+00:00",
+    "subject": "lanes: drop Node::fmax (wip)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/7797c0b472db.md",
+    "original_message_sha256": "54b2dd1b8166bc2e824e9d1cb8a5ce8cdb4bfb521b50d69b0c124c1657c3134b"
+  },
+  {
+    "commit": "a48b6158cdbcae92e3ac001e7e605291c29182f8",
+    "date": "2026-11-03T16:07:04+00:00",
+    "subject": "lanes: small tables in TABS (wip)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/a48b6158cdbc.md",
+    "original_message_sha256": "2f70a360666abfd73b6920fdd2b7d99cba0a21e43635ccc92b5b4cf9500cef57"
+  },
+  {
+    "commit": "2cadf571e26fa2b343a08305d28af71f10b562da",
+    "date": "2026-11-03T16:08:37+00:00",
+    "subject": "index path: fewer \u00b5ops per lookup index (wip)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/2cadf571e26f.md",
+    "original_message_sha256": "14763e4f276f73365dd45af0a32f1b4235ec5bba0f39127656a75cf920ffcaa4"
+  },
+  {
+    "commit": "24bd7819db50a1d8123f218951130a711fc66f6b",
+    "date": "2026-11-03T16:08:37+00:00",
+    "subject": "lanes: skip count with bzhi; test live moves directly (wip)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/24bd7819db50.md",
+    "original_message_sha256": "4898150bf49d1ae67b54a6131b6765b9e6669800acf00845585db225e1520c43"
+  },
+  {
+    "commit": "986a6e4291a4bd8e8a82b003169c3da53de741ef",
+    "date": "2026-11-03T16:08:37+00:00",
+    "subject": "lanes: child node in moved/other terms (wip)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/986a6e4291a4.md",
+    "original_message_sha256": "ed4f354ca8a72244cf38196575594bdda65487b74fff9f0c805dfd6e8501409f"
+  },
+  {
+    "commit": "0a71855b8ccde7cd4242c6bd29787ea446ed5002",
+    "date": "2026-11-03T16:08:37+00:00",
+    "subject": "lanes: resolve/advance micro-ops (wip)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/0a71855b8ccd.md",
+    "original_message_sha256": "c141599a40bd37961affe179d68a0437963247c7c8f8f500d43c7e5e572274b7"
+  },
+  {
+    "commit": "72ade783a1e88be0c348641d76185253a7a033df",
+    "date": "2026-11-03T16:08:37+00:00",
+    "subject": "lanes: round-robin without a per-round exit branch (wip)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/72ade783a1e8.md",
+    "original_message_sha256": "624894d2ce4b49302f6d8442e05322ed8ed71d5a4093debe7e6d74527277b0d0"
+  },
+  {
+    "commit": "9f1daf44617e8c0e143350631f20bf12492df2ca",
+    "date": "2026-11-03T16:08:37+00:00",
+    "subject": "lanes: value of the pending lookup without a branch on the code (wip)",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/r6c"
+    ],
+    "record": "history/commits/9f1daf44617e.md",
+    "original_message_sha256": "4626cf4b8185bf8096a69e168bf989ffaa94fa003f015913e39f9ab899619e65"
+  },
+  {
+    "commit": "cc29b2485cd375eef8fdb15186bce2f466982d0c",
+    "date": "2026-11-03T17:25:33+00:00",
+    "subject": "b2: cached cocsep pointer and merged node counting (neutral; baseline for the next commit)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/cc29b2485cd3.md",
+    "original_message_sha256": "a468e02167dab062fe1a76e6eb43a19916a229d2bc3842bb0c3f041aee572a8f"
+  },
+  {
+    "commit": "fccd78034ac6da4da1bc194e372e5ce367706255",
+    "date": "2026-11-03T17:25:33+00:00",
+    "subject": "b2: skip-sibling WIP (skipk), baseline for the next commit",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/fccd78034ac6.md",
+    "original_message_sha256": "338befedde0fa37194aa913f041e1ad2d01ac966488da4bf0be3302301d8007f"
+  },
+  {
+    "commit": "e6dd85c082c3b7a517e2d235cd027e7d06ce5443",
+    "date": "2026-11-03T17:25:33+00:00",
+    "subject": "b2: node stores the chosen-side cubes, 96-byte node (negative, -2.9%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/b2-skip-node-ab-layout"
+    ],
+    "record": "history/commits/e6dd85c082c3.md",
+    "original_message_sha256": "3c5bb6708f05e70d8091437cdf9d20b717e536145f0140fdf67d8cc36242811b"
+  },
+  {
+    "commit": "2e2b293be73ce0bc8f0dac2d3b99431ee3302828",
+    "date": "2026-11-03T17:25:33+00:00",
+    "subject": "b2: branch-free skip guard and a single pop branch (negative, -8.1%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/b2-skip-cmov-guard-cumulative"
+    ],
+    "record": "history/commits/2e2b293be73c.md",
+    "original_message_sha256": "a70d8d933fed75a6b959c50eb6fe9465aa940aea4c5abb9788ea25d536711dce"
+  },
+  {
+    "commit": "758b2b9614c7673a762b1adafbbd64a29ef88fff",
+    "date": "2026-11-03T17:25:33+00:00",
+    "subject": "b2: read ahead the next lane's lookup value (negative, -4.4%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/b2-readahead-value"
+    ],
+    "record": "history/commits/758b2b9614c7.md",
+    "original_message_sha256": "26b9aa008045d8dc5ffa401edd8b2fa4415e3cd0c2223f13c3169f2f3b962b46"
+  },
+  {
+    "commit": "42990f0c9e4f21081339b72861a942a5625e9d91",
+    "date": "2026-11-03T17:25:33+00:00",
+    "subject": "b2: read-ahead with eager sibling clearing (negative, -11.0%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/b2-readahead-eager-sibling"
+    ],
+    "record": "history/commits/42990f0c9e4f.md",
+    "original_message_sha256": "dfdefaac3181e7878c9522a2203fdb6dbe2ea00344ce6034824f0a67342f8248"
+  },
+  {
+    "commit": "35080564e6e121d192adecfcf84a3b39a4227f95",
+    "date": "2026-11-03T17:25:33+00:00",
+    "subject": "b2: read-ahead with the resolve bookkeeping and a unified dispatch (negative, -8.0%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/b2-readahead-bookkeeping-dispatch"
+    ],
+    "record": "history/commits/35080564e6e1.md",
+    "original_message_sha256": "4e10f45ba660730b659a092e1b821f6d8ae04c85263345b5ed2bd20f8a95a83b"
+  },
+  {
+    "commit": "1b1965658793523b2c6a1be1e75614a970140d77",
+    "date": "2026-11-03T17:25:33+00:00",
+    "subject": "b2: branchless moved-side resolution (negative, -2.2%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/b2-moved-push-branchless-incr"
+    ],
+    "record": "history/commits/1b1965658793.md",
+    "original_message_sha256": "2abe2e2603514cc5fc1844fa7c88ee2d7b93d97665d190501ef9623525a3494e"
+  },
+  {
+    "commit": "2b14f5547a54e14c453324ae02472503441e8f78",
+    "date": "2026-11-03T17:25:33+00:00",
+    "subject": "a2: side choice tie-break by the other side's bound (negative, -0.07% nodes)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/a2-side-tiebreak"
+    ],
+    "record": "history/commits/2b14f5547a54.md",
+    "original_message_sha256": "2c31f1a555ec9c0aa6df2a7411512e9e3b2026ff0886e8f7aa9c3966bcb78bbd"
+  },
+  {
+    "commit": "23d44519b13dcc784ab037f0b3bb33ac3fd5a70a",
+    "date": "2026-11-03T17:25:33+00:00",
+    "subject": "a2: exclude the opposite face's half turn on tight bounds (negative, +-0.07% nodes)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/a2-opp-tight"
+    ],
+    "record": "history/commits/23d44519b13d.md",
+    "original_message_sha256": "ff8d46b79ef250f79c8482d901cd2e4d8ef6bb8239e50a762e2e4fa87c070c07"
+  },
+  {
+    "commit": "a376e75399efa16c58c0bd46b221cf9521964951",
+    "date": "2026-11-03T17:25:33+00:00",
+    "subject": "a2: job statistic = best root child instead of the sum (negative, +0.3% nodes)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/a2-jobstat-max"
+    ],
+    "record": "history/commits/a376e75399ef.md",
+    "original_message_sha256": "f6495cdb9e5476d12a26bc13fc6a00406386c5052bcafc30b0006b711ac4d7b9"
+  },
+  {
+    "commit": "67c40b3fd35145d1631571aa48c674a07257b228",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "p5: phase-bucketed lane scheduling with FIFO pointer arrays (negative, -6.1%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/p5-bucket-fifo"
+    ],
+    "record": "history/commits/67c40b3fd351.md",
+    "original_message_sha256": "6a51d4905410e7ac5a4b22dea8d635ae7f5be964169784e6f69f5302ed635f23"
+  },
+  {
+    "commit": "a5bbce53c2bc9e2a1b7484284cc5ea838c3c7ca5",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "m4: WIP stack c6, baseline for the following diagnostics",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/a5bbce53c2bc.md",
+    "original_message_sha256": "9c47145c641ff0aee8147373bcd22118405174974fc87004feb798dd52f15f97"
+  },
+  {
+    "commit": "20267cd182bd06544c28daa96ecf36ee57ef38d1",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "p5: fresh-child fast path on top of regs (negative, neutral -0.0%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/p5-fresh-child"
+    ],
+    "record": "history/commits/20267cd182bd.md",
+    "original_message_sha256": "d23781b1cddd908b4cbb8a8483b67f27c54cb3c54f6a8e81da86d73cd0db688e"
+  },
+  {
+    "commit": "d06bdf24c39c05cd52a6dbb0112a647fd4da1710",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "p5: diagnostic, bucket-fifo's visit order with main's dispatch (negative, -4.5% 1T vs identity)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/p5-diag-perm-random"
+    ],
+    "record": "history/commits/d06bdf24c39c.md",
+    "original_message_sha256": "5cd862f1fb962f643cda59175cfcd2f7094d3042b766c50e8f769eb2619acb03"
+  },
+  {
+    "commit": "c8c2d3354dffc6ca1af996ce1d2b68b9d728518b",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "p5: diagnostic, lanes visited through FIFO pointer arrays in identity order (negative, -5.1% 1T)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/p5-diag-perm-identity"
+    ],
+    "record": "history/commits/c8c2d3354dff.md",
+    "original_message_sha256": "bacd213a87500c96663d7694a38fc72f8abff5c4892dd5afba203792ebfa46c5"
+  },
+  {
+    "commit": "171e67b1b933e9ee3d1d4f4923e488e1e2b04d46",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "p5: bucket-fifo with prefetcht0 instead of NTA (negative, -8.2%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/p5-bucket-fifo-t0"
+    ],
+    "record": "history/commits/171e67b1b933.md",
+    "original_message_sha256": "e310e07868a251d1003ff63ba5884268ae2e7ccaa30ca195149eb67f24deed46"
+  },
+  {
+    "commit": "77d2af5f811dcf4c6f5b90929e0bf8687129e4f2",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "p5: bucket-fifo with prefetch of the next lanes' state (negative, -2.5% 1T vs bucket-fifo)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/p5-bucket-fifo-lanepf"
+    ],
+    "record": "history/commits/77d2af5f811d.md",
+    "original_message_sha256": "a88ab983274dfba04fd164ab2e5baad3856a539bfba0a63db2ef4938ed271568"
+  },
+  {
+    "commit": "432b59fe61a5ce221ad5934d22361ceaf457ee14",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "p5: phase buckets as lane bit masks (negative, +6.9% instructions/node, not timed)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/p5-bucket-bitmask"
+    ],
+    "record": "history/commits/432b59fe61a5.md",
+    "original_message_sha256": "2ad992929fe9f04096c5fd36792c19ee55f1f312baf52aadfd436d88f32058dc"
+  },
+  {
+    "commit": "e4972070d6e61d4f76a7b53582fbd9705966b362",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "p5: phase buckets within two fixed lane groups (negative, -8.4%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/p5-bucket-2groups"
+    ],
+    "record": "history/commits/e4972070d6e6.md",
+    "original_message_sha256": "b8a3291d3b78239b4ce8095f946b72a5ca4b0cfe061d5d7f048a04bd070baac9"
+  },
+  {
+    "commit": "b3081166aeaba6961eb052269b937b7d1a86b193",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "m4: paired lookups for X children (negative, -40%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m4-pair-lookups"
+    ],
+    "record": "history/commits/b3081166aeab.md",
+    "original_message_sha256": "8e3fa10354a7b97e6174d029a3b1ac59d540d13a2acddb1fcf9a1d3c983b8166"
+  },
+  {
+    "commit": "ce684bc7bb4dbc06b19a1322b5de2a672601de41",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "m4: drop Node::lb, compute max(fmax) at pop (negative, -3.3%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m4-nolb"
+    ],
+    "record": "history/commits/ce684bc7bb4d.md",
+    "original_message_sha256": "4533761e5bad0459afa46b35d65731ad820539ee55022b3cde6f1b340e261701"
+  },
+  {
+    "commit": "d78f7860986f55103237c07c7b644b43aeefd89e",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "m4: job-finished path out of line (negative, -1.7%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m4-nextjob-on-stack"
+    ],
+    "record": "history/commits/d78f7860986f.md",
+    "original_message_sha256": "2559aa9ae08abd9b0fd9b408c010176321a06410aa8730d7d707feaa1e58cfb4"
+  },
+  {
+    "commit": "0b26189f3e6b2a844ed23cd20b1a24f140cb6c29",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "m4: exhaustion test on live instead of the remaining todo (negative, neutral)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m4-live-on-stack"
+    ],
+    "record": "history/commits/0b26189f3e6b.md",
+    "original_message_sha256": "c5412587bfeac8a98173ca12a85d25f9b0a4f94ad0466b75ff29397c9ed81414"
+  },
+  {
+    "commit": "1c69af11398d2d739b6a423503c6eacf3db04f7c",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "m4: Node::lb replaced by a max-fmax byte and a dead mask (negative, -1.1%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m4-fmx"
+    ],
+    "record": "history/commits/1c69af11398d.md",
+    "original_message_sha256": "2ffcfdbfb2cf4d34bf7614e879974143c125333cdcb19bdc283ad246b2ca6832"
+  },
+  {
+    "commit": "0af6b955250be198b7940bd124c6b5e27c5b24f3",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "m4: sibling-face masks from a table with select_unpredictable (negative, neutral -0.3%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m4-fmask-on-stack"
+    ],
+    "record": "history/commits/0af6b955250b.md",
+    "original_message_sha256": "7c1059209942dd88214c75008a28c7ff1a6673ec6d5b32aac27e00116a088bfc"
+  },
+  {
+    "commit": "61e15b15b1cc0d52c145cb481fe7a67cd7368b25",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "m4: sibling-face masks from a table, written as if/else (negative, -4.3%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m4-fmask-branchy-incl-c6"
+    ],
+    "record": "history/commits/61e15b15b1cc.md",
+    "original_message_sha256": "97bd137e80f5e7a7f58fe8275a6c778a6e151550f36ef528fa73cfbb1416f015"
+  },
+  {
+    "commit": "52e776939050886b1893757b66797bc4ca6ec4a4",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "m4: diagnostic, extra index computation and prefetch per child (negative, -16.8%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m4-diag-extra-index-prefetch"
+    ],
+    "record": "history/commits/52e776939050.md",
+    "original_message_sha256": "d24e960ccab5fc0951914bb8293ec209e3b26e00004252638f91c63cb620c718"
+  },
+  {
+    "commit": "452f2739e23fdd46b3bcb809a7bb71752e0bb521",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "m4: diagnostic, one extra index computation per generated node (negative, -13%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m4-diag-extra-index"
+    ],
+    "record": "history/commits/452f2739e23f.md",
+    "original_message_sha256": "d5c22e450a91ae6ae3a1997aee832d348b4b567601184ff05006706632238867"
+  },
+  {
+    "commit": "3e53d61b0c6da6a5c820537ff4de4696e4a20a30",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "m4: diagnostic, 50% random branch resolving after the lookup (negative, -15.1%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m4-diag-brL-incl-c6"
+    ],
+    "record": "history/commits/3e53d61b0c6d.md",
+    "original_message_sha256": "2e583c57902ff28f2cbfb67c798e6f5f9816cc0a5a87f00dc1cf80d1df7c2b77"
+  },
+  {
+    "commit": "70aed1824fc6ffc9d36ff23b643f824ff1d10f65",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "m4: diagnostic, 50% random early-resolving branch per visit (negative, -13.2%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m4-diag-brE-incl-c6"
+    ],
+    "record": "history/commits/70aed1824fc6.md",
+    "original_message_sha256": "dc2cfd4e78990afc3fb098d1f444b859e27b94dcc3f1dea80e85681dc873e995"
+  },
+  {
+    "commit": "3ccfd1ffd06093bd345c924c13c0298083e66f1d",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "m3: branch-free side selection in push_child (negative, -4.0%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m3-push-select"
+    ],
+    "record": "history/commits/3ccfd1ffd060.md",
+    "original_message_sha256": "6658708954bc0f415df7641ad9779e36ccedc15a8eb34356831720a7268e311c"
+  },
+  {
+    "commit": "5011ffac005b6d24910d13ec7de27423495651d2",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "m3: merged node counting in advance (negative, -1.1%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m3-merged-node-count"
+    ],
+    "record": "history/commits/5011ffac005b.md",
+    "original_message_sha256": "c50154d2f01e7886a11c090462ddd8a78173d5705784441f17e8a98d5aef5dd2"
+  },
+  {
+    "commit": "93c78c6d3b0dda7988ad3326fa5c74536fb7a9d8",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "m3: compile-time k = 11 copy of the lane engine (negative, -2.1%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m3-k11-specialize"
+    ],
+    "record": "history/commits/93c78c6d3b0d.md",
+    "original_message_sha256": "5e49db4d9df7a74a8476c5778e40e9a6f9daeac541e25edbdd5764a15da777ed"
+  },
+  {
+    "commit": "f354d7bee14bb26eb543c8df110c518793323240",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "c4: sticky inverse side for INV jobs (negative, -3.14% vs -3.87% nodes)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c4-sticky-inverse"
+    ],
+    "record": "history/commits/f354d7bee14b.md",
+    "original_message_sha256": "5a8fb999422f72744292525f0ddcf9fd428dcf6c8d74649ea814ac4847d5574f"
+  },
+  {
+    "commit": "9e7e1fdbe92aca8cd8af2c153e5f94c5be5d8be4",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "c4: carry the job root's child in each Node (negative, no measurable change)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c4-root-child-field"
+    ],
+    "record": "history/commits/9e7e1fdbe92a.md",
+    "original_message_sha256": "453c1cc474e9abc0908e41141f6c3eed093d5c9708b7a4909538480098e10700"
+  },
+  {
+    "commit": "a8186d34f018390be2661dcfe12af78c8e826e73",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "c4: FIRST_PER_JOB = 4 (negative, -3.91% vs -4.23% nodes)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c4-per-job-4"
+    ],
+    "record": "history/commits/a8186d34f018.md",
+    "original_message_sha256": "ccc03c8aa341f8e585f395f977570a8f73f8c3711690772c36355d069dd21e96"
+  },
+  {
+    "commit": "8f2a550068e858276787c57bccb405b653e14920",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "c4: FIRST_PER_JOB = 2 (negative, -5.40% vs -5.76% nodes)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c4-per-job-2"
+    ],
+    "record": "history/commits/8f2a550068e8.md",
+    "original_message_sha256": "7086975dce6402ced4ac611ae0f420744b0e2f6e48c46923a6755dc8e02e81bc"
+  },
+  {
+    "commit": "3a1290e0ec21e3c46013682393ba9b4f9dda7c32",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "c4: no face bias in the child statistic (negative, -5.48% vs -5.76% nodes)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c4-no-face-bias"
+    ],
+    "record": "history/commits/3a1290e0ec21.md",
+    "original_message_sha256": "1607c18d342fbaca2233ebe9d904e4b13a001933e86403f0892f72ea50fbef87"
+  },
+  {
+    "commit": "6efbdec69b6d5f6b5a3c67be3fbf572cdf662737",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "c4: next_run without #[cold] (negative, -2.7% on ff2b7a4, neutral on 35c608c)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c4-next-run-not-cold"
+    ],
+    "record": "history/commits/6efbdec69b6d.md",
+    "original_message_sha256": "d50acf8ff187194b0b76a6bfa8de7ff360ff261c0975b33d12729a77819b4d01"
+  },
+  {
+    "commit": "38fdcd586baaae26ba8bdb8068d7b5b13210c2d6",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "c4: MERGE = 8, wider first-part runs (negative, -3.85% vs -4.01% nodes)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c4-merge-wide"
+    ],
+    "record": "history/commits/38fdcd586baa.md",
+    "original_message_sha256": "72c9120401c181694f5feaa6a9bdf4e4b3870d185116ed1c4bc593e81cad751e"
+  },
+  {
+    "commit": "c85dc955f3c41d21a8d4a75a56e1fd964a709c04",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "c4: cap the first-part runs per job (negative, +1.88% / -4.26% vs -5.74% nodes)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c4-group-caps"
+    ],
+    "record": "history/commits/c85dc955f3c4.md",
+    "original_message_sha256": "5c0e91e4dfb296a2d17ebe146aa648814eae6c646e325adddcc6fa77be4f2355"
+  },
+  {
+    "commit": "0fabd57fbc3c6d0bb29e8f3d0277e5e23030ce90",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "c4: free side choice at job roots (negative, -4.23% vs -5.74% nodes)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c4-free-side"
+    ],
+    "record": "history/commits/0fabd57fbc3c.md",
+    "original_message_sha256": "ce0bcc392e56b45cf375cc4c2812c5bf82e2cdfc9a95aa7f4cab4967d248fcfe"
+  },
+  {
+    "commit": "901ddb23e28c47c8a383c5179babf93199032e43",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "c4: whole-job iterations in canonical job order (negative, +2.6% nodes)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c4-canonical-whole-order"
+    ],
+    "record": "history/commits/901ddb23e28c.md",
+    "original_message_sha256": "49d1345a0f3982c4b8461c17080fac0011bf30c7e84fe3e9e5d71f888d1f94cd"
+  },
+  {
+    "commit": "8cf03500ea4c8debac5d185c1f53b7af0dc82d56",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "b2: one resolve for both lookup kinds, advance unchanged (negative, -3.8%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/b2-unified-resolve-only"
+    ],
+    "record": "history/commits/8cf03500ea4c.md",
+    "original_message_sha256": "ea3c37c3bb40534a65b8c54dd304035671e7d5fc36f9d061571433370cebd9c3"
+  },
+  {
+    "commit": "364a3651703c754777539c6ce114333f7aa82b2f",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "b2: unified resolve without the phase dispatch (negative, -3.3%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/b2-unified-resolve"
+    ],
+    "record": "history/commits/364a3651703c.md",
+    "original_message_sha256": "83bb8cb64c89671a5c7de5c22bc709a3ff9e0931d91eee107abd7b67432562b0"
+  },
+  {
+    "commit": "ee4285af716ca9e37ef89b385efa8f906297d825",
+    "date": "2026-11-03T17:25:34+00:00",
+    "subject": "b2: unified resolve on top of skip-sibling (negative, -4.5%)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/b2-skipk-unified-resolve"
+    ],
+    "record": "history/commits/ee4285af716c.md",
+    "original_message_sha256": "c7e01f6ea2e941a38c064b3788df7d205697f89f52db1887bd8673222e558699"
+  },
+  {
+    "commit": "2786c88c1aa9e04afaa9c4c7c976cb8aaea0b3e5",
+    "date": "2026-11-03T17:26:18+00:00",
+    "subject": "c7: experiment knobs (C7K env)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/2786c88c1aa9.md",
+    "original_message_sha256": "882ed84ecd2ff7ff9a8f2712cd194392033a067f5734707666e7dbc8afdf160c"
+  },
+  {
+    "commit": "49ef886a597b1d2d8e0abe616c6b5c3abb597bb4",
+    "date": "2026-11-03T17:36:31+00:00",
+    "subject": "c7: diag dataset dump + dseval",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/49ef886a597b.md",
+    "original_message_sha256": "e1d7be4fcc162c91c8f07cff77c57ced7b04e46db3b34d651d8c860c40dabb9c"
+  },
+  {
+    "commit": "6945909a89da3145979bf8b301a6c3eadc9cbf53",
+    "date": "2026-11-03T17:51:21+00:00",
+    "subject": "lanes: Lane hot fields first",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/6945909a89da.md",
+    "original_message_sha256": "6fa7848572510fa292713f1f91cd71b105a069b1cd74d761cb0bd2a13bd19e33"
+  },
+  {
+    "commit": "880fcda18fa9e71309d87e42be85ec905bc74ca3",
+    "date": "2026-11-03T17:51:21+00:00",
+    "subject": "lanes: Node without align(64): 96 bytes",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/r6e"
+    ],
+    "record": "history/commits/880fcda18fa9.md",
+    "original_message_sha256": "6424c8948c9b051e9ba08ccb50c8142b8b71508cc34ed9b5ecdf19647be38ee4"
+  },
+  {
+    "commit": "8ed40c7095310abde96a404b5065fcc320fcd1e6",
+    "date": "2026-11-03T18:05:17+00:00",
+    "subject": "c7: diag knobs (force normal), dseval policies",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/c7-exp"
+    ],
+    "record": "history/commits/8ed40c709531.md",
+    "original_message_sha256": "cf8f1a70f208c0d225b481f14eb4f744ca689f726f02a097493048bd656b10e0"
+  },
+  {
+    "commit": "59971d56129dd2dc269ec599e23d36044dada882",
+    "date": "2026-11-03T18:36:50+00:00",
+    "subject": "c7-glob WIP: split iterations with knobs",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/c7-clean"
+    ],
+    "record": "history/commits/59971d56129d.md",
+    "original_message_sha256": "2e6d025aba772213d06a5c27dd417944c66d40d86639f8480897ef5435d0617a"
+  },
+  {
+    "commit": "fe99d60db8300a0f76ecc40baaa21b12fdb03e3c",
+    "date": "2026-11-03T18:38:28+00:00",
+    "subject": "c7-glob: pstat inheritance knob",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/fe99d60db830.md",
+    "original_message_sha256": "68f9dba65c3024070bf0cfeec86b93127e39863b1cd6f26f80dcf6c6158f8f01"
+  },
+  {
+    "commit": "06bd97e74c82d7a83f99e9b8c75d32ab96e559e0",
+    "date": "2026-11-03T18:41:38+00:00",
+    "subject": "c7-glob: rest key knob 9",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/06bd97e74c82.md",
+    "original_message_sha256": "7e9a53ece014a734605c819152363e41cf848dc03249b1e306454cfe512a0fea"
+  },
+  {
+    "commit": "d1bd52513a764985d23e02fe90f508b019401b30",
+    "date": "2026-11-03T19:04:23+00:00",
+    "subject": "c7-glob: face bias knob 10",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/d1bd52513a76.md",
+    "original_message_sha256": "e20f877936bde8ac5729be67cf35d94c1ff5190aa436ed6b0612b44cbd6c90a7"
+  },
+  {
+    "commit": "0cbf681944d4a94934d0a056a7bcd0c5784eaab6",
+    "date": "2026-11-03T19:07:49+00:00",
+    "subject": "NEGATIVE: lanes: cache the job prefix cubes in setup_job (c7)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c7-jc"
+    ],
+    "record": "history/commits/0cbf681944d4.md",
+    "original_message_sha256": "13dda8e78fba2ec8e26c6f8a2993e1c96612e37661bdb57ba7140e8250d926cb"
+  },
+  {
+    "commit": "45263f28d6833407b6afc75bd2aaf3ea231ba117",
+    "date": "2026-11-03T19:46:08+00:00",
+    "subject": "c7-glob: force normal at pstat iteration (knob 2 = 2)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/45263f28d683.md",
+    "original_message_sha256": "7fbd95597e48bc41ebf9cb7c1c4f2f179269fc294fe62f87690769c7499a205f"
+  },
+  {
+    "commit": "a680785677f3e9e0375f192b43d596022aff7229",
+    "date": "2026-11-03T20:09:29+00:00",
+    "subject": "lanes: drop Node::fmax",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/a680785677f3.md",
+    "original_message_sha256": "2e0e8dd49be1229bc661dca1501d7023f2197c7e3c0d7915dbefe04557593b70"
+  },
+  {
+    "commit": "1e857f6e8ea6cb2fe41e726bde2bf2021b3a8c13",
+    "date": "2026-11-03T20:09:29+00:00",
+    "subject": "lanes: small tables in TABS",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/1e857f6e8ea6.md",
+    "original_message_sha256": "c6e5e103c5011610c7d015a787eb03cd21a0900e4befd7c36ed44b813d8cd32c"
+  },
+  {
+    "commit": "83a7fea641526cf3bcf80be3518c7da053c94582",
+    "date": "2026-11-03T20:09:29+00:00",
+    "subject": "index path: fewer \u00b5ops per lookup index",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/83a7fea64152.md",
+    "original_message_sha256": "c4dcb843c078d0338430246b91a0501d5c9513a23d9bb9992d5e33fd41fc7422"
+  },
+  {
+    "commit": "4671e59afa0b96273e8d29c739a71d81b7adecd9",
+    "date": "2026-11-03T20:09:29+00:00",
+    "subject": "lanes: skip count with bzhi; test the live moves directly",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/4671e59afa0b.md",
+    "original_message_sha256": "5ccc97745fa08613d2334b9b968d8eb94adae72ab869a9eab50f8f72cd5dddb6"
+  },
+  {
+    "commit": "0dbcef817449e9c21525460d61a1af919eb85acb",
+    "date": "2026-11-03T20:09:29+00:00",
+    "subject": "lanes: child node in moved/other terms",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/0dbcef817449.md",
+    "original_message_sha256": "61f5cfa8b5932245a9c12dd36aabf0deedbf428b2b8776d8c5bc28371e34f776"
+  },
+  {
+    "commit": "9e112282644cd5d6319df76a741ee5c7ac7cbe30",
+    "date": "2026-11-03T20:09:29+00:00",
+    "subject": "lanes: fewer \u00b5ops in the resolve and advance paths",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/9e112282644c.md",
+    "original_message_sha256": "146f8ba9ca65a1f45b32521c975d8f330fa1de3282e375459332a622884810d4"
+  },
+  {
+    "commit": "ecd311e753f183e09efe7e0f5d90f31d23400627",
+    "date": "2026-11-03T20:10:02+00:00",
+    "subject": "lanes: drop Node::fmax",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/ecd311e753f1.md",
+    "original_message_sha256": "2e0e8dd49be1229bc661dca1501d7023f2197c7e3c0d7915dbefe04557593b70"
+  },
+  {
+    "commit": "26b4f4c546d1a98dfd6035432ba7004ab69c83bf",
+    "date": "2026-11-03T20:10:02+00:00",
+    "subject": "lanes: small tables in TABS",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/26b4f4c546d1.md",
+    "original_message_sha256": "c6e5e103c5011610c7d015a787eb03cd21a0900e4befd7c36ed44b813d8cd32c"
+  },
+  {
+    "commit": "85e9c794ca12bfbdac75fdd06c39baf51f07d42c",
+    "date": "2026-11-03T20:10:02+00:00",
+    "subject": "index path: fewer \u00b5ops per lookup index",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/85e9c794ca12.md",
+    "original_message_sha256": "c4dcb843c078d0338430246b91a0501d5c9513a23d9bb9992d5e33fd41fc7422"
+  },
+  {
+    "commit": "621b70a2eabbf62d6e4655c1f8cba604810a3862",
+    "date": "2026-11-03T20:10:02+00:00",
+    "subject": "lanes: skip count with bzhi; test the live moves directly",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/621b70a2eabb.md",
+    "original_message_sha256": "5ccc97745fa08613d2334b9b968d8eb94adae72ab869a9eab50f8f72cd5dddb6"
+  },
+  {
+    "commit": "d2a3c2ea1c1f49d0e6a5ab98da3332d4623696d9",
+    "date": "2026-11-03T20:10:02+00:00",
+    "subject": "lanes: child node in moved/other terms",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/d2a3c2ea1c1f.md",
+    "original_message_sha256": "61f5cfa8b5932245a9c12dd36aabf0deedbf428b2b8776d8c5bc28371e34f776"
+  },
+  {
+    "commit": "82b291e92cc1f48033b69e2042c2db408cb67904",
+    "date": "2026-11-03T20:10:02+00:00",
+    "subject": "lanes: fewer \u00b5ops in the resolve and advance paths",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/82b291e92cc1.md",
+    "original_message_sha256": "146f8ba9ca65a1f45b32521c975d8f330fa1de3282e375459332a622884810d4"
+  },
+  {
+    "commit": "9ad3673646a4eb6903fc0c0c990c58d3fa069bb5",
+    "date": "2026-11-03T20:13:58+00:00",
+    "subject": "lanes: compute the next lane pointer early (neutral/negative)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m6-ring-next-early"
+    ],
+    "record": "history/commits/9ad3673646a4.md",
+    "original_message_sha256": "124d38105809eb07ef2cd2b2ed3886da50bf1d3ed4315dfc828e2c03904a8e16"
+  },
+  {
+    "commit": "fae93077faf1a36c41389d3029107580955f421b",
+    "date": "2026-11-03T20:14:07+00:00",
+    "subject": "lanes: Lane hot fields first",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m6-lane-hot-fields-first"
+    ],
+    "record": "history/commits/fae93077faf1.md",
+    "original_message_sha256": "c0225475b9a3baa6b9e9b1f91717e2288bc02917c4c88f49e08ed13213a0d1c9"
+  },
+  {
+    "commit": "3a809a1a7b7bb1450c5dad8425c6b4172aa40f5b",
+    "date": "2026-11-03T20:14:07+00:00",
+    "subject": "lanes: compute only the looked-up side's child cube",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m6-lazy-child-cube"
+    ],
+    "record": "history/commits/3a809a1a7b7b.md",
+    "original_message_sha256": "1039515b8e262272c295e337fac121b61ddf7330b23686d14e07b48a695d3cd6"
+  },
+  {
+    "commit": "704949866e192183a212946983dcf514fadc7845",
+    "date": "2026-11-03T20:14:08+00:00",
+    "subject": "lanes: value of the pending lookup without a branch on the code",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m6-value-branchless"
+    ],
+    "record": "history/commits/704949866e19.md",
+    "original_message_sha256": "013d838a4696ceb6ebb65ac13a2c821e5338185640bda5348e6824901968f4cb"
+  },
+  {
+    "commit": "729dc52734057da36f91cdeacc16b7143b0c4bab",
+    "date": "2026-11-03T20:14:08+00:00",
+    "subject": "lanes: round-robin without a per-round exit branch",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m6-ring-roundrobin"
+    ],
+    "record": "history/commits/729dc5273405.md",
+    "original_message_sha256": "04a5397975e0174fa056b1384296088d3f6d203bd890b48a03a54bc2183753b1"
+  },
+  {
+    "commit": "f7ad05b622b66c26f367336dc9bc489b842299a1",
+    "date": "2026-11-03T20:14:08+00:00",
+    "subject": "lanes: count lookups at issue, merged with the node count",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m6-packed-counter"
+    ],
+    "record": "history/commits/f7ad05b622b6.md",
+    "original_message_sha256": "de5f554d45ca2ecfc166a79ac38e4015a4c9eb1469c7d944640e10162ed64f62"
+  },
+  {
+    "commit": "a0c7b5453be6f7e54c42f32e1d5b77a86b449803",
+    "date": "2026-11-03T20:14:08+00:00",
+    "subject": "lanes: Node without align(64): 96 bytes",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m6-node-96-bytes"
+    ],
+    "record": "history/commits/a0c7b5453be6.md",
+    "original_message_sha256": "bd98f423b76dad6037e5c480eb332fb85dbba3008164a5a0152b806526e682d1"
+  },
+  {
+    "commit": "0a20becb63ef93f26af8e8f29965e9cac111c952",
+    "date": "2026-11-03T20:22:18+00:00",
+    "subject": "lanes: resolve prologue before the phase dispatch (wip)",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/s2-prologue"
+    ],
+    "record": "history/commits/0a20becb63ef.md",
+    "original_message_sha256": "a72224afd0ebeda11239a365c216709d3c92a329d1c625ee6b01a72cf982b41c"
+  },
+  {
+    "commit": "20a770bb9da8e71bc87079f50a8e4f64af6e67d7",
+    "date": "2026-11-03T20:40:56+00:00",
+    "subject": "lanes: order root children across jobs in the iterations on unchanged jobs (c7)",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/c7-childsplit"
+    ],
+    "record": "history/commits/20a770bb9da8.md",
+    "original_message_sha256": "e2f2966ec64d573faa8c1fe6a34fc8e936e7d24de3e75cca8f653231e1cbc7e5"
+  },
+  {
+    "commit": "85e7e0f6c05096e5049050f431419105987ec87c",
+    "date": "2026-11-03T20:41:56+00:00",
+    "subject": "lanes: drop Node::fmax",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/85e7e0f6c050.md",
+    "original_message_sha256": "2e0e8dd49be1229bc661dca1501d7023f2197c7e3c0d7915dbefe04557593b70"
+  },
+  {
+    "commit": "fc9725e2f3decec5d7e9526365e0aeeb1845f2db",
+    "date": "2026-11-03T20:41:56+00:00",
+    "subject": "lanes: small tables in TABS",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/fc9725e2f3de.md",
+    "original_message_sha256": "c6e5e103c5011610c7d015a787eb03cd21a0900e4befd7c36ed44b813d8cd32c"
+  },
+  {
+    "commit": "64076389965002adcfab26f293017f14f4f98783",
+    "date": "2026-11-03T20:41:56+00:00",
+    "subject": "index path: fewer \u00b5ops per lookup index",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/640763899650.md",
+    "original_message_sha256": "c4dcb843c078d0338430246b91a0501d5c9513a23d9bb9992d5e33fd41fc7422"
+  },
+  {
+    "commit": "20bab8121bf8434816fe4615e609f1cec059b3f1",
+    "date": "2026-11-03T20:41:56+00:00",
+    "subject": "lanes: skip count with bzhi; test the live moves directly",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/20bab8121bf8.md",
+    "original_message_sha256": "46eb429174c494023391a8753ee66a5085ad51d17f3730037618cf6a58b05aff"
+  },
+  {
+    "commit": "a36d5fd511dae6bf39a21ce8acd8db8588187c5d",
+    "date": "2026-11-03T20:41:56+00:00",
+    "subject": "lanes: child node in moved/other terms",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/a36d5fd511da.md",
+    "original_message_sha256": "349b7ab27d651ec6e4ac3ec7630f4d17246a29b62257280db8f82a081d1c6db5"
+  },
+  {
+    "commit": "bc92a325f9876d90fc305a08eec92494f64db3ed",
+    "date": "2026-11-03T20:41:56+00:00",
+    "subject": "lanes: fewer \u00b5ops in the resolve and advance paths",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/bc92a325f987.md",
+    "original_message_sha256": "146f8ba9ca65a1f45b32521c975d8f330fa1de3282e375459332a622884810d4"
+  },
+  {
+    "commit": "3750ae91a293b4fb3fe4cc934c6bf90e3c56aa23",
+    "date": "2026-11-03T20:43:25+00:00",
+    "subject": "lanes: resolve prologue before the phase dispatch",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m6-resolve-prologue"
+    ],
+    "record": "history/commits/3750ae91a293.md",
+    "original_message_sha256": "1dd47d9e5d7bdcd2c5b0b21ff59f197f520d10fba99c1608902c85da4ac20928"
+  },
+  {
+    "commit": "4a1cccd76195f9652820795d3a3c726a218baee0",
+    "date": "2026-11-03T20:43:36+00:00",
+    "subject": "solver: table prefetch hint T0 instead of NTA (negative, -1.0% 1T)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m6-prefetch-t0-t1"
+    ],
+    "record": "history/commits/4a1cccd76195.md",
+    "original_message_sha256": "6122d3ed6339961948fbdc33b4f3764fa66817f1e8aaa2c960a6f66af3101c88"
+  },
+  {
+    "commit": "fc6d9c92cf5846b1e2b37ae937d8c5ef7b6bd3be",
+    "date": "2026-11-03T20:54:06+00:00",
+    "subject": "Merge opt/m6-micro: micro round 6, 6 patches (+8.0% 48T, +6.1% 1T)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/fc6d9c92cf58.md",
+    "original_message_sha256": "a6f4d6ef282d1a239d1acd1186411826c4066cb183770b243f9fa8efbf5d982a"
+  },
+  {
+    "commit": "cb8cb70f3172ff7a5cc729c61383d1d4f28ebed2",
+    "date": "2026-11-03T20:57:04+00:00",
+    "subject": "Merge opt/m6-micro: micro round 6, 6 patches (+8.0% 48T, +6.1% 1T)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/cb8cb70f3172.md",
+    "original_message_sha256": "5f088134e06ab8dc4fd2c905ff0b9c677672baf8857aab6a25764eae18743240"
+  },
+  {
+    "commit": "8ce5f911216e486ba1a59ab34b961da237a37eec",
+    "date": "2026-11-03T21:16:51+00:00",
+    "subject": "wip memcnt: count nodes in stats directly",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7"
+    ],
+    "record": "history/commits/8ce5f911216e.md",
+    "original_message_sha256": "a07cd7d20825cb4c91c4efdeb90882706b9954b90ed0a13f6222e28c800074dd"
+  },
+  {
+    "commit": "cb9f374c8f524ad8dadd71531b46b4b551f71bba",
+    "date": "2026-11-03T21:17:25+00:00",
+    "subject": "wip idx: Tinv eo folded into the first xor; 64-bit pext for msplit",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/cb9f374c8f52.md",
+    "original_message_sha256": "71e3ae9cdb719922f68c185ab7e80d4d238294adfa20e9435250b5f36034126b"
+  },
+  {
+    "commit": "bd9c40724a79b7cdc058baacc52921e1ce9799fb",
+    "date": "2026-11-03T21:17:59+00:00",
+    "subject": "wip kind: face, kind and face mask of a move from tables",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/bd9c40724a79.md",
+    "original_message_sha256": "e30c84bd4e55e8f759411b6282b82380b8b853a16b27e448846eb422d255cbfb"
+  },
+  {
+    "commit": "6f033a4c7b2a320173a312f6526c8491a48f7743",
+    "date": "2026-11-03T21:21:48+00:00",
+    "subject": "share: count down a lane's ended jobs when it takes a piece",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/6f033a4c7b2a.md",
+    "original_message_sha256": "0ec0d60f151984aa66013ed3b19bf21695ad51b6e9aef5a865dabde8cd2fbbe0"
+  },
+  {
+    "commit": "4088803efe2894e7087a9dd9d8f73a7fa64a2e30",
+    "date": "2026-11-03T21:21:48+00:00",
+    "subject": "share: builds in stages use all threads, and no fresh pages",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/4088803efe28.md",
+    "original_message_sha256": "ee4967bada84bbe15d28bb4e5388c9438b1016ca0edee30618299631c98a5d3a"
+  },
+  {
+    "commit": "16aa5677df2294729b02de122c7495b6d519c0bc",
+    "date": "2026-11-03T21:25:10+00:00",
+    "subject": "NEGATIVE: BOLT post-link layout (build-bolt.sh): +0.3% at 1T on cb8cb70, within noise",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/a7-bolt"
+    ],
+    "record": "history/commits/16aa5677df22.md",
+    "original_message_sha256": "f683d5108b6a80c3b808b0f42057847627d3a1e5662b3ebe3b65254746fe0223"
+  },
+  {
+    "commit": "2f64e61ec8fabd3eae879be649c2c3988fc6dc03",
+    "date": "2026-11-03T21:25:11+00:00",
+    "subject": "NEGATIVE: target-cpu alternatives to native (znver5, znver4, x86-64-v4, -avx512f)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/a7-target-cpu"
+    ],
+    "record": "history/commits/2f64e61ec8fa.md",
+    "original_message_sha256": "1546fdbbe6768d3edf66de275e198fd285166b2d1dd0e888a02ce3aa469d1cb9"
+  },
+  {
+    "commit": "d6bff7a34504ff9083d41590ac4357ea11e5bf83",
+    "date": "2026-11-03T21:25:11+00:00",
+    "subject": "NEGATIVE: -C relocation-model=static (non-PIE executable) (-0.4% at 1T on 78ce33e, +0.1% on cb8cb70)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/a7-relocation-static"
+    ],
+    "record": "history/commits/d6bff7a34504.md",
+    "original_message_sha256": "c2153dc43c64eea44c4a8af6966c58b4d76e013187e18b48d37127b5b9210420"
+  },
+  {
+    "commit": "5a2cde64179e566cb92210bf2d9b7e37af003210",
+    "date": "2026-11-03T21:25:11+00:00",
+    "subject": "NEGATIVE: PGO trained on the exact stream workload, with and without BOLT (-1.3..-1.5% at 1T)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/a7-pgo"
+    ],
+    "record": "history/commits/5a2cde64179e.md",
+    "original_message_sha256": "a68cfeaaa687f4349d88e4b62e26badc9a12bf5c5ec8939d46dc622e70f3c0da"
+  },
+  {
+    "commit": "41696a74d49d64a194edaf6a6cd60ecac26b1a20",
+    "date": "2026-11-03T21:25:11+00:00",
+    "subject": "NEGATIVE: opt-level = 2 for the release profile (neutral at 1T on 78ce33e and cb8cb70)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/a7-opt-level-2"
+    ],
+    "record": "history/commits/41696a74d49d.md",
+    "original_message_sha256": "93c5af43e3c028559eb200ccc3e6bc316722f76eaa868ed4def494a60629c7ea"
+  },
+  {
+    "commit": "7985687c5787802e50b94740f2a32e72a0ab3862",
+    "date": "2026-11-03T21:25:11+00:00",
+    "subject": "NEGATIVE: nightly toolchain (1.101, LLVM 23.1.5) and nightly -Z flags (0.0% / -0.5% at 1T)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/a7-nightly"
+    ],
+    "record": "history/commits/7985687c5787.md",
+    "original_message_sha256": "b41aadef229cb7f07fe002cad05075496fa3300613be85da848487c4ed399a78"
+  },
+  {
+    "commit": "d68e404c1714b86af053a03fcf4bd50f8281872f",
+    "date": "2026-11-03T21:25:11+00:00",
+    "subject": "NEGATIVE: lto = \"thin\" instead of \"fat\" (-1.0% at 1T)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/a7-lto-thin"
+    ],
+    "record": "history/commits/d68e404c1714.md",
+    "original_message_sha256": "3dec3c3d3548ffde81eb96a5364d7bf633d319e2b782a42d292584f643a95cd6"
+  },
+  {
+    "commit": "4d2718ba6a11662dcce5fa6b2ca1bee6ecad7e1d",
+    "date": "2026-11-03T21:25:11+00:00",
+    "subject": "NEGATIVE: LLVM codegen flags (-C llvm-args=...): none faster at 1T",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/a7-llvm-args"
+    ],
+    "record": "history/commits/4d2718ba6a11.md",
+    "original_message_sha256": "ea363e30cc29aa9d097a33a492d28c6e3cdc1d8cf7c3d7765f3f075dea078e70"
+  },
+  {
+    "commit": "ee604003b27ea1beb1ed865fbbd0db3181fdd1a3",
+    "date": "2026-11-03T21:25:38+00:00",
+    "subject": "wip idx2: eo of Tinv in the 128-byte sym_edge entry",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/ee604003b27e.md",
+    "original_message_sha256": "715b055939aeb2e3a10a1d8d928bd81ff62d5fbe26958fad6c6bd92fc75d3305"
+  },
+  {
+    "commit": "a4c9a93713bc7e8326bb9f0b00de4fb7d5513db3",
+    "date": "2026-11-03T21:34:16+00:00",
+    "subject": "wip kind2: X-move blend mask from a table",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-kind"
+    ],
+    "record": "history/commits/a4c9a93713bc.md",
+    "original_message_sha256": "9ab998f5fbd4d187e2bfd0c612391217e73172733d06cd929c11e6702e506ce7"
+  },
+  {
+    "commit": "07b86e77c6e3c5880e5312e19af8f42989fce03d",
+    "date": "2026-11-03T21:39:01+00:00",
+    "subject": "wip cnt: count the reached moves with blsmsk",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-cnt"
+    ],
+    "record": "history/commits/07b86e77c6e3.md",
+    "original_message_sha256": "6382b6fd26b62e4e3f337a40589e9b28eddb55adb2763a4977ae78f82a325a4f"
+  },
+  {
+    "commit": "5d091930705a45e873c68de7c69885c1f735a245",
+    "date": "2026-11-03T21:41:31+00:00",
+    "subject": "lanes: order root children across jobs in the iterations on unchanged jobs (c7, v2)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/5d091930705a.md",
+    "original_message_sha256": "03e854584acde9421143d6116fd022c2f3c89dffe3cb9ab6b482cc71b8535493"
+  },
+  {
+    "commit": "8de21424f0a0e8cb2c4220de3a74a40118ca3617",
+    "date": "2026-11-03T21:52:20+00:00",
+    "subject": "wip early: pending-child fields and node count written before the index",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/8de21424f0a0.md",
+    "original_message_sha256": "e12f441a67899f552dfad24b9bbda97135477b98860bdf94ba5aae2eebf66259"
+  },
+  {
+    "commit": "9de8aec55a012f07c2b45f027f6665517ee4fc34",
+    "date": "2026-11-03T21:53:31+00:00",
+    "subject": "lanes: count nodes into Lane::stats where they are reached",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m7-memcnt"
+    ],
+    "record": "history/commits/9de8aec55a01.md",
+    "original_message_sha256": "d9d492f471b92d6b8acc24214e589561c9d29d548c5c1f356ec8a8e77d81fb0a"
+  },
+  {
+    "commit": "d274402d3df1af71eed5a73423eeed704f283a68",
+    "date": "2026-11-03T21:55:35+00:00",
+    "subject": "wip idx3: 64-bit vpmovmskb output",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-idx"
+    ],
+    "record": "history/commits/d274402d3df1.md",
+    "original_message_sha256": "dba22ec414453168e994dd7fa423e8ce456411c7c98a131f558104e2edfc5973"
+  },
+  {
+    "commit": "5899187edebd216e79cec500bbb31c90a29b35a2",
+    "date": "2026-11-03T21:56:37+00:00",
+    "subject": "wip cnt: count the reached moves with blsmsk",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/5899187edebd.md",
+    "original_message_sha256": "6382b6fd26b62e4e3f337a40589e9b28eddb55adb2763a4977ae78f82a325a4f"
+  },
+  {
+    "commit": "e7d0063d0ee6e5236a1996ba968c048ff0b17354",
+    "date": "2026-11-03T21:56:40+00:00",
+    "subject": "wip kind: face, kind and face mask of a move from tables",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/e7d0063d0ee6.md",
+    "original_message_sha256": "e30c84bd4e55e8f759411b6282b82380b8b853a16b27e448846eb422d255cbfb"
+  },
+  {
+    "commit": "84ab89c8f69a57c4231abb9a16a851f0fbd97bd3",
+    "date": "2026-11-03T21:56:45+00:00",
+    "subject": "wip kind2: X-move blend mask from a table",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/84ab89c8f69a.md",
+    "original_message_sha256": "9ab998f5fbd4d187e2bfd0c612391217e73172733d06cd929c11e6702e506ce7"
+  },
+  {
+    "commit": "94339b1529f13d775bf6d109270561772b11c786",
+    "date": "2026-11-03T21:56:50+00:00",
+    "subject": "wip idx: Tinv eo folded into the first xor; 64-bit pext for msplit",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/94339b1529f1.md",
+    "original_message_sha256": "71e3ae9cdb719922f68c185ab7e80d4d238294adfa20e9435250b5f36034126b"
+  },
+  {
+    "commit": "068f2e8832d01cfa0153e443812d9d7a034853fe",
+    "date": "2026-11-03T21:56:50+00:00",
+    "subject": "wip idx2: eo of Tinv in the 128-byte sym_edge entry",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/068f2e8832d0.md",
+    "original_message_sha256": "715b055939aeb2e3a10a1d8d928bd81ff62d5fbe26958fad6c6bd92fc75d3305"
+  },
+  {
+    "commit": "b2316160401386c1181a29d69b05a6a8e8273a15",
+    "date": "2026-11-03T21:56:50+00:00",
+    "subject": "wip idx3: 64-bit vpmovmskb output",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-s1"
+    ],
+    "record": "history/commits/b23161604013.md",
+    "original_message_sha256": "dba22ec414453168e994dd7fa423e8ce456411c7c98a131f558104e2edfc5973"
+  },
+  {
+    "commit": "eeb7fd4eb9ff7189f296ce2d33e46fafd097b6fc",
+    "date": "2026-11-03T22:01:20+00:00",
+    "subject": "wip lazy: only the looked-up child cube, from selected operands",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-lazy"
+    ],
+    "record": "history/commits/eeb7fd4eb9ff.md",
+    "original_message_sha256": "44653d7061e8e0f409afa197badc9b0af6c1ca4e9f3c583bc699a784b6820283"
+  },
+  {
+    "commit": "c048b83cd4f14053898ce3f0aab508fb4a593473",
+    "date": "2026-11-03T22:01:56+00:00",
+    "subject": "wip early2: corner-depth test against r",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-early"
+    ],
+    "record": "history/commits/c048b83cd4f1.md",
+    "original_message_sha256": "5b36f03ea30ec823cdf8034b848598e30130bd3991016a4725aa30f806b6091c"
+  },
+  {
+    "commit": "6391056539e36b8fbf9f7ce50611ae61692fd67a",
+    "date": "2026-11-03T22:03:35+00:00",
+    "subject": "diag: 3 imuls off the value chain",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-dnolat"
+    ],
+    "record": "history/commits/6391056539e3.md",
+    "original_message_sha256": "4f2833d1febc92d3941f3252f42c4f29d662052bf3c929f15254fe05ed92eff0"
+  },
+  {
+    "commit": "2c1c76cc9764dec750e44c71b06abe1ad050e76f",
+    "date": "2026-11-03T22:06:20+00:00",
+    "subject": "c7-glob: depth-normalised statistic knob 11",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/2c1c76cc9764.md",
+    "original_message_sha256": "44ce3bd73b4e486d48043fcadde5160204d444027a9608616014bca7da78db0d"
+  },
+  {
+    "commit": "aa34aba8919c96b3d1517a26af7b7f9f983b644e",
+    "date": "2026-11-03T22:09:59+00:00",
+    "subject": "c7-glob: sign knob 12",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/aa34aba8919c.md",
+    "original_message_sha256": "e65f4311102df0a1ab0a0c8f52035fab51f681e22a6ed6cf74ae4c984a4aa512"
+  },
+  {
+    "commit": "d03784e35ede7148dccd64f9095a3e077fe1ba86",
+    "date": "2026-11-03T22:10:14+00:00",
+    "subject": "c7-glob: fix knob 11 enable",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/c7-glob"
+    ],
+    "record": "history/commits/d03784e35ede.md",
+    "original_message_sha256": "7536587e78bd5039fd8f1496ed7a59df0cf04d353e1103ef4cf29c4c2cbef764"
+  },
+  {
+    "commit": "6c8f362eba2313ceaaf51f18a701aba821fefd4b",
+    "date": "2026-11-03T22:10:58+00:00",
+    "subject": "wip ra: read the next lane's pending value one visit ahead",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/6c8f362eba23.md",
+    "original_message_sha256": "9cb91221807038fa146ef757cf64198cd87b8721535fcd52cb2d1c30dbcca40b"
+  },
+  {
+    "commit": "fb8124b6654e1c561ae8bce4df7591bb20c57010",
+    "date": "2026-11-03T22:14:59+00:00",
+    "subject": "NEGATIVE/EXPERIMENT (c7): the knob build behind c7-childsplit's tuning (C7K env), with all variants measured",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c7-knob-experiments"
+    ],
+    "record": "history/commits/fb8124b6654e.md",
+    "original_message_sha256": "3474d10bd1d80d25790fdb65ce74fac3b890fb0b3aac67588eaf0edf6ce7077d"
+  },
+  {
+    "commit": "bb71b0ca641df4401192790a79c8c8230531c54d",
+    "date": "2026-11-03T22:14:59+00:00",
+    "subject": "NEGATIVE: lanes: cache the job prefix cubes in setup_job (c7)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c7-jobcache"
+    ],
+    "record": "history/commits/bb71b0ca641d.md",
+    "original_message_sha256": "13dda8e78fba2ec8e26c6f8a2993e1c96612e37661bdb57ba7140e8250d926cb"
+  },
+  {
+    "commit": "ec4f2d5dffdb8c459d0ce7c871a0cfaadb12ff84",
+    "date": "2026-11-03T22:14:59+00:00",
+    "subject": "NEGATIVE (c7): keep the solver's free side choice at full-length job roots; inverse-side jobs run whole",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c7-free-side-inv-whole"
+    ],
+    "record": "history/commits/ec4f2d5dffdb.md",
+    "original_message_sha256": "72613e9d67a02e5a67dd5c50009e9b29996a7a6522cc98ad0adc877be4dc8244"
+  },
+  {
+    "commit": "dbd01c4e82949e2d77791aaf8ea924fb81f977f2",
+    "date": "2026-11-03T22:14:59+00:00",
+    "subject": "EXPERIMENT (c7): final-iteration dataset (C7DUMP) and offline policy evaluator (dseval)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c7-dataset-dseval"
+    ],
+    "record": "history/commits/dbd01c4e8294.md",
+    "original_message_sha256": "c9bd5c626a63b02feeead684c00f7d53fc6c5d80c92e71e234fdfde104425b58"
+  },
+  {
+    "commit": "b241b65aba40e582bc924f944c1845c15a765231",
+    "date": "2026-11-03T22:15:06+00:00",
+    "subject": "NEUTRAL (c7): non-temporal JobX stores in whole runs; NTA prefetch in th (patch file)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c7-ntstore"
+    ],
+    "record": "history/commits/b241b65aba40.md",
+    "original_message_sha256": "21cfb367b92d134f1fac66e69a351a9e8c26ddaf070e41f0149f8938d42942cd"
+  },
+  {
+    "commit": "d8d61d3a0b354ee0616f8fa08e1681e112dab2dc",
+    "date": "2026-11-03T22:15:07+00:00",
+    "subject": "NEGATIVE (c7): per-node overhead probes of the per-child bookkeeping (1T (patch file)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c7-overhead-probes"
+    ],
+    "record": "history/commits/d8d61d3a0b35.md",
+    "original_message_sha256": "9c5eb0282921fd8bc89108e08d40934daf93452862b14bba0210411810fd1da5"
+  },
+  {
+    "commit": "d575f4074457eff0c0774400a99b9cc1cfe41b85",
+    "date": "2026-11-03T22:18:23+00:00",
+    "subject": "wip ra2: pending child's remaining moves kept in the lane",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-ra2"
+    ],
+    "record": "history/commits/d575f4074457.md",
+    "original_message_sha256": "0bb408f6af74eb6b5a94f7752119bcc3b7c481e22e575c85fe9e1585ad1ff019"
+  },
+  {
+    "commit": "474cd9879f209925fac90a2966b6abc2aadd0f29",
+    "date": "2026-11-03T22:41:06+00:00",
+    "subject": "wip ra3: pointer iteration",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/474cd9879f20.md",
+    "original_message_sha256": "e33e472bd1dd954afac960d7f738875336850e4547160f1b03d9958530d7a884"
+  },
+  {
+    "commit": "445deca5529bf36092b9c116dd2ee963f1eb96f6",
+    "date": "2026-11-03T22:47:34+00:00",
+    "subject": "wip ra4: read ahead the next lane's table word only",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/445deca5529b.md",
+    "original_message_sha256": "534ad50a2b50fa0f33471715197fb7fa6d56caeda79ae8ba32003fb5ef2f932b"
+  },
+  {
+    "commit": "f47a736cbe2c552ff87b2579744824bcd9730b1a",
+    "date": "2026-11-03T22:48:26+00:00",
+    "subject": "wip ra2: pending child's remaining moves kept in the lane",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-ra5"
+    ],
+    "record": "history/commits/f47a736cbe2c.md",
+    "original_message_sha256": "0bb408f6af74eb6b5a94f7752119bcc3b7c481e22e575c85fe9e1585ad1ff019"
+  },
+  {
+    "commit": "e5a83a06707cad5e92eaef5b79b5d656cc5e7ab0",
+    "date": "2026-11-03T22:52:50+00:00",
+    "subject": "wip ra6: read-ahead word through the next lane's k_word",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-ra"
+    ],
+    "record": "history/commits/e5a83a06707c.md",
+    "original_message_sha256": "a17d2c7b37f51f8ef41c58f53e3fd91fa0b1c5b3ec6c08634a3d8dd5937531a2"
+  },
+  {
+    "commit": "f947454a3ff0c15df9bde437a2983e5de1369665",
+    "date": "2026-11-03T22:54:34+00:00",
+    "subject": "share: join a fresh cube before publishing it",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/f947454a3ff0.md",
+    "original_message_sha256": "8ff805cbb65f298298f50e0138265f315452b318e77395d78b02412f0f16356e"
+  },
+  {
+    "commit": "7853462a575153358b6d1fec00da83f34f0712b5",
+    "date": "2026-11-03T22:54:34+00:00",
+    "subject": "miri: run the unit tests under Miri; miri.sh",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/7853462a5751.md",
+    "original_message_sha256": "e5eadcaa4bccb837642c6eb2feeb25b94c7a471fb0de32c744831605e1edb59f"
+  },
+  {
+    "commit": "b2f4b136117dd09a3680ad78967e7088ae8dab33",
+    "date": "2026-11-03T22:54:34+00:00",
+    "subject": "tests: hot index path, conjugates in every mode; cross-check tools",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/b2f4b136117d.md",
+    "original_message_sha256": "e3670c0bfa48d0cc0fc892f29f3b3b1138d56bbbef93484bbf36b152cf1bf151"
+  },
+  {
+    "commit": "8953929ecbb006709d60d60cb019e3ff99b78921",
+    "date": "2026-11-03T22:54:34+00:00",
+    "subject": "tables: check the table meta and the file size when opening a table",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/8953929ecbb0.md",
+    "original_message_sha256": "cfd8002c1c313039e5b8e1ee2f3e6b4d38e07079d983c4ce2e05c194982e51d4"
+  },
+  {
+    "commit": "b84fb7c3482cb912be7e8cbee31796dadb779410",
+    "date": "2026-11-03T22:54:34+00:00",
+    "subject": "tables: map table files opened for solving read-only",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/b84fb7c3482c.md",
+    "original_message_sha256": "502834e4bb6dc9ca11b1a2fc2fe63474497b9ac7f6c135475e46c5b3b377dba6"
+  },
+  {
+    "commit": "a2682d9e2c65b9d8ae2457976ed013914f16b05f",
+    "date": "2026-11-03T23:19:03+00:00",
+    "subject": "lanes: speculative prefetch of the next face's first child",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-spec"
+    ],
+    "record": "history/commits/a2682d9e2c65.md",
+    "original_message_sha256": "7078291f8ce855c7468f8f0a8b71d11fac670cecf7c092b000bf3ec0588fd429"
+  },
+  {
+    "commit": "fcc8d7ba99e7b62f19f2d2b1f35d21fcbedd6774",
+    "date": "2026-11-03T23:23:38+00:00",
+    "subject": "Merge opt/l6-share-a: share-mode hang fix, parallel staged builds (-39% latency)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/fcc8d7ba99e7.md",
+    "original_message_sha256": "ede010cc281df22c6be6c19ecb0212397f01b1374d851baa1dd90ec801189379"
+  },
+  {
+    "commit": "ab059ff166775b7066644a0e9d3fbf3c998d80e2",
+    "date": "2026-11-03T23:29:46+00:00",
+    "subject": "wip ra2: pending child's remaining moves kept in the lane",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-ra7"
+    ],
+    "record": "history/commits/ab059ff16677.md",
+    "original_message_sha256": "0bb408f6af74eb6b5a94f7752119bcc3b7c481e22e575c85fe9e1585ad1ff019"
+  },
+  {
+    "commit": "47b5da2fc3dff3b55df05926caf80274548a1593",
+    "date": "2026-11-03T23:36:45+00:00",
+    "subject": "share: few cubes in progress; data structures",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/47b5da2fc3df.md",
+    "original_message_sha256": "0c999cf7f3c43fe639acdceba883d87f099f4ae38b99428a98dca1e18b0e2936"
+  },
+  {
+    "commit": "1235cdd1c725b384035a9ea7de06fab3ceb1ea9b",
+    "date": "2026-11-03T23:36:45+00:00",
+    "subject": "share: the solver as a parameter of the visit loop",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/1235cdd1c725.md",
+    "original_message_sha256": "49f1211ae7c2965c201ef4164ec6b207c3f4a5cfe27a6a84b8972518084beea1"
+  },
+  {
+    "commit": "c5d7705b542dab33612dfa8cb11ade2e7423d5b5",
+    "date": "2026-11-03T23:36:45+00:00",
+    "subject": "share: no early 4-move prefixes",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/c5d7705b542d.md",
+    "original_message_sha256": "34ddd8ea4ada686f326211dbcb1e5402002deeffa529000c43e05f72417e6a5f"
+  },
+  {
+    "commit": "f0efcde8d471eb144b420a62e8b05e05a1cf09ef",
+    "date": "2026-11-03T23:49:42+00:00",
+    "subject": "Merge opt/r7-series: share race fix, table hardening, Miri, stress tools",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/f0efcde8d471.md",
+    "original_message_sha256": "07f8cddac82753ee7399c0aaf0f5f9400905c670526df1988518fd66d93efbad"
+  },
+  {
+    "commit": "97ae7e5c1c5f68087a61cae84aa3ccb22d8bb099",
+    "date": "2026-11-03T23:55:17+00:00",
+    "subject": "lanes: read the next lane's lookup ahead, and the prune bound",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m7-ra"
+    ],
+    "record": "history/commits/97ae7e5c1c5f.md",
+    "original_message_sha256": "04c619e277744109bf11598c66de182f5de1383b5f3542a3eed2fead8898773d"
+  },
+  {
+    "commit": "21e3ca9a6cf97072401516ab8f01910cfa3e26a3",
+    "date": "2026-11-03T23:57:22+00:00",
+    "subject": "lanes: order root children across jobs in the iterations on unchanged jobs (c7, v2)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/21e3ca9a6cf9.md",
+    "original_message_sha256": "c6639d0a7962d712b0a12694ca136c1cf31947fa1477b1462ae374b40edcc53a"
+  },
+  {
+    "commit": "22161f55b5d6badd83a19d7e7359c5be34eb0adc",
+    "date": "2026-11-04T01:01:44+00:00",
+    "subject": "lanes: 24 lanes per thread by default",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-lanes"
+    ],
+    "record": "history/commits/22161f55b5d6.md",
+    "original_message_sha256": "1a0ee5d2dffba520cd40bf00e50858bd6a66a017a5294651c3f0de4c2d06c2ef"
+  },
+  {
+    "commit": "619bfce8f2e3a6316506ae4e45615775ac63e842",
+    "date": "2026-11-04T01:02:30+00:00",
+    "subject": "diag: prune outcome of each lookup by the node's bound on that side",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-diag"
+    ],
+    "record": "history/commits/619bfce8f2e3.md",
+    "original_message_sha256": "866c5c455c3a26eea1b652caa65606eebf155570004c858c361a8f871f96fe98"
+  },
+  {
+    "commit": "36668cca0f389401aa6d04dfc078748602d0b0f1",
+    "date": "2026-11-04T01:41:08+00:00",
+    "subject": "Merge opt/l6-share-2: share mode with few cubes in progress (-5.6% latency, +4.0% share batch)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/36668cca0f38.md",
+    "original_message_sha256": "18ac7b2115bfa437477cc526ab7d54ba7ebbebf8483a0b0297e68afeb5385abe"
+  },
+  {
+    "commit": "8ff10a684b4127d1ad00d7b3eeb0907faeaef7f7",
+    "date": "2026-11-04T01:44:09+00:00",
+    "subject": "wip lz: lazy child cube alone (table k-mask), on base",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/8ff10a684b41.md",
+    "original_message_sha256": "0621a5e8f3292d9a85146a29b3071337f575af7ebe9546c0668d3ef4733a8aac"
+  },
+  {
+    "commit": "a44b861a9ff3de8e6af0c9d9df61d4f8deb0814c",
+    "date": "2026-11-04T02:00:10+00:00",
+    "subject": "lz: names, docs, pedantic",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-lz"
+    ],
+    "record": "history/commits/a44b861a9ff3.md",
+    "original_message_sha256": "8730560cb5efc49209d6218df0021d23654cc8dd56c821d5b47c1ac28f22909f"
+  },
+  {
+    "commit": "314da193ac1b6135b50e6012091334c8a4ee90b3",
+    "date": "2026-11-04T02:18:56+00:00",
+    "subject": "lanes: fewer \u00b5ops per child (lazy child cube, early stores, blsmsk count, move tables, index tweaks)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m7-neutral-lazy"
+    ],
+    "record": "history/commits/314da193ac1b.md",
+    "original_message_sha256": "7e4b4b6f6640e029e95e109d265c723f3a6ad5a1b19b1df57d58b2a44e72ec79"
+  },
+  {
+    "commit": "be9149a7b594305a172c04630cd33ee47c0c4f43",
+    "date": "2026-11-04T02:44:22+00:00",
+    "subject": "wip lz: lazy child cube alone (table k-mask), on base",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/be9149a7b594.md",
+    "original_message_sha256": "0621a5e8f3292d9a85146a29b3071337f575af7ebe9546c0668d3ef4733a8aac"
+  },
+  {
+    "commit": "5148cb7b52bd8257fb1af2759633cb75690a93f9",
+    "date": "2026-11-04T02:44:22+00:00",
+    "subject": "lz: names, docs, pedantic",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-lz-rb"
+    ],
+    "record": "history/commits/5148cb7b52bd.md",
+    "original_message_sha256": "8730560cb5efc49209d6218df0021d23654cc8dd56c821d5b47c1ac28f22909f"
+  },
+  {
+    "commit": "26af596fab44a97106b6ddf3b8db7c758f984e45",
+    "date": "2026-11-04T03:22:23+00:00",
+    "subject": "Merge opt/c7-childsplit: root children ordered across jobs (-6..-8% nodes, +4.4% 1T)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/26af596fab44.md",
+    "original_message_sha256": "fe30cbaaf21292e40322382b9d87f135d5fe1445acdc1358aabf3e78258c47b7"
+  },
+  {
+    "commit": "0b35690389294034f713c9b192bee8012f8c85ff",
+    "date": "2026-11-04T03:22:23+00:00",
+    "subject": "lanes: 24 lanes per thread by default",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/0b3569038929.md",
+    "original_message_sha256": "59efc7a454a6fe14344f53ec9f81de73a6873214e58185314b491356531b8ba0"
+  },
+  {
+    "commit": "2203a07f032675f45d0a623a999b7f5674b04bac",
+    "date": "2026-11-04T03:22:23+00:00",
+    "subject": "check.sh: a private test log per run",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/2203a07f0326.md",
+    "original_message_sha256": "65bd64c1f71ba5a3efff44336bbd800527a20d0adf3ff825cf572b6f1ec1e0e0"
+  },
+  {
+    "commit": "f3c38ea2eb4b2c00665d483065f0fe8b1b7b66ed",
+    "date": "2026-11-04T03:22:51+00:00",
+    "subject": "lanes: compute only the looked-up child cube (wip message)",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-lz-next"
+    ],
+    "record": "history/commits/f3c38ea2eb4b.md",
+    "original_message_sha256": "257649d5e1bf6aaf8007a9f9ae9eecdd6578ff3c6f460f168d74a070c962202d"
+  },
+  {
+    "commit": "f38d89d067a418a0020416d8c9b8398f3edc72a3",
+    "date": "2026-11-04T03:36:51+00:00",
+    "subject": "Notes added by 'git notes add'",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/f38d89d067a4.md",
+    "original_message_sha256": "9881f0b70e29a93f099fc0f0d6c09086ce085ea8b9ed2f372ed2b88cb1b526f0"
+  },
+  {
+    "commit": "4cf638d6e5ee418f545842f75e41b08421453f9a",
+    "date": "2026-11-04T03:38:32+00:00",
+    "subject": "Notes added by 'git notes add'",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/4cf638d6e5ee.md",
+    "original_message_sha256": "9881f0b70e29a93f099fc0f0d6c09086ce085ea8b9ed2f372ed2b88cb1b526f0"
+  },
+  {
+    "commit": "f2cb1f407d93866344c0d4dc38e5c7400672de52",
+    "date": "2026-11-04T03:55:45+00:00",
+    "subject": "tables: binary layout independent of the build folder",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/f2cb1f407d93.md",
+    "original_message_sha256": "3aefd6a5f21524ec65d3f2e5868fff3173b8144bf0dccc710e67f257ced0c2d2"
+  },
+  {
+    "commit": "e5f5278476c9f2eb3b524746cf6a6f61525b6a85",
+    "date": "2026-11-04T04:45:05+00:00",
+    "subject": "Notes added by 'git notes add'",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/e5f5278476c9.md",
+    "original_message_sha256": "9881f0b70e29a93f099fc0f0d6c09086ce085ea8b9ed2f372ed2b88cb1b526f0"
+  },
+  {
+    "commit": "6f0a8a4115275f8eba881b377eeddf8b56684891",
+    "date": "2026-11-04T04:45:27+00:00",
+    "subject": "lanes: fewer \u00b5ops per child (lazy child cube, early stores, blsmsk count, move tables, index tweaks)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/6f0a8a411527.md",
+    "original_message_sha256": "7e4b4b6f6640e029e95e109d265c723f3a6ad5a1b19b1df57d58b2a44e72ec79"
+  },
+  {
+    "commit": "a5412dc7b982185e842c6ea0a101d071736c0cfc",
+    "date": "2026-11-04T05:51:22+00:00",
+    "subject": "stack: names, docs, get_unchecked, gain comments (wip)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/a5412dc7b982.md",
+    "original_message_sha256": "0a0d0bc7fb3dffad7500a8964583e4cfd620440a57783204f167f612ec84883c"
+  },
+  {
+    "commit": "5e0aca2d69ccf80eb6bb2c0f8267c2c0bd231cd2",
+    "date": "2026-11-04T06:13:27+00:00",
+    "subject": "stack: typed SymEdge entries, pedantic casts",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/5e0aca2d69cc.md",
+    "original_message_sha256": "881a0f881ff595c9b3fca7cd00b7e7bdd53139d46bcad2fadd41158bb663f22e"
+  },
+  {
+    "commit": "ceef720dd9d4e0d8295b64b07620015021614b81",
+    "date": "2026-11-04T06:23:23+00:00",
+    "subject": "stack: gain comments",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-stack-next"
+    ],
+    "record": "history/commits/ceef720dd9d4.md",
+    "original_message_sha256": "cc8e09ecbc86940afb98e445f7004867d18e72da3bb9941e195d505cc07e2f09"
+  },
+  {
+    "commit": "a3eb8bf5e3ddb7457425c21bd0a474dc00a0f6ad",
+    "date": "2026-11-04T06:26:43+00:00",
+    "subject": "lanes: read the next lane's lookup ahead, and the prune bound",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-ra-next"
+    ],
+    "record": "history/commits/a3eb8bf5e3dd.md",
+    "original_message_sha256": "0d68a8de79806ba659d7c4161d91deeaf2ec528d245a9d176b1f5c82e398945d"
+  },
+  {
+    "commit": "b68d360d3aaf95e94deeafaa3c86c917279d6187",
+    "date": "2026-11-04T06:28:40+00:00",
+    "subject": "lanes: compute only the looked-up child cube (wip message)",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-lz-f2"
+    ],
+    "record": "history/commits/b68d360d3aaf.md",
+    "original_message_sha256": "257649d5e1bf6aaf8007a9f9ae9eecdd6578ff3c6f460f168d74a070c962202d"
+  },
+  {
+    "commit": "af05c64df43ff14c3e3005806ae673a40d0262e0",
+    "date": "2026-11-04T06:29:05+00:00",
+    "subject": "lanes: count nodes into Lane::stats where they are reached",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-memcnt-f2"
+    ],
+    "record": "history/commits/af05c64df43f.md",
+    "original_message_sha256": "d9d492f471b92d6b8acc24214e589561c9d29d548c5c1f356ec8a8e77d81fb0a"
+  },
+  {
+    "commit": "595e42439cde0e80f2948a87065508cb5253bed9",
+    "date": "2026-11-04T06:29:28+00:00",
+    "subject": "bench: each mode's thread code compiled on its own",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/595e42439cde.md",
+    "original_message_sha256": "6b6ed38eaf6c06d0cbdde75f794646cab1e10a129fd5887bbe5a924b3e653bc6"
+  },
+  {
+    "commit": "69eefe7426ba1111839a273730172a57c09c49aa",
+    "date": "2026-11-04T06:33:04+00:00",
+    "subject": "lanes: fewer \u00b5ops per child (lazy child cube, early stores, blsmsk count, move tables, index tweaks)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/69eefe7426ba.md",
+    "original_message_sha256": "7e4b4b6f6640e029e95e109d265c723f3a6ad5a1b19b1df57d58b2a44e72ec79"
+  },
+  {
+    "commit": "0ee8244986e78e51638d7e953d2cfa7c91c55db4",
+    "date": "2026-11-04T06:33:04+00:00",
+    "subject": "stack: names, docs, get_unchecked, gain comments (wip)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/0ee8244986e7.md",
+    "original_message_sha256": "0a0d0bc7fb3dffad7500a8964583e4cfd620440a57783204f167f612ec84883c"
+  },
+  {
+    "commit": "4dce79b097e1f89a7cb4782a1d0d5a22cc28edb8",
+    "date": "2026-11-04T06:33:04+00:00",
+    "subject": "stack: typed SymEdge entries, pedantic casts",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/4dce79b097e1.md",
+    "original_message_sha256": "881a0f881ff595c9b3fca7cd00b7e7bdd53139d46bcad2fadd41158bb663f22e"
+  },
+  {
+    "commit": "c91bbd9ad103e9794779f4a787cd2c5298a07e8b",
+    "date": "2026-11-04T06:33:04+00:00",
+    "subject": "stack: gain comments",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-stack-595"
+    ],
+    "record": "history/commits/c91bbd9ad103.md",
+    "original_message_sha256": "cc8e09ecbc86940afb98e445f7004867d18e72da3bb9941e195d505cc07e2f09"
+  },
+  {
+    "commit": "91a997cd1e8dd93318cef173ae0b4b565f63e829",
+    "date": "2026-11-04T06:33:04+00:00",
+    "subject": "lanes: count nodes into Lane::stats where they are reached",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-memcnt-595"
+    ],
+    "record": "history/commits/91a997cd1e8d.md",
+    "original_message_sha256": "d9d492f471b92d6b8acc24214e589561c9d29d548c5c1f356ec8a8e77d81fb0a"
+  },
+  {
+    "commit": "3603c4943cb4ad373ddbf07484906e31562ca575",
+    "date": "2026-11-04T06:33:04+00:00",
+    "subject": "lanes: compute only the looked-up child cube (wip message)",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-lz-595"
+    ],
+    "record": "history/commits/3603c4943cb4.md",
+    "original_message_sha256": "257649d5e1bf6aaf8007a9f9ae9eecdd6578ff3c6f460f168d74a070c962202d"
+  },
+  {
+    "commit": "abce87ca68e0b89ce160aa030d9952fb6de881ac",
+    "date": "2026-11-04T07:04:26+00:00",
+    "subject": "lanes: code for root children without statistics, rest phase by the job's best code (c8)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/abce87ca68e0.md",
+    "original_message_sha256": "99ebe5dd6369f29483c455ca7115f49e0b726574508f962857fd4348f3c7febf"
+  },
+  {
+    "commit": "d64adf1ba3dfdbb15511ef642d285638a443eccf",
+    "date": "2026-11-04T07:05:29+00:00",
+    "subject": "NEGATIVE c8: predictor study for final-iteration ordering (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c8-predictor-study"
+    ],
+    "record": "history/commits/d64adf1ba3df.md",
+    "original_message_sha256": "25d317aab99019be40edf8bb68143d8a22542d5b20edc6f454517cbf679667ef"
+  },
+  {
+    "commit": "6b19f9eacd19956804f922d6464b1b6a48f5d735",
+    "date": "2026-11-04T07:05:53+00:00",
+    "subject": "diag: 9 cycles of extra latency on the pending value",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-dlat"
+    ],
+    "record": "history/commits/6b19f9eacd19.md",
+    "original_message_sha256": "0b92a8d7dd361a50e20b55357cf6d82d8fa5973794d8dfc4f28526ffd42a03e8"
+  },
+  {
+    "commit": "2c44dc2a40a757cf0e9a00a6418bd0fc2b180160",
+    "date": "2026-11-04T07:06:01+00:00",
+    "subject": "lanes: fewer \u00b5ops per child (lazy child cube, early stores, blsmsk count, move tables, index tweaks)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/2c44dc2a40a7.md",
+    "original_message_sha256": "7e4b4b6f6640e029e95e109d265c723f3a6ad5a1b19b1df57d58b2a44e72ec79"
+  },
+  {
+    "commit": "97a17ef52f3b891113c7926ec783f5a0c334ae11",
+    "date": "2026-11-04T07:06:01+00:00",
+    "subject": "stack: names, docs, get_unchecked, gain comments (wip)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/97a17ef52f3b.md",
+    "original_message_sha256": "0a0d0bc7fb3dffad7500a8964583e4cfd620440a57783204f167f612ec84883c"
+  },
+  {
+    "commit": "e8c47ed06a8e603a2ff91698706d1061e54df3aa",
+    "date": "2026-11-04T07:06:01+00:00",
+    "subject": "stack: typed SymEdge entries, pedantic casts",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/e8c47ed06a8e.md",
+    "original_message_sha256": "881a0f881ff595c9b3fca7cd00b7e7bdd53139d46bcad2fadd41158bb663f22e"
+  },
+  {
+    "commit": "d8dd89306e9e19820cbb8488df47e4825274ebf4",
+    "date": "2026-11-04T07:06:01+00:00",
+    "subject": "stack: gain comments",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-stack-abce"
+    ],
+    "record": "history/commits/d8dd89306e9e.md",
+    "original_message_sha256": "cc8e09ecbc86940afb98e445f7004867d18e72da3bb9941e195d505cc07e2f09"
+  },
+  {
+    "commit": "e5f5f4d9ab729f4bf2e1b9f438e56630fa26de5a",
+    "date": "2026-11-04T07:46:33+00:00",
+    "subject": "NEGATIVE c8: c7's child ordering ported to share mode (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c8-share-child-order"
+    ],
+    "record": "history/commits/e5f5f4d9ab72.md",
+    "original_message_sha256": "981f2003681112de261cb143bc9defab03232fd13e67e8627d62fa037834d441"
+  },
+  {
+    "commit": "d32017790819c715997af3716e7287ff7e3a14c1",
+    "date": "2026-11-04T07:57:00+00:00",
+    "subject": "wip smc: stack + node count into stats",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-smc-abce"
+    ],
+    "record": "history/commits/d32017790819.md",
+    "original_message_sha256": "96498513deaa076160f45f225ce086345cb4a6ee62ec437d72b693ef8673e2d8"
+  },
+  {
+    "commit": "d13944f66f9140e5cb18d7da950910370ddd64c1",
+    "date": "2026-11-04T08:03:30+00:00",
+    "subject": "share: typed pointers for the build tasks' buffers",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/d13944f66f91.md",
+    "original_message_sha256": "c9689b164a520b9632a0087a098d09c791dcadef60a9f4612b8f00c7d8e18dd2"
+  },
+  {
+    "commit": "71d69aef4e3c622efc90f8050996714237d536e4",
+    "date": "2026-11-04T08:03:30+00:00",
+    "subject": "share: names, docs and pedantic lints",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/71d69aef4e3c.md",
+    "original_message_sha256": "bf01f63b06495affaff232a311ed77fa8a1ebc06d6e3d53bb1de4cdc867ef1c1"
+  },
+  {
+    "commit": "55e048ead00eb408aa4f494fc58305712cacb7e6",
+    "date": "2026-11-04T08:03:30+00:00",
+    "subject": "share: the measured gain of each optimization in its comment",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/55e048ead00e.md",
+    "original_message_sha256": "2f8403ed71f20a11dcda5d00c0b268a14dd3cb1e534d553425c08fd04434486a"
+  },
+  {
+    "commit": "e8db5ed5c11b56b3bbba61f64a336b2ba24078f5",
+    "date": "2026-11-04T08:04:29+00:00",
+    "subject": "NEGATIVE l6: early-builds (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/l6-early-builds"
+    ],
+    "record": "history/commits/e8db5ed5c11b.md",
+    "original_message_sha256": "7413713ce836e17a89321d89075b2bda007ef34155506152f6f52878494bfffc"
+  },
+  {
+    "commit": "b1ece51b8448e70ef59896d6094f7aaa6a99d304",
+    "date": "2026-11-04T08:04:30+00:00",
+    "subject": "NEGATIVE l6: yield-at-once (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/l6-yield-at-once"
+    ],
+    "record": "history/commits/b1ece51b8448.md",
+    "original_message_sha256": "06fd7c0881075d3f9f4db0c5e04e077c7fe331e6152949929b726b58602cdc43"
+  },
+  {
+    "commit": "bf49c350c978f4dacd23895044ef28d4fce16443",
+    "date": "2026-11-04T08:05:17+00:00",
+    "subject": "NEGATIVE l6: poolrun-inline-never (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/l6-poolrun-inline-never"
+    ],
+    "record": "history/commits/bf49c350c978.md",
+    "original_message_sha256": "09bd5a7cec0863c22af544478cc646f0d4d901579d82d1a8177e714700b3ce59"
+  },
+  {
+    "commit": "9a8a1f8a8a2941d0c5b44769e4aab727d35c6dfb",
+    "date": "2026-11-04T08:05:17+00:00",
+    "subject": "NEGATIVE l6: early-4move-prefixes (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/l6-early-4move-prefixes"
+    ],
+    "record": "history/commits/9a8a1f8a8a29.md",
+    "original_message_sha256": "99985f20b0285b47c5658204b48d24fa21ddecb7cff6c9062e99e372aca79050"
+  },
+  {
+    "commit": "0176bc4285b6591cd622f84350f14dcf85caf54e",
+    "date": "2026-11-04T08:05:17+00:00",
+    "subject": "NEGATIVE l6: align-all-functions (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/l6-align-all-functions"
+    ],
+    "record": "history/commits/0176bc4285b6.md",
+    "original_message_sha256": "7a7302ad53340c0be4dab4c1cfc14affe581b69538347d50555b418ae5907556"
+  },
+  {
+    "commit": "eebb0c20816294b552566649a246864b96176963",
+    "date": "2026-11-04T08:13:03+00:00",
+    "subject": "wip align: hot sections at fixed 64-byte offsets",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-align-abce"
+    ],
+    "record": "history/commits/eebb0c208162.md",
+    "original_message_sha256": "1d044355698bc87ebf9d32a6d2b6fee01467e80c1d6959737cc2daad10cd1128"
+  },
+  {
+    "commit": "35f8d768cb762fb4a409f08d0949c759f8cf1fa2",
+    "date": "2026-11-04T08:31:33+00:00",
+    "subject": "stack (squashed, message pending)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/35f8d768cb76.md",
+    "original_message_sha256": "1809fd423915c04a87d9fe942bbce3c7c2491e475efdc37f9bc4c9093702216e"
+  },
+  {
+    "commit": "860d79e14a436689682a2db966206ec84b8f5fcf",
+    "date": "2026-11-04T09:10:32+00:00",
+    "subject": "wip align: hot sections at fixed 64-byte offsets",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-final"
+    ],
+    "record": "history/commits/860d79e14a43.md",
+    "original_message_sha256": "1d044355698bc87ebf9d32a6d2b6fee01467e80c1d6959737cc2daad10cd1128"
+  },
+  {
+    "commit": "b997cba22a0491ef1d9b17259be560839b6c7e84",
+    "date": "2026-11-04T09:28:26+00:00",
+    "subject": "NEGATIVE x-nx: diagnostics (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/xnx-diagnostics"
+    ],
+    "record": "history/commits/b997cba22a04.md",
+    "original_message_sha256": "2ac3f3e856ff00dbe95450228a7d7855b517e72e10be5c2309c5ac81ab8d079a"
+  },
+  {
+    "commit": "1825a57d8a19bda4fba0eb71ecede2a59379b7b8",
+    "date": "2026-11-04T09:28:26+00:00",
+    "subject": "NEGATIVE x-nx: axis-inheritance (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/xnx-axis-inheritance"
+    ],
+    "record": "history/commits/1825a57d8a19.md",
+    "original_message_sha256": "eed37546b3301d2a33e54799e78ba7d653d005c3435cb8efd9140875b928d87f"
+  },
+  {
+    "commit": "ecfca0cdf9c91c35ee47f03a9cd8265687edb0d1",
+    "date": "2026-11-04T10:08:09+00:00",
+    "subject": "NEGATIVE x-h48: eoesep-fallback (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/xh48-eoesep-fallback"
+    ],
+    "record": "history/commits/ecfca0cdf9c9.md",
+    "original_message_sha256": "a68a6a7e9e6b5d93c872e8e5a9df6c2803e74766ae7eb17d2093d12478c056b9"
+  },
+  {
+    "commit": "cb5f4063f7764c2560c2ab87208c3d05037e3a7e",
+    "date": "2026-11-04T10:08:09+00:00",
+    "subject": "NEGATIVE x-h48: base11-h11 (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/xh48-base11-h11"
+    ],
+    "record": "history/commits/cb5f4063f776.md",
+    "original_message_sha256": "3515909fdca271fadbde84065ac096f9d856a35be9dcc72ea2c12f9b43a413af"
+  },
+  {
+    "commit": "e6a8130ee4f1207d7ba7ec3bf1852df9a83dbdc6",
+    "date": "2026-11-04T10:27:40+00:00",
+    "subject": "NEGATIVE c9: claims sized to idle lanes (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c9-claims-idle-lanes"
+    ],
+    "record": "history/commits/e6a8130ee4f1.md",
+    "original_message_sha256": "6f455187ca5c4f5775dd7689d2308a186f5cf1893de15287eb26cd9e3a818d61"
+  },
+  {
+    "commit": "b2f2c9a3dd1fd832b204ff7cf7ec42d64eb69fc5",
+    "date": "2026-11-04T10:31:18+00:00",
+    "subject": "lints: clippy pedantic, std idioms instead of C idioms",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/b2f2c9a3dd1f.md",
+    "original_message_sha256": "92e1bc100e7057901b1f585b897bc1260fae6f916270893a2060a6fa50f3a992"
+  },
+  {
+    "commit": "301115f5352947152b7448a03184996ea678bad3",
+    "date": "2026-11-04T10:31:18+00:00",
+    "subject": "cubie, coord: descriptive names and docs",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/301115f53529.md",
+    "original_message_sha256": "2b11839684ab43b5656428206f1aa6f13aaa416772611e13e1567e18997c08a0"
+  },
+  {
+    "commit": "44530928bf5d57dd9ef4d5b3cd131f110b5cfb6e",
+    "date": "2026-11-04T10:31:18+00:00",
+    "subject": "simd, tables, gen, lib: descriptive names and docs",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/44530928bf5d.md",
+    "original_message_sha256": "df9142a3b0f1640a8022dc9ed815b883d3aff472f2271091d4144b1128ca6d2c"
+  },
+  {
+    "commit": "ece816ad95c0a22de74c69dfb72dd87c9f0dcde8",
+    "date": "2026-11-04T10:31:18+00:00",
+    "subject": "solver: descriptive names, docs, search split into steps",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/ece816ad95c0.md",
+    "original_message_sha256": "3a9e1b07bf02512f4e80f10fd019a25791da13c7081391b3ba22e2e70531116d"
+  },
+  {
+    "commit": "854dfe834565ff5d49c1aab02bc83bed802fd83a",
+    "date": "2026-11-04T10:31:18+00:00",
+    "subject": "bins, tests, examples: descriptive names and docs",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/854dfe834565.md",
+    "original_message_sha256": "ce5a5460f37a5ce98ba88d96411b630c0b3f2b67d7a293e76139d238b3ca17b8"
+  },
+  {
+    "commit": "3cc6ee3f7ea4f4d254f1fdcb8f51812b1dbf94d9",
+    "date": "2026-11-04T10:31:18+00:00",
+    "subject": "lanes: descriptive field and item names",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/3cc6ee3f7ea4.md",
+    "original_message_sha256": "6d9dfc671da5bdbbd3df47dcb67ba637f38d6fe2ae8e02978e8d5c57cd441723"
+  },
+  {
+    "commit": "3f7054d21503a4f72cd53b876ed93f370d33f793",
+    "date": "2026-11-04T10:31:18+00:00",
+    "subject": "lanes: descriptive local names",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/3f7054d21503.md",
+    "original_message_sha256": "2314ffa53f03b20b2351027b7103a39b8677167275dfc2f768b97847d2b36602"
+  },
+  {
+    "commit": "ab5d21a67f5bb073b61a12b3b307115b8f898140",
+    "date": "2026-11-04T10:31:18+00:00",
+    "subject": "lanes: docs",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/ab5d21a67f5b.md",
+    "original_message_sha256": "f80e85d66aa9c64ee6179398da08d1281dfb178ff5a18bdd2d76e90862537584"
+  },
+  {
+    "commit": "b60889076b2f59a4b3b4c6e9418f9fdacc783c9e",
+    "date": "2026-11-04T10:31:18+00:00",
+    "subject": "lanes: get_unchecked at the index instead of assert_unchecked hints",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/b60889076b2f.md",
+    "original_message_sha256": "18f4d0ae28eb2c257efdd8d53936da7d8e0bb20b83af1c5e6e240e53b2aeb97e"
+  },
+  {
+    "commit": "dda14e259d972c83547fa4c76a7aa00a283102bf",
+    "date": "2026-11-04T10:31:18+00:00",
+    "subject": "annotations: the measured gain of each optimization, inline",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/dda14e259d97.md",
+    "original_message_sha256": "e6e4a964fc6bf4757d455507647e0c080bbc60c4f722f22948721e75ddde6bc6"
+  },
+  {
+    "commit": "c9a1c4ddfcc0c0307caf8dab6b5a3ed52c63bcec",
+    "date": "2026-11-04T10:32:43+00:00",
+    "subject": "Merge work/s8: readability sweep (names, docs, clippy pedantic, std idioms, get_unchecked, gain comments)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/c9a1c4ddfcc0.md",
+    "original_message_sha256": "8b8d4f9dd2b45ea45935cf7747768ab90a6bab958092e3aa9ef64ec16b95516e"
+  },
+  {
+    "commit": "735dd254c5835f83b3892ff275e6473f406827e4",
+    "date": "2026-11-04T10:35:17+00:00",
+    "subject": "share: the two gain comments missing from l6-share-3",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/735dd254c583.md",
+    "original_message_sha256": "aed3ac9455325eda074b76fbce84b46b43adee2799c93c4fb4ad5679b51efe6f"
+  },
+  {
+    "commit": "e70f83de2a7b55d26ae5dbaa1cae53ef86894c20",
+    "date": "2026-11-04T10:36:12+00:00",
+    "subject": "renamed base (abce87c through s8 map)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/e70f83de2a7b.md",
+    "original_message_sha256": "bc16c4390cb7dd712d6bbfa0ec35bbaa6414b1357a8564cb5398ccc87d5a287d"
+  },
+  {
+    "commit": "53c26be3bb63f0b2f0c01b7697cc7e5ece39abeb",
+    "date": "2026-11-04T10:36:12+00:00",
+    "subject": "mine renamed",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-port-base"
+    ],
+    "record": "history/commits/53c26be3bb63.md",
+    "original_message_sha256": "665fa46d5f6417798f53ddaba072a3323563ea8144626b98af34d9c3651fe637"
+  },
+  {
+    "commit": "67cae2e77b76349d86a5ec63c49d4416277b114c",
+    "date": "2026-11-04T10:41:30+00:00",
+    "subject": "port: stack + align on 735dd25 (wip)",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-port"
+    ],
+    "record": "history/commits/67cae2e77b76.md",
+    "original_message_sha256": "82f8172d13a73046cfae9da3fe9f0210cb1bd4df9e848b0d580c84e1d3d71d95"
+  },
+  {
+    "commit": "ef5887fca9f6958e5837678c6682b2f645c121fd",
+    "date": "2026-11-04T11:41:08+00:00",
+    "subject": "wip c1 align",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-c1"
+    ],
+    "record": "history/commits/ef5887fca9f6.md",
+    "original_message_sha256": "371a4acef042a69852d583024d699efdb73f4e9e3c209c4ecd055f87b069b4c5"
+  },
+  {
+    "commit": "48d9d272d87f8875e56edafc24804765ed3c0b76",
+    "date": "2026-11-04T11:41:12+00:00",
+    "subject": "wip c2 stack",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-c2"
+    ],
+    "record": "history/commits/48d9d272d87f.md",
+    "original_message_sha256": "6231f3cac23baad7f989528b06826bbda6535c8ca16526ba0fe857c2b2878899"
+  },
+  {
+    "commit": "33ca4494589e142872f252aa1b2c3bba6a350ef3",
+    "date": "2026-11-04T12:45:05+00:00",
+    "subject": "share: trace lines buffered, costly counters behind CUBE_TRACE bits",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/33ca4494589e.md",
+    "original_message_sha256": "49b886987bded36b6d9a8ae760400dc0b52ba29e444019e066fa24e1b2e930d7"
+  },
+  {
+    "commit": "085a9fd342e72bec2fdf64cc20edd70d76aadc63",
+    "date": "2026-11-04T12:45:05+00:00",
+    "subject": "share: one barrier-free first pass for the iterations up to 16",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/085a9fd342e7.md",
+    "original_message_sha256": "0f961de18da24764ebc1651092767eca60811049f5f5366f7fd160962cb34f3f"
+  },
+  {
+    "commit": "1f4c85a0983f6b4c207595561d4a52411587dcf8",
+    "date": "2026-11-04T12:45:05+00:00",
+    "subject": "share: in iteration tails, a thread splits its own lanes only while it has at most 8 active",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/1f4c85a0983f.md",
+    "original_message_sha256": "902bc68465b62b016970c62f77a46487cca135cadf0a7fdfc9efb3d1b812c60a"
+  },
+  {
+    "commit": "43a98ccf6c58e32d74d6e0629636fa4702768ae1",
+    "date": "2026-11-04T12:49:59+00:00",
+    "subject": "NEGATIVE c10: first-pass-order (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c10-first-pass-order"
+    ],
+    "record": "history/commits/43a98ccf6c58.md",
+    "original_message_sha256": "d454b7253bc14201fdc57897ace2b4924cbae99e341b02af7e5d73723fa3b3d7"
+  },
+  {
+    "commit": "19afe7a0308e7f88d0d29b25b603932c6b00d486",
+    "date": "2026-11-04T12:49:59+00:00",
+    "subject": "NEGATIVE c10: dord (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c10-dord"
+    ],
+    "record": "history/commits/19afe7a0308e.md",
+    "original_message_sha256": "5fe0e6d4c5a93f38fd8c31a1a5771d724b3265454efcd41e618babe9d156fc1b"
+  },
+  {
+    "commit": "9b5d34d9557c855bfc294613f07e3d376000cc64",
+    "date": "2026-11-04T12:50:22+00:00",
+    "subject": "wip c1 align",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-c1n"
+    ],
+    "record": "history/commits/9b5d34d9557c.md",
+    "original_message_sha256": "371a4acef042a69852d583024d699efdb73f4e9e3c209c4ecd055f87b069b4c5"
+  },
+  {
+    "commit": "5edd4935e0f939c4b135728c4bf8bf8d956410aa",
+    "date": "2026-11-04T12:50:25+00:00",
+    "subject": "wip c2 stack",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m7-c2n"
+    ],
+    "record": "history/commits/5edd4935e0f9.md",
+    "original_message_sha256": "6231f3cac23baad7f989528b06826bbda6535c8ca16526ba0fe857c2b2878899"
+  },
+  {
+    "commit": "9e692430e34face39da3594eed2c272709d1bdb8",
+    "date": "2026-11-04T13:14:52+00:00",
+    "subject": "share: after a solved cube, drop its lanes first, then refill them together",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/9e692430e34f.md",
+    "original_message_sha256": "2ac81d7c6f3c56b8807093a9426644acc13e3a1489aa3cfd33bf7d003598bd2f"
+  },
+  {
+    "commit": "3a0994fbd1a1a05333b2e737965be472724f53ae",
+    "date": "2026-11-04T13:53:31+00:00",
+    "subject": "NEGATIVE x-h48: permutation parity bit instead of an EO bit (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/xh48-parity-bit"
+    ],
+    "record": "history/commits/3a0994fbd1a1.md",
+    "original_message_sha256": "fa7f5040f7b9bf6ff1fdcb428177983594383fe33e3510982be42b33db98f137"
+  },
+  {
+    "commit": "5cce44d59af63c92747b56f35ca7f4aa88e8ace5",
+    "date": "2026-11-04T14:01:36+00:00",
+    "subject": "share: a first pass claims its jobs in extension order (no sort)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/5cce44d59af6.md",
+    "original_message_sha256": "1a8ca2935ccce157aa474d4285aed9c5b55690e2bda3f60d1c537aa1f645fe89"
+  },
+  {
+    "commit": "18e2da17ae1b39754d3506c4c0d76990814331b6",
+    "date": "2026-11-04T14:07:09+00:00",
+    "subject": "NEGATIVE c10: pass-big-first (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c10-pass-big-first"
+    ],
+    "record": "history/commits/18e2da17ae1b.md",
+    "original_message_sha256": "1a8cc2d20278a84022a224bc1e71d160ea56620583ed36fd1a7a0540801a18c4"
+  },
+  {
+    "commit": "9c6e48471a3f8653135d92996cf22827923dce49",
+    "date": "2026-11-04T14:54:11+00:00",
+    "subject": "lanes: count nodes into Lane::stats where they are reached",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m7-memcnt-595"
+    ],
+    "record": "history/commits/9c6e48471a3f.md",
+    "original_message_sha256": "a7f9670c5a7855bfea09f0e80b327b1d464d5a71da2390221ebc3e7d6fcc716b"
+  },
+  {
+    "commit": "1c31eca1d56ee3281d1d8de6ec049b775f79e524",
+    "date": "2026-11-04T15:14:23+00:00",
+    "subject": "hot: the stream and share loops start at fixed offsets of a 64-byte line",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/1c31eca1d56e.md",
+    "original_message_sha256": "b0241349d71d548098c72f888cad81e230f23ece6db07591d2d152c0b1b13f6c"
+  },
+  {
+    "commit": "f8a4919d06752c1f4d80a201cc2a9f8006cbe394",
+    "date": "2026-11-04T15:14:23+00:00",
+    "subject": "lanes: fewer \u00b5ops per generated child (lazy child cube, blsmsk count, move tables, early stores, index tweaks)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/f8a4919d0675.md",
+    "original_message_sha256": "c44dc435feb2766e745d93578eeca5538a7c0cd1c29dc8f8d4f455ac1fabf7fa"
+  },
+  {
+    "commit": "3a197be78f2d6e0805ef4e33fbe6c55565ec777b",
+    "date": "2026-11-04T15:17:33+00:00",
+    "subject": "NEGATIVE m7: spec-prefetch (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m7-spec-prefetch"
+    ],
+    "record": "history/commits/3a197be78f2d.md",
+    "original_message_sha256": "fa28c6034dcb8c4e27f5da96293d7b6346443e8bd7b302473e23f522db783840"
+  },
+  {
+    "commit": "8cda81a90ea53c0fd9772cf26a7789fe243aa807",
+    "date": "2026-11-04T15:17:33+00:00",
+    "subject": "NEGATIVE m7: read-ahead (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m7-read-ahead"
+    ],
+    "record": "history/commits/8cda81a90ea5.md",
+    "original_message_sha256": "ccd0688d496cd6b4377518bfc26734dbab4d346feba85fdaaeefc9355bafd9d5"
+  },
+  {
+    "commit": "5807139f3fc5b6fab39e99c2f3c9a491257ed265",
+    "date": "2026-11-04T15:17:33+00:00",
+    "subject": "NEGATIVE m7: memory-node-count (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m7-memory-node-count"
+    ],
+    "record": "history/commits/5807139f3fc5.md",
+    "original_message_sha256": "51c283716523da3744d86581f40d0e189788c78bb893228a358519453777eae4"
+  },
+  {
+    "commit": "2b3f3fd2d90eb1c73fcfe7cbcb249de733b991dc",
+    "date": "2026-11-04T15:17:33+00:00",
+    "subject": "NEGATIVE m7: diag-value-latency (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m7-diag-value-latency"
+    ],
+    "record": "history/commits/2b3f3fd2d90e.md",
+    "original_message_sha256": "f559f903df4f536933c462779882478d090e835344173f7cd62656c150ae06ff"
+  },
+  {
+    "commit": "1dad831878a4f0fd4d1495c5f78459566f09aa74",
+    "date": "2026-11-04T15:35:15+00:00",
+    "subject": "NEGATIVE x-vc: p18bc-variants (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/xvc-p18bc-variants"
+    ],
+    "record": "history/commits/1dad831878a4.md",
+    "original_message_sha256": "e7d8808de3f12643f4296babc3d43594028bf936ca19ff7247a11d3e867a9938"
+  },
+  {
+    "commit": "d5f6550ea381ee035a9d33d80e7f50bbbbd1edc4",
+    "date": "2026-11-04T15:35:15+00:00",
+    "subject": "NEGATIVE x-vc: p18-dense (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/xvc-p18-dense"
+    ],
+    "record": "history/commits/d5f6550ea381.md",
+    "original_message_sha256": "779a8141e6eed66c51598babbf6a0798f5bfd7cf744c46477a7be414cee6e4d4"
+  },
+  {
+    "commit": "0d8cce152814d81e12b55d9834d2e2a05a8e2b1b",
+    "date": "2026-11-04T15:35:15+00:00",
+    "subject": "NEGATIVE x-vc: diag-index-chain-latency (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/xvc-diag-index-chain-latency"
+    ],
+    "record": "history/commits/0d8cce152814.md",
+    "original_message_sha256": "fa8e093355c4c9d030f7a9e68dce887567c930b387a7485d5ca1e4b723e0f88d"
+  },
+  {
+    "commit": "cd45a97591685f83a89003e987b27cd3e02853d8",
+    "date": "2026-11-04T15:35:15+00:00",
+    "subject": "NEGATIVE x-vc: cocsep-18bit-p18d (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/xvc-cocsep-18bit-p18d"
+    ],
+    "record": "history/commits/cd45a9759168.md",
+    "original_message_sha256": "5328f61b15f164dd08439ff630272ea86c2189bbda41e9827d8555e7508ae137"
+  },
+  {
+    "commit": "225283c09bdd30a974d3dbe9c638d5f50ad0027d",
+    "date": "2026-11-04T15:35:15+00:00",
+    "subject": "NEGATIVE x-vc: clflushopt-table-lines (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/xvc-clflushopt-table-lines"
+    ],
+    "record": "history/commits/225283c09bdd.md",
+    "original_message_sha256": "439f0016484ea424b64adbcd97f968af40904974f840fa7bcc995cdec83350c3"
+  },
+  {
+    "commit": "2b4d326f63848328ca60051e2ffba30eac91ce01",
+    "date": "2026-11-04T15:35:15+00:00",
+    "subject": "NEGATIVE x-vc: ck2-halfsplit (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/xvc-ck2-halfsplit"
+    ],
+    "record": "history/commits/2b4d326f6384.md",
+    "original_message_sha256": "620f63c8e7b8d5fa814cbdaeb92dfcb622d562cc1831698661b9a4081bc03bbe"
+  },
+  {
+    "commit": "673d49e5d6f829cda57495b158d8e7b51690deae",
+    "date": "2026-11-04T15:49:46+00:00",
+    "subject": "tables, gen: any table size h0..h11 generated directly; self-describing table files",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/673d49e5d6f8.md",
+    "original_message_sha256": "ced2b569b4b5705f6a72f13cd33e867bb08c6fbe51a06b13f0fdced4f45401af"
+  },
+  {
+    "commit": "84a4aa1e2d378e0ce29d5564a3ed42a33882edbe",
+    "date": "2026-11-04T15:49:46+00:00",
+    "subject": "backends: portable cube (NEON, scalar; wasm ground) next to the unchanged x86 one",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/84a4aa1e2d37.md",
+    "original_message_sha256": "0fa8a5656cff820371e40538aafae9a37c7ea65f25978d2b522622468e0f722d"
+  },
+  {
+    "commit": "fe926ed60a20a727eededffdc1f6c83af7d8da3c",
+    "date": "2026-11-04T15:49:46+00:00",
+    "subject": "laptop: lanes per table size, README \"Running on a laptop\"",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/fe926ed60a20.md",
+    "original_message_sha256": "7c5b27bc97968ad18ca09a84eee869c85df0b26529cb5704ceaea2ec1e2d6e8b"
+  },
+  {
+    "commit": "d0091528a64cfb6f9769fcfe0f845d87a5ef9f90",
+    "date": "2026-11-04T16:00:36+00:00",
+    "subject": "NEGATIVE p10: map-4k-pages (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/p10-map-4k-pages"
+    ],
+    "record": "history/commits/d0091528a64c.md",
+    "original_message_sha256": "1f39cad1e68ce9380dac27615efc532d42afcc6a8548ae467cda9c58144c61ba"
+  },
+  {
+    "commit": "c8d9400f4c90136c0b607192e22dd0178500a047",
+    "date": "2026-11-04T16:00:36+00:00",
+    "subject": "NEGATIVE p10: h7-base10 (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/p10-h7-base10"
+    ],
+    "record": "history/commits/c8d9400f4c90.md",
+    "original_message_sha256": "3c84cb4d46386d51184819120888cf5dcce28d3f695b9ba42df77c0b61e97681"
+  },
+  {
+    "commit": "30c42fa3e2b6db7778a6af39aa1c9d36679bd597",
+    "date": "2026-11-04T16:00:36+00:00",
+    "subject": "NEGATIVE p10: h11-lanes40 (not merged)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/p10-h11-lanes40"
+    ],
+    "record": "history/commits/30c42fa3e2b6.md",
+    "original_message_sha256": "1d6a9f980545f0cfe06c227dc8ac5c9bd7a157ea70a69d67c880778c9b6c6127"
+  },
+  {
+    "commit": "a5464296eea9c0ee7e2bd2a9bda8c201d196502d",
+    "date": "2026-11-04T16:14:19+00:00",
+    "subject": "simd: hot tables aligned to a 4 KiB page",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/a5464296eea9.md",
+    "original_message_sha256": "22845e37275fd8852da5f9a5f84c6b5a7c9d16efaafa4429d0590ccef67f167d"
+  },
+  {
+    "commit": "857a0c650407a26d4cfa69e45bfe5afa10defcd0",
+    "date": "2026-11-04T16:55:52+00:00",
+    "subject": "symstart: one job per class of equivalent prefixes for symmetric inputs",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/857a0c650407.md",
+    "original_message_sha256": "b1b199a7057543065cd19fce681540557ae6558cbb960b81861a4bc4b2ca2e5d"
+  },
+  {
+    "commit": "287e14a62ce128a80185f9962c602f774d06bdec",
+    "date": "2026-11-04T16:58:18+00:00",
+    "subject": "Notes added by 'git notes add'",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/287e14a62ce1.md",
+    "original_message_sha256": "9881f0b70e29a93f099fc0f0d6c09086ce085ea8b9ed2f372ed2b88cb1b526f0"
+  },
+  {
+    "commit": "b014902ac3788224993ba737a3c0bcf24238bab7",
+    "date": "2026-11-04T16:59:07+00:00",
+    "subject": "m8: unsafe pass (WIP)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/b014902ac378.md",
+    "original_message_sha256": "11d0a661edaf5a73bef97af462c501d7795dd8a67d4315500cd0ca4dcb368068"
+  },
+  {
+    "commit": "96c1c48fd3cd8b02b247186ba73ff9f15fd9b582",
+    "date": "2026-11-04T16:59:11+00:00",
+    "subject": "WIP ix: msplit rows pre-shifted (no imul after the msplit lookup)",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m8-ix"
+    ],
+    "record": "history/commits/96c1c48fd3cd.md",
+    "original_message_sha256": "f9271563b32852e4f54fd972ec31a4989714b9a86054d062c32a805872c8387e"
+  },
+  {
+    "commit": "2227080975db20f0f093d3ef711343aa67cc8285",
+    "date": "2026-11-04T16:59:11+00:00",
+    "subject": "WIP pm: apply_move both fix-up candidates in parallel",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m8-pm"
+    ],
+    "record": "history/commits/2227080975db.md",
+    "original_message_sha256": "25a2cad535edae13042440ea7f4f92f0c7c42bab446a67ce70ac6593638f8a48"
+  },
+  {
+    "commit": "34cb3d01345fb14cbf870fb3f3000075a48e04a4",
+    "date": "2026-11-04T16:59:11+00:00",
+    "subject": "WIP e1: prefetch runs 4 ahead",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m8-e1"
+    ],
+    "record": "history/commits/34cb3d01345f.md",
+    "original_message_sha256": "66aa7e052ebbdbdd39755b2bc2eb6ba9a3b2f4a59c27ffe39af062d34d5eee67"
+  },
+  {
+    "commit": "37f10e69fb57056687e83b2f4ceab51e2fcc7b51",
+    "date": "2026-11-04T17:01:08+00:00",
+    "subject": "m8: unsafe pass (WIP, 2 more)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/37f10e69fb57.md",
+    "original_message_sha256": "c39ccf7d496105b9e58da2c507e9314a77c95d30b9112911760acb979f65b69a"
+  },
+  {
+    "commit": "c136ffad892d4625f897b2a15faa773b0a042159",
+    "date": "2026-11-04T17:06:45+00:00",
+    "subject": "m8: unsafe pass (WIP, find_split)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/c136ffad892d.md",
+    "original_message_sha256": "7a5a963a68e44705a65e7526de888f4ccdcc8cb3154315e96a482285bce00931"
+  },
+  {
+    "commit": "fcfabaf74b2ecfc5854dc39a22dd104dc5ba2787",
+    "date": "2026-11-04T17:11:50+00:00",
+    "subject": "WIP rp: share lanes by pointer",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m8-rp"
+    ],
+    "record": "history/commits/fcfabaf74b2e.md",
+    "original_message_sha256": "198d806c5e0abbb3447195685629adee516ba9569be1757df2d5d4c11e3daf3e"
+  },
+  {
+    "commit": "88acb9771410f3827128734174acefbd92bb6509",
+    "date": "2026-11-04T17:20:44+00:00",
+    "subject": "m8: unsafe pass (WIP, maintenance paths, sort keys)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/88acb9771410.md",
+    "original_message_sha256": "44fccfe8ba1ac400c6b65d482b782ca2c9dce188eaf88725318bba21560deedc"
+  },
+  {
+    "commit": "18ae814422d16ad4f5844645fdf27444c0a7ad2f",
+    "date": "2026-11-04T17:24:02+00:00",
+    "subject": "WIP uL: unsafe pass without share.rs",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m8-uL"
+    ],
+    "record": "history/commits/18ae814422d1.md",
+    "original_message_sha256": "f210e2111ce62c1c367e3dfad17ec58516a084ce8c7d7ecc9cd6afb22ce273a7"
+  },
+  {
+    "commit": "176da902b3f56fae81a978541573bf9a3493e131",
+    "date": "2026-11-04T17:43:11+00:00",
+    "subject": "WIP ix: msplit rows pre-shifted (no imul after the msplit lookup)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/176da902b3f5.md",
+    "original_message_sha256": "f9271563b32852e4f54fd972ec31a4989714b9a86054d062c32a805872c8387e"
+  },
+  {
+    "commit": "49e893d45683c3135f8384aab0b50f270443ec44",
+    "date": "2026-11-04T17:43:11+00:00",
+    "subject": "WIP pm: apply_move both fix-up candidates in parallel",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/49e893d45683.md",
+    "original_message_sha256": "25a2cad535edae13042440ea7f4f92f0c7c42bab446a67ce70ac6593638f8a48"
+  },
+  {
+    "commit": "acde8cbfecd64de3e1fcca2cb6dc967fe2d789f0",
+    "date": "2026-11-04T17:43:11+00:00",
+    "subject": "WIP e1: prefetch runs 4 ahead",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/acde8cbfecd6.md",
+    "original_message_sha256": "66aa7e052ebbdbdd39755b2bc2eb6ba9a3b2f4a59c27ffe39af062d34d5eee67"
+  },
+  {
+    "commit": "cff53a57691ebc7eb1cac980596909eacb9bab07",
+    "date": "2026-11-04T17:43:11+00:00",
+    "subject": "WIP rp: share lanes by pointer",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m8-stack"
+    ],
+    "record": "history/commits/cff53a57691e.md",
+    "original_message_sha256": "198d806c5e0abbb3447195685629adee516ba9569be1757df2d5d4c11e3daf3e"
+  },
+  {
+    "commit": "8926c95e79a016d5de2579f592ce042951f9606c",
+    "date": "2026-11-04T17:59:21+00:00",
+    "subject": "share: job and build buffers touched when allocated (no page faults while a pool warms up)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/8926c95e79a0.md",
+    "original_message_sha256": "f3b5af7acd0d75b9193fdd3380ebe7858aa5c21e07f961c7bb62d7124f2526e9"
+  },
+  {
+    "commit": "def2cd0a16a5f58db9bcc039268eb43eafd4d17e",
+    "date": "2026-11-04T17:59:21+00:00",
+    "subject": "share: the best root-child groups of 10% of the jobs run first in the likely last iterations (top-1 split)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/def2cd0a16a5.md",
+    "original_message_sha256": "223263d02de6ef14794ddaf15aa81735df5fb2062f802ef30fb655e611b91678"
+  },
+  {
+    "commit": "cb3f335f9cdcaff9b5fc1e2ec0477d42309b02f6",
+    "date": "2026-11-04T18:18:26+00:00",
+    "subject": "WIP rp: share lanes by pointer",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m8-pre-def2"
+    ],
+    "record": "history/commits/cb3f335f9cdc.md",
+    "original_message_sha256": "198d806c5e0abbb3447195685629adee516ba9569be1757df2d5d4c11e3daf3e"
+  },
+  {
+    "commit": "9b5838a2717bc9a016b78a0a66750dc59c9c151b",
+    "date": "2026-11-04T18:23:45+00:00",
+    "subject": "NEGATIVE c11: sort-chunk (not merged), plus the order-replay diagnostics",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/c11-sort-chunk"
+    ],
+    "record": "history/commits/9b5838a2717b.md",
+    "original_message_sha256": "7c671899b60205ebaa5294bf623034a63730352166e02abcec426b53702d0bc0"
+  },
+  {
+    "commit": "99250517a43e47b67061cf27a15dbf7c2ca1e6e4",
+    "date": "2026-11-04T18:32:21+00:00",
+    "subject": "lanes, share: unsafe pass (WIP)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/99250517a43e.md",
+    "original_message_sha256": "9c74c0aae5859e8b98dafb05e985b039a37ecc16b56c38a5299c3a31f93547b2"
+  },
+  {
+    "commit": "fe8a1579288f6b2266a23af00afa2b9118185e95",
+    "date": "2026-11-04T18:32:21+00:00",
+    "subject": "share: the round loop visits the lanes by pointer (WIP)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/fe8a1579288f.md",
+    "original_message_sha256": "3db120ebe1b47c0b404dbc36bdece63b552254fa062392009de8e7dab1d8cf34"
+  },
+  {
+    "commit": "7eaede8caef6da394909bd67a680cab8c627483a",
+    "date": "2026-11-04T19:46:05+00:00",
+    "subject": "wasm: SIMD128 backend; the library runs in WebAssembly (WASI, with and without threads)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/7eaede8caef6.md",
+    "original_message_sha256": "95157f5e1d086a971dfab9d63795dff0b77e22430f6220f4eea85ddf68349343"
+  },
+  {
+    "commit": "876a97edb90a8a9ea5cf1530d3f4578f7b3b1b39",
+    "date": "2026-11-04T19:46:05+00:00",
+    "subject": "wasm: the WebAssembly module (wasm/) for browsers and Node; README \"WebAssembly\"",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/876a97edb90a.md",
+    "original_message_sha256": "419253acc127d62ba61ea973e3695673683cb8fff2c0439ad3156be245d45991"
+  },
+  {
+    "commit": "89771347be28f37999ba0702ea191c473cbf7bdb",
+    "date": "2026-11-04T19:48:38+00:00",
+    "subject": "Merge port/wasm: the solver compiles to WebAssembly (SIMD128 backend, wasm/ module for Node and browsers)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/89771347be28.md",
+    "original_message_sha256": "96e2734c46524616c41b283c44971d6f7e10e8b3724297a4746b7f95c686108d"
+  },
+  {
+    "commit": "df0c43c49ba0d83add1f80eb1d10bc3295284a82",
+    "date": "2026-11-04T19:48:48+00:00",
+    "subject": "NEGATIVE m8: index without the multiply after the msplit lookup, both fix-up candidates in apply_move, runs prefetched 4 ahead (neutral as a stack)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m8-index-rows-applymove-runprefetch",
+      "archive/m8-stack2"
+    ],
+    "record": "history/commits/df0c43c49ba0.md",
+    "original_message_sha256": "33ab0681ae5ddc8fc38db9c43f817013fd0b295804f00aa5c1952b9a71ccc525"
+  },
+  {
+    "commit": "afa6b6ae5ad0d704f3e9be3bd5c0eae23a69c379",
+    "date": "2026-11-04T20:18:39+00:00",
+    "subject": "lanes, share: no bounds checks, unwraps or division checks on the search, run and job paths (unsafe pass)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/afa6b6ae5ad0.md",
+    "original_message_sha256": "f4b527270c4d0ee207c032e90163d8361b7187166e48451a23293ab55dbea6ce"
+  },
+  {
+    "commit": "54f3e30cfb4d52099a9ca6b95ef2aa57175ca791",
+    "date": "2026-11-04T20:32:14+00:00",
+    "subject": "share: the round loop visits the lanes by pointer; share pad 16",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/54f3e30cfb4d.md",
+    "original_message_sha256": "20caed04ccef7189a61b0930e37b6e80d736df6f20474565f51f13152ed74c93"
+  },
+  {
+    "commit": "33a80428ab4303cf6a7c7aa145dd856f9bf11cb6",
+    "date": "2026-11-04T20:32:43+00:00",
+    "subject": "lanes, share: no bounds checks, unwraps or division checks on the search, run and job paths (unsafe pass)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/33a80428ab43.md",
+    "original_message_sha256": "f4b527270c4d0ee207c032e90163d8361b7187166e48451a23293ab55dbea6ce"
+  },
+  {
+    "commit": "95cbb11bf2a78bd2e7138c868b4e1b925ec6d25f",
+    "date": "2026-11-04T20:32:43+00:00",
+    "subject": "share: the round loop visits the lanes by pointer; share pad 16",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/95cbb11bf2a7.md",
+    "original_message_sha256": "20caed04ccef7189a61b0930e37b6e80d736df6f20474565f51f13152ed74c93"
+  },
+  {
+    "commit": "ddd551ce6cea9898296bc7421a3a2afbdc6c7620",
+    "date": "2026-11-04T20:32:48+00:00",
+    "subject": "WIP ix: msplit rows pre-shifted (no imul after the msplit lookup)",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m8-ix3"
+    ],
+    "record": "history/commits/ddd551ce6cea.md",
+    "original_message_sha256": "f9271563b32852e4f54fd972ec31a4989714b9a86054d062c32a805872c8387e"
+  },
+  {
+    "commit": "7608a28f10c4c22e2ec421a9ba477e61a3783ba7",
+    "date": "2026-11-04T21:27:40+00:00",
+    "subject": "Merge opt/m8-unsafe: unchecked search/run/job paths, share rounds by pointer (share pad 16)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/7608a28f10c4.md",
+    "original_message_sha256": "5edfcf6912bab69224abf1fdeedfca983716cb519c68ea0cc3f420f4182fa58c"
+  },
+  {
+    "commit": "2143c89483c1aa3d5dee36915a2758eb6a2b2e16",
+    "date": "2026-11-04T21:28:11+00:00",
+    "subject": "EXPERIMENT: stack/heap pads (env CUBEOPT_PAD_TOP, CUBEOPT_PAD_RUN, CUBEOPT_HEAP_PAD), diag",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/2143c89483c1.md",
+    "original_message_sha256": "9bec86b851bf826ec29163adda22c461a6a93ad2d112eadb053584ff90af1324"
+  },
+  {
+    "commit": "2d1a114436ac35691b92cf4191a5057472c8aba3",
+    "date": "2026-11-04T21:28:11+00:00",
+    "subject": "EXPERIMENT: PAD_ROUNDS, PAD_IDLE",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/2d1a114436ac.md",
+    "original_message_sha256": "7b3a1f9112015c1b0fe8c9995578f5b6653aa6b57c8f2e966df293c23da45245"
+  },
+  {
+    "commit": "a8fbc07bad645f81294cfe41d497d6464ee5cb2f",
+    "date": "2026-11-04T21:39:34+00:00",
+    "subject": "Notes added by 'git notes add'",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/a8fbc07bad64.md",
+    "original_message_sha256": "9881f0b70e29a93f099fc0f0d6c09086ce085ea8b9ed2f372ed2b88cb1b526f0"
+  },
+  {
+    "commit": "442f868ccbd9b4c6eb2b7ad290d536f9a87e9b53",
+    "date": "2026-11-04T22:42:35+00:00",
+    "subject": "WIP rp2: only next/end live across the visits",
+    "reachable_from_release": false,
+    "refs": [
+      "archive/m8-rp2"
+    ],
+    "record": "history/commits/442f868ccbd9.md",
+    "original_message_sha256": "fd87cf2960b5aaf0372244e2b8aac8ca878a50ea3749d830e54de3634e68ec36"
+  },
+  {
+    "commit": "2a0574ffd0fecfe1954bc5831a2bb4eedfc6bb9c",
+    "date": "2026-11-05T00:19:01+00:00",
+    "subject": "wasm: threads build hang fixed (wasi-libc init, threads that never exit, memory that never grows); wasm steps of check.sh time-limited",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/2a0574ffd0fe.md",
+    "original_message_sha256": "03dac423ede72f378ccbe98e14597c72d5397339a25e83ed14338f381a16ac73"
+  },
+  {
+    "commit": "3a9a50a1c6585a2511e9a3d192e0f4bef7138edb",
+    "date": "2026-11-05T01:29:23+00:00",
+    "subject": "Merge port/wasm-hangfix: wasm threads build no longer hangs (wasi-libc init, persistent thread pool, fixed memory)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/3a9a50a1c658.md",
+    "original_message_sha256": "d115281800c23fe203b2e7c3e3b0297b852cbd945e9070c974ea364b0fc8a819"
+  },
+  {
+    "commit": "7443b8f12fbcfea85978344ae3654f2cb47c7413",
+    "date": "2026-11-05T01:29:48+00:00",
+    "subject": "WIP e1: prefetch runs 4 ahead",
+    "reachable_from_release": false,
+    "refs": [
+      "work/m8-r2"
+    ],
+    "record": "history/commits/7443b8f12fbc.md",
+    "original_message_sha256": "66aa7e052ebbdbdd39755b2bc2eb6ba9a3b2f4a59c27ffe39af062d34d5eee67"
+  },
+  {
+    "commit": "13dc481f3d832aedeab7c95ed56701700fc2e2c3",
+    "date": "2026-11-05T01:46:41+00:00",
+    "subject": "neg: stack and heap placement sweeps of the share and stream threads (tools, no gain)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/s9-placement-sweep"
+    ],
+    "record": "history/commits/13dc481f3d83.md",
+    "original_message_sha256": "44578dc658c3387370be240cb0d5250d9bb20d496e6a146d4504eb00016faef0"
+  },
+  {
+    "commit": "168830dc564fb6cf8c9b2c67a839f3bb8804d83a",
+    "date": "2026-11-05T02:47:36+00:00",
+    "subject": "neg: stack placement pinned without pinning the hot code's page offset",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/s9-stack-pin-only"
+    ],
+    "record": "history/commits/168830dc564f.md",
+    "original_message_sha256": "384ed7a34aa9d3bdfe9f42063ea4a8270ab7d6eb02be30b57e03c0e6222947c6"
+  },
+  {
+    "commit": "fe8ee7e7fb1ba4c2c468a7b07903c0344527f149",
+    "date": "2026-11-05T02:56:50+00:00",
+    "subject": "NEGATIVE m8: setup_run prefetches the job and child order of the run 4 entries ahead (neutral)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m8-run-prefetch-4"
+    ],
+    "record": "history/commits/fe8ee7e7fb1b.md",
+    "original_message_sha256": "7c9471705f3e7d48eb01a58f5cdb81e57dfc94d915ff0db602b727991b5908d9"
+  },
+  {
+    "commit": "398fdb8c19f25fa2cc5a4d61110d88923a2fd1e5",
+    "date": "2026-11-05T02:56:50+00:00",
+    "subject": "NEGATIVE m8: Worker::rounds keeps only the lane pointers live (neutral to negative)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/m8-rounds-live-set"
+    ],
+    "record": "history/commits/398fdb8c19f2.md",
+    "original_message_sha256": "1ea5f7cdd718b5eb913aa2b99a8c3fee04c30e973bc384d656414b8cebd48a5b"
+  },
+  {
+    "commit": "df9f8d6b7d005a7805a285017cf836d0a8d52021",
+    "date": "2026-11-05T04:39:49+00:00",
+    "subject": "NEGATIVE: PGO of bench, stream mode, re-measured with pinned hot-loop pads (best pad 32: -0.2% at 1T)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/pb1-pgo-stream"
+    ],
+    "record": "history/commits/df9f8d6b7d00.md",
+    "original_message_sha256": "8c06094fe9a8a660de5c4eef6064c72c60e5222bffd2d90bfdaea7447f461567"
+  },
+  {
+    "commit": "a20b030805e34b3e30db0d89998b8c23016a8ba1",
+    "date": "2026-11-05T04:40:05+00:00",
+    "subject": "NEGATIVE: BOLT on top of PGO (bench): stream -1.3% at 1T, share no better than PGO alone",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/pb1-pgo-bolt"
+    ],
+    "record": "history/commits/a20b030805e3.md",
+    "original_message_sha256": "f719a07aa9810a86eebcc5392a0862763b652bef1aa19326f7be3be39d718b71"
+  },
+  {
+    "commit": "fa1d453f51544636f89b57713a7f41f968e43c63",
+    "date": "2026-11-05T04:43:41+00:00",
+    "subject": "share: a first pass reports no longer solution while it reports its shortest one",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/fa1d453f5154.md",
+    "original_message_sha256": "0f4f9832b7e4d228803e30660478b2bedfffd7f13171e02a623fba11a5834901"
+  },
+  {
+    "commit": "04b6d8466ead4faf15cd9c88a3f178696b6a8957",
+    "date": "2026-11-05T04:43:41+00:00",
+    "subject": "share: cancel_done counts down the jobs it leaves with nothing pending (release flake)",
+    "reachable_from_release": false,
+    "refs": [],
+    "record": "history/commits/04b6d8466ead.md",
+    "original_message_sha256": "84085736eacfed622cf690a8c6203838759536b51176f8bbe9259b49f430e4d6"
+  },
+  {
+    "commit": "f99a27bc7ae95287d205b712e63482249612a2d6",
+    "date": "2026-11-05T04:43:41+00:00",
+    "subject": "check.sh: under qemu, the /proc/self/maps test runs alone; failed greps stop the script",
+    "reachable_from_release": false,
+    "refs": [
+      "work/r8"
+    ],
+    "record": "history/commits/f99a27bc7ae9.md",
+    "original_message_sha256": "68eb26306c6e770a63443d985103e1c16ee7bcf3562e6fd50302ca5bb6d5eb5c"
+  },
+  {
+    "commit": "9be649d70d6a0757422e670d3f620e8cb3d32b36",
+    "date": "2026-11-05T04:44:59+00:00",
+    "subject": "share: a first pass reports no longer solution while it reports its shortest one",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/9be649d70d6a.md",
+    "original_message_sha256": "0f4f9832b7e4d228803e30660478b2bedfffd7f13171e02a623fba11a5834901"
+  },
+  {
+    "commit": "1571c4758aca9929c527063fe4419ad4c81a8172",
+    "date": "2026-11-05T04:44:59+00:00",
+    "subject": "share: cancel_done counts down the jobs it leaves with nothing pending (release flake)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/1571c4758aca.md",
+    "original_message_sha256": "84085736eacfed622cf690a8c6203838759536b51176f8bbe9259b49f430e4d6"
+  },
+  {
+    "commit": "c620d6985f72c0ec6b9ce3ad8f0320a25118e405",
+    "date": "2026-11-05T04:44:59+00:00",
+    "subject": "check.sh: under qemu, the /proc/self/maps test runs alone; failed greps stop the script",
+    "reachable_from_release": true,
+    "refs": [
+      "fix/r8-share"
+    ],
+    "record": "history/commits/c620d6985f72.md",
+    "original_message_sha256": "68eb26306c6e770a63443d985103e1c16ee7bcf3562e6fd50302ca5bb6d5eb5c"
+  },
+  {
+    "commit": "7b017cc50a23dfabaa64f75b48cc7946eb93c0d9",
+    "date": "2026-11-05T04:45:23+00:00",
+    "subject": "NEGATIVE (r8): Pool::run building its Worker through a `Worker::new` constructor (applies on top of work/r8 f99a27b, i.e. 3a9a50a + r8-share-fix).",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/r8-worker-new-frame"
+    ],
+    "record": "history/commits/7b017cc50a23.md",
+    "original_message_sha256": "aeca378b433b7e90797c239ca374742f43876896452bbcef3edffad08b26d323"
+  },
+  {
+    "commit": "bd49ddbd9835fde1d9975077ec4ca8e71069cd85",
+    "date": "2026-11-05T05:09:40+00:00",
+    "subject": "wasm: Bun instead of Node for the JavaScript tooling (Bun 1.4.4)",
+    "reachable_from_release": false,
+    "refs": [
+      "work/p11"
+    ],
+    "record": "history/commits/bd49ddbd9835.md",
+    "original_message_sha256": "1b2b647c5dd46c04732b1942c3727dab3efc31f090c6d94a177515073b58b1b1"
+  },
+  {
+    "commit": "a7ce28f4a4779b98ff5702bfa284dce8b9f7bdb5",
+    "date": "2026-11-05T05:16:45+00:00",
+    "subject": "Merge fix/r8-share: first pass never reports a longer solution; release flake fixed; qemu-safe NEON check",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/a7ce28f4a477.md",
+    "original_message_sha256": "0dbde300a5cf74206de92cae2d58813813e4ad45f019a6b3e2e7fc0fac6a57cf"
+  },
+  {
+    "commit": "ca31e63a31f95154e7772c737af36ef87b778b0b",
+    "date": "2026-11-05T05:16:45+00:00",
+    "subject": "wasm: Bun instead of Node for the JavaScript tooling (Bun 1.4.4)",
+    "reachable_from_release": true,
+    "refs": [
+      "port/bun"
+    ],
+    "record": "history/commits/ca31e63a31f9.md",
+    "original_message_sha256": "1b2b647c5dd46c04732b1942c3727dab3efc31f090c6d94a177515073b58b1b1"
+  },
+  {
+    "commit": "585b3b651afe0c5da12e2d72db86f98d86ded643",
+    "date": "2026-11-05T05:18:05+00:00",
+    "subject": "Merge port/bun: the wasm/ JavaScript tooling runs on Bun instead of Node (user request)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/585b3b651afe.md",
+    "original_message_sha256": "81a699a939b9f9dcdd71921e2544e5ef4d91822517cf17354747ad1016445721"
+  },
+  {
+    "commit": "1969e3dedc1eb79ef1329f30e22252675a782b94",
+    "date": "2026-11-05T05:18:58+00:00",
+    "subject": "NEG share: open list under spin::RwLock instead of SpinRw",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/d1-spin-rwlock"
+    ],
+    "record": "history/commits/1969e3dedc1e.md",
+    "original_message_sha256": "4c926fd14632d882a992ac28569214e7e9aa704849517a4f2a3c0e3a6610650b"
+  },
+  {
+    "commit": "1af9b73a477cc565885219699ebe40a4396ae53c",
+    "date": "2026-11-05T05:18:58+00:00",
+    "subject": "NEG lanes: sort_jobs and sort_runs by radsort",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/d1-radsort"
+    ],
+    "record": "history/commits/1af9b73a477c.md",
+    "original_message_sha256": "2d483afdd63019b9854632a2f269fd5311929d04178ddb47f0f5624b1e3204b8"
+  },
+  {
+    "commit": "de7159d9991969e92bd4eff36839bf9672c23554",
+    "date": "2026-11-05T05:18:58+00:00",
+    "subject": "NEG share: open list under parking_lot::RwLock instead of SpinRw",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/d1-pl-rwlock"
+    ],
+    "record": "history/commits/de7159d99919.md",
+    "original_message_sha256": "7ef897ef629da0ddab129afaa6df5821f9ee19b80033a461e5330fbc675193fe"
+  },
+  {
+    "commit": "8e2cd70eb69ac7c867fa4a2ebe2ecfee7ff6ba05",
+    "date": "2026-11-05T05:18:58+00:00",
+    "subject": "NEG (no code): in-house items kept after inspection (d1 crate sweep)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/d1-inspection"
+    ],
+    "record": "history/commits/8e2cd70eb69a.md",
+    "original_message_sha256": "5c63469c8e9756c211e9ecb14e73e5d88fa65f244b3f539435e126f35d1f6a2b"
+  },
+  {
+    "commit": "e78d28efdf08b6b2ef3abb439bcf8f89cb9c8f5a",
+    "date": "2026-11-05T05:18:58+00:00",
+    "subject": "NEG symstart: FxHashMap for the dedup map",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/d1-fx-symstart"
+    ],
+    "record": "history/commits/e78d28efdf08.md",
+    "original_message_sha256": "420e52f75b88963ac1a1a0974094d5bda199f3913fe0b5f2034769028dc28de2"
+  },
+  {
+    "commit": "65dfaca8b6b08feb11b9b4404fe43b0f0d2323ac",
+    "date": "2026-11-05T05:18:58+00:00",
+    "subject": "NEG gen: FxHashSet for the dfs prefix set (hashbrown's set adopted instead)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/d1-fx-dfs"
+    ],
+    "record": "history/commits/65dfaca8b6b0.md",
+    "original_message_sha256": "d3db75451b105e52a3e92f1eaece883ffd2512420eb4ae05cd3af928431a6615"
+  },
+  {
+    "commit": "113893e2fccf73d7571b8e66a0ab14e0ede27e27",
+    "date": "2026-11-05T05:18:58+00:00",
+    "subject": "NEG share: SpinRw waits with crossbeam's Backoff",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/d1-backoff-spinrw"
+    ],
+    "record": "history/commits/113893e2fccf.md",
+    "original_message_sha256": "e048823e6d31a164159bea10f6cb0b4257f5292d205f13c86103098e4b85bc4f"
+  },
+  {
+    "commit": "6c37603b99ca0903433e1caca7b54611ae08e853",
+    "date": "2026-11-05T05:18:58+00:00",
+    "subject": "NEG share: idle wait with crossbeam's Backoff",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/d1-backoff-idle"
+    ],
+    "record": "history/commits/6c37603b99ca.md",
+    "original_message_sha256": "718ce9c68bd1f2f879a93ac97b91bec083c0f84b84b15124f653de7c7859c33b"
+  },
+  {
+    "commit": "46fbc3961361384a9d7eafded88fbbb38e70d5f3",
+    "date": "2026-11-05T05:18:58+00:00",
+    "subject": "NEG share: job statistics as atomic_float::AtomicF32 (fetch_add for add_f32)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/d1-atomic-float"
+    ],
+    "record": "history/commits/46fbc3961361.md",
+    "original_message_sha256": "70305249c72966277b3067aa3efcc620554324d2b31ec275c16a81f9fcc505a6"
+  },
+  {
+    "commit": "89dca7b49811be0c00717b87809e7c5de0901f2e",
+    "date": "2026-11-05T06:18:36+00:00",
+    "subject": "fast.sh: the fastest optimal solve of one random scramble (largest table, all threads on one cube)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/89dca7b49811.md",
+    "original_message_sha256": "fab8089dc6ab7a17e3e3bd4460cfaf355e70d021b9acfd9ba94c367585bd878a"
+  },
+  {
+    "commit": "38ab3865e7418331ae407159b2e63bb6391e7cf8",
+    "date": "2026-11-05T06:23:52+00:00",
+    "subject": "DIAGNOSTIC (not for merging): counting global allocator in bench and solve",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/pb1-diag-alloc-count"
+    ],
+    "record": "history/commits/38ab3865e741.md",
+    "original_message_sha256": "ed2f8c7a7a23cc523a9eac52758981df8d651a00a32e3dd67013ec423f5aae67"
+  },
+  {
+    "commit": "66c4f038d70a17b026ffa7030dd2ff6627a7950e",
+    "date": "2026-11-05T06:39:26+00:00",
+    "subject": "scripts/pgo-solve.sh: profile-guided build of `solve` (1T -2.1% ms/cube; 48T -c 1 neutral)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/66c4f038d70a.md",
+    "original_message_sha256": "c46c4b94d5997ce05cddb66d1c50675cdabcd03e89eae18546143ca26b2de9f3"
+  },
+  {
+    "commit": "aee16458e05a0314565d54589303b061ccc2d83d",
+    "date": "2026-11-05T06:39:26+00:00",
+    "subject": "lanes: compile-time size checks of Node, Job and ChildOrder (x86-64)",
+    "reachable_from_release": true,
+    "refs": [
+      "opt/pb1"
+    ],
+    "record": "history/commits/aee16458e05a.md",
+    "original_message_sha256": "a226df1b9d3c7487a2db55b88bcd5c313571c75788545ccb81bbf7d91e7e8e1c"
+  },
+  {
+    "commit": "0d1a0e8c43075a3429f6b3269c7f6198eda80184",
+    "date": "2026-11-05T06:44:54+00:00",
+    "subject": "Merge opt/pb1: Rust Performance Book audit results (optional PGO build of solve, size checks)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/0d1a0e8c4307.md",
+    "original_message_sha256": "98450d4e031d3f1d49e25e7f1eb0535774e303759303c59469fa36e534eef78b"
+  },
+  {
+    "commit": "2f4fb7a0b16a16292a12448032cd70d5c0497cb0",
+    "date": "2026-11-05T06:45:26+00:00",
+    "subject": "share: Pad is crossbeam's CachePadded",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/2f4fb7a0b16a.md",
+    "original_message_sha256": "6ebf0b93d01fd82ee55304221aea6a4f67dd1230277d6e8743b84e8468514e23"
+  },
+  {
+    "commit": "bb0759857a64d2bbe7043e4d4cc1f34939e995d5",
+    "date": "2026-11-05T06:45:33+00:00",
+    "subject": "share: parking_lot's Mutex for the share mode's mutexes",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/bb0759857a64.md",
+    "original_message_sha256": "492f3bc4b1622d3bca9730f4f972e9f0b8bc07321de4866a9b4c57f6c4878295"
+  },
+  {
+    "commit": "31525f16bedd0fb9cdc415b2d0bf981d2e22cafc",
+    "date": "2026-11-05T06:45:33+00:00",
+    "subject": "gen: hashbrown's HashSet for the dfs prefix set",
+    "reachable_from_release": true,
+    "refs": [
+      "opt/d1-crates-v2"
+    ],
+    "record": "history/commits/31525f16bedd.md",
+    "original_message_sha256": "1a7cc12d7a508c16631a1ad7c06920eb946ce5fca84378806d5c7eb88a23c45c"
+  },
+  {
+    "commit": "5855122021bfacfb663bc6b8c483317b23fb3608",
+    "date": "2026-11-05T07:40:56+00:00",
+    "subject": "neg: page-pin the hot code and stack of both binaries (stream loop, its helpers, share)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/s9-full-pin"
+    ],
+    "record": "history/commits/5855122021bf.md",
+    "original_message_sha256": "3f8923e0cea0774dbf5638fdb5e103f5db8e1e5c0aa70a25d036e5c0827e383a"
+  },
+  {
+    "commit": "4c74267c73d12cf840c87acf92c4d89ca23e1211",
+    "date": "2026-11-05T08:00:27+00:00",
+    "subject": "Merge opt/d1-crates-v2: crates.io swaps where measured >= neutral (user request)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/4c74267c73d1.md",
+    "original_message_sha256": "2c235045769e155182bf6202b7887499765c78ad52967c51f850376dd7b62340"
+  },
+  {
+    "commit": "508cbe503004920ba02589bd1353f904447c99e0",
+    "date": "2026-11-05T08:17:39+00:00",
+    "subject": "solve: share workers' state and frames and the round loop at fixed page offsets",
+    "reachable_from_release": true,
+    "refs": [
+      "opt/s9-pin-v2"
+    ],
+    "record": "history/commits/508cbe503004.md",
+    "original_message_sha256": "7f5dfc32d0bdcbc744f87ff2589774674e29c61e7f8a113ecd3a0aae175da8e2"
+  },
+  {
+    "commit": "ca820b6c2a325e8a6cc434c2af07129e77443ba9",
+    "date": "2026-11-05T09:13:26+00:00",
+    "subject": "Merge opt/s9-pin-v2: solve's share mode at fixed page offsets (4K-aliasing-proof layout)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/ca820b6c2a32.md",
+    "original_message_sha256": "90e9f28168aa427f5a891cdeffd7e426a4ab2682023a6b00b1d5d831e0f1e9e4"
+  },
+  {
+    "commit": "8d2dae7142890a05c8840f6ec27b3ad8ceb515d6",
+    "date": "2026-11-05T09:52:26+00:00",
+    "subject": "NEG share: sort_unstable_by for the trace's finish times (+7.6 KB bench .text)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/g1-sort-unstable-trace"
+    ],
+    "record": "history/commits/8d2dae714289.md",
+    "original_message_sha256": "3580327f01de9351c6f547e36de12b3e2f879087b52cb028aa1de837cff53713"
+  },
+  {
+    "commit": "8bf3684c38f2011ad23567c7e5d6b1d45188f8f7",
+    "date": "2026-11-05T09:52:26+00:00",
+    "subject": "NEG gen: Box<[T]> for Generator::derived (changes the BFS relabel pass)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/g1-generator-derived-box"
+    ],
+    "record": "history/commits/8bf3684c38f2.md",
+    "original_message_sha256": "8ce4f9f491821d7fa9e4f32d8065ba011b79b233aed7402c8bc612be41f58395"
+  },
+  {
+    "commit": "17afb1a2d9ccb87f0fd5213c7e1c86aa6857c9a8",
+    "date": "2026-11-05T09:52:26+00:00",
+    "subject": "NEG share: write! instead of format! + extend in Pool::counters (+1.1 KB bench::run)",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/g1-counters-write"
+    ],
+    "record": "history/commits/17afb1a2d9cc.md",
+    "original_message_sha256": "8e69d38b0aae581f153a1246ccd7c11a0043c77fcd80ad6c19bffa5c31d30e3c"
+  },
+  {
+    "commit": "6990603a918d29191a520d55c50e5935e1633c4f",
+    "date": "2026-11-05T12:32:34+00:00",
+    "subject": "tables, cubie: Box<[T]> for the fixed-size cocsep tables and the symmetry list",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/6990603a918d.md",
+    "original_message_sha256": "0ba0d8f1b0b0337a1937fc86b94f87b751e4f32f378da5f5a3460ff387f61abc"
+  },
+  {
+    "commit": "55bca493c5aeb46e7627efc365347691a6d670f5",
+    "date": "2026-11-05T12:32:34+00:00",
+    "subject": "tables::file, cubie: with_capacity at known sizes",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/55bca493c5ae.md",
+    "original_message_sha256": "43808231b72dd5a302d607094c3bcc8b46c89e46450bf4864f97ba229aa33b21"
+  },
+  {
+    "commit": "0d6a899f7a714224697bf9dfeca39822953e0520",
+    "date": "2026-11-05T12:32:34+00:00",
+    "subject": "symstart, cubie: fixed-size arrays instead of temporary Vecs",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/0d6a899f7a71.md",
+    "original_message_sha256": "30d76f52f0ada16e16a2b2d91f1dbce173cbc897c0203249970aa614969a7093"
+  },
+  {
+    "commit": "a5c7a6ffc17a82f7866d335fa47bcc1ecd474174",
+    "date": "2026-11-05T12:32:34+00:00",
+    "subject": "lanes: one allocation per solution in Lane::reconstruct",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/a5c7a6ffc17a.md",
+    "original_message_sha256": "43630335e1f1b73f7c33045e06ff8f03bb836d495eecdefb991f6743d24dd921"
+  },
+  {
+    "commit": "43fc26bf8714e2711f1f2d17f3d45864cb595731",
+    "date": "2026-11-05T12:32:34+00:00",
+    "subject": "cubie, build.rs: format_moves writes one String",
+    "reachable_from_release": true,
+    "refs": [
+      "opt/g1-idioms"
+    ],
+    "record": "history/commits/43fc26bf8714.md",
+    "original_message_sha256": "4cee56dc6e031334733e5b9fe2b2bdaa81140d6cb8b91f7ddf694e69228b2c74"
+  },
+  {
+    "commit": "0c4bfe2e1f64312dca4740e72247b48f26fa4bf9",
+    "date": "2026-11-05T12:36:27+00:00",
+    "subject": "Merge opt/g1-idioms: common Rust idioms on cold paths (user request)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/0c4bfe2e1f64.md",
+    "original_message_sha256": "0dbe97a4b06b4ed6c847cabd72426ad17a89549f8c6bc5b87df3253deae57d71"
+  },
+  {
+    "commit": "b9fc895f860409be38d150f23aced457fb7435e5",
+    "date": "2026-11-05T13:35:36+00:00",
+    "subject": "tables, cubie: thiserror error types for table files and facelets",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/b9fc895f8604.md",
+    "original_message_sha256": "de51e1adf456c1690f0d85e7886f7e66b8e5efadd1ce21383552d723aa51a772"
+  },
+  {
+    "commit": "b6d7821e3c797906b247ed1a27c6d759eb85bfaa",
+    "date": "2026-11-05T13:35:36+00:00",
+    "subject": "binaries: clap, anyhow, log/env_logger, --json, progress bars, completions",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/b6d7821e3c79.md",
+    "original_message_sha256": "b510430d8345200cf70095faf7fc87583178a6f81fbc1f14a3144071426c4f31"
+  },
+  {
+    "commit": "760ad75fb82cfc05db454cf605fb27f7933e114c",
+    "date": "2026-11-05T13:35:36+00:00",
+    "subject": "benches: criterion micro-benchmarks of the kernels (feature `bench`)",
+    "reachable_from_release": true,
+    "refs": [
+      "opt/u1-cli"
+    ],
+    "record": "history/commits/760ad75fb82c.md",
+    "original_message_sha256": "09c40a5570e0459cc9f71a4f2784cac4afcdc52fe57c78128cf50acdd7ef2799"
+  },
+  {
+    "commit": "229b99fa949190b457a32ed8ed2ead4346ec1b1a",
+    "date": "2026-11-05T13:50:12+00:00",
+    "subject": "Merge opt/u1-cli: clap, anyhow, thiserror, log/env_logger, --json, indicatif, clap_complete, criterion (user request)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/229b99fa9491.md",
+    "original_message_sha256": "434518a958dda1cef0446060627347d53cca44cc3d590d76d328d65fccf88df5"
+  },
+  {
+    "commit": "80620c47fba364caabf433ac8c96dd0a1290b399",
+    "date": "2026-11-05T13:50:36+00:00",
+    "subject": "solve --fast: fast.sh as a flag (largest table, all threads, warm-up, solve time)",
+    "reachable_from_release": true,
+    "refs": [
+      "opt/u1-fast"
+    ],
+    "record": "history/commits/80620c47fba3.md",
+    "original_message_sha256": "c1e96d48494b9c70ac04f24ce36ef6861c02b585d23328dc45961cda8e050cfc"
+  },
+  {
+    "commit": "18c4a66142bcac30fadc5ed6fd2a2fe0dbaeeb2a",
+    "date": "2026-11-05T13:52:15+00:00",
+    "subject": "Merge opt/u1-fast: solve --fast replaces fast.sh (user request)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/18c4a66142bc.md",
+    "original_message_sha256": "55144b6af0db8cd51bcc221bc89fbfa70d7b2a3c2e36c7fa23c3ef19f45f88af"
+  },
+  {
+    "commit": "7f4950de2832042863f66c424d59918ae7336d35",
+    "date": "2026-11-05T16:29:20+00:00",
+    "subject": "comments: measured gains at every notable optimization, checked against git history",
+    "reachable_from_release": true,
+    "refs": [
+      "docs/an1-annotations"
+    ],
+    "record": "history/commits/7f4950de2832.md",
+    "original_message_sha256": "c555caeba9d3f04b419bf3d540089b95cadc497f218c448227a6aa763e922ae5"
+  },
+  {
+    "commit": "0b5b5a6f23a303c5390cab3abde04af4c743d0f6",
+    "date": "2026-11-05T16:29:29+00:00",
+    "subject": "Merge docs/an1-annotations: inline measured gains at every notable optimization (user request)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/0b5b5a6f23a3.md",
+    "original_message_sha256": "4e2f81f987af7df53bf020d44dbffdb344b5c64fc9e0e468edd16d568671fc59"
+  },
+  {
+    "commit": "2403aa31344fd8b2ba2d977e92141f75d0319bac",
+    "date": "2026-11-05T18:29:28+00:00",
+    "subject": "gen, solve, bench: check disk and memory before the run, not deep into it",
+    "reachable_from_release": true,
+    "refs": [
+      "opt/u1-preflight"
+    ],
+    "record": "history/commits/2403aa31344f.md",
+    "original_message_sha256": "a14ce0cb57c8675e8c2526d244bfd01e8fb6939244e4075c746d4c854110e1ea"
+  },
+  {
+    "commit": "10977c2742cc0f2f747f3d8fe61738dfd2197f65",
+    "date": "2026-11-05T18:52:29+00:00",
+    "subject": "Merge opt/u1-preflight: gen/solve/bench check disk and memory before the run (user request)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/10977c2742cc.md",
+    "original_message_sha256": "2fecf2c50eeac9c328bf47dbbe7d81ecd39f427eb21405c56f8c1fe4e96e6099"
+  },
+  {
+    "commit": "ffd23945c9a0a0a27bc25f9be31e465200c429a1",
+    "date": "2026-11-05T19:47:53+00:00",
+    "subject": "tables: shared memory segments (--shm), as vcube's (user request)",
+    "reachable_from_release": true,
+    "refs": [
+      "opt/shm1"
+    ],
+    "record": "history/commits/ffd23945c9a0.md",
+    "original_message_sha256": "0ee7d4243bcce181f5fba2842e79edd71951873bde017a41dcfe263262852f09"
+  },
+  {
+    "commit": "4bf1b5ed1914e650beb6c30394046fafbaf8048c",
+    "date": "2026-11-05T20:40:34+00:00",
+    "subject": "Merge opt/shm1: tables in System V shared memory (--shm), like vcube (user request)",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/4bf1b5ed1914.md",
+    "original_message_sha256": "1e4e298b3c5a8936494a02f10a58a2adeebf7e8c937e62e18dd2993036b90bad"
+  },
+  {
+    "commit": "ae25e0a20feddf89178fb4d9d50223f949133633",
+    "date": "2026-11-05T20:40:45+00:00",
+    "subject": "cubie: the cube model's constants from build.rs, a Move type; no panics in the model",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/ae25e0a20fed.md",
+    "original_message_sha256": "8a777dc1faa7551027e818edf1055c98bb8ba58f18a8396112525b9faa7ae415"
+  },
+  {
+    "commit": "ae4912557e86b9f63de3b787e59e4f45b22944e7",
+    "date": "2026-11-05T20:40:45+00:00",
+    "subject": "hot: the pad checks are compile-time assertions in the pad constants",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/ae4912557e86.md",
+    "original_message_sha256": "86e6a2134d53f41abff0136b4ce99bc9121d20f36e4bad0be1c89725a7385cf2"
+  },
+  {
+    "commit": "3eff15740b19632c257791df4c9aa157b1b52101",
+    "date": "2026-11-05T22:52:24+00:00",
+    "subject": "tables, gen, parallel: errors instead of panics",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/3eff15740b19.md",
+    "original_message_sha256": "f26396ef76e1e3f1774b6cc94005ab4e49f5ccb4c663aebc39a8c224ce8ea5e0"
+  },
+  {
+    "commit": "db87483080a306c5ba7a97f201e21ada1078997d",
+    "date": "2026-11-05T22:52:24+00:00",
+    "subject": "lanes, share, solver, bins, wasm: give up past 20 moves instead of asserting; no panics",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/db87483080a3.md",
+    "original_message_sha256": "3fcc819bd660615338bbdb037aec3152864fb15a65d125509b0cab1f327c625b"
+  },
+  {
+    "commit": "2627ad3906f2b5f77ff306afbf1846331f5fb956",
+    "date": "2026-11-05T22:52:24+00:00",
+    "subject": "enforce no panics: crate lints, a scan for asserts in check.sh",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/2627ad3906f2.md",
+    "original_message_sha256": "37f38a13f5efcbfdd1b0ebe750da3009d4b8e6b6bf0ef8fc839833f841b539b9"
+  },
+  {
+    "commit": "4b1707a7e96a64f0db72d214ac8098c73cc7c4b4",
+    "date": "2026-11-06T01:45:48+00:00",
+    "subject": "Complete no-panic integration with shared tables and fallible workers",
+    "reachable_from_release": true,
+    "refs": [
+      "opt/no-panics"
+    ],
+    "record": "history/commits/4b1707a7e96a.md",
+    "original_message_sha256": "5df00e5d092ac63ae1972272fd953570ad9cb2c4bb3e4284a82df1044f16e307"
+  },
+  {
+    "commit": "e127307602882155fa0c0bce5da173b6ac6614f6",
+    "date": "2026-11-06T01:54:37+00:00",
+    "subject": "Merge opt/no-panics: remove intentional runtime panic paths",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/e12730760288.md",
+    "original_message_sha256": "f2ffb78e539264b3eebdacab2b1ff1c17b7a61776057887f876f27f284f54522"
+  },
+  {
+    "commit": "a1fce13a2ee591ee4d31a763a27f7ef132d5a86b",
+    "date": "2026-11-06T02:31:35+00:00",
+    "subject": "Keep stream completion reporting cold and restore its measured page offset",
+    "reachable_from_release": true,
+    "refs": [
+      "opt/stream-completion"
+    ],
+    "record": "history/commits/a1fce13a2ee5.md",
+    "original_message_sha256": "6a5bece4064c0783a1553ca304f18dfc3e86ce374f11bfdd12cf9c09ffb39650"
+  },
+  {
+    "commit": "935cb7fa369248161244507b7c13aa9c405f9ff1",
+    "date": "2026-11-06T02:31:35+00:00",
+    "subject": "Merge opt/stream-completion: keep stream completion cold and pin placement",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/935cb7fa3692.md",
+    "original_message_sha256": "179224f05da50b6b235ce1fba9ec64b9862e5d1293c22c4455a0da39ca207ad9"
+  },
+  {
+    "commit": "0ed8002e3339480f4f4b323ade92311f8c6ecba8",
+    "date": "2026-11-06T17:17:44+00:00",
+    "subject": "Rename project, CLI, library and WebAssembly assets to egg-solver",
+    "reachable_from_release": true,
+    "refs": [
+      "chore/rename-egg-solver"
+    ],
+    "record": "history/commits/0ed8002e3339.md",
+    "original_message_sha256": "9e3a41259a7847cdab6711233034a9a021fc58855599af5bd398f425b57f314b"
+  },
+  {
+    "commit": "cd963dc26b081ddfd2cc1bcdd2c48bd06c92ae8f",
+    "date": "2026-11-06T17:17:44+00:00",
+    "subject": "Merge chore/rename-egg-solver: complete requested naming",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/cd963dc26b08.md",
+    "original_message_sha256": "d50c526397cd661252f40748196ecb3b6f1224ea39c584358c3081665b68091b"
+  },
+  {
+    "commit": "af9a7e73a599247b5a7f0b20d03394df0c7e3fe3",
+    "date": "2026-11-06T18:08:54+00:00",
+    "subject": "Remove scalar performance comparisons from README",
+    "reachable_from_release": true,
+    "refs": [
+      "docs/omit-scalar-comparisons"
+    ],
+    "record": "history/commits/af9a7e73a599.md",
+    "original_message_sha256": "dca0be350701036cae2a5c7cad5db14ad733461b86444e1299ef8a9e6b6eef1f"
+  },
+  {
+    "commit": "56ace9c10792b91d3fa521ca4af24801ca8b71fc",
+    "date": "2026-11-06T18:08:54+00:00",
+    "subject": "Merge docs/omit-scalar-comparisons: apply report presentation preference",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/56ace9c10792.md",
+    "original_message_sha256": "b17ace763768a4c18c3e6ebf6f43ade0bbdcd2b175d133ff8e3d0fe9b7c3b23d"
+  },
+  {
+    "commit": "447e43277f9280045d639f99bc38ab735e6c3900",
+    "date": "2026-11-06T21:03:14+00:00",
+    "subject": "Require an unsafe contract for atomic table-memory views; make Miri failures fatal",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/447e43277f92.md",
+    "original_message_sha256": "7e3bb074651d93fbe9566084957ca8057116b3e15b33a1ce028e6bae6a3bdbbc"
+  },
+  {
+    "commit": "12bb580a8e148cdc0049976e62e3db0797e9fd62",
+    "date": "2026-11-06T21:32:58+00:00",
+    "subject": "Exercise staged-sort tasks concurrently in the Miri test catalogue",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/12bb580a8e14.md",
+    "original_message_sha256": "3f169df669b792ea20dd653da9ca3cfee7bb3a598ad37f27ce25a0df44c0789e"
+  },
+  {
+    "commit": "93867a4597ab821b4064a0d407d3c89e133c9013",
+    "date": "2026-11-06T22:32:58+00:00",
+    "subject": "Backport explicit futex pointer arguments and isolate SysV test attachments",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/93867a4597ab.md",
+    "original_message_sha256": "6435841be8790eb0dffe1393a3923e9ec2634449b17087b4bf133a41a71ea78e"
+  },
+  {
+    "commit": "988f289fed03f2490359fe660297d9f502363845",
+    "date": "2026-11-07T00:07:39+00:00",
+    "subject": "Parallelize independent heavy Miri test families",
+    "reachable_from_release": true,
+    "refs": [],
+    "record": "history/commits/988f289fed03.md",
+    "original_message_sha256": "5f21c27c0dcdfd04069adbd1a26eb93d0f6aed1f645891c41cd18969a4a1015a"
+  },
+  {
+    "commit": "316597f64a9bd749e8a01b67f96c108c03611e68",
+    "date": "2026-11-07T07:07:07+00:00",
+    "subject": "Close unsafe API invariants and search publication races",
+    "reachable_from_release": true,
+    "refs": [
+      "work/miri-checks"
+    ],
+    "record": "history/commits/316597f64a9b.md",
+    "original_message_sha256": "73fc79137ed76596ead6e4db41879af39076e2c0ba08a7d711c93da1f9781bb8"
+  },
+  {
+    "commit": "842a5043abfd550313a86a3d9bb5254f4b457540",
+    "date": "2026-11-07T14:47:20+00:00",
+    "subject": "Merge audited memory, coordinate and search-publication safety fixes",
+    "reachable_from_release": true,
+    "refs": [
+      "main"
+    ],
+    "record": "history/commits/842a5043abfd.md",
+    "original_message_sha256": "c99e193e8ef192f08da25c86f31383c5e3113b07d8adfab6b4db6b4da680dd19"
+  },
+  {
+    "commit": "fb892a97f7fece9cbf4a9b430a58420f63edd34d",
+    "date": "2026-11-07T20:24:12+00:00",
+    "subject": "Archive rejected outlined lane advancement",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/pmu-outlined-lane-advance"
+    ],
+    "record": "history/commits/fb892a97f7fe.md",
+    "original_message_sha256": "02bd767a4d62edcc01353e8efb4b974b06447c54f5b68db45fa63260e0d3cde3"
+  },
+  {
+    "commit": "1a6f91913e42a0c1df995f70f5bda82bf6d36719",
+    "date": "2026-11-07T20:24:12+00:00",
+    "subject": "Archive rejected byte-sized packed table decoder",
+    "reachable_from_release": false,
+    "refs": [
+      "neg/pmu-byte-packed-load"
+    ],
+    "record": "history/commits/1a6f91913e42.md",
+    "original_message_sha256": "e1a06869459e8d168f2a20eb2af7b64146e3d5be636c13e5515778de956ae49f"
+  }
+]

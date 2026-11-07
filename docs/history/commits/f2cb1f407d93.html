@@ -1,0 +1,35 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>tables: binary layout independent of the build folder — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="f2cb1f407d93.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="tables-binary-layout-independent-of-the-build-folder">tables: binary layout independent of the build folder</h1>
+<p>Commit <code>f2cb1f407d93866344c0d4dc38e5c7400672de52</code> · 2026-11-04T03:55:45+00:00</p>
+<p>This commit is reachable from the released main history. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: Historical ancestor; no current branch tip</p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>tables: binary layout independent of the build folder</p>
+<p><code>meta_path</code> built the <code>.hugemeta</code> path of hugetlbfs tables with
+<code>format!(&quot;{}/tables/...&quot;, env!(&quot;CARGO_MANIFEST_DIR&quot;))</code>, so every binary
+contained the absolute path of the source tree it was built from. Builds
+of the same commit from folders of different path lengths then had
+different data layouts: from /data/agents/lt and from
+/data/agents/layout-test-with-a-much-longer-path, 225 bytes of .text
+(displacements of .rodata references) differed. On this machine layout
+alone moves benchmark results by 1-2%, so A/B comparisons between
+binaries built in different worktrees were confounded (e.g. an agent's
+1T &quot;+1.7%&quot; between a base and a pure rename turned out to be this).</p>
+<p>The path is now copied at compile time into a fixed 256-byte static
+(<code>BUILD_DIR</code>, read through <code>black_box</code> so the padded buffer is what the
+binary contains). The same two builds now have byte-identical .text and
+identical section addresses. Behaviour is unchanged (same meta files).</p>
+<p>Stream, 1 thread, 5 paired runs (bench stream 10 60 1 24), solves/s:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>build</th><th>runs</th><th>median</th></tr>
+</thead>
+<tbody>
+<tr><td>main 2203a07</td><td>23.417 23.600 23.233 23.483 23.633</td><td>23.483</td></tr>
+<tr><td>this commit</td><td>23.700 23.683 23.683 23.683 23.667</td><td>23.683</td></tr>
+</tbody>
+</table></div>
+<p>+0.9%, which is itself a layout shift (the larger static moves .text
+by 0xd0), not a speedup: no hot code changes. 48 threads: pending (git
+note).</p>
+<p>check.sh passes.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

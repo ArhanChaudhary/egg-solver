@@ -1,0 +1,42 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>b2: read ahead the next lane's lookup value (negative, -4.4%) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="758b2b9614c7.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="b2-read-ahead-the-next-lane-s-lookup-value-negative-4-4">b2: read ahead the next lane's lookup value (negative, -4.4%)</h1>
+<p>Commit <code>758b2b9614c7673a762b1adafbbd64a29ef88fff</code> · 2026-11-03T17:25:33+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>neg/b2-readahead-value</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>b2: read ahead the next lane's lookup value (negative, -4.4%)</p>
+<p>During a lane's visit, the run loop also reads the next lane's pending
+lookup value into that lane's state (read_ahead: k_v, plus whether it
+prunes the pending child). The next visit's prune branches then depend on
+a byte in the lane state instead of on the table load. Includes a
+branchless value() for values read ahead of use, and padding that puts
+the bytes in separate 4-byte slots.</p>
+<p>Why: a mispredicted branch that waits on a DRAM load resolves late and
+costs more; reading the value one visit early should make the prune
+branches resolve early.</p>
+<p>48 threads (bench /mnt/huge/h11 stream 20 30 48 16, solves/s, 1 run each):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>build</th><th>solves/s</th><th>change</th></tr>
+</thead>
+<tbody>
+<tr><td>main fe58740</td><td>671.8</td><td></td></tr>
+<tr><td>read-ahead, padded (this patch)</td><td>641.9</td><td>-4.4%</td></tr>
+<tr><td>earlier session, main fe58740</td><td>683.5</td><td></td></tr>
+<tr><td>first version (ra), unpadded</td><td>624.5</td><td>-8.6%</td></tr>
+<tr><td>ra2 (+ precomputed prune), unpadded</td><td>623.8</td><td>-8.7%</td></tr>
+</tbody>
+</table></div>
+<p>1-thread solves/s: not recorded.</p>
+<p>Conclusion: slower. The unpadded versions also hit a store-to-load
+forwarding stall (LLVM widened the k_po byte load to 32 bits across the
+phase byte just stored, 5% of samples); padding fixed that and it is
+still -4.4%. Likely reason: b2's sensitivity builds showed the lookup
+latency is already hidden by the interleaved lanes (+12 cycles of latency
+cost only what its extra uops cost), so resolving the prune branches
+earlier saves little, while the read-ahead adds a load and stores of a
+second lane's state to every visit.</p>
+<p>Source: scratchpad b2/neg-readahead-value.patch (= wip-readahead2p),
+made against fe58740; applies cleanly. The same diff is also on
+opt/neg-readahead (b4e64c3).
+Numbers are the agent's own (not re-measured for this record). Not merged; recorded per the rule that every candidate gets a branch.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

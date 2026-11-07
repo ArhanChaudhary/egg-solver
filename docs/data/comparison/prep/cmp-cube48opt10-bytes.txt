@@ -1,0 +1,25 @@
+real diff at offset 0 (group 0, byte 0): ours 06 theirs 00
+real diff at offset 4 (group 0, byte 4): ours 54 theirs 00
+real diff at offset 5 (group 0, byte 5): ours aa theirs 50
+real diff at offset 6 (group 0, byte 6): ours aa theirs 05
+real diff at offset 7 (group 0, byte 7): ours aa theirs 51
+real diff at offset 8 (group 0, byte 8): ours 95 theirs 40
+real diff at offset 9 (group 0, byte 9): ours 96 theirs 14
+real diff at offset 10 (group 0, byte 10): ours 66 theirs 90
+real diff at offset 11 (group 0, byte 11): ours 19 theirs 25
+real diff at offset 13 (group 0, byte 13): ours 54 theirs 00
+real diff at offset 14 (group 0, byte 14): ours a6 theirs 50
+real diff at offset 15 (group 0, byte 15): ours 9a theirs 05
+real diff at offset 16 (group 1, byte 0): ours aa theirs 08
+real diff at offset 17 (group 1, byte 1): ours 5a theirs 05
+real diff at offset 18 (group 1, byte 2): ours 69 theirs 04
+real diff at offset 19 (group 1, byte 3): ours 69 theirs 41
+real diff at offset 20 (group 1, byte 4): ours 55 theirs 45
+real diff at offset 21 (group 1, byte 5): ours 16 theirs 01
+real diff at offset 22 (group 1, byte 6): ours a5 theirs 55
+real diff at offset 23 (group 1, byte 7): ours a6 theirs 50
+benign nibble diffs 172108390 (ours 11: 157973301, 12: 14135089, other: 0) of 1945681920 groups (8.8%), real diffs 29791179308
+ours: codes 0:1133240200 1:11196287163 2:64164706157 3:44138045520; minimum nibbles 0:1 1:1 2:4 3:34 4:316 5:3452 6:40457 7:485503 8:5885693 9:67286659 10:559724594 11:1214503690 12:97750966 15:550
+theirs: codes 0:1134918810 1:11222950329 2:64306616699 3:43967793202; minimum nibbles 0:1 1:1 2:4 3:34 4:329 5:3587 6:42455 7:509720 8:6216718 9:71922069 10:599070554 15:1267916448
+code histograms DIFFER
+exit 1

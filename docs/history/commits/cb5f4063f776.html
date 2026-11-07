@@ -1,0 +1,41 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEGATIVE x-h48: base11-h11 (not merged) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="cb5f4063f776.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="negative-x-h48-base11-h11-not-merged">NEGATIVE x-h48: base11-h11 (not merged)</h1>
+<p>Commit <code>cb5f4063f7764c2560c2ab87208c3d05037e3a7e</code> · 2026-11-04T10:08:09+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>neg/xh48-base11-h11</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>NEGATIVE x-h48: base11-h11 (not merged)</p>
+<p>From 63fbdf80a5b17f892ec73161f1f3186c960dfacb Mon Sep 17 00:00:00 2001
+From: Ubuntu
+<a href="mailto:super@claude-cube.usubflgyqkfexnnpr2q2liw1rb.bx.internal.cloudapp.net">super@claude-cube.usubflgyqkfexnnpr2q2liw1rb.bx.internal.cloudapp.net</a>
+Date: Wed, 4 Nov 2026 09:28:55 +0000
+Subject: [PATCH] neg: base 11 for the h11 table (emulated exactly from the
+base-10 table)</p>
+<p>nissy-core and cube48opt use base 10 for h11 (codes: &lt;=10 with a
+fallback, 11, 12, &gt;=13). This count-only experiment emulates a base-11 h11
+table exactly with our base-10 one (env CUBE_BASE11=1):</p>
+<ul>
+<li>true 11 (code 1) falls back like code 0 (group minimum, corner depth);</li>
+<li>code 2 stays 12;</li>
+<li>code 3 is 13 if one of the 18 neighbors has code 2 (exactly 12), else
+<blockquote>
+<p>= 14 (a coset outside the subgroup is 1 + its nearest neighbor away).</p>
+</blockquote>
+</li>
+</ul>
+<p>random:1000:2026, 8 threads of one CCD (count.sh style); lengths identical
+(15:1 16:35 17:270 18:662 19:32):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>table</th><th align="right">nodes/cube</th><th align="right">lookups/cube</th></tr>
+</thead>
+<tbody>
+<tr><td>base 10 (main)</td><td align="right">3058198</td><td align="right">2588380</td></tr>
+<tr><td>base 11</td><td align="right">3368592</td><td align="right">2960401</td></tr>
+<tr><td>change</td><td align="right">+10.2%</td><td align="right">+14.4%</td></tr>
+</tbody>
+</table></div>
+<p>Negative: losing the exact 11 costs more at r1 = 10 (0.33M lookups/cube)
+than the new 14 saves at r1 = 13 (63K lookups/cube). Base 10 stays.
+(Base 9 or merged levels would lose an exact level at r1 = 11..12, where
+most lookups are.)</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

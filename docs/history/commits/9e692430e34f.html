@@ -1,0 +1,59 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>share: after a solved cube, drop its lanes first, then refill them together — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="9e692430e34f.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="share-after-a-solved-cube-drop-its-lanes-first-then-refill-them-together">share: after a solved cube, drop its lanes first, then refill them together</h1>
+<p>Commit <code>9e692430e34face39da3594eed2c272709d1bdb8</code> · 2026-11-04T13:14:52+00:00</p>
+<p>This commit is reachable from the released main history. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: Historical ancestor; no current branch tip</p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>share: after a solved cube, drop its lanes first, then refill them together</p>
+<p>When a cube was solved, each thread restarted its lanes of the cube one
+by one, and each restart looked for work on its own: another job,
+fresh cubes, the open list (its read lock) and splits. With one cube at
+a time that is all 24 lanes of all 48 threads at once, on the lines of
+the open list's lock, just when the next cube's first build opens its
+extension tasks (and publishes them under the write lock). The 48-thread
+trace (CUBE_TRACE=5) showed one thread (sometimes 2-12) running all 18
+tasks of the first build's extension, ~50 us, while the later builds'
+tasks were shared by 44-47 threads.</p>
+<p>Now <code>cancel_done</code> ends and deactivates the lanes of solved cubes (and a
+first pass's useless entries), and then <code>fill_idle</code> refills them, up to
+the first lane without work.</p>
+<p>48 threads, 6 paired holds (as for the commits before; AB = the first pass and TAIL_LANES):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>test</th><th>before runs</th><th>after runs</th><th>before median</th><th>after median</th><th>change (median of pairs) [min, max]</th><th>nodes/cube before -&gt; after</th></tr>
+</thead>
+<tbody>
+<tr><td>c1-rs</td><td>1.777 1.784 1.692 1.759 1.744 1.803</td><td>1.653 1.660 1.641 1.660 1.724 1.722</td><td>1.768</td><td>1.660</td><td>-5.1% [-7.0, -1.1]</td><td>3.773M -&gt; 3.712M</td></tr>
+<tr><td>c0-rs</td><td>1.041 1.064 1.058 1.062 1.054 1.105</td><td>1.053 1.060 1.062 1.049 1.047 1.097</td><td>1.060</td><td>1.056</td><td>-0.5% [-1.2, +1.2]</td><td>3.329M -&gt; 3.314M</td></tr>
+<tr><td>bshare/s</td><td>960.3 968.0 963.1 969.3 964.2 925.9</td><td>960.0 947.8 965.5 962.7 957.3 923.9</td><td>963.6</td><td>958.6</td><td>-0.4% [-2.1, +0.3]</td><td>3.304M -&gt; 3.308M</td></tr>
+</tbody>
+</table></div>
+<p>Short sets (solve -c 1 -n 200, ms/cube; 3 holds):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>test</th><th>before runs</th><th>after runs</th><th>before median</th><th>after median</th><th>change (median of pairs) [min, max]</th><th>nodes/cube before -&gt; after</th></tr>
+</thead>
+<tbody>
+<tr><td>c1-random_move_15f</td><td>0.191 0.194 0.194</td><td>0.173 0.174 0.175</td><td>0.194</td><td>0.174</td><td>-9.8% [-10.3, -9.4]</td><td>0.112M -&gt; 0.107M</td></tr>
+<tr><td>c1-random_move_16f</td><td>0.261 0.267 0.267</td><td>0.238 0.259 0.241</td><td>0.267</td><td>0.241</td><td>-8.8% [-9.7, -3.0]</td><td>0.147M -&gt; 0.145M</td></tr>
+<tr><td>c1-random_move_17f</td><td>0.639 0.639 0.642</td><td>0.621 0.622 0.617</td><td>0.639</td><td>0.621</td><td>-2.8% [-3.9, -2.7]</td><td>0.652M -&gt; 0.650M</td></tr>
+<tr><td>c1-random_state_depth15</td><td>0.175 0.178 0.176</td><td>0.154 0.153 0.157</td><td>0.176</td><td>0.154</td><td>-12.0% [-14.0, -10.8]</td><td>0.105M -&gt; 0.101M</td></tr>
+<tr><td>c1-random_state_depth16</td><td>0.240 0.249 0.218</td><td>0.225 0.249 0.221</td><td>0.240</td><td>0.225</td><td>+0.0% [-6.2, +1.4]</td><td>0.130M -&gt; 0.127M</td></tr>
+<tr><td>c1-random_state_depth17</td><td>0.717 0.748 0.708</td><td>0.714 0.724 0.676</td><td>0.717</td><td>0.714</td><td>-3.2% [-4.5, -0.4]</td><td>0.784M -&gt; 0.782M</td></tr>
+</tbody>
+</table></div>
+<p>1 thread, layout-averaged (4 linker-shuffled layouts x 3 paired runs, solve -t 1, ms/cube):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>test</th><th>B/A median</th><th>mean</th><th>pairs</th><th>[min, max]</th></tr>
+</thead>
+<tbody>
+<tr><td>solve -c 0 -n 100</td><td>+0.14%</td><td>+0.16%</td><td>12</td><td>[-0.59%, +0.87%]</td></tr>
+<tr><td>solve -c 1 -n 10</td><td>+0.04%</td><td>+0.11%</td><td>12</td><td>[-0.24%, +0.47%]</td></tr>
+</tbody>
+</table></div>
+<p>Correctness: check.sh passes. Solution lengths identical cube for cube
+to main's, 0 BAD (8 threads, one L3 slot): 1000 scrambles of 1-14
+moves, random_move_15f 200, random_state_depth15 200 (-c 1),
+random_state 500 (-c 1, -c 0), random_state_depth18 3000 (-c 1, -c 0).
+<code>Worker::rounds</code> is instruction-identical to main's.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

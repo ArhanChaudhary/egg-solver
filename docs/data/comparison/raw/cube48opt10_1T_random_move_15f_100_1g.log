@@ -1,0 +1,219 @@
+use sse, bmi2
+use huge page
+uniq_sym_states = 3393
+read pruning table from file h48prun31h1.dat
+ 0           43
+ 1           29
+ 2          111
+ 3          733
+ 4         6435
+ 5        48670
+ 6       395266
+ 7      3155073
+ 8     25865565
+ 9    196289112
+10    909157773
+11  11222950329
+12  64306616699
+13  43724582962
+Avg: 12.249, 120389068800 entry
+F2 R  F' U2 R2 F2 R  U' D2 L  D  F2 L  F' R  
+Cube1 finished in 15, 2888/131 node(s), tt=0.390 ms, 135.04ns/node, 114.00ns/probe, 0.263 inv/node, 1.185 probe/node 52 split(s)
+L2 B2 R  D2 L  U' F' L  U  D' F2 R  B  R' D' 
+Cube2 finished in 15, 19626/138 node(s), tt=1.370 ms, 69.81ns/node, 59.39ns/probe, 0.253 inv/node, 1.175 probe/node 95 split(s)
+L' F2 R  U' F2 D2 L' R  F  R2 L  U' L  U2 R' 
+Cube3 finished in 15, 21390/155 node(s), tt=1.313 ms, 61.38ns/node, 52.00ns/probe, 0.259 inv/node, 1.181 probe/node 71 split(s)
+B' D  U2 R  B2 L' B  R' B' U2 B' L2 F  U  F' 
+Cube4 finished in 15, 4753/151 node(s), tt=0.326 ms, 68.59ns/node, 57.84ns/probe, 0.258 inv/node, 1.186 probe/node 83 split(s)
+U2 L' R2 B' R  B' R2 B2 U2 R' U' R2 B2 D2 L  
+Cube5 finished in 15, 10810/176 node(s), tt=0.643 ms, 59.48ns/node, 52.10ns/probe, 0.242 inv/node, 1.142 probe/node 151 split(s)
+U' D' F  D' U  B  L  B  U' F  D  R  F' L2 F2 
+Cube6 finished in 15, 11108/185 node(s), tt=0.632 ms, 56.90ns/node, 48.86ns/probe, 0.255 inv/node, 1.164 probe/node 132 split(s)
+F  B' L' D  U' L' U  D  F' B  R2 F' B2 U2 L' 
+Cube7 finished in 15, 12058/245 node(s), tt=0.718 ms, 59.55ns/node, 50.73ns/probe, 0.276 inv/node, 1.174 probe/node 277 split(s)
+B' R' U' F' D2 R' F' R  B2 U  F' R' F' L  B2 
+Cube8 finished in 15, 12376/145 node(s), tt=0.724 ms, 58.50ns/node, 49.11ns/probe, 0.256 inv/node, 1.191 probe/node 96 split(s)
+D2 R2 U  F' U2 F' R  L  U2 D' R2 F' D2 B2 D' 
+Cube9 finished in 15, 11133/159 node(s), tt=0.609 ms, 54.70ns/node, 47.20ns/probe, 0.241 inv/node, 1.159 probe/node 83 split(s)
+B' U  F2 D2 F  B2 D  B  R' D' B' D2 U2 R' L' 
+Cube10 finished in 15, 2944/152 node(s), tt=0.197 ms, 66.92ns/node, 56.72ns/probe, 0.273 inv/node, 1.180 probe/node 71 split(s)
+F' B2 R2 F2 R2 L2 B  U2 F' B  R  D' U  B' U  
+Cube11 finished in 14, 35145/218 node(s), tt=1.776 ms, 50.53ns/node, 45.25ns/probe, 0.229 inv/node, 1.117 probe/node 942 split(s)
+L2 B' D' R  D2 R  U2 R  L2 F' R2 L2 U2 L' U' 
+Cube12 finished in 15, 3856/192 node(s), tt=0.268 ms, 69.50ns/node, 60.43ns/probe, 0.252 inv/node, 1.150 probe/node 117 split(s)
+U' B' U2 D2 L2 U  D2 B2 R2 D  F' B2 D  F  U  
+Cube13 finished in 14, 31441/180 node(s), tt=1.757 ms, 55.88ns/node, 48.05ns/probe, 0.252 inv/node, 1.163 probe/node 471 split(s)
+U2 F' L  U' F  U2 B2 L' U  R' F  R2 U  B  L  
+Cube14 finished in 15, 2258/148 node(s), tt=0.159 ms, 70.42ns/node, 60.78ns/probe, 0.228 inv/node, 1.159 probe/node 67 split(s)
+D  F  U  F2 L' U2 L  F  U' L' R2 U  L  U  R2 
+Cube15 finished in 15, 28107/164 node(s), tt=1.481 ms, 52.69ns/node, 44.91ns/probe, 0.248 inv/node, 1.173 probe/node 115 split(s)
+D  B2 R' D' U' L2 D' L  U  R2 U2 D' B' R  U  
+Cube16 finished in 15, 26536/163 node(s), tt=1.395 ms, 52.57ns/node, 44.84ns/probe, 0.252 inv/node, 1.172 probe/node 61 split(s)
+B' R' D' L' R' U  D2 L' D' U' L' D2 F' R2 L2 
+Cube17 finished in 15, 22634/182 node(s), tt=1.211 ms, 53.50ns/node, 45.78ns/probe, 0.254 inv/node, 1.169 probe/node 210 split(s)
+L2 R2 U  L' F  L2 U  D  L2 D  R  F' U2 L2 R' 
+Cube18 finished in 15, 3265/149 node(s), tt=0.211 ms, 64.62ns/node, 54.89ns/probe, 0.262 inv/node, 1.177 probe/node 101 split(s)
+L  D2 R  B' F' L2 U  B  U  D' L' U2 L  U2 F' 
+Cube19 finished in 15, 13692/155 node(s), tt=0.758 ms, 55.36ns/node, 46.46ns/probe, 0.261 inv/node, 1.192 probe/node 42 split(s)
+D2 U  B' D2 R  D2 L  R2 U' D2 L  R  F  R  L  
+Cube20 finished in 15, 14531/140 node(s), tt=0.779 ms, 53.61ns/node, 44.99ns/probe, 0.276 inv/node, 1.192 probe/node 88 split(s)
+D  L  F' D' L2 B  D2 R2 U2 R  D' U' B2 F2 L' 
+Cube21 finished in 15, 6927/307 node(s), tt=0.431 ms, 62.22ns/node, 55.54ns/probe, 0.254 inv/node, 1.120 probe/node 370 split(s)
+D  U' L' U' R  F  B  R2 B2 L' B' D  L  F2 L' 
+Cube22 finished in 15, 19645/240 node(s), tt=1.062 ms, 54.06ns/node, 45.64ns/probe, 0.252 inv/node, 1.184 probe/node 183 split(s)
+F  D  B2 R' U' F2 L2 U' R  L  U2 R  F' U  L  
+Cube23 finished in 15, 51954/169 node(s), tt=2.754 ms, 53.01ns/node, 44.29ns/probe, 0.276 inv/node, 1.197 probe/node 121 split(s)
+B  R' D2 L  U  B2 R2 U  R  B2 L2 U' B  D2 U2 
+Cube24 finished in 15, 10825/162 node(s), tt=0.593 ms, 54.78ns/node, 46.19ns/probe, 0.263 inv/node, 1.186 probe/node 84 split(s)
+D  U  F' D' B2 U2 R  F  L2 D' F  L2 U2 R  B' 
+Cube25 finished in 15, 11212/144 node(s), tt=0.616 ms, 54.94ns/node, 46.79ns/probe, 0.254 inv/node, 1.174 probe/node 95 split(s)
+U' L2 R' F2 L  D' R' L2 B2 R  D  R2 B' L2 F2 
+Cube26 finished in 15, 7893/168 node(s), tt=0.446 ms, 56.51ns/node, 48.12ns/probe, 0.262 inv/node, 1.174 probe/node 90 split(s)
+L' R' D  U' B' R  U  R  B' D  F2 R2 U  R' U' 
+Cube27 finished in 15, 28501/158 node(s), tt=1.495 ms, 52.45ns/node, 44.78ns/probe, 0.250 inv/node, 1.171 probe/node 131 split(s)
+L  F2 B  R' D  R2 L2 U  L  U' F' D' B2 D2 F2 
+Cube28 finished in 15, 11189/179 node(s), tt=0.597 ms, 53.36ns/node, 46.12ns/probe, 0.252 inv/node, 1.157 probe/node 131 split(s)
+L2 F2 D2 U2 F2 D' F' R' B2 R2 D' U' F2 L' B  
+Cube29 finished in 15, 16116/151 node(s), tt=0.848 ms, 52.62ns/node, 45.75ns/probe, 0.243 inv/node, 1.150 probe/node 98 split(s)
+U  D  B  L  U2 F  B  R' L2 D2 U' B2 U' F  B  
+Cube30 finished in 15, 23418/164 node(s), tt=1.195 ms, 51.03ns/node, 44.09ns/probe, 0.242 inv/node, 1.157 probe/node 87 split(s)
+U' F2 R  B  U2 R2 U2 L2 U2 L' F2 U' R' L2 U2 
+Cube31 finished in 15, 29364/142 node(s), tt=1.549 ms, 52.75ns/node, 44.47ns/probe, 0.259 inv/node, 1.186 probe/node 91 split(s)
+R' U2 D2 R2 F2 D' F2 B  R  L2 U  L2 R' F' U2 
+Cube32 finished in 15, 25044/153 node(s), tt=1.346 ms, 53.75ns/node, 44.76ns/probe, 0.285 inv/node, 1.201 probe/node 83 split(s)
+R' D' F  D  B  F  R' F  L2 U2 B  F  L2 U2 D2 
+Cube33 finished in 15, 17681/345 node(s), tt=0.994 ms, 56.22ns/node, 48.53ns/probe, 0.276 inv/node, 1.158 probe/node 418 split(s)
+U2 L2 R2 D  L2 U' R  B  D2 R2 F' B' D' R  U  
+Cube34 finished in 15, 15043/146 node(s), tt=0.814 ms, 54.11ns/node, 46.25ns/probe, 0.257 inv/node, 1.170 probe/node 53 split(s)
+B' U  D  R' F2 U2 L2 R2 F2 U2 D  F  B' D2 F' 
+Cube35 finished in 14, 12335/204 node(s), tt=0.716 ms, 58.05ns/node, 50.55ns/probe, 0.254 inv/node, 1.148 probe/node 685 split(s)
+F2 U2 D2 R  F2 L2 U  B' F  R  B2 F2 R  F2 B2 
+Cube36 finished in 15, 52151/205 node(s), tt=2.520 ms, 48.32ns/node, 42.97ns/probe, 0.213 inv/node, 1.125 probe/node 332 split(s)
+F' B2 L  U' B' R2 U  B' U2 L2 B2 D' L' R2 F' 
+Cube37 finished in 15, 7797/151 node(s), tt=0.457 ms, 58.61ns/node, 50.18ns/probe, 0.250 inv/node, 1.168 probe/node 70 split(s)
+R  B  R2 B2 L  B' F2 R' B  D  F' R  D  F' B2 
+Cube38 finished in 15, 12293/168 node(s), tt=0.683 ms, 55.56ns/node, 46.42ns/probe, 0.266 inv/node, 1.197 probe/node 129 split(s)
+U' R  F2 R  L2 F  R2 D' R' D  F' L  D' R' D2 
+Cube39 finished in 15, 13277/155 node(s), tt=0.746 ms, 56.19ns/node, 46.89ns/probe, 0.269 inv/node, 1.198 probe/node 66 split(s)
+L2 F2 D2 F  B2 R' L2 F  B2 L2 B2 U' L2 F2 L2 
+Cube40 finished in 14, 8765/152 node(s), tt=0.492 ms, 56.13ns/node, 49.75ns/probe, 0.237 inv/node, 1.128 probe/node 224 split(s)
+L2 B' F' R2 L2 U  F  B  R' D' R2 U' R' B' R2 
+Cube41 finished in 15, 7599/176 node(s), tt=0.431 ms, 56.72ns/node, 48.10ns/probe, 0.251 inv/node, 1.179 probe/node 125 split(s)
+D  R2 F' L2 R  B' U' D  F  U' R  D  U' L' B' 
+Cube42 finished in 15, 5908/153 node(s), tt=0.347 ms, 58.73ns/node, 49.51ns/probe, 0.252 inv/node, 1.186 probe/node 49 split(s)
+L  U2 L2 R  F' L' R2 D  L2 U  L' R' U2 D  L2 
+Cube43 finished in 15, 12494/138 node(s), tt=0.670 ms, 53.63ns/node, 46.06ns/probe, 0.232 inv/node, 1.164 probe/node 52 split(s)
+U2 R  B' L  F  U' D  F  B2 L  U' B' D' R  U  
+Cube44 finished in 15, 17645/172 node(s), tt=0.960 ms, 54.41ns/node, 45.62ns/probe, 0.261 inv/node, 1.193 probe/node 90 split(s)
+R  B  U' B2 L2 F  B  L' B  U' F  L2 B2 R  D  
+Cube45 finished in 15, 13504/163 node(s), tt=0.727 ms, 53.84ns/node, 45.80ns/probe, 0.256 inv/node, 1.175 probe/node 108 split(s)
+B' F' U  B2 R  D2 L2 U' F  B2 U  L2 R' F' D  
+Cube46 finished in 15, 33735/156 node(s), tt=1.752 ms, 51.93ns/node, 44.05ns/probe, 0.261 inv/node, 1.179 probe/node 126 split(s)
+L2 R2 U' B2 R' B2 F  D2 R2 U  F  D2 B  F2 D' 
+Cube47 finished in 15, 4151/127 node(s), tt=0.281 ms, 67.69ns/node, 57.72ns/probe, 0.245 inv/node, 1.173 probe/node 37 split(s)
+F2 B' U' D  F  D' F' B' L2 U' L2 D  L  R' F' 
+Cube48 finished in 15, 17724/142 node(s), tt=0.949 ms, 53.54ns/node, 44.83ns/probe, 0.282 inv/node, 1.194 probe/node 69 split(s)
+B2 R  D2 U2 B2 D  R  L2 F' R2 L' U' B  R' L  
+Cube49 finished in 15, 16506/170 node(s), tt=0.880 ms, 53.31ns/node, 45.30ns/probe, 0.263 inv/node, 1.177 probe/node 110 split(s)
+D  F  U  D2 B' L  R  B' R  F  B2 U  D2 R  F2 
+Cube50 finished in 15, 10514/146 node(s), tt=0.578 ms, 54.97ns/node, 46.65ns/probe, 0.263 inv/node, 1.179 probe/node 60 split(s)
+B2 U2 R' F2 U2 L2 B' D  F2 D  R' L2 B2 L  B2 
+Cube51 finished in 15, 11404/165 node(s), tt=0.622 ms, 54.54ns/node, 46.35ns/probe, 0.259 inv/node, 1.177 probe/node 161 split(s)
+B  U' D2 F' U2 R  D2 L  F  R' D  L' D2 R  F2 
+Cube52 finished in 15, 5352/143 node(s), tt=0.312 ms, 58.30ns/node, 49.54ns/probe, 0.246 inv/node, 1.177 probe/node 46 split(s)
+B2 D' R  D2 L' F' U' L' F' U2 R  U2 L' R' D' 
+Cube53 finished in 15, 13217/159 node(s), tt=0.719 ms, 54.40ns/node, 45.91ns/probe, 0.267 inv/node, 1.185 probe/node 89 split(s)
+L  D2 R  D  B' R2 B' R  U2 R2 L' B' L  F' B  
+Cube54 finished in 15, 3888/169 node(s), tt=0.245 ms, 63.01ns/node, 52.63ns/probe, 0.285 inv/node, 1.197 probe/node 108 split(s)
+R' F  B  L2 F2 B2 D' L' F  D' R' U' R' F' L  
+Cube55 finished in 15, 9178/155 node(s), tt=0.513 ms, 55.89ns/node, 48.36ns/probe, 0.261 inv/node, 1.156 probe/node 50 split(s)
+R  D2 U2 F  B' U2 L' B2 D  L2 F  U2 F  D  U' 
+Cube56 finished in 15, 23353/155 node(s), tt=1.262 ms, 54.04ns/node, 45.22ns/probe, 0.285 inv/node, 1.195 probe/node 107 split(s)
+U2 F2 L2 F2 R  D2 B  D2 B' U  B2 U2 L2 R  B  
+Cube57 finished in 15, 10488/151 node(s), tt=0.579 ms, 55.21ns/node, 46.97ns/probe, 0.268 inv/node, 1.175 probe/node 54 split(s)
+F' R  L' F  B' U  F' L  B  U' R' F' L2 D2 R2 
+Cube58 finished in 15, 6742/144 node(s), tt=0.386 ms, 57.25ns/node, 48.35ns/probe, 0.272 inv/node, 1.184 probe/node 85 split(s)
+B' L2 R' D' F2 U  B' D  U  F' L  F  U  R' L  
+Cube59 finished in 15, 4984/167 node(s), tt=0.285 ms, 57.18ns/node, 49.45ns/probe, 0.229 inv/node, 1.156 probe/node 81 split(s)
+F' B2 L' F' R2 F2 R2 U' F2 R' U' D  R  L  D' 
+Cube60 finished in 15, 20731/172 node(s), tt=1.083 ms, 52.24ns/node, 44.17ns/probe, 0.268 inv/node, 1.183 probe/node 108 split(s)
+R2 B2 L2 R' D' U  B2 D  B  R2 U2 D  L  B  F2 
+Cube61 finished in 14, 5166/191 node(s), tt=0.307 ms, 59.43ns/node, 51.42ns/probe, 0.274 inv/node, 1.156 probe/node 285 split(s)
+L2 F  D2 B2 F  L2 U  D' B2 D  F' U2 F' D2 F' 
+Cube62 finished in 15, 100979/213 node(s), tt=5.273 ms, 52.22ns/node, 45.97ns/probe, 0.248 inv/node, 1.136 probe/node 456 split(s)
+F' B  L  F' B2 D  U2 F  R2 L  F2 B' U  R' B2 
+Cube63 finished in 15, 13647/138 node(s), tt=0.764 ms, 55.98ns/node, 46.74ns/probe, 0.255 inv/node, 1.198 probe/node 47 split(s)
+D' F2 L2 B  D  F2 U2 F' U  F' U' B  D  B2 U' 
+Cube64 finished in 15, 37985/188 node(s), tt=2.107 ms, 55.47ns/node, 46.25ns/probe, 0.281 inv/node, 1.199 probe/node 249 split(s)
+R2 L' D' B  U' R' L2 B2 R' L2 F  L  R' B  U  
+Cube65 finished in 15, 3670/157 node(s), tt=0.228 ms, 62.13ns/node, 53.42ns/probe, 0.264 inv/node, 1.163 probe/node 75 split(s)
+L' D  B' U  F2 L2 U' R  D' R' D' R  U' L2 U  
+Cube66 finished in 15, 4372/160 node(s), tt=0.263 ms, 60.16ns/node, 49.67ns/probe, 0.290 inv/node, 1.211 probe/node 66 split(s)
+U2 B  R2 D2 R  F2 B' R2 B2 U  F2 L' D2 L' F' 
+Cube67 finished in 15, 5086/168 node(s), tt=0.299 ms, 58.79ns/node, 51.10ns/probe, 0.229 inv/node, 1.150 probe/node 83 split(s)
+D' U  L2 F' D2 F' B' R' D2 U2 F' U' R  U2 L  
+Cube68 finished in 15, 24349/185 node(s), tt=1.300 ms, 53.39ns/node, 45.94ns/probe, 0.243 inv/node, 1.162 probe/node 227 split(s)
+L2 D  R' B2 R  U' F' R  L  F  B2 D2 L' R2 D2 
+Cube69 finished in 15, 7057/138 node(s), tt=0.400 ms, 56.68ns/node, 48.02ns/probe, 0.254 inv/node, 1.180 probe/node 86 split(s)
+F  D  B2 F  U2 L  B  R2 L2 B  D2 B  R2 U2 D' 
+Cube70 finished in 15, 11285/156 node(s), tt=0.653 ms, 57.86ns/node, 48.91ns/probe, 0.277 inv/node, 1.183 probe/node 156 split(s)
+F2 B  R2 B2 U' L  U2 R2 F2 L2 U2 D2 B  L' D2 
+Cube71 finished in 13, 1318/150 node(s), tt=0.095 ms, 72.08ns/node, 62.71ns/probe, 0.258 inv/node, 1.149 probe/node 202 split(s)
+R  F' R  D2 B' U  B  U' L  F2 R' L2 B' F' D  
+Cube72 finished in 15, 15758/155 node(s), tt=0.852 ms, 54.07ns/node, 45.70ns/probe, 0.269 inv/node, 1.183 probe/node 96 split(s)
+L' R  U' D' R  U2 L  U  B  D  L  U2 R  F  U  
+Cube73 finished in 15, 32349/150 node(s), tt=1.726 ms, 53.36ns/node, 44.79ns/probe, 0.285 inv/node, 1.191 probe/node 148 split(s)
+U' L  R' D' B  F' U' F  B2 R' F  B  L  U  R  
+Cube74 finished in 15, 7462/155 node(s), tt=0.434 ms, 58.16ns/node, 48.70ns/probe, 0.267 inv/node, 1.194 probe/node 46 split(s)
+F' R  D' R  B2 U  L' U2 B2 R' L' U  B  D2 L' 
+Cube75 finished in 15, 5194/176 node(s), tt=0.302 ms, 58.14ns/node, 50.24ns/probe, 0.250 inv/node, 1.157 probe/node 105 split(s)
+R  D2 U  R' L' U' R  D2 B  R' L' F2 U' D  B2 
+Cube76 finished in 15, 17409/164 node(s), tt=0.909 ms, 52.21ns/node, 44.59ns/probe, 0.254 inv/node, 1.171 probe/node 110 split(s)
+R2 B  D' R  F2 B' L2 U  B' R2 F2 L  R' B' L  
+Cube77 finished in 15, 20231/166 node(s), tt=1.084 ms, 53.58ns/node, 45.10ns/probe, 0.280 inv/node, 1.188 probe/node 87 split(s)
+F2 L' B  F' U2 B' R  B2 F' R2 D2 F  R  U' R' 
+Cube78 finished in 15, 7137/149 node(s), tt=0.422 ms, 59.13ns/node, 50.20ns/probe, 0.262 inv/node, 1.178 probe/node 87 split(s)
+R  U' D2 F2 U' D2 R' B' D' B  R' L' F' U' F  
+Cube79 finished in 15, 16544/161 node(s), tt=0.892 ms, 53.92ns/node, 45.61ns/probe, 0.263 inv/node, 1.182 probe/node 72 split(s)
+U2 R2 B2 L2 B  D  B2 D  L' B' U2 B  R' F' B' 
+Cube80 finished in 15, 14996/139 node(s), tt=0.783 ms, 52.21ns/node, 45.69ns/probe, 0.214 inv/node, 1.143 probe/node 65 split(s)
+R2 L2 F  U  B2 R  L' F  L2 U' R  L2 B2 F2 U  
+Cube81 finished in 15, 4986/147 node(s), tt=0.316 ms, 63.38ns/node, 53.52ns/probe, 0.287 inv/node, 1.184 probe/node 66 split(s)
+U' R  D2 L2 F  D  F  R' F' U' L  B2 R  D' F  
+Cube82 finished in 15, 2143/146 node(s), tt=0.144 ms, 67.20ns/node, 56.98ns/probe, 0.245 inv/node, 1.179 probe/node 73 split(s)
+U' F2 U2 L' F  D2 U  L' U2 D  B2 L  F2 L  D  
+Cube83 finished in 15, 3439/150 node(s), tt=0.211 ms, 61.36ns/node, 52.83ns/probe, 0.250 inv/node, 1.161 probe/node 74 split(s)
+R  F' U2 L' D  F2 D2 B  U' F' U' R2 D' R  B' 
+Cube84 finished in 15, 2718/148 node(s), tt=0.173 ms, 63.65ns/node, 54.69ns/probe, 0.241 inv/node, 1.164 probe/node 57 split(s)
+D' R' D2 U  L  D  U' B2 U2 D  B  D  L  F  U' 
+Cube85 finished in 15, 6553/144 node(s), tt=0.391 ms, 59.67ns/node, 50.21ns/probe, 0.289 inv/node, 1.188 probe/node 66 split(s)
+U  L  B' R' D2 B2 U2 L' F  B2 D' U  F  U' D2 
+Cube86 finished in 15, 11155/145 node(s), tt=0.600 ms, 53.79ns/node, 46.94ns/probe, 0.231 inv/node, 1.146 probe/node 120 split(s)
+L' D' R  F2 D2 F  B' D  L  U  F' U2 F  R  D  
+Cube87 finished in 15, 24359/135 node(s), tt=1.308 ms, 53.70ns/node, 45.04ns/probe, 0.263 inv/node, 1.192 probe/node 82 split(s)
+F2 D2 L' D  B  L2 B2 D  U2 L  U' F' B2 D2 U2 
+Cube88 finished in 15, 8473/153 node(s), tt=0.474 ms, 55.94ns/node, 47.07ns/probe, 0.257 inv/node, 1.188 probe/node 68 split(s)
+D' L' R2 F  R2 F  D  F  B2 R' U' L  U2 F2 R2 
+Cube89 finished in 15, 7976/132 node(s), tt=0.465 ms, 58.30ns/node, 49.10ns/probe, 0.263 inv/node, 1.187 probe/node 48 split(s)
+R' U  F  L  R  D2 F  L  R' B2 D' R  U  R2 U  
+Cube90 finished in 15, 15494/158 node(s), tt=0.840 ms, 54.21ns/node, 45.22ns/probe, 0.266 inv/node, 1.199 probe/node 65 split(s)
+D  R' U  R2 B  L2 R  F' D2 B' U' B  R' D  F  
+Cube91 finished in 15, 12150/146 node(s), tt=0.670 ms, 55.14ns/node, 46.79ns/probe, 0.251 inv/node, 1.179 probe/node 65 split(s)
+F  L2 B  R  F' B2 D  B2 R2 D  U' B2 D2 F2 L  
+Cube92 finished in 12, 400/158 node(s), tt=0.045 ms, 112.50ns/node, 116.28ns/probe, 0.217 inv/node, 0.968 probe/node 151 split(s)
+L' F' L2 F2 D2 R' B  R  U' D2 R' D2 F  D2 F2 
+Cube93 finished in 15, 20671/153 node(s), tt=1.122 ms, 54.28ns/node, 45.24ns/probe, 0.285 inv/node, 1.200 probe/node 107 split(s)
+F  D2 L2 B  L' B  L2 R  B2 R' B' F  U' B  D' 
+Cube94 finished in 15, 4990/169 node(s), tt=0.308 ms, 61.72ns/node, 52.52ns/probe, 0.253 inv/node, 1.175 probe/node 113 split(s)
+L  B  L' B' L  B2 R' L  F  D  L' U  L' R' B' 
+Cube95 finished in 15, 19632/160 node(s), tt=1.061 ms, 54.04ns/node, 45.34ns/probe, 0.263 inv/node, 1.192 probe/node 86 split(s)
+B' U' R2 L' B' F' L  F' U2 B' D  L2 F' D  U' 
+Cube96 finished in 15, 2556/135 node(s), tt=0.173 ms, 67.68ns/node, 56.41ns/probe, 0.273 inv/node, 1.200 probe/node 45 split(s)
+D  U2 B  F' U  L  R' U' D' R' B' U' L' B' F2 
+Cube97 finished in 15, 3872/147 node(s), tt=0.237 ms, 61.21ns/node, 51.11ns/probe, 0.288 inv/node, 1.198 probe/node 63 split(s)
+U' F  U  F  B2 R2 L  F2 L' U  R  F' U2 B' D' 
+Cube98 finished in 15, 11686/157 node(s), tt=0.645 ms, 55.19ns/node, 46.06ns/probe, 0.281 inv/node, 1.198 probe/node 76 split(s)
+L2 F' L  R2 U2 L2 B  F' U2 L' U  B' U  B' F2 
+Cube99 finished in 15, 18407/179 node(s), tt=0.984 ms, 53.46ns/node, 45.21ns/probe, 0.272 inv/node, 1.182 probe/node 120 split(s)
+L2 F  R' B' D' U2 L' F2 U2 B  U2 D' R  D  U  
+Cube100 finished in 15, 2692/154 node(s), tt=0.181 ms, 67.24ns/node, 57.41ns/probe, 0.293 inv/node, 1.171 probe/node 50 split(s)

@@ -1,0 +1,12 @@
+status 0
+run vcube112 48 random_state 200 thp
+start 2026-11-04 23:07:49
+wall_s 113.04
+cpu_s 1842.08 3.67
+maxrss_kb 3716240
+gate_wait_s 0
+ext_cores 0.3
+pages 3717948 3717948 3714052 2398208 0 3590138 vc-optimal
+free_1g_pages 0 0
+table /data/competitors/vcube/nxprune_1_12_09.dat 2603089920
+thp always [madvise] never defrag always defer defer+madvise [madvise] never

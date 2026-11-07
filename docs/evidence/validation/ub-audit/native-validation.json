@@ -1,0 +1,95 @@
+{
+  "status": "PASS",
+  "source": {
+    "sha256": "93478bc5c45ba267255574f8cb466f02f006f1c7bf558fb8f9d088ec4307a4c9",
+    "files": [
+      ".cargo/config.toml",
+      "Cargo.lock",
+      "Cargo.toml",
+      "benches/kernels.rs",
+      "build.rs",
+      "check.sh",
+      "examples/symgen.rs",
+      "examples/tabcheck.rs",
+      "examples/xsolve.rs",
+      "miri.sh",
+      "src/bin/bench.rs",
+      "src/bin/gen.rs",
+      "src/bin/solve.rs",
+      "src/cli.rs",
+      "src/cli/preflight.rs",
+      "src/coord.rs",
+      "src/cubie.rs",
+      "src/env.rs",
+      "src/gen.rs",
+      "src/gen/collapse.rs",
+      "src/gen/dfs.rs",
+      "src/gen/progress.rs",
+      "src/hot.rs",
+      "src/lanes.rs",
+      "src/lanes/share.rs",
+      "src/lib.rs",
+      "src/main.rs",
+      "src/parallel.rs",
+      "src/portable/coord.rs",
+      "src/portable/mod.rs",
+      "src/portable/v16_neon.rs",
+      "src/portable/v16_scalar.rs",
+      "src/portable/v16_wasm.rs",
+      "src/prefetch.rs",
+      "src/simd.rs",
+      "src/solver.rs",
+      "src/symstart.rs",
+      "src/tables.rs",
+      "src/tables/file.rs",
+      "src/tables/shm.rs",
+      "tests/cli.rs",
+      "tests/correctness.rs",
+      "tests/no_runtime_panics.rs",
+      "vendor/parking_lot_core/Cargo.toml",
+      "vendor/parking_lot_core/build.rs",
+      "vendor/parking_lot_core/src/lib.rs",
+      "vendor/parking_lot_core/src/parking_lot.rs",
+      "vendor/parking_lot_core/src/spinwait.rs",
+      "vendor/parking_lot_core/src/thread_parker/generic.rs",
+      "vendor/parking_lot_core/src/thread_parker/linux.rs",
+      "vendor/parking_lot_core/src/thread_parker/mod.rs",
+      "vendor/parking_lot_core/src/thread_parker/redox.rs",
+      "vendor/parking_lot_core/src/thread_parker/sgx.rs",
+      "vendor/parking_lot_core/src/thread_parker/unix.rs",
+      "vendor/parking_lot_core/src/thread_parker/wasm.rs",
+      "vendor/parking_lot_core/src/thread_parker/wasm_atomic.rs",
+      "vendor/parking_lot_core/src/thread_parker/windows/bindings.rs",
+      "vendor/parking_lot_core/src/thread_parker/windows/keyed_event.rs",
+      "vendor/parking_lot_core/src/thread_parker/windows/mod.rs",
+      "vendor/parking_lot_core/src/thread_parker/windows/waitaddress.rs",
+      "vendor/parking_lot_core/src/util.rs",
+      "vendor/parking_lot_core/src/word_lock.rs",
+      "wasm/Cargo.toml",
+      "wasm/build.rs",
+      "wasm/src/lib.rs",
+      "wasm/src/threads.rs"
+    ]
+  },
+  "results": [
+    {
+      "name": "full-check",
+      "exit_code": 0
+    },
+    {
+      "name": "native-binaries",
+      "exit_code": 0
+    }
+  ],
+  "hot_comparison": [
+    {
+      "binary": "bench",
+      "exit_code": 0
+    },
+    {
+      "binary": "solve",
+      "exit_code": 0
+    }
+  ],
+  "completed_at": "2026-11-07T07:05:27.420802+00:00"
+}

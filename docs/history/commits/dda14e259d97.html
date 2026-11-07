@@ -1,0 +1,102 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>annotations: the measured gain of each optimization, inline — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="dda14e259d97.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="annotations-the-measured-gain-of-each-optimization-inline">annotations: the measured gain of each optimization, inline</h1>
+<p>Commit <code>dda14e259d972c83547fa4c76a7aa00a283102bf</code> · 2026-11-04T10:31:18+00:00</p>
+<p>This commit is reachable from the released main history. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: Historical ancestor; no current branch tip</p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>annotations: the measured gain of each optimization, inline</p>
+<p>User request: &quot;inline comment every optimization followed by how much %
+faster that code made it&quot;. Comments only, in lanes.rs, solver.rs,
+coord.rs, simd.rs, tables.rs and gen.rs (share.rs got its own from l6,
+55e048e). Each says what the code does
+and why, then the gain as measured when it was added, with its basis and
+source:</p>
+<ul>
+<li>48T / 1T: <code>bench stream</code> medians of the A/B that added it, e.g.
+&quot;(+2.6% at 48T when added, prefetch-nta.)&quot;;</li>
+<li>nodes, lookups, throughput or batch time where that is what was
+measured, e.g. &quot;(-36% nodes, +46% at 48T on a batch when added,
+job-order.)&quot;;</li>
+<li>for a patch of several pieces measured once: &quot;(part of m4-micro's +7.7%
+at 48T)&quot;, plus the piece's own number where the patch measured it;</li>
+<li>&quot;(not measured separately)&quot; where no number exists (the parts of the
+first version, the BFS direction switch, ...).
+The numbers come from the commit messages and merges of the opt/*
+branches and git notes (mined into /data/agents/s8/annotations-mined.md;
+neg/* ignored); none is new. The module doc of lanes.rs is reflowed into
+two paragraphs (what lanes are; the two sides).</li>
+</ul>
+<p>Verification: check.sh passes; the .text section is byte-identical to
+the previous commit's (comments only); verify.sh identical to main.</p>
+<p>Perf, solves/s (stream, 24 lanes). 1T: main 55e048e vs the final tree
+(the same .text as this commit), each built at 4 code layouts (lld
+.text section shuffle, seeds 1-3; &quot;none&quot; = the normal order), paired
+runs per layout (build-layouts.sh, abl1t.sh 2):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>build, layout</th><th>runs</th><th>median</th></tr>
+</thead>
+<tbody>
+<tr><td>main, Lnone</td><td>25.383 25.583</td><td>25.483</td></tr>
+<tr><td>final, Lnone</td><td>25.017 25.467</td><td>25.242 (-0.9%)</td></tr>
+<tr><td>main, L1</td><td>25.050 25.317</td><td>25.184</td></tr>
+<tr><td>final, L1</td><td>25.000 25.400</td><td>25.200 (+0.1%)</td></tr>
+<tr><td>main, L2</td><td>25.133 25.517</td><td>25.325</td></tr>
+<tr><td>final, L2</td><td>25.600 25.400</td><td>25.500 (+0.7%)</td></tr>
+<tr><td>main, L3</td><td>25.267 25.350</td><td>25.309</td></tr>
+<tr><td>final, L3</td><td>25.317 25.733</td><td>25.525 (+0.9%)</td></tr>
+</tbody>
+</table></div>
+<p>LAYOUT-AVERAGED threads=1 B/A: median -0.20% mean +0.17% over 8 pairs (min -1.44%, max +1.86%)</p>
+<p>Share mode, 1T (bench random:600:2026 600 1 24 share, solves/s; same
+layouts, 2 paired runs each, shareab.sh):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>build, layout</th><th>runs</th><th>median</th></tr>
+</thead>
+<tbody>
+<tr><td>main, Lnone</td><td>23.893 23.271</td><td>23.582</td></tr>
+<tr><td>final, Lnone</td><td>23.671 22.489</td><td>23.080 (-2.1%)</td></tr>
+<tr><td>main, L1</td><td>22.646 23.198</td><td>22.922</td></tr>
+<tr><td>final, L1</td><td>22.834 23.087</td><td>22.960 (+0.2%)</td></tr>
+<tr><td>main, L2</td><td>22.438 23.847</td><td>23.142</td></tr>
+<tr><td>final, L2</td><td>22.296 23.737</td><td>23.017 (-0.5%)</td></tr>
+<tr><td>main, L3</td><td>23.478 23.744</td><td>23.611</td></tr>
+<tr><td>final, L3</td><td>23.592 23.900</td><td>23.746 (+0.6%)</td></tr>
+</tbody>
+</table></div>
+<p>SHARE 1T B/A: median -0.48% mean -0.49% over 8 pairs (min -3.36%, max +0.83%)</p>
+<p>Share mode and solve at 48T (final-checks.sh: bench share 1000 cubes,
+2 pairs; solve -c 0 and -c 1 on random_state.txt, 500 cubes; every
+run verified, lengths per cube identical):</p>
+<pre><code>share pair 1 m55: solves/sec 940.092 nodes/cube 3329131 lookups/cube 2814156 lengths 15:1 16:35 17:270 18:662 19:32
+share pair 1 d10: solves/sec 938.662 nodes/cube 3296836 lookups/cube 2786497 lengths 15:1 16:35 17:270 18:662 19:32
+share pair 2 m55: solves/sec 923.508 nodes/cube 3308940 lookups/cube 2796781 lengths 15:1 16:35 17:270 18:662 19:32
+share pair 2 d10: solves/sec 933.507 nodes/cube 3313652 lookups/cube 2800779 lengths 15:1 16:35 17:270 18:662 19:32
+solve -c 0 m55: exit 0 BAD 0 total 500 cubes wall 0.564741 wall/cube 0.001129 nodes/cube 3351653 threads 48 lanes 24 concurrency 0
+solve -c 0 d10: exit 0 BAD 0 total 500 cubes wall 0.571968 wall/cube 0.001144 nodes/cube 3349344 threads 48 lanes 24 concurrency 0
+  -c 0: per-cube lengths identical
+solve -c 1 m55: exit 0 BAD 0 total 500 cubes wall 0.938153 wall/cube 0.001876 nodes/cube 3933308 threads 48 lanes 24 concurrency 1
+solve -c 1 d10: exit 0 BAD 0 total 500 cubes wall 1.043556 wall/cube 0.002087 nodes/cube 3932129 threads 48 lanes 24 concurrency 1
+  -c 1: per-cube lengths identical
+</code></pre>
+<p>solve -c 1 again, 4 pairs in alternating order (ms/cube; -c 1 is noisy:
+main's 595e424 saw 2.04-2.61 ms for one binary):</p>
+<pre><code>pair 1: m55=1.921 d10=2.005
+pair 2: m55=1.965 d10=1.926
+pair 3: m55=1.942 d10=1.989
+pair 4: m55=1.943 d10=1.959
+</code></pre>
+<p>48T: not re-run on 55e048e (per the coordinator, the layout-averaged
+1T above is the check for a refactor). Before the rebases, on main
+f2cb1f4 (3 interleaved rounds, ab48.sh; commit 8 = this series
+without this commit and the comments):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>build</th><th>runs</th><th>median</th></tr>
+</thead>
+<tbody>
+<tr><td>main f2cb1f4</td><td>1083.233 1078.067 1093.300</td><td>1083.233</td></tr>
+<tr><td>commit 8 on f2cb1f4</td><td>1086.467 1091.200 1085.767</td><td>1086.467 (+0.3%)</td></tr>
+</tbody>
+</table></div>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

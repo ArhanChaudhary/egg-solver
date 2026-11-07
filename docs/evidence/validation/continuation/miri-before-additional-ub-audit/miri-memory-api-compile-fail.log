@@ -1,0 +1,11 @@
+    Checking miri-memory-api-compile-fail v0.0.0 (/data/agents/codex-resume/miri-memory-api-compile-fail)
+error[E0133]: call to unsafe function `Memory::words` is unsafe and requires unsafe block
+ --> src/main.rs:7:17
+  |
+7 |     let words = memory.words().unwrap();
+  |                 ^^^^^^^^^^^^^^ call to unsafe function
+  |
+  = note: consult the function's documentation for information on how to avoid undefined behavior
+
+For more information about this error, try `rustc --explain E0133`.
+error: could not compile `miri-memory-api-compile-fail` (bin "miri-memory-api-compile-fail") due to 1 previous error

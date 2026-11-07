@@ -1,0 +1,155 @@
+[
+  {
+    "name": "main-native",
+    "source": "main",
+    "exit_code": 101,
+    "command": [
+      "/data/agents/mordant-audit/target-tool/release/cargo-mordant",
+      "--workspace",
+      "--all-targets",
+      "--features",
+      "bench",
+      "--locked",
+      "--keep-going",
+      "--message-format=json"
+    ],
+    "rustflags": "workspace native configuration"
+  },
+  {
+    "name": "safety-native",
+    "source": "safety",
+    "exit_code": 101,
+    "command": [
+      "/data/agents/mordant-audit/target-tool/release/cargo-mordant",
+      "--workspace",
+      "--all-targets",
+      "--features",
+      "bench",
+      "--locked",
+      "--keep-going",
+      "--message-format=json"
+    ],
+    "rustflags": "workspace native configuration"
+  },
+  {
+    "name": "ssse3-westmere",
+    "source": "ssse3",
+    "exit_code": 101,
+    "command": [
+      "/data/agents/mordant-audit/target-tool/release/cargo-mordant",
+      "--workspace",
+      "--all-targets",
+      "--features",
+      "bench",
+      "--locked",
+      "--keep-going",
+      "--message-format=json"
+    ],
+    "rustflags": "-C target-cpu=westmere"
+  },
+  {
+    "name": "main-native-supported",
+    "source": "main",
+    "exit_code": 0,
+    "command": [
+      "/data/agents/mordant-audit/target-tool/release/cargo-mordant",
+      "--workspace",
+      "--exclude",
+      "egg-solver-wasm",
+      "--all-targets",
+      "--features",
+      "bench",
+      "--locked",
+      "--keep-going",
+      "--message-format=json"
+    ],
+    "rustflags": "workspace native configuration"
+  },
+  {
+    "name": "main-wasm-supported",
+    "source": "main",
+    "exit_code": 0,
+    "command": [
+      "/data/agents/mordant-audit/target-tool/release/cargo-mordant",
+      "-p",
+      "egg-solver-wasm",
+      "--lib",
+      "--target",
+      "wasm32-wasip1",
+      "--locked",
+      "--keep-going",
+      "--message-format=json"
+    ],
+    "rustflags": "-C target-feature=+simd128"
+  },
+  {
+    "name": "safety-native-supported",
+    "source": "safety",
+    "exit_code": 0,
+    "command": [
+      "/data/agents/mordant-audit/target-tool/release/cargo-mordant",
+      "--workspace",
+      "--exclude",
+      "egg-solver-wasm",
+      "--all-targets",
+      "--features",
+      "bench",
+      "--locked",
+      "--keep-going",
+      "--message-format=json"
+    ],
+    "rustflags": "workspace native configuration"
+  },
+  {
+    "name": "safety-wasm-supported",
+    "source": "safety",
+    "exit_code": 0,
+    "command": [
+      "/data/agents/mordant-audit/target-tool/release/cargo-mordant",
+      "-p",
+      "egg-solver-wasm",
+      "--lib",
+      "--target",
+      "wasm32-wasip1",
+      "--locked",
+      "--keep-going",
+      "--message-format=json"
+    ],
+    "rustflags": "-C target-feature=+simd128"
+  },
+  {
+    "name": "ssse3-native-supported",
+    "source": "ssse3",
+    "exit_code": 0,
+    "command": [
+      "/data/agents/mordant-audit/target-tool/release/cargo-mordant",
+      "--workspace",
+      "--exclude",
+      "egg-solver-wasm",
+      "--all-targets",
+      "--features",
+      "bench",
+      "--locked",
+      "--keep-going",
+      "--message-format=json"
+    ],
+    "rustflags": "-C target-cpu=westmere"
+  },
+  {
+    "name": "ssse3-wasm-supported",
+    "source": "ssse3",
+    "exit_code": 0,
+    "command": [
+      "/data/agents/mordant-audit/target-tool/release/cargo-mordant",
+      "-p",
+      "egg-solver-wasm",
+      "--lib",
+      "--target",
+      "wasm32-wasip1",
+      "--locked",
+      "--keep-going",
+      "--message-format=json"
+    ],
+    "rustflags": "-C target-feature=+simd128"
+  }
+]

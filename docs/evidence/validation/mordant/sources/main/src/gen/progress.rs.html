@@ -1,0 +1,53 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>progress.rs — source evidence</title><style>body{font:15px system-ui;margin:2rem}pre{font:13px/1.6 monospace;overflow:auto}.line:target{background:#fff0a0}a{color:#42617a;text-decoration:none}</style><h1>progress.rs</h1><p>Source evidence snapshot. Original file SHA-256: <code>a4505dfd96977c890c091785e3c2bcfab07ff37939bc29cc912ecf95f4d8c150</code>. <a href="progress.rs">Raw source</a></p><pre><span class="line" id="L1"><a href="#L1">    1</a> //! Progress of the table generators. Each finished step is reported as a</span>
+<span class="line" id="L2"><a href="#L2">    2</a> //! line, printed to stderr unless a `Reporter` is installed; the `gen`</span>
+<span class="line" id="L3"><a href="#L3">    3</a> //! binary installs one on a terminal, which also draws a progress bar of</span>
+<span class="line" id="L4"><a href="#L4">    4</a> //! the current step. Reports cost an atomic load each, per chunk of work.</span>
+<span class="line" id="L5"><a href="#L5">    5</a> </span>
+<span class="line" id="L6"><a href="#L6">    6</a> use std::fmt::Arguments;</span>
+<span class="line" id="L7"><a href="#L7">    7</a> use std::sync::OnceLock;</span>
+<span class="line" id="L8"><a href="#L8">    8</a> </span>
+<span class="line" id="L9"><a href="#L9">    9</a> /// Receives the generators&#x27; progress (from any thread).</span>
+<span class="line" id="L10"><a href="#L10">   10</a> pub trait Reporter: Send + Sync {</span>
+<span class="line" id="L11"><a href="#L11">   11</a>     /// A finished step, as the line printed without a reporter.</span>
+<span class="line" id="L12"><a href="#L12">   12</a>     fn line(&amp;self, line: &amp;str);</span>
+<span class="line" id="L13"><a href="#L13">   13</a>     /// A step (`name`) of `total` units starts.</span>
+<span class="line" id="L14"><a href="#L14">   14</a>     fn start(&amp;self, name: &amp;str, total: u64);</span>
+<span class="line" id="L15"><a href="#L15">   15</a>     /// `units` more units of the current step are done.</span>
+<span class="line" id="L16"><a href="#L16">   16</a>     fn advance(&amp;self, units: u64);</span>
+<span class="line" id="L17"><a href="#L17">   17</a> }</span>
+<span class="line" id="L18"><a href="#L18">   18</a> </span>
+<span class="line" id="L19"><a href="#L19">   19</a> static REPORTER: OnceLock&lt;Box&lt;dyn Reporter&gt;&gt; = OnceLock::new();</span>
+<span class="line" id="L20"><a href="#L20">   20</a> </span>
+<span class="line" id="L21"><a href="#L21">   21</a> /// Send all progress to `reporter` from now on. Returns false (and drops</span>
+<span class="line" id="L22"><a href="#L22">   22</a> /// it) if one is installed already.</span>
+<span class="line" id="L23"><a href="#L23">   23</a> pub fn install(reporter: Box&lt;dyn Reporter&gt;) -&gt; bool {</span>
+<span class="line" id="L24"><a href="#L24">   24</a>     REPORTER.set(reporter).is_ok()</span>
+<span class="line" id="L25"><a href="#L25">   25</a> }</span>
+<span class="line" id="L26"><a href="#L26">   26</a> </span>
+<span class="line" id="L27"><a href="#L27">   27</a> /// Whether a reporter is installed.</span>
+<span class="line" id="L28"><a href="#L28">   28</a> #[must_use]</span>
+<span class="line" id="L29"><a href="#L29">   29</a> pub fn installed() -&gt; bool {</span>
+<span class="line" id="L30"><a href="#L30">   30</a>     REPORTER.get().is_some()</span>
+<span class="line" id="L31"><a href="#L31">   31</a> }</span>
+<span class="line" id="L32"><a href="#L32">   32</a> </span>
+<span class="line" id="L33"><a href="#L33">   33</a> /// Report a finished step: to the reporter, else to stderr.</span>
+<span class="line" id="L34"><a href="#L34">   34</a> pub fn line(line: Arguments&lt;&#x27;_&gt;) {</span>
+<span class="line" id="L35"><a href="#L35">   35</a>     match REPORTER.get() {</span>
+<span class="line" id="L36"><a href="#L36">   36</a>         Some(reporter) =&gt; reporter.line(&amp;line.to_string()),</span>
+<span class="line" id="L37"><a href="#L37">   37</a>         None =&gt; eprintln!(&quot;{line}&quot;),</span>
+<span class="line" id="L38"><a href="#L38">   38</a>     }</span>
+<span class="line" id="L39"><a href="#L39">   39</a> }</span>
+<span class="line" id="L40"><a href="#L40">   40</a> </span>
+<span class="line" id="L41"><a href="#L41">   41</a> /// Start a step of `total` units (for the reporter only).</span>
+<span class="line" id="L42"><a href="#L42">   42</a> pub fn start(name: Arguments&lt;&#x27;_&gt;, total: u64) {</span>
+<span class="line" id="L43"><a href="#L43">   43</a>     if let Some(reporter) = REPORTER.get() {</span>
+<span class="line" id="L44"><a href="#L44">   44</a>         reporter.start(&amp;name.to_string(), total);</span>
+<span class="line" id="L45"><a href="#L45">   45</a>     }</span>
+<span class="line" id="L46"><a href="#L46">   46</a> }</span>
+<span class="line" id="L47"><a href="#L47">   47</a> </span>
+<span class="line" id="L48"><a href="#L48">   48</a> /// `units` more units of the current step are done (for the reporter only).</span>
+<span class="line" id="L49"><a href="#L49">   49</a> pub fn advance(units: u64) {</span>
+<span class="line" id="L50"><a href="#L50">   50</a>     if let Some(reporter) = REPORTER.get() {</span>
+<span class="line" id="L51"><a href="#L51">   51</a>         reporter.advance(units);</span>
+<span class="line" id="L52"><a href="#L52">   52</a>     }</span>
+<span class="line" id="L53"><a href="#L53">   53</a> }</span></pre></html>

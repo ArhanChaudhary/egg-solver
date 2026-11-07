@@ -1,0 +1,223 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>x-h48: nissy-core (H48) technique inventory vs cube-opt — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../../history/index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="x-h48-inventory.md">Markdown source</a> · Offline document</p><details><summary>On this page</summary><ul><li><a href="#a-tables-coordinates-generation">A. Tables, coordinates, generation</a></li><li><a href="#b-lookup-pipeline">B. Lookup pipeline</a></li><li><a href="#c-search-rules">C. Search rules</a></li><li><a href="#d-ordering-and-parallelism">D. Ordering and parallelism</a></li><li><a href="#e-low-level">E. Low level</a></li><li><a href="#f-solutions">F. Solutions</a></li><li><a href="#g-correctness-finding-nissy-s-h11-table-is-slightly-inadmissible-the-r7-distribution-difference">G. Correctness finding: nissy's h11 table is slightly inadmissible (the r7 distribution difference)</a></li><li><a href="#measurements">Measurements</a></li><li><a href="#feasibility-a-bigger-effective-table-than-h11-within-65-gib-ideas-2-2-2-4-4-2-4-4-analysis-only-no-table-generated">Feasibility: a bigger effective table than h11 within ~65 GiB (ideas 2.2-2.4, 4.2-4.4). Analysis only, no table generated</a></li></ul></details><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="x-h48-nissy-core-h48-technique-inventory-vs-cube-opt">x-h48: nissy-core (H48) technique inventory vs cube-opt</h1>
+<p>Reference: <code>~/ref/nissy-core</code> at 1f7e8e9. Ours: <code>~/cube-opt</code> main 55e048e.</p>
+<p>Paths in nissy are relative to <code>src/</code>; <code>h48/</code> means <code>src/solvers/h48/</code>. &quot;lanes&quot; means <code>src/lanes.rs</code> and &quot;solver&quot; means <code>src/solver.rs</code> (ours).</p>
+<p>Verdict codes:</p>
+<ul>
+<li><strong>HAVE</strong>: we do the same.</li>
+<li><strong>BETTER</strong>: we do more, with a measured gain.</li>
+<li><strong>GAP</strong>: missing and applicable.</li>
+<li><strong>N/A</strong>: missing but does not apply.</li>
+<li><strong>MEASURED-NO</strong>: missing, measured, and doesn't pay.</li>
+</ul>
+<h2 id="a-tables-coordinates-generation">A. Tables, coordinates, generation</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>nissy (file:line)</th><th>what it does</th><th>ours (file:line)</th><th>applicable / why</th><th>expected gain</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>A1</td><td>Fully symmetric target group H48</td><td>doc/h48.md &quot;The target subgroup&quot;; h48/coordinate.h:10-43</td><td>H = corners oriented and in their own tetrad, edges in their own slice (+ oriented for h11). Invariant under all 48 symmetries, so one lookup per side and 48-fold reduction.</td><td>coord.rs:1-13; tables.rs:54-125</td><td>same</td><td>-</td><td>HAVE</td></tr>
+<tr><td>A2</td><td>cocsep: symmetry-reduced corner part (3393 classes) + ttrep + corner depth in one entry</td><td>h48/gendata_cocsep.h:84-136 (32-bit <code>class&lt;&lt;16 | ttrep&lt;&lt;8 | depth</code>, index <code>co&lt;&lt;7 | 7-bit csep</code>, 1.1 MB)</td><td>Gives the corner class, the conjugation to its representative, and a corner lower bound in one load.</td><td>tables.rs:20-24, 54-125 (3-byte packed, rank-70 csep, 459 KB on a THP); coord.rs:156-218 (pext index)</td><td>same idea, smaller and faster</td><td>-</td><td>BETTER (f99ebc4 packed cocsep +2.8%, e9d751e cocsep LUT)</td></tr>
+<tr><td>A3</td><td>hN = h11 with 11-N EO bits dropped</td><td>h48/coordinate.h:42 (<code>&gt;&gt; (11-h)</code>: drops the low EO bits; EO innermost)</td><td>Intermediate tables as min-collapses of h11.</td><td>coord.rs:327-331 (<code>reduce_key</code>: drops EO bits, E-slice innermost)</td><td>Only h11 is used in production. Different EO subsets than nissy, so the h7/h8 distributions are not comparable with nissy's (definitional).</td><td>-</td><td>HAVE</td></tr>
+<tr><td>A4</td><td>2-bit entries with a per-table base (h8..h11 base 10; h4..h7 9; h0..h3 8)</td><td>h48/gendata_h48.h:154-198</td><td>Codes 1..3 mean base+1..base+3; code 0 means ≤ base (needs a fallback).</td><td>tables.rs:333-336 (<code>default_base</code>: h11 10; h0 7)</td><td>same base for h11</td><td>base 11 for h11: see measurement M2</td><td>HAVE (M2 tests the alternative)</td></tr>
+<tr><td>A5</td><td>Fallback minimum interleaved with the entries</td><td>h48/gendata_types_macros.h:114-127; h48/gendata_h48.h:506-552; doc/h48.md &quot;Fallback tables&quot;</td><td>Each 64-byte line holds 254 entries plus a 4-bit min of their true depths, so a code-0 read costs no extra miss. Lines of 256/128 bits were &quot;not significantly&quot; better.</td><td>tables.rs:315-347, solver.rs:123-137 (cube48opt layout: 16-byte groups, 62 E-slice placements + 4-bit min)</td><td>same idea, finer group</td><td>-</td><td>BETTER (9090310: neutral at h11, much stronger for small h)</td></tr>
+<tr><td>A6</td><td>eoesep fallback table</td><td>h48/solve.h:123-141 (<code>p == 0</code> gives <code>MAX(pmin, eoesep)</code>); h48/gendata_eoesep.h (782 esep classes × 2^11 EO, 4-bit, ~0.9 MB)</td><td>On a code-0 read, also look up the edges-only distance (edges in slice + oriented).</td><td><strong>no</strong>. solver.rs:132-134 uses <code>max(group min, corner depth)</code>.</td><td>Valid: H_e contains H, half turns and all symmetries, so it is also safe for X2 inherit, X′ twin and NO_HALF. Code-0 reads that pass happen only at r1 ≤ 9 (diag-code0: ~12K lookups/cube).</td><td>small (diag-code0 bound &lt;1% of lookups)</td><td>see M1</td></tr>
+<tr><td>A7</td><td>Corner-depth (cocsep) precheck before the edge index/lookup</td><td>h48/solve.h:208-212, 235-239</td><td>Prunes a child on the corner bound without touching the big table.</td><td>lanes:1054, 1129, 1205; solver:362, 390; also folded into the code-0 value (solver:133)</td><td>same, plus the fold</td><td>-</td><td>HAVE (+ fold)</td></tr>
+<tr><td>A8</td><td>Table alignment</td><td>doc/solvers.md (64-byte aligned)</td><td>One line per lookup.</td><td>1 GiB hugetlbfs pages (tables.rs Mem::file)</td><td>ours is TLB-free too</td><td>-</td><td>BETTER</td></tr>
+<tr><td>A9</td><td>Expected-distribution check of a table</td><td>h48/checkdata.h:7-132, 142-199</td><td>Detects corrupt or misgenerated tables.</td><td>Generator prints the distribution. tables.rs:616 tests cocsep. r7 added meta/size checks (8953929). No h11 code-distribution check on open.</td><td>integrity only, no speed</td><td>0</td><td>optional (not needed for speed)</td></tr>
+<tr><td>A10</td><td>Table generation: depth-≤8 BFS in a hash map, then a parallel DFS 4 levels deep from every depth-8 cube with mutex-chunked marks; brute force for h1..h10</td><td>h48/gendata_h48.h:48-80, 154-466; h48/map.h</td><td>Builds 2-bit tables without a full-coordinate BFS.</td><td>gen.rs (full BFS on h11 with forward/backward switching, atomics, h7/h8 derived as min-collapses in the same pass: h11+h8+h7 in ~2 min)</td><td>ours is exact and much faster</td><td>-</td><td>BETTER. <strong>nissy bug, see section G</strong></td></tr>
+<tr><td>A11</td><td>Self-symmetry closure (FOREACH_H48SIM)</td><td>h48/gendata_types_macros.h:136-148</td><td>Marks every coordinate equivalent under the corner representative's self-symmetries.</td><td>gen.rs:84-99 (<code>for_each_index</code>); backward step stays closed because neighbours are found by inverse moves</td><td>same</td><td>-</td><td>HAVE</td></tr>
+<tr><td>A12</td><td>Backward BFS step (&quot;torchlight&quot;) when the frontier is large</td><td>h48/gendata_eoesep.h:131-198 (from depth 9); doc/h48.md</td><td>Scan unvisited entries for a neighbour in the frontier.</td><td>gen.rs:160-169, 219-261</td><td>same</td><td>-</td><td>HAVE</td></tr>
+</tbody>
+</table></div>
+<h2 id="b-lookup-pipeline">B. Lookup pipeline</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>nissy (file:line)</th><th>what it does</th><th>ours (file:line)</th><th>applicable / why</th><th>expected gain</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>B1</td><td>Pruning pipeline over a node's children + prefetch</td><td>h48/solve.h:157-255 (stage 1: other-side cdata + prefetch; stage 2: other-side value + moved-side prefetch; stage 3: moved-side value). Doc: +25% pipeline, +20% prefetch.</td><td>Overlaps the misses of one node's children.</td><td>lanes:1-28, 1408-1491: 24 interleaved explicit-stack DFS lanes per thread, one NTA miss each, across nodes and cubes. nissy's TODO.md calls this &quot;microthreading&quot;, its only remaining idea.</td><td>superset</td><td>-</td><td>BETTER</td></tr>
+<tr><td>B2</td><td>Prefetch hint</td><td>utils/prefetch.h (T0)</td><td></td><td>NTA (solver:141-147)</td><td>NTA measured better (neg/m6-prefetch-t0-t1, ebd6c20 +2.6%)</td><td>-</td><td>BETTER</td></tr>
+<tr><td>B3</td><td>No lookups (or cdata) while remaining &gt; base+3</td><td>h48/solve.h:199-201</td><td>A table value can't prune there.</td><td>lanes:1006-1031; solver:356-357</td><td>same</td><td>-</td><td>HAVE</td></tr>
+<tr><td>B4</td><td>X2 child inherits the other side's bound</td><td>h48/solve.h:173-176, 186-189</td><td>A half turn doesn't change the other side's H-coset.</td><td>lanes:1051; solver:339</td><td>same</td><td>-</td><td>HAVE</td></tr>
+<tr><td>B5</td><td>Other (inverse) side looked up first</td><td>h48/solve.h:203-244</td><td>The other-side value prunes before the moved-side lookup is issued.</td><td>lanes:1048-1074, 1116-1139</td><td>same</td><td>-</td><td>HAVE</td></tr>
+<tr><td>B6</td><td>X′ shares X's other-side value</td><td><strong>nissy: no</strong> (looks up X′'s other side again)</td><td></td><td>lanes:82-87, 1096-1103, 1127</td><td>ours only</td><td>-</td><td>BETTER (0b65adf: −28% lookups)</td></tr>
+<tr><td>B7</td><td>Carry normal + inverse cubes; premoves instead of inverting</td><td>h48/solve.h:179-180, 192-193; doc &quot;Avoiding inverse cube computation&quot;</td><td></td><td>lanes Node a/b; simd.rs:207 <code>premove_inv</code></td><td>same</td><td>-</td><td>HAVE</td></tr>
+</tbody>
+</table></div>
+<h2 id="c-search-rules">C. Search rules</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>nissy (file:line)</th><th>what it does</th><th>ours (file:line)</th><th>applicable / why</th><th>expected gain</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>C1</td><td>Iterative deepening over fixed depth-4 tasks, from depth 5</td><td>h48/solve.h:4, 675-680, 455-527</td><td>Tasks are always 4 moves long. Every depth from 5 is searched.</td><td>Start at max(ln, li, 1) (lanes:472). Jobs are min(d−(base+3), 4) long (solver:156-163).</td><td>ours skips useless shallow iterations</td><td>-</td><td>BETTER</td></tr>
+<tr><td>C2</td><td>Task-root bound: normal side only; dfs root starts with lb_normal = lb_inverse = 0 and inverse mask ALL</td><td>h48/solve.h:419-427, 487-488</td><td></td><td>Both job-root bounds cached with batched prefetch; tight masks at job roots (lanes:478-540, 886-897)</td><td>ours prunes/tightens at the job root</td><td>-</td><td>BETTER (c52cb63, 9f9a4d3)</td></tr>
+<tr><td>C3</td><td>Side choice: expand the side with fewer allowed moves (NISS switch)</td><td>h48/solve.h:350</td><td></td><td>lanes:1249-1257, 1333-1339; solver:315</td><td>same (ties go to normal)</td><td>-</td><td>HAVE</td></tr>
+<tr><td>C4</td><td>Tight bound on one side means no half turn next on the other side</td><td>h48/solve.h:275-278, 299-302</td><td>A bound equal to the remaining depth rules out a final half turn from that side's view.</td><td>lanes:1243-1248, 892-897; solver:456-461</td><td>same</td><td>-</td><td>HAVE</td></tr>
+<tr><td>C5</td><td>Canonical sequences: no repeated face; opposite faces only as U&lt;D, R&lt;L, F&lt;B</td><td>core/constants.h:437-444; core/moves.h:331-334</td><td></td><td>solver:13-27 <code>ALLOWED_AFTER</code></td><td>identical masks</td><td>-</td><td>HAVE</td></tr>
+<tr><td>C6</td><td>Last move: moves allowed on both sides, solved test</td><td>h48/solve.h:324-344</td><td></td><td>lanes:1252-1253, 1007-1015; solver:300-313</td><td>same</td><td>-</td><td>HAVE</td></tr>
+<tr><td>C7</td><td>Solved before the target depth: abandon</td><td>h48/solve.h:314</td><td></td><td>lanes:1019, 1161; solver:433</td><td>same</td><td>-</td><td>HAVE</td></tr>
+<tr><td>C8</td><td>Sibling-face pruning and back-jumps</td><td><strong>nissy: no</strong></td><td></td><td>lanes:983-988, 1088-1094; solver:421-479</td><td>ours only</td><td>-</td><td>BETTER (0c48355 −18% nodes; 7a173a1 +13.6%)</td></tr>
+<tr><td>C9</td><td>Symmetric-start filtering</td><td>h48/solve.h:504, 518-521 (<code>symmetry_mask</code> at each of the first 4 levels drops symmetric-equivalent moves); core/transform.h:411-423; solvers/solutions.h (reports the variants)</td><td>For an input within 3 moves of a symmetric position, explores one move per symmetry orbit: superflip 43254 → 1038 tasks (41.7×, doc).</td><td><strong>no</strong></td><td>Random states essentially never have a nontrivial symmetry (or are within 3 moves of one). Zero on the benchmark; helps only special inputs (superflip, patterns). nissy has no antisymmetric (inverse-conjugate) filter either.</td><td>0 on random states</td><td>N/A for speed (optional robustness patch, see M4)</td></tr>
+<tr><td>C10</td><td>Stop when enough solutions</td><td>h48/solve.h:315</td><td></td><td>FOUND propagation</td><td>same (one solution)</td><td>-</td><td>HAVE</td></tr>
+</tbody>
+</table></div>
+<h2 id="d-ordering-and-parallelism">D. Ordering and parallelism</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>nissy (file:line)</th><th>what it does</th><th>ours (file:line)</th><th>applicable / why</th><th>expected gain</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>D1</td><td>Task ranking by nodes visited × face factor (47525 / 58206 ≈ √(2/3)), sorted from depth 16</td><td>h48/solve.h:432-447, 545-553, 687-689</td><td>Finds the solution earlier in the last iteration (doc: ~40% for single solutions).</td><td>Statistic Σ 8^(16−h) × the same face factors (lanes:99-109, 269-306), radix sort (lanes:116-147); c7 cross-job per-child ordering (lanes:553-855); c8 unseen code</td><td>Measured: node-count rank 1.91M vs ours 1.661M final-iteration nodes/cube (aa43192), then c7 −6..−8% and c8 −1%</td><td>-</td><td>BETTER</td></tr>
+<tr><td>D2</td><td>Per-cube multithreading: depth-4 tasks split statically round-robin (<code>i += threads</code>)</td><td>h48/solve.h:401</td><td>One cube at a time, all threads.</td><td>Stream mode (one cube per lane) for throughput. share.rs for batch/latency: dynamic job claims, staged builds, node splitting (cube48opt <code>split_ida_node</code>).</td><td>ours is dynamic</td><td>-</td><td>BETTER</td></tr>
+<tr><td>D3</td><td>Pause / resume / stop polling</td><td>h48/solve.h:402-405, 698-721</td><td>API feature</td><td>no</td><td>not a speed technique</td><td>-</td><td>N/A</td></tr>
+</tbody>
+</table></div>
+<h2 id="e-low-level">E. Low level</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>nissy (file:line)</th><th>what it does</th><th>ours (file:line)</th><th>applicable / why</th><th>expected gain</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>E1</td><td>Cube in one AVX2 register (vcube layout); compose = shuffle + orientation add/min</td><td>arch/avx2.h:101-121</td><td></td><td>simd.rs:182-205</td><td>same; moves are specialised AVX-512 in ours</td><td>-</td><td>HAVE / BETTER</td></tr>
+<tr><td>E2</td><td>Inverse by a vpshufb addition chain</td><td>arch/avx2.h:123-160</td><td></td><td>simd.rs:225-255 (identical chain; used once per cube)</td><td>same</td><td>-</td><td>HAVE</td></tr>
+<tr><td>E3</td><td>Moves = compose with constant move cubes (switch)</td><td>core/moves.h:4-5, <code>move</code>/<code>premove</code></td><td></td><td>simd.rs:195-210</td><td>ours specialised</td><td>-</td><td>BETTER</td></tr>
+<tr><td>E4</td><td>Conjugation by full compose (transform)</td><td>core/transform.h</td><td></td><td>Edge-only conjugation with two shuffles (coord.rs:245-297)</td><td>ours fewer µops</td><td>-</td><td>BETTER (42a7c98 +5.5%)</td></tr>
+<tr><td>E5</td><td>Coordinates: co by a scalar 7-step loop; csep by movemask (7-bit binary index); esep by a scalar binomial loop; eo by movemask</td><td>arch/avx2.h <code>coord_co</code>, <code>coord_csep</code>, <code>coord_esep</code>, <code>coord_eo</code></td><td></td><td>pext + LUTs, vpmovmskb asm (coord.rs:156-297)</td><td>ours faster</td><td>-</td><td>BETTER (m1, m4, m6 rounds)</td></tr>
+<tr><td>E6</td><td>popcount side choice</td><td>arch/avx2.h <code>popcount_u64</code></td><td></td><td><code>count_ones</code></td><td>same</td><td>-</td><td>HAVE</td></tr>
+</tbody>
+</table></div>
+<h2 id="f-solutions">F. Solutions</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>nissy (file:line)</th><th>what it does</th><th>ours (file:line)</th><th>applicable / why</th><th>expected gain</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>F1</td><td>Un-NISS: normal moves + inverted premoves in reverse</td><td>solvers/solutions.h <code>appendsolution</code></td><td></td><td>lanes:1293-1309; solver:269-272</td><td>same</td><td>-</td><td>HAVE</td></tr>
+<tr><td>F2</td><td>Multi-solution dedup (<code>allowedmoves</code> after un-NISS), symmetric variants</td><td>solvers/solutions.h</td><td></td><td>n/a (one solution)</td><td>not needed</td><td>-</td><td>N/A</td></tr>
+</tbody>
+</table></div>
+<h2 id="g-correctness-finding-nissy-s-h11-table-is-slightly-inadmissible-the-r7-distribution-difference">G. Correctness finding: nissy's h11 table is slightly inadmissible (the r7 distribution difference)</h2>
+<ul>
+<li><strong>Bug:</strong> h48/gendata_h48.h:307-316 (<code>gendata_h48_runthread</code>) together with h48/map.h:68-87 (<code>h48map_nextkvpair</code>, which post-increments the slot index).
+<ul>
+<li>The loop <code>kv = nextkvpair(map, next); if (*next == capacity) break;</code> drops the entry in the last slot (<code>capacity - 1</code>).</li>
+<li>With nissy's fixed capacity 10000019 and hash function, that slot holds the depth-8 h11 entry 189880194105 (class 2675, no self-symmetry).</li>
+<li>Its 4-level DFS never runs (the loop visits 7,437,854 of 7,437,855 short entries).</li>
+<li>The same loop shape is in <code>gendata_h48short</code> (gendata_h48.h:62-65). It is harmless there: the entry's val is 8, the last BFS level.</li>
+</ul>
+</li>
+<li><strong>Proof:</strong>
+<ul>
+<li>nissy's own depth-≤8 BFS, run from its source, equals ours per depth (1/1/4/34/333/3815/45382/548562/6839723).</li>
+<li>Modelling nissy's values in the 49,206 entries within 4 moves of the skipped root (8 + distance to the other depth-8 roots) gives ours − nissy = <strong>[+159, +1689, +7691, −9539]</strong> per code. That is exactly r7's difference (ours [1150763320, 12045847349, 91163441021, 136418085910] vs nissy's checkdata.h).</li>
+<li>Scripts: <code>/data/agents/x-h48/drv/{short,lastslot,skipped}.c</code>.</li>
+</ul>
+</li>
+<li><strong>Consequence:</strong>
+<ul>
+<li><strong>Our h11 is exact; nothing to fix.</strong></li>
+<li>nissy's h11 over-estimates 11,546 entries by one level: 159 true ≤10 coded 1, 1848 true 11 coded 2, 9539 true 12 coded 3. Its table is thus very slightly inadmissible.</li>
+<li>h0 is unaffected: ours (base 7) equals nissy's h0 on every comparable level.</li>
+<li>h7/h8 can't be compared: different EO subsets.</li>
+</ul>
+</li>
+</ul>
+<h2 id="measurements">Measurements</h2>
+<p>All counts are deterministic node counts (count.sh-style: 8 threads of one CCD, h11 unless noted). Baseline main 55e048e on random:1000:2026: <strong>3,058,198 nodes/cube, 2,588,380 lookups/cube</strong>, lengths 15:1 16:35 17:270 18:662 19:32. Every experiment kept the lengths identical.</p>
+<h3 id="m1-eoesep-fallback-a6-measured-no-at-h11">M1. eoesep fallback (A6): MEASURED-NO at h11</h3>
+<ul>
+<li><strong>Edge-only table:</strong> unreduced, one byte per (msplit, eo11, eslot) key, 73 MB; BFS in <code>src/exp.rs</code>.
+<ul>
+<li>Distribution: 0:1 1:6 2:75 3:870 4:9810 5:102520 6:986669 7:8137622 8:34145345 9:27231078 10:349198 11:6; 34650 × 2048 valid keys.</li>
+<li>nissy's 782-class reduction has the same depths (maxvalue 11).</li>
+<li>It is weak: mostly 8-9, against h11 values of 11-13.</li>
+</ul>
+</li>
+<li><strong>Mode 1, nissy's rule:</strong> on a code-0 read, take max(group min, corner depth, eoesep).
+<ul>
+<li>Result: <strong>3,063,419 nodes/cube (+0.17%), 2,592,913 lookups/cube (+0.17%)</strong>.</li>
+<li>A stronger bound can only lower node counts in an exhaustive iteration. The +0.17% is therefore ordering noise in the last iteration (the job statistics change).</li>
+<li>Even before table cost, there is no gain. This matches diag-code0: only ~12K code-0 lookups per cube pass at r1 ≤ 9.</li>
+</ul>
+</li>
+<li><strong>Mode 3:</strong> the edge bound folded into the corner bound (precheck + fallback, any k), on h7/h8 for the same-size comparisons. See M1b.</li>
+</ul>
+<h3 id="m2-base-11-for-h11-a4-measured-no-10-nodes-worse">M2. base 11 for h11 (A4): MEASURED-NO (−10% nodes worse)</h3>
+<ul>
+<li><strong>Emulation:</strong> an exact base-11 h11 table emulated from our base-10 table.
+<ul>
+<li>True 11 (code 1) becomes a code-0 fallback, max(group min, corner depth).</li>
+<li>Code 2 stays 12.</li>
+<li>Code 3 becomes 13 if any of the 18 neighbours has code 2 (exactly 12), else 14 (exact, since dist = 1 + min over neighbours).</li>
+</ul>
+</li>
+<li><strong>Result:</strong> <strong>3,368,592 nodes/cube (+10.2%), 2,960,401 lookups/cube (+14.4%)</strong>.</li>
+<li><strong>Why:</strong> losing the exact &quot;11&quot; costs far more at r1 = 10 (0.33M lookups/cube) than the new &quot;14&quot; saves at r1 = 13 (63K lookups/cube).</li>
+<li><strong>Other mappings:</strong> base 9, or merging 12/13 or 11/12, would lose an exact level at r1 = 11/12, where 2.3M of the 2.6M lookups happen. So base 10 is the right offset for h11, as nissy and cube48opt also chose.</li>
+</ul>
+<h3 id="m4-symmetric-start-filtering-c9-n-a-on-random-states">M4. Symmetric-start filtering (C9): N/A on random states</h3>
+<ul>
+<li>2000 random states, all 7,004,000 positions at depths 0..3 of their canonical prefix trees (the levels nissy's <code>symmetry_mask</code> checks): <strong>0 with a nontrivial symmetry</strong>. The filter never fires on the benchmark distribution.</li>
+<li>For symmetric inputs (superflip: 43254 → 1038 tasks in nissy) it would cut the job tree.</li>
+<li>Cost for us: only a root-level check is affordable (48 conjugations, ~0.2 µs/cube). nissy's full 4-level check (~3.5K prefix nodes × 48 conjugations ≈ 0.5 ms/cube) would cost ~1% at our 40 ms/cube at 1T.</li>
+<li>Correctness for one solution: keeping the first allowed move of each orbit is sound. If a solution starts with a dropped move t(m), conjugating it by t gives one starting with m, or, after canonical reordering of commuting moves, with an earlier face. That potential strictly decreases, so a kept first move always exists.</li>
+</ul>
+<h3 id="m1b-m3-see-below">M1b / M3: see below</h3>
+<h2 id="feasibility-a-bigger-effective-table-than-h11-within-65-gib-ideas-2-2-2-4-4-2-4-4-analysis-only-no-table-generated">Feasibility: a bigger effective table than h11 within ~65 GiB (ideas 2.2-2.4, 4.2-4.4). Analysis only, no table generated</h2>
+<p><strong>Verdict:</strong> infeasible. The smallest H48-compatible refinement of the coset space is 2×, and at its information content it needs ≥ 70 GiB.</p>
+<p><strong>1. Which refinements keep the H48 design.</strong> A refinement H′ ⊂ H must keep two properties:</p>
+<ul>
+<li>Invariance under all 48 symmetries: one lookup per side, and 48-fold reduction.</li>
+<li>All half turns in H′: X2 inherit (B4), the X/X′ twin (B6) and NO_HALF on tight bounds (C4) all depend on it.</li>
+</ul>
+<p>So G2 = ⟨U2, D2, R2, L2, F2, B2⟩ ⊆ H′ ⊆ H.</p>
+<ul>
+<li>|H| = 4!·4!·(4!)³/2 = 3,981,312 and |G2| = 663,552, so [H : G2] = 6.</li>
+<li>In G2 the corner and edge permutations are always even, while H contains odd ones (a corner 2-swap inside a tetrad with an edge 2-swap inside a slice). So K = H ∩ {even permutations} is an index-2 subgroup with G2 ⊆ K.
+<ul>
+<li>K is symmetry-invariant: conjugation preserves parity.</li>
+<li>It is the only one: &quot;parity of one tetrad&quot; or &quot;of one slice&quot; is not symmetry-invariant, since symmetries swap tetrads and permute slices.</li>
+<li>K-coordinate = (H48 coordinate, parity bit). Parity = number of quarter turns mod 2, unchanged by half turns.</li>
+</ul>
+</li>
+<li>Above K, the next refinement is G2 itself: corners in the half-turn state, ×6.</li>
+<li>Refinements that drop the half-turn property lose B4/B6/C4 and are larger anyway (a full corner permutation is ×576, an edge permutation inside slices ×13824).</li>
+</ul>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>coset space</th><th align="right">entries</th><th align="right">2 bit</th><th align="right">1.6 bit (trits)</th><th align="right">1.3 bit</th><th align="right">1.25 bit (h11's entropy)</th></tr>
+</thead>
+<tbody>
+<tr><td>h11 (now: 2 bit, 58.0 GiB with the group-min layout)</td><td align="right">2.408e11</td><td align="right">56.1 GiB</td><td align="right">44.8</td><td align="right">36.4</td><td align="right">35.0</td></tr>
+<tr><td>K11 = h11 × parity</td><td align="right">4.816e11</td><td align="right">112.1</td><td align="right">89.7</td><td align="right"><strong>72.9</strong></td><td align="right">70.1</td></tr>
+<tr><td>h11 × G2-corners</td><td align="right">1.445e12</td><td align="right">336</td><td align="right">269</td><td align="right">219</td><td align="right">210</td></tr>
+</tbody>
+</table></div>
+<ul>
+<li>K11 in 65 GiB allows <strong>≤ 1.16 bits/entry</strong>, with no room for fallback minima.</li>
+<li>The h11 code distribution [0.48%, 5.0%, 37.9%, 56.7%] already has 1.248 bits of entropy. K11's distribution has its mass one level deeper and is at least as spread (13 and ≥14 both large), so lossless coding needs ≥ 1.25 bits.</li>
+<li>To fit, a lossy code would have to merge levels. M2 shows what losing one exact level costs: base 11 is +10.2% nodes; losing 12 or 13 is far worse (most lookups happen at r1 = 11..12).</li>
+</ul>
+<p><strong>2. Gain if it fit.</strong> A 2× coset space adds ~0.27 ply of mean h (13.3× nodes per ply), i.e. at most ~2× fewer nodes. Our own scaling agrees: h8 → h11 (8× entries) gives 23.9M → 3.06M nodes/cube, 7.8×. The lossy coding needed to fit would eat a large, uncertain part of that.</p>
+<p><strong>3. Decode cost per lookup.</strong> Our lookup is ~15 ns at 1T, mostly the DRAM miss; decode today is one shift and mask.</p>
+<ul>
+<li>Trits (5 per byte, a 243-entry LUT): one extra L1 load and a few ALU ops (~1-2 ns). But it gives only 3 levels at 1.6 bits, which doesn't fit K11 anyway.</li>
+<li>tANS: ~170 sequential symbol decodes (~1000 instructions, ~300 ns) per lookup, about 20× our whole per-lookup cost. Infeasible. This matches CS's and TR's own judgement in ideas 2.4.</li>
+</ul>
+<p><strong>4. 96-way merge (inverse folded into the table): impossible for H48.</strong></p>
+<ul>
+<li>The coordinate is a right coset H·x. A premove by h ∈ H leaves it unchanged; that is exactly why an X2 child keeps the <em>other</em> side's bound.</li>
+<li>But (h·x)⁻¹ = x⁻¹·h⁻¹ is in a different coset in general. So the inverse's coset is not a function of the entry, and no single entry can stand for {x, x⁻¹}. That would need H to be normal in G, and it isn't.</li>
+<li>Storing lexmin(pos, pos⁻¹) needs a position-indexed (hashed) table, not a coset table.</li>
+<li>We already do the 48-way part (A1), and we probe the inverse separately (B5).</li>
+</ul>
+<p><strong>5. What does fit.</strong> Equal or smaller spaces with <em>different</em> information:</p>
+<ul>
+<li>h10 × parity: exactly h11's 2.408e11 entries and the same 2-bit layout.</li>
+<li>h8 × G2-corners: 1.806e11 entries, 42 GiB.</li>
+</ul>
+<p>Whether parity (or the half-turn corner state) is worth more than the EO bits it replaces is unknown. h10 × parity can't be BFS-generated exactly in our RAM: the true coordinate K11 would need 112 GiB at 2 bits. It would need a nissy-style DFS min-collapse instead.</p>
+<p>A cheap way to find out is a small-scale analogue: h1 vs h0 × parity (both 2.35e8 entries, ~60 MB). The generator already BFSes true coordinates, and h0 × parity is one. Adding the parity bit to the index would let us compare node counts directly. If parity loses to an EO bit at small scale, the idea is dead. If it wins clearly, h10 × parity at h11's size is the next step.</p>
+<p><strong>6. Using the 23 GiB that entropy coding of h11 itself would free (35 vs 58 GiB).</strong> Nothing H48-compatible fits it (the next coset space is 2×). A second, differently-shaped table (e.g. a 16-symmetry UD-axis one) would add a second DRAM probe per lookup. Ideas 3.1 (&quot;one big table beats several small ones&quot;) and our own lookup-bound profile argue against it.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

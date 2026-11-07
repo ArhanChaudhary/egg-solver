@@ -1,0 +1,189 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>wasm: the WebAssembly module (wasm/) for browsers and Node; README &quot;WebAssembly&quot; — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="876a97edb90a.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="wasm-the-webassembly-module-wasm-for-browsers-and-node-readme-webassembly">wasm: the WebAssembly module (wasm/) for browsers and Node; README &quot;WebAssembly&quot;</h1>
+<p>Commit <code>876a97edb90a8a9ea5cf1530d3f4578f7b3b1b39</code> · 2026-11-04T19:46:05+00:00</p>
+<p>This commit is reachable from the released main history. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: Historical ancestor; no current branch tip</p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>wasm: the WebAssembly module (wasm/) for browsers and Node; README &quot;WebAssembly&quot;</p>
+<p>User request: &quot;make it also compile to wasm&quot;. <code>wasm/build.sh</code> builds two
+modules of ~380 KB each:</p>
+<ul>
+<li>
+<p><code>wasm/dist/cubeopt.wasm</code>: wasm32-wasip1, one thread;</p>
+</li>
+<li>
+<p><code>cubeopt-threads.wasm</code>: wasm32-wasip1-threads.</p>
+</li>
+<li>
+<p>wasm/src/lib.rs (crate cubeopt-wasm, a workspace member, cdylib): a plain
+C ABI, no bindings generator. The exports:</p>
+<ul>
+<li><code>cubeopt_table_buffer(len)</code> returns memory that the caller fills with a
+table file; <code>cubeopt_table_load(verify)</code> checks and installs it;</li>
+<li><code>cubeopt_generate(k, base, threads)</code> (h0..h6);</li>
+<li><code>cubeopt_solve</code>: one cube, in share mode with one cube in progress, on
+this thread or on all threads;</li>
+<li><code>cubeopt_solve_batch</code>: stream mode, for throughput;</li>
+<li><code>cubeopt_bench</code>: as <code>bench stream</code>;</li>
+<li><code>cubeopt_random</code>: the facelets of the cubes of <code>bench random:N:SEED</code>.
+Cubes are scrambles or facelet strings. Results come back as JSON in an
+output buffer. All exports share one compiled copy of the stream search
+(<code>stream</code>), and the build script sets cfg(wasm_threads), because the
+threads target's <code>atomics</code> is not visible to cfg(target_feature).</li>
+</ul>
+</li>
+<li>
+<p>Lanes per thread in the module: 16. Lanes pay off in wasm too, but
+already fully at 8. V8, h6, 100 depth-17 cubes, 1 thread:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>lanes</th><th>1</th><th>8</th><th>16</th><th>24</th><th>40</th><th>64</th></tr>
+</thead>
+<tbody>
+<tr><td>time (s)</td><td>200.6</td><td>123.8</td><td>125.3</td><td>128.2</td><td>130.3</td><td>127.9</td></tr>
+</tbody>
+</table></div>
+<p>16 lanes take 23 MB instead of the 56 MB of 40.</p>
+</li>
+<li>
+<p>wasm/cubeopt.mjs: the JavaScript API, for Node and browsers. It:</p>
+<ul>
+<li>
+<p>instantiates the module;</p>
+</li>
+<li>
+<p>provides the WASI functions the module imports (clock, console output,
+sleep);</p>
+</li>
+<li>
+<p>for the threads build, implements wasi-threads' <code>thread-spawn</code> with a
+pool of workers (<code>cubeopt-thread.mjs</code>, Web Workers or worker_threads).
+A worker waits on a shared control slot, runs <code>wasi_thread_start</code>, and
+waits again;</p>
+</li>
+<li>
+<p>copies tables from the file or fetch stream straight into the module's
+memory;</p>
+</li>
+<li>
+<p>warms up V8 (<code>warmUp</code>, called by loadTable and generateTable). V8 runs
+new code with its baseline compiler and gives a function optimized code
+only from its next call, so a long first solve would run slowly to its
+end. On h6 with 100 depth-17 cubes and 1 thread:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>Node 26 run</th><th>time (s)</th></tr>
+</thead>
+<tbody>
+<tr><td>default, no warm-up</td><td>187.7</td></tr>
+<tr><td>with the warm-up</td><td>129.5</td></tr>
+<tr><td><code>--no-liftoff</code></td><td>130.6 (same module)</td></tr>
+</tbody>
+</table></div>
+<p>The warm-up takes ~0.6 s.</p>
+</li>
+</ul>
+</li>
+<li>
+<p>The demos:</p>
+<ul>
+<li>wasm/demo.mjs (Node): solve stdin or random states, <code>--batch</code>,
+<code>--bench</code>;</li>
+<li>wasm/index.html + demo-worker.mjs (browser): generate h0..h4 or load a
+table file or URL, then solve scrambles, facelets or random states;</li>
+<li>serve.mjs: a static server with the COOP/COEP headers the threads build
+needs, and a table folder at /tables/;</li>
+<li>test.mjs: a smoke test of both builds, run by check.sh when node is
+installed (h0 generated, solutions checked, threads present).</li>
+</ul>
+</li>
+<li>
+<p>[profile.wasm-release]: release without debug info, for the module's
+build.</p>
+</li>
+<li>
+<p>README.md &quot;WebAssembly&quot;: build, JS API, Node, browser, tables per
+environment with measured solve times, threads and COOP/COEP, speed,
+memory64, tests.</p>
+</li>
+</ul>
+<p>Speed, h6, 100 depth-17 cubes (14.8M nodes each), 1 thread, batch, Zen 5:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>build</th><th>time (s)</th><th>Mnodes/s</th></tr>
+</thead>
+<tbody>
+<tr><td>native x86 (AVX-512)</td><td>21.7</td><td>68</td></tr>
+<tr><td>wasm, wasmtime 44</td><td>121.6, 122.2</td><td>12.2</td></tr>
+<tr><td>wasm, V8 (Node 26, warm-up)</td><td>123.6, 124.3</td><td>11.9</td></tr>
+</tbody>
+</table></div>
+<p>NEON ran only under qemu here, which says nothing about speed.</p>
+<p>Random states, one at a time, V8, mean and median per cube (10 cubes,
+seed 1; h4: 5):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>table</th><th>1 thread</th><th>8 threads (one L3 domain)</th></tr>
+</thead>
+<tbody>
+<tr><td>h4 base 8</td><td>21.6 s, 20.7 s</td><td></td></tr>
+<tr><td>h5</td><td>19.4 s, 10.3 s</td><td></td></tr>
+<tr><td>h6</td><td>12.6 s, 5.0 s</td><td>1.6 s, 0.65 s (88.6 Mnodes/s)</td></tr>
+<tr><td>h7</td><td>6.7 s, 2.9 s</td><td>0.93 s, 0.44 s</td></tr>
+</tbody>
+</table></div>
+<p>Generation in the module (V8):</p>
+<ul>
+<li>h0 base 7: 2.3 s;</li>
+<li>h4 base 8: 75 s on 1 thread, 13.4 s on 8 threads.</li>
+</ul>
+<p>Validation:</p>
+<ul>
+<li>Node 26 (V8 14): both builds generate tables, load h4..h7 files and solve.
+h7 (3.6 GiB) fits in wasm32's memory: loading it with <code>verify</code> takes 23 s.
+The node counts are identical to native (previous commit; h5 and h6).</li>
+<li>Headless Chromium 141, index.html, cross-origin isolated through
+serve.mjs:
+<ul>
+<li>1 thread: h0 generated in 2.5 s;</li>
+<li>h6 (1.8 GiB) fetched in 3-13 s, h7 (3.6 GiB) in 14.7 s;</li>
+<li>8 threads: h4 base 8 generated in 13.0 s; a random state solved in
+0.66 s instead of 5.15 s on 1 thread (same solution).</li>
+</ul>
+</li>
+<li>check.sh passes, including test.mjs for both modules.</li>
+</ul>
+<p>x86 unchanged. This commit does not touch the library, only a workspace
+member, a profile and Cargo.lock entries. The checks in the previous
+commit's message cover the two commits together.</p>
+<ul>
+<li>Speed: bench stream on h11 with 24 lanes, main def2cd0 vs this stack,
+both built from the same folder.
+1 thread (ab1t, 6 paired runs), solves/s:
+<div class="table-wrap"><table>
+<thead>
+<tr><th>build</th><th>median</th><th>runs</th></tr>
+</thead>
+<tbody>
+<tr><td>main</td><td>24.767</td><td>24.717 25.517 24.867 24.767 25.217 24.150</td></tr>
+<tr><td>stack</td><td>24.733</td><td>24.983 24.783 24.733 24.717 25.117 24.217</td></tr>
+<tr><td>-0.1%: neutral.</td><td></td><td></td></tr>
+<tr><td>48 threads (ab48, 3 runs, outside load 0.1 cores), solves/s:</td><td></td><td></td></tr>
+<tr><td>build</td><td>median</td><td>runs</td></tr>
+<tr><td>-------</td><td>----------</td><td>-----------------------------</td></tr>
+<tr><td>main</td><td>1027.433</td><td>1014.367 1027.433 1030.200</td></tr>
+<tr><td>stack</td><td>1036.333</td><td>1023.700 1078.333 1036.333</td></tr>
+<tr><td>+0.9%, within the 48T noise: neutral.</td><td></td><td></td></tr>
+</tbody>
+</table></div>
+</li>
+<li>Earlier, on main 857a0c6 with the stack as it was then (read_once still
+a no-op on wasm, same hot code):
+<ul>
+<li>1T: 25.167 [25.200 25.167 25.167 25.250 25.317 25.033] vs 25.300
+[25.417 25.317 25.317 25.300 25.217 25.217];</li>
+<li>48T: 1074.467 [1074.467 1070.500 1087.000] vs 1082.733 [1082.733
+1076.800 1088.100].</li>
+</ul>
+</li>
+</ul>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

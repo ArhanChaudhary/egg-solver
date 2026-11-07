@@ -1,0 +1,31 @@
+{
+  "round": 2,
+  "order": [
+    "bytes",
+    "outline",
+    "base"
+  ],
+  "records": {
+    "bytes": {
+      "variant": "bytes",
+      "round": 2,
+      "throughput": 152.067,
+      "outside_cores": 0.0,
+      "binary_sha256": "639ad2ad0700638e48e46ec3785395edab44254b14fe8a3d01431805a6c25bf0"
+    },
+    "outline": {
+      "variant": "outline",
+      "round": 2,
+      "throughput": 136.533,
+      "outside_cores": 0.1,
+      "binary_sha256": "241411822b759f29ba5b80e2dbc97397538f48cd6bf61e37cd491e60a8989f69"
+    },
+    "base": {
+      "variant": "base",
+      "round": 2,
+      "throughput": 155.233,
+      "outside_cores": 0.0,
+      "binary_sha256": "8dadabae98f69673be8f1f800c59cde5435fdf16edb1ff2c67159db02c5dd3b8"
+    }
+  }
+}

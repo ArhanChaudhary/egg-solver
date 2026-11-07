@@ -1,0 +1,30 @@
+test nxopt31 random_state_from25
+000 6.284M nodes, 213.499 ns/node
+001 16.548M nodes, 207.440 ns/node
+002 50.333M nodes, 207.614 ns/node
+003 58.501M nodes, 208.807 ns/node
+004 282.159M nodes, 206.844 ns/node
+005 40.457M nodes, 203.313 ns/node
+006 132.244M nodes, 204.588 ns/node
+007 0.371M nodes, 204.357 ns/node
+008 46.694M nodes, 205.335 ns/node
+009 3.423M nodes, 201.287 ns/node
+010 63.500M nodes, 201.633 ns/node
+011 2.529M nodes, 203.422 ns/node
+012 11.686M nodes, 205.285 ns/node
+013 50.493M nodes, 206.939 ns/node
+014 27.256M nodes, 205.475 ns/node
+015 339.515M nodes, 205.728 ns/node
+016 28.464M nodes, 202.138 ns/node
+017 2.197M nodes, 209.827 ns/node
+018 35.051M nodes, 208.401 ns/node
+019 215.646M nodes, 204.890 ns/node
+020 38.330M nodes, 207.805 ns/node
+021 25.460M nodes, 208.204 ns/node
+022 44.036M nodes, 206.004 ns/node
+023 46.590M nodes, 204.502 ns/node
+024 77.721M nodes, 203.266 ns/node
+Avg 65.820M nodes, 205.664 ns/node, tt=13.537s
+
+runtest.sh: line 329: syntax error near unexpected token `)'
+runtest.sh: line 329: `)$ ]]; then'

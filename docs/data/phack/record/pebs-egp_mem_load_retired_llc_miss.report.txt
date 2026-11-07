@@ -1,0 +1,21 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 55  of event 'egp_mem_load_retired_llc_miss'
+# Event count (approx.): 110165
+#
+# Overhead  Symbol                                                                              IPC   [IPC Coverage]
+# ........  ..................................................................................  ....................
+#
+    58.18%  [.] <cubeopt::lanes::Lane>::setup_run                                               -      -            
+    32.73%  [.] cubeopt::lanes::run_lanes::<bench::run::{closure#1}::{closure#0}::{closure#0}>  -      -            
+     5.45%  [.] <cubeopt::lanes::Lane>::start_iteration                                         -      -            
+     1.82%  [.] <cubeopt::lanes::Lane>::extend_jobs                                             -      -            
+     1.82%  [.] malloc                                                                          -      -            
+
+
+#
+# (Tip: Sample related events with: perf record -e '{cycles,instructions}:S')
+#

@@ -1,0 +1,336 @@
+    Checking egg-solver v0.1.0 (/home/super/egg-solver)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.15s
+test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.69s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.89s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling libc v0.2.191
+   Compiling serde_core v1.0.229
+   Compiling thiserror v2.0.21
+   Compiling heck v0.5.0
+   Compiling zmij v1.0.23
+   Compiling portable-atomic v1.15.0
+   Compiling parking_lot_core v0.9.12 (/home/super/egg-solver/vendor/parking_lot_core)
+   Compiling serde_json v1.0.154
+   Compiling crossbeam-utils v0.8.23
+   Compiling anyhow v1.0.104
+   Compiling serde v1.0.229
+    Checking utf8parse v0.2.2
+    Checking colorchoice v1.0.5
+    Checking anstyle v1.0.14
+    Checking is_terminal_polyfill v1.70.2
+    Checking anstyle-query v1.1.5
+    Checking strsim v0.11.1
+    Checking clap_lex v1.1.1
+    Checking unicode-width v0.2.3
+    Checking cfg-if v1.0.5
+    Checking scopeguard v1.2.0
+    Checking log v0.4.35
+    Checking smallvec v1.16.4
+    Checking allocator-api2 v0.2.21
+    Checking itoa v1.0.18
+    Checking memchr v2.8.3
+    Checking unit-prefix v0.5.2
+    Checking foldhash v0.2.0
+    Checking equivalent v1.0.3
+    Checking anstyle-parse v1.0.0
+    Checking lock_api v0.4.14
+    Checking env_filter v2.0.0
+    Checking anstream v1.0.0
+    Checking env_logger v0.11.11
+    Checking clap_builder v4.6.7
+   Compiling syn v3.0.9
+    Checking hashbrown v0.16.1
+   Compiling thiserror-impl v2.0.21
+   Compiling clap_derive v4.6.7
+   Compiling serde_derive v1.0.229
+    Checking console v0.16.6
+    Checking parking_lot v0.12.5
+    Checking indicatif v0.18.6
+   Compiling egg-solver v0.1.0 (/home/super/egg-solver)
+    Checking clap v4.6.7
+    Checking clap_complete v4.6.11
+    Finished `release` profile [optimized + debuginfo] target(s) in 3.44s
+   Compiling libc v0.2.191
+   Compiling serde_core v1.0.229
+   Compiling portable-atomic v1.15.0
+   Compiling zmij v1.0.23
+   Compiling thiserror v2.0.21
+    Checking utf8parse v0.2.2
+    Checking is_terminal_polyfill v1.70.2
+    Checking anstyle-query v1.1.5
+    Checking colorchoice v1.0.5
+    Checking anstyle v1.0.14
+    Checking clap_lex v1.1.1
+    Checking strsim v0.11.1
+    Checking unicode-width v0.2.3
+    Checking cfg-if v1.0.5
+    Checking scopeguard v1.2.0
+    Checking log v0.4.35
+    Checking smallvec v1.16.4
+    Checking allocator-api2 v0.2.21
+    Checking itoa v1.0.18
+    Checking unit-prefix v0.5.2
+    Checking memchr v2.8.3
+    Checking foldhash v0.2.0
+    Checking equivalent v1.0.3
+   Compiling parking_lot_core v0.9.12 (/home/super/egg-solver/vendor/parking_lot_core)
+   Compiling serde v1.0.229
+   Compiling anyhow v1.0.104
+   Compiling serde_json v1.0.154
+   Compiling crossbeam-utils v0.8.23
+   Compiling egg-solver v0.1.0 (/home/super/egg-solver)
+    Checking anstyle-parse v1.0.0
+    Checking lock_api v0.4.14
+    Checking env_filter v2.0.0
+    Checking anstream v1.0.0
+    Checking clap_builder v4.6.7
+    Checking env_logger v0.11.11
+    Checking hashbrown v0.16.1
+    Checking clap v4.6.7
+    Checking clap_complete v4.6.11
+    Checking console v0.16.6
+    Checking parking_lot v0.12.5
+    Checking indicatif v0.18.6
+    Finished `release` profile [optimized + debuginfo] target(s) in 2.62s
+   Compiling wasm-bindgen-shared v0.2.130
+   Compiling rustversion v1.0.23
+   Compiling bumpalo v3.20.3
+    Checking utf8parse v0.2.2
+    Checking unicode-ident v1.0.27
+    Checking is_terminal_polyfill v1.70.2
+    Checking colorchoice v1.0.5
+    Checking anstyle-query v1.1.5
+    Checking anstyle v1.0.14
+    Checking cfg-if v1.0.5
+    Checking slab v0.4.12
+    Checking futures-core v0.3.34
+    Checking pin-project-lite v0.2.17
+    Checking futures-task v0.3.34
+    Checking strsim v0.11.1
+    Checking clap_lex v1.1.1
+    Checking unicode-width v0.2.3
+    Checking log v0.4.35
+    Checking itoa v1.0.18
+    Checking foldhash v0.2.0
+    Checking equivalent v1.0.3
+    Checking allocator-api2 v0.2.21
+    Checking unit-prefix v0.5.2
+    Checking memchr v2.8.3
+   Compiling serde_core v1.0.229
+   Compiling libc v0.2.191
+   Compiling zmij v1.0.23
+   Compiling portable-atomic v1.15.0
+   Compiling serde v1.0.229
+   Compiling serde_json v1.0.154
+   Compiling anyhow v1.0.104
+   Compiling thiserror v2.0.21
+   Compiling crossbeam-utils v0.8.23
+   Compiling syn v3.0.9
+    Checking anstyle-parse v1.0.0
+    Checking env_filter v2.0.0
+    Checking futures-util v0.3.34
+    Checking console v0.16.6
+    Checking anstream v1.0.0
+    Checking clap_builder v4.6.7
+    Checking env_logger v0.11.11
+    Checking hashbrown v0.16.1
+   Compiling wasm-bindgen v0.2.130
+   Compiling wasm-bindgen-macro-support v0.2.130
+   Compiling thiserror-impl v2.0.21
+   Compiling clap_derive v4.6.7
+   Compiling serde_derive v1.0.229
+   Compiling egg-solver v0.1.0 (/home/super/egg-solver)
+    Checking clap v4.6.7
+    Checking clap_complete v4.6.11
+   Compiling wasm-bindgen-macro v0.2.130
+    Checking js-sys v0.3.107
+    Checking web-time v1.1.0
+    Checking indicatif v0.18.6
+    Finished `release` profile [optimized + debuginfo] target(s) in 8.39s
+   Compiling libc v0.2.191
+   Compiling serde_core v1.0.229
+   Compiling portable-atomic v1.15.0
+   Compiling thiserror v2.0.21
+    Checking utf8parse v0.2.2
+    Checking is_terminal_polyfill v1.70.2
+    Checking anstyle-query v1.1.5
+    Checking colorchoice v1.0.5
+    Checking anstyle v1.0.14
+    Checking strsim v0.11.1
+    Checking clap_lex v1.1.1
+    Checking log v0.4.35
+    Checking unicode-width v0.2.3
+    Checking unit-prefix v0.5.2
+    Checking itoa v1.0.18
+    Checking memchr v2.8.3
+    Checking allocator-api2 v0.2.21
+    Checking foldhash v0.2.0
+    Checking web-time v1.1.0
+    Checking equivalent v1.0.3
+   Compiling zmij v1.0.23
+   Compiling crossbeam-utils v0.8.23
+   Compiling anyhow v1.0.104
+   Compiling serde v1.0.229
+   Compiling serde_json v1.0.154
+   Compiling egg-solver v0.1.0 (/home/super/egg-solver)
+    Checking anstyle-parse v1.0.0
+    Checking env_filter v2.0.0
+    Checking anstream v1.0.0
+    Checking console v0.16.6
+    Checking clap_builder v4.6.7
+    Checking env_logger v0.11.11
+    Checking indicatif v0.18.6
+    Checking hashbrown v0.16.1
+    Checking clap v4.6.7
+    Checking clap_complete v4.6.11
+    Finished `release` profile [optimized + debuginfo] target(s) in 2.14s
+   Compiling egg-solver-wasm v0.1.0 (/home/super/egg-solver/wasm)
+   Compiling syn v3.0.9
+   Compiling thiserror-impl v2.0.21
+   Compiling thiserror v2.0.21
+   Compiling egg-solver v0.1.0 (/home/super/egg-solver)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.90s
+    Checking utf8parse v0.2.2
+    Checking colorchoice v1.0.5
+    Checking anstyle v1.0.14
+    Checking is_terminal_polyfill v1.70.2
+    Checking anstyle-query v1.1.5
+    Checking strsim v0.11.1
+    Checking clap_lex v1.1.1
+    Checking unicode-width v0.2.3
+    Checking log v0.4.35
+    Checking itoa v1.0.18
+   Compiling libc v0.2.191
+   Compiling serde_core v1.0.229
+   Compiling zmij v1.0.23
+   Compiling portable-atomic v1.15.0
+   Compiling serde v1.0.229
+   Compiling serde_json v1.0.154
+   Compiling thiserror v2.0.21
+   Compiling anyhow v1.0.104
+   Compiling crossbeam-utils v0.8.23
+    Checking memchr v2.8.3
+    Checking allocator-api2 v0.2.21
+    Checking foldhash v0.2.0
+    Checking equivalent v1.0.3
+    Checking web-time v1.1.0
+    Checking unit-prefix v0.5.2
+   Compiling egg-solver v0.1.0 (/home/super/egg-solver)
+    Checking anstyle-parse v1.0.0
+    Checking env_filter v2.0.0
+    Checking anstream v1.0.0
+    Checking console v0.16.6
+    Checking clap_builder v4.6.7
+    Checking env_logger v0.11.11
+    Checking indicatif v0.18.6
+    Checking hashbrown v0.16.1
+    Checking clap v4.6.7
+    Checking clap_complete v4.6.11
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.97s
+   Compiling egg-solver-wasm v0.1.0 (/home/super/egg-solver/wasm)
+    Checking thiserror v2.0.21
+   Compiling egg-solver v0.1.0 (/home/super/egg-solver)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.70s
+   Compiling utf8parse v0.2.2
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling anstyle v1.0.14
+   Compiling colorchoice v1.0.5
+   Compiling anstyle-query v1.1.5
+   Compiling strsim v0.11.1
+   Compiling clap_lex v1.1.1
+   Compiling log v0.4.35
+   Compiling unicode-width v0.2.3
+   Compiling unit-prefix v0.5.2
+   Compiling itoa v1.0.18
+   Compiling foldhash v0.2.0
+   Compiling memchr v2.8.3
+   Compiling equivalent v1.0.3
+   Compiling allocator-api2 v0.2.21
+   Compiling web-time v1.1.0
+   Compiling serde_core v1.0.229
+   Compiling libc v0.2.191
+   Compiling zmij v1.0.23
+   Compiling portable-atomic v1.15.0
+   Compiling anyhow v1.0.104
+   Compiling crossbeam-utils v0.8.23
+   Compiling anstyle-parse v1.0.0
+   Compiling thiserror v2.0.21
+   Compiling egg-solver v0.1.0 (/home/super/egg-solver)
+   Compiling env_filter v2.0.0
+   Compiling anstream v1.0.0
+   Compiling console v0.16.6
+   Compiling clap_builder v4.6.7
+   Compiling env_logger v0.11.11
+   Compiling hashbrown v0.16.1
+   Compiling indicatif v0.18.6
+   Compiling serde v1.0.229
+   Compiling serde_json v1.0.154
+   Compiling clap v4.6.7
+   Compiling clap_complete v4.6.11
+    Finished `release` profile [optimized + debuginfo] target(s) in 11.41s
+  Executable unittests src/lib.rs (/data2/build/egg-solver-target/wasm32-wasip1-threads/release/deps/egg_solver-2fbcdf06d19a6c43.wasm)
+test result: ok. 49 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.37s
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling thiserror v2.0.21
+   Compiling libc v0.2.191
+   Compiling crossbeam-utils v0.8.23
+   Compiling equivalent v1.0.3
+   Compiling allocator-api2 v0.2.21
+   Compiling foldhash v0.2.0
+   Compiling egg-solver-wasm v0.1.0 (/home/super/egg-solver/wasm)
+   Compiling hashbrown v0.16.1
+   Compiling syn v3.0.9
+   Compiling thiserror-impl v2.0.21
+   Compiling egg-solver v0.1.0 (/home/super/egg-solver)
+    Finished `wasm-release` profile [optimized] target(s) in 7.34s
+   Compiling foldhash v0.2.0
+   Compiling allocator-api2 v0.2.21
+   Compiling equivalent v1.0.3
+   Compiling libc v0.2.191
+   Compiling crossbeam-utils v0.8.23
+   Compiling thiserror v2.0.21
+   Compiling egg-solver-wasm v0.1.0 (/home/super/egg-solver/wasm)
+   Compiling egg-solver v0.1.0 (/home/super/egg-solver)
+   Compiling hashbrown v0.16.1
+    Finished `wasm-release` profile [optimized] target(s) in 5.89s
+[gen h0] depth 0: 1 entries
+[gen h0] depth 1: 1 entries (forward, 0.0s step, 0.0s total)
+[gen h0] depth 2: 4 entries (forward, 0.0s step, 0.0s total)
+[gen h0] depth 3: 34 entries (forward, 0.0s step, 0.0s total)
+[gen h0] depth 4: 331 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 5: 3612 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 6: 41605 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 7: 474128 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 8: 4953846 entries (forward, 0.2s step, 0.3s total)
+[gen h0] depth 9: 34776317 entries (forward, 1.7s step, 2.0s total)
+[gen h0] >= 10: 77317571 entries
+wasm test: egg-solver.wasm (1 thread(s)) ok in 2.1 s
+[gen h0] depth 0: 1 entries
+[gen h0] depth 1: 1 entries (forward, 0.0s step, 0.0s total)
+[gen h0] depth 2: 4 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 3: 34 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 4: 331 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 5: 3612 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 6: 41605 entries (forward, 0.0s step, 0.2s total)
+[gen h0] depth 7: 474128 entries (forward, 0.0s step, 0.2s total)
+[gen h0] depth 8: 4953846 entries (forward, 0.1s step, 0.3s total)
+[gen h0] depth 9: 34776317 entries (forward, 0.7s step, 1.0s total)
+[gen h0] >= 10: 77317571 entries
+wasm test: egg-solver-threads.wasm (3 thread(s)) ok in 1.1 s
+   Compiling egg-solver v0.1.0 (/home/super/egg-solver)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.16s
+test result: ok. 56 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.59s
+test result: ok. 56 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 1.90s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 56 filtered out; finished in 0.06s
+CHECK OK

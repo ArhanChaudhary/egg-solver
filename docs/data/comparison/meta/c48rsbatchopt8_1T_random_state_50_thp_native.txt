@@ -1,0 +1,16 @@
+status 0
+run c48rsbatchopt8 1 random_state 50 thp native 1
+pagemode thp arena 0 only -
+start 2026-11-06 21:56:45
+wall_s 105.30
+cpu_s 53.03 2.70
+maxrss_kb 7606464
+gate_wait_s 0
+ext_cores 0.0
+pages 7606008 7606008 7603212 7600128 0 1367345 c48rs-opt8-nat
+free_1g_pages 58 58
+memfree_gib_at_start 12.2
+thpwarm_pct 90.7
+table /mnt/egg/super/xcr/cube48opt-rust/opt8/h48prun31h8.dat 7782727680
+thp always [madvise] never defrag always defer defer+madvise [madvise] never
+par 0 slot -

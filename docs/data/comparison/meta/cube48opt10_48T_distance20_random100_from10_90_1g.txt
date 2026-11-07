@@ -1,0 +1,16 @@
+status 0
+run cube48opt10 48 distance20_random100_from10 90 1g shipped 1
+pagemode hugetlb arena 39728447488 only cube48opt10,cube48opt10-pgo
+start 2026-11-06 00:15:23
+wall_s 311.30
+cpu_s 2488.39 169.41
+maxrss_kb 60572
+gate_wait_s 0
+ext_cores 0.0
+pages 30471140 62436 58760 0 30408704 658619 cube48opt10
+free_1g_pages 58 58
+memfree_gib_at_start 14.2
+thpwarm_pct -
+table /data2/competitors/cube48opt10/h48prun31h1.dat 31130910720
+thp always [madvise] never defrag always defer defer+madvise [madvise] never
+par 0 slot -

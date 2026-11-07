@@ -1,0 +1,54 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>share: a first pass claims its jobs in extension order (no sort) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="5cce44d59af6.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="share-a-first-pass-claims-its-jobs-in-extension-order-no-sort">share: a first pass claims its jobs in extension order (no sort)</h1>
+<p>Commit <code>5cce44d59af63c92747b56f35ca7f4aa88e8ace5</code> · 2026-11-04T14:01:36+00:00</p>
+<p>This commit is reachable from the released main history. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: Historical ancestor; no current branch tip</p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>share: a first pass claims its jobs in extension order (no sort)</p>
+<p>A cube's first build sorted the first pass's 3240 jobs by their bounds
+(<code>stats_from_bounds</code>, then <code>sort_serial</code>): one thread's serial pass over
+jobs that the extension tasks of other threads had just written, about
+40 us at 48 threads on every cube, while all threads waited for the
+pass to open. The order matters little: the pass is rarely the last
+iteration, and its phases overlap without barriers.</p>
+<p>Now the pass claims all its jobs as the extension left them; the ones
+infeasible in a phase are skipped when taken (<code>Worker::take</code> checks the
+bounds before making the job's cubes). <code>stats_from_bounds</code> remains for
+first builds that are not a pass.</p>
+<p>Screening on top of the previous commit (48 threads, 2 holds; the
+counting-sort index in neg/c10-first-pass-order, mode 2, vs mode 0):
+-c 1 -4.5%, 15-move scrambles -9.1%, 16-move -7.4%, 12-14-move -13.3%,
+depth-15 states -13.4%, -c 0 +0.1%. (Before cxl, the same change was
++0.8% on -c 1: the threads' late arrival at the first build hid it.)</p>
+<p>48 threads, 7 paired holds (before = 9e69243; -c 1 and -c 0 on random_state 500, ms/cube; bench share, solves/s; the short sets, solve -c 1 -n 200, in the first 3 holds):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>test</th><th>before runs</th><th>after runs</th><th>before median</th><th>after median</th><th>change (median of pairs) [min, max]</th><th>nodes/cube before -&gt; after</th></tr>
+</thead>
+<tbody>
+<tr><td>c1-rs</td><td>1.696 1.669 1.657 1.673 1.668 1.734 1.661</td><td>1.692 1.660 1.612 1.642 1.637 1.676 1.659</td><td>1.669</td><td>1.659</td><td>-1.9% [-3.3, -0.1]</td><td>3.720M -&gt; 3.717M</td></tr>
+<tr><td>c0-rs</td><td>1.053 1.042 1.043 1.038 1.049 1.039 1.042</td><td>1.043 1.056 1.041 1.050 1.048 1.043 1.040</td><td>1.042</td><td>1.043</td><td>-0.1% [-0.9, +1.3]</td><td>3.319M -&gt; 3.317M</td></tr>
+<tr><td>bshare/s</td><td>906.4 969.6 972.1 973.4 967.4 971.0 968.9</td><td>967.5 972.0 968.8 976.9 963.8 972.3 974.0</td><td>969.6</td><td>972.0</td><td>+0.3% [-0.4, +6.7]</td><td>3.302M -&gt; 3.304M</td></tr>
+<tr><td>c1-random_move_15f</td><td>0.174 0.174 0.173</td><td>0.146 0.146 0.147</td><td>0.174</td><td>0.146</td><td>-16.1% [-16.1, -15.0]</td><td>0.107M -&gt; 0.100M</td></tr>
+<tr><td>c1-random_move_16f</td><td>0.264 0.239 0.240</td><td>0.216 0.217 0.214</td><td>0.240</td><td>0.216</td><td>-10.8% [-18.2, -9.2]</td><td>0.146M -&gt; 0.147M</td></tr>
+<tr><td>c1-random_move_17f</td><td>0.660 0.615 0.616</td><td>0.615 0.602 0.617</td><td>0.616</td><td>0.615</td><td>-2.1% [-6.8, +0.2]</td><td>0.652M -&gt; 0.646M</td></tr>
+<tr><td>c1-random_state_depth15</td><td>0.158 0.158 0.151</td><td>0.127 0.124 0.138</td><td>0.158</td><td>0.127</td><td>-19.6% [-21.5, -8.6]</td><td>0.099M -&gt; 0.093M</td></tr>
+<tr><td>c1-random_state_depth16</td><td>0.276 0.232 0.255</td><td>0.193 0.192 0.184</td><td>0.255</td><td>0.192</td><td>-27.8% [-30.1, -17.2]</td><td>0.127M -&gt; 0.129M</td></tr>
+<tr><td>c1-random_state_depth17</td><td>0.683 0.678 0.675</td><td>0.686 0.683 0.690</td><td>0.678</td><td>0.686</td><td>+0.7% [+0.4, +2.2]</td><td>0.780M -&gt; 0.777M</td></tr>
+</tbody>
+</table></div>
+<p>1 thread, layout-averaged (4 linker-shuffled layouts x 3 paired runs, solve -t 1, ms/cube):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>test</th><th>B/A median</th><th>mean</th><th>pairs</th><th>[min, max]</th></tr>
+</thead>
+<tbody>
+<tr><td>solve -c 0 -n 100</td><td>-0.08%</td><td>+0.28%</td><td>12</td><td>[-1.37%, +3.55%]</td></tr>
+<tr><td>solve -c 1 -n 10</td><td>+0.06%</td><td>+0.23%</td><td>12</td><td>[-0.40%, +1.16%]</td></tr>
+</tbody>
+</table></div>
+<p>Correctness: check.sh passes. Solution lengths identical cube for cube
+to main's, 0 BAD (8 threads, one L3 slot): 1000 scrambles of 1-14
+moves, random_move_15f 200, random_state_depth15 200 (-c 1),
+random_state 500 (-c 1, -c 0), random_state_depth18 3000 (-c 1, -c 0).
+<code>Worker::rounds</code> is instruction-identical to main's.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

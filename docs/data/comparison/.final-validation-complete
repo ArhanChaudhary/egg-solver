@@ -1,0 +1,30 @@
+{
+  "pre_rename_commit": "935cb7fa369248161244507b7c13aa9c405f9ff1",
+  "requested_during_benchmarks": true,
+  "requested_at": "2026-11-06 16:59:06 UTC",
+  "pre_rename_sha256": {
+    "bench": "e1e0a1e2ce9966e981ad9338aaff290c41249acfa841b9998acfa23ee171658a",
+    "solve": "9acf86d85e99d75ab92ad9c2c93caedf90d37c7156b411b98b0a51d48cd0f75c"
+  },
+  "commit": "842a5043abfd550313a86a3d9bb5254f4b457540",
+  "checks": "CHECK OK",
+  "h8_search_identity": "PASS",
+  "hot_code": "PASS",
+  "h11_search_identity": "PASS",
+  "completed_at": "2026-11-06 17:17:44 UTC",
+  "renamed_sha256": {
+    "bench": "207b3576d89cbb2b0fca4dc6d89f2fef1a5a25ecb4e14aa77f20bb1d1320f48d",
+    "solve": "d65c2ca6f7ef25e02e63bbb268b1c390e36c5c0985b09f06db366d9d3e710494"
+  },
+  "rename_merge_commit": "cd963dc26b081ddfd2cc1bcdd2c48bd06c92ae8f",
+  "source_checked_commit": "316597f64a9bd749e8a01b67f96c108c03611e68",
+  "documentation_only_followup": "56ace9c10792b91d3fa521ca4af24801ca8b71fc",
+  "previous_source_checked_commit": "cd963dc26b081ddfd2cc1bcdd2c48bd06c92ae8f",
+  "source_checked_fingerprint": "93478bc5c45ba267255574f8cb466f02f006f1c7bf558fb8f9d088ec4307a4c9",
+  "source_checked_worktree": "/data/agents/codex-resume/miri-checks",
+  "miri_followup_commit": "316597f64a9bd749e8a01b67f96c108c03611e68",
+  "miri_validation": "PASS",
+  "miri_source_fingerprint": "93478bc5c45ba267255574f8cb466f02f006f1c7bf558fb8f9d088ec4307a4c9",
+  "final_h11_comparison": "PASS",
+  "finalized_at": "2026-11-07 15:18:20 UTC"
+}

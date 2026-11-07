@@ -1,0 +1,38 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>diag: prune outcome of each lookup by the node's bound on that side — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="619bfce8f2e3.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="diag-prune-outcome-of-each-lookup-by-the-node-s-bound-on-that-side">diag: prune outcome of each lookup by the node's bound on that side</h1>
+<p>Commit <code>619bfce8f2e3a6316506ae4e45615775ac63e842</code> · 2026-11-04T01:02:30+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>archive/m7-diag</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>diag: prune outcome of each lookup by the node's bound on that side</p>
+<p>DIAGNOSTIC (not for merge). Against cb8cb70 (= fc6d9c9's tree).</p>
+<p>Counts every resolved lookup by its kind (other side of X; moved side of
+X, X2, X') and by r - bound of the node on the looked-up side (<code>lo</code> for
+the other side; a new <code>Node::lm</code> for the moved side). It also counts
+whether the child was pruned (value &gt; r - 1). bench prints the table
+after a batch.</p>
+<p>random:200:2026 (7 threads, 20 lanes), counts (pass / prune):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>lookup</th><th>r-bound 0</th><th>1</th><th>2</th><th>3+</th></tr>
+</thead>
+<tbody>
+<tr><td>other (X)</td><td>43.7M / 294.0M</td><td>17.6M / 35.1M</td><td>4.76M / 5.91M</td><td>1.30M / 1.83M</td></tr>
+<tr><td>moved X</td><td>6.94M / 23.5M</td><td>17.1M / 12.0M</td><td>6.03M / 0.24M</td><td>1.45M / 0.09M</td></tr>
+<tr><td>moved X2</td><td>4.27M / 13.8M</td><td>15.2M / 10.1M</td><td>5.71M / 0.18M</td><td>1.46M / 0.06M</td></tr>
+<tr><td>moved X'</td><td>6.92M / 18.0M</td><td>16.9M / 11.8M</td><td>5.87M / 0.18M</td><td>1.39M / 0.07M</td></tr>
+</tbody>
+</table></div>
+<p>What follows:</p>
+<ul>
+<li>The other side's bound says little about whether the X child's
+lookup prunes. Even at r - lo = 2 it prunes 55%: the table is far from
+consistent below its base, where code 0 falls back to the group
+minimum and the corner depth. So issuing an X child's moved-side
+lookup together with the other side's when the other side looks
+loose wastes over half of them (cf. neg/m4-pair-lookups).</li>
+<li>The moved side is predictable by class (77% / 41% / 4% prune), but
+the class is high-entropy itself. Feeding it to the predictor (a
+per-class dispatch or an early branch) would add about as many
+early mispredicts as it removes late ones.</li>
+</ul>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

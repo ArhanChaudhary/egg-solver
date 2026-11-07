@@ -1,0 +1,185 @@
+{
+  "base": {
+    "commit": "93867a4597ab821b4064a0d407d3c89e133c9013",
+    "hypotheses": [
+      "byte decoder shortens packed lookup dependency and removes wide loads",
+      "outline advance reduces duplicated instruction footprint"
+    ],
+    "host_pmu": false
+  },
+  "binaries": [
+    {
+      "variant": "base",
+      "pad": 0,
+      "binary": "bench",
+      "path": "/data/agents/pmu-opt/bin/base-p0-bench",
+      "sha256": "8dadabae98f69673be8f1f800c59cde5435fdf16edb1ff2c67159db02c5dd3b8"
+    },
+    {
+      "variant": "base",
+      "pad": 0,
+      "binary": "solve",
+      "path": "/data/agents/pmu-opt/bin/base-p0-solve",
+      "sha256": "1c438a76b91dc19c1874e3d195f452703e46b61c0d6f6457be55975a29a9e8f1"
+    },
+    {
+      "variant": "base",
+      "pad": 16,
+      "binary": "bench",
+      "path": "/data/agents/pmu-opt/bin/base-p16-bench",
+      "sha256": "baa7604b56cdb5db4608d3958d6ae0331e939a7da5edb93fc563820cc3043982"
+    },
+    {
+      "variant": "base",
+      "pad": 16,
+      "binary": "solve",
+      "path": "/data/agents/pmu-opt/bin/base-p16-solve",
+      "sha256": "1c438a76b91dc19c1874e3d195f452703e46b61c0d6f6457be55975a29a9e8f1"
+    },
+    {
+      "variant": "base",
+      "pad": 32,
+      "binary": "bench",
+      "path": "/data/agents/pmu-opt/bin/base-p32-bench",
+      "sha256": "53067a29156d66682a58d6923b3e86e42c7ddbbb88b8db56a16977b78a493c3c"
+    },
+    {
+      "variant": "base",
+      "pad": 32,
+      "binary": "solve",
+      "path": "/data/agents/pmu-opt/bin/base-p32-solve",
+      "sha256": "1c438a76b91dc19c1874e3d195f452703e46b61c0d6f6457be55975a29a9e8f1"
+    },
+    {
+      "variant": "base",
+      "pad": 48,
+      "binary": "bench",
+      "path": "/data/agents/pmu-opt/bin/base-p48-bench",
+      "sha256": "5224a0eb79638ba19d84aab82d03845cec608564dcf48d9d1ca414774ebe7f24"
+    },
+    {
+      "variant": "base",
+      "pad": 48,
+      "binary": "solve",
+      "path": "/data/agents/pmu-opt/bin/base-p48-solve",
+      "sha256": "1c438a76b91dc19c1874e3d195f452703e46b61c0d6f6457be55975a29a9e8f1"
+    },
+    {
+      "variant": "bytes",
+      "pad": 0,
+      "binary": "bench",
+      "path": "/data/agents/pmu-opt/bin/bytes-p0-bench",
+      "sha256": "639ad2ad0700638e48e46ec3785395edab44254b14fe8a3d01431805a6c25bf0"
+    },
+    {
+      "variant": "bytes",
+      "pad": 0,
+      "binary": "solve",
+      "path": "/data/agents/pmu-opt/bin/bytes-p0-solve",
+      "sha256": "5406a8d9a8a73f2c58f385a869580d9dd5d23f6b86d2622638559169832d461a"
+    },
+    {
+      "variant": "bytes",
+      "pad": 16,
+      "binary": "bench",
+      "path": "/data/agents/pmu-opt/bin/bytes-p16-bench",
+      "sha256": "b151565a865dfb839656dc2d31cd3ef757c9b9e53d043fa0236a406d5ba2b73c"
+    },
+    {
+      "variant": "bytes",
+      "pad": 16,
+      "binary": "solve",
+      "path": "/data/agents/pmu-opt/bin/bytes-p16-solve",
+      "sha256": "5406a8d9a8a73f2c58f385a869580d9dd5d23f6b86d2622638559169832d461a"
+    },
+    {
+      "variant": "bytes",
+      "pad": 32,
+      "binary": "bench",
+      "path": "/data/agents/pmu-opt/bin/bytes-p32-bench",
+      "sha256": "e5bfcfc117b745be262532d32d0edc1f3ec92b2caf5c92dea43889e1d8b3684d"
+    },
+    {
+      "variant": "bytes",
+      "pad": 32,
+      "binary": "solve",
+      "path": "/data/agents/pmu-opt/bin/bytes-p32-solve",
+      "sha256": "5406a8d9a8a73f2c58f385a869580d9dd5d23f6b86d2622638559169832d461a"
+    },
+    {
+      "variant": "bytes",
+      "pad": 48,
+      "binary": "bench",
+      "path": "/data/agents/pmu-opt/bin/bytes-p48-bench",
+      "sha256": "d022c3c06fbbd119470c6d0d79ecbb0983dcbf3a4c6fecbb536ae381fe8f941d"
+    },
+    {
+      "variant": "bytes",
+      "pad": 48,
+      "binary": "solve",
+      "path": "/data/agents/pmu-opt/bin/bytes-p48-solve",
+      "sha256": "5406a8d9a8a73f2c58f385a869580d9dd5d23f6b86d2622638559169832d461a"
+    },
+    {
+      "variant": "outline",
+      "pad": 0,
+      "binary": "bench",
+      "path": "/data/agents/pmu-opt/bin/outline-p0-bench",
+      "sha256": "0b5f6e4a3e3229672650c47de1945f271756928c3f0ee400323a1a95cb080325"
+    },
+    {
+      "variant": "outline",
+      "pad": 0,
+      "binary": "solve",
+      "path": "/data/agents/pmu-opt/bin/outline-p0-solve",
+      "sha256": "7c50a4a0043cbf94fb2f3b1d0f245ea376b57cf7b47618562a41c7941443ac0b"
+    },
+    {
+      "variant": "outline",
+      "pad": 16,
+      "binary": "bench",
+      "path": "/data/agents/pmu-opt/bin/outline-p16-bench",
+      "sha256": "241411822b759f29ba5b80e2dbc97397538f48cd6bf61e37cd491e60a8989f69"
+    },
+    {
+      "variant": "outline",
+      "pad": 16,
+      "binary": "solve",
+      "path": "/data/agents/pmu-opt/bin/outline-p16-solve",
+      "sha256": "7c50a4a0043cbf94fb2f3b1d0f245ea376b57cf7b47618562a41c7941443ac0b"
+    },
+    {
+      "variant": "outline",
+      "pad": 32,
+      "binary": "bench",
+      "path": "/data/agents/pmu-opt/bin/outline-p32-bench",
+      "sha256": "ac2b11c019d19f37353f52f527415a393d31f8ce2ba9bfc27ddafc5f94dfffc7"
+    },
+    {
+      "variant": "outline",
+      "pad": 32,
+      "binary": "solve",
+      "path": "/data/agents/pmu-opt/bin/outline-p32-solve",
+      "sha256": "7c50a4a0043cbf94fb2f3b1d0f245ea376b57cf7b47618562a41c7941443ac0b"
+    },
+    {
+      "variant": "outline",
+      "pad": 48,
+      "binary": "bench",
+      "path": "/data/agents/pmu-opt/bin/outline-p48-bench",
+      "sha256": "da49b0408fb67abe5633f4227848b9b503a3e82d9afd237339875ff839a6e588"
+    },
+    {
+      "variant": "outline",
+      "pad": 48,
+      "binary": "solve",
+      "path": "/data/agents/pmu-opt/bin/outline-p48-solve",
+      "sha256": "7c50a4a0043cbf94fb2f3b1d0f245ea376b57cf7b47618562a41c7941443ac0b"
+    }
+  ],
+  "tests": {
+    "bytes": "native library/integration/CLI tests and clippy passed",
+    "bytes_miri": "exhaustive decoder test passed in x86 and portable strict provenance; not a full-suite certificate",
+    "outline": "native library/integration/CLI tests and clippy passed"
+  }
+}

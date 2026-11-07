@@ -1,0 +1,77 @@
+    Checking egg-solver v0.1.0 (/data/agents/ub-audit/fix)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.52s
+test result: ok. 58 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.07s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.67s
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.13s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.07s
+warning: use of deprecated associated function `core::num::<impl i64>::max_value`: replaced by the `MAX` associated constant on this type
+   --> vendor/parking_lot_core/src/thread_parker/unix.rs:221:42
+    |
+221 |     if timeout.as_secs() > libc::time_t::max_value() as u64 {
+    |                                          ^^^^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+warning: `parking_lot_core` (lib) generated 1 warning
+warning: `parking_lot_core` (lib) generated 1 warning (1 duplicate)
+    Checking egg-solver v0.1.0 (/data/agents/ub-audit/fix)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.28s
+    Checking egg-solver v0.1.0 (/data/agents/ub-audit/fix)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.36s
+    Checking egg-solver v0.1.0 (/data/agents/ub-audit/fix)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.84s
+    Checking egg-solver v0.1.0 (/data/agents/ub-audit/fix)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.29s
+    Checking egg-solver v0.1.0 (/data/agents/ub-audit/fix)
+    Checking egg-solver-wasm v0.1.0 (/data/agents/ub-audit/fix/wasm)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.82s
+    Checking egg-solver v0.1.0 (/data/agents/ub-audit/fix)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.31s
+    Checking egg-solver v0.1.0 (/data/agents/ub-audit/fix)
+    Checking egg-solver-wasm v0.1.0 (/data/agents/ub-audit/fix/wasm)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.84s
+   Compiling egg-solver v0.1.0 (/data/agents/ub-audit/fix)
+    Finished `release` profile [optimized + debuginfo] target(s) in 10.98s
+  Executable unittests src/lib.rs (target/wasm32-wasip1-threads/release/deps/egg_solver-2fbcdf06d19a6c43.wasm)
+test result: ok. 49 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.65s
+   Compiling egg-solver v0.1.0 (/data/agents/ub-audit/fix)
+   Compiling egg-solver-wasm v0.1.0 (/data/agents/ub-audit/fix/wasm)
+    Finished `wasm-release` profile [optimized] target(s) in 7.57s
+   Compiling egg-solver v0.1.0 (/data/agents/ub-audit/fix)
+   Compiling egg-solver-wasm v0.1.0 (/data/agents/ub-audit/fix/wasm)
+    Finished `wasm-release` profile [optimized] target(s) in 8.15s
+[gen h0] depth 0: 1 entries
+[gen h0] depth 1: 1 entries (forward, 0.0s step, 0.0s total)
+[gen h0] depth 2: 4 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 3: 34 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 4: 331 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 5: 3612 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 6: 41605 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 7: 474128 entries (forward, 0.0s step, 0.2s total)
+[gen h0] depth 8: 4953846 entries (forward, 0.3s step, 0.5s total)
+[gen h0] depth 9: 34776317 entries (forward, 2.3s step, 2.8s total)
+[gen h0] >= 10: 77317571 entries
+wasm test: egg-solver.wasm (1 thread(s)) ok in 2.9 s
+[gen h0] depth 0: 1 entries
+[gen h0] depth 1: 1 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 2: 4 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 3: 34 entries (forward, 0.0s step, 0.2s total)
+[gen h0] depth 4: 331 entries (forward, 0.0s step, 0.2s total)
+[gen h0] depth 5: 3612 entries (forward, 0.0s step, 0.3s total)
+[gen h0] depth 6: 41605 entries (forward, 0.0s step, 0.4s total)
+[gen h0] depth 7: 474128 entries (forward, 0.0s step, 0.4s total)
+[gen h0] depth 8: 4953846 entries (forward, 0.1s step, 0.6s total)
+[gen h0] depth 9: 34776317 entries (forward, 0.8s step, 1.4s total)
+[gen h0] >= 10: 77317571 entries
+wasm test: egg-solver-threads.wasm (3 thread(s)) ok in 1.6 s
+    Checking egg-solver v0.1.0 (/data/agents/ub-audit/fix)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.95s
+test result: ok. 56 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.06s
+test result: ok. 56 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 3.57s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 56 filtered out; finished in 0.16s
+CHECK OK

@@ -1,0 +1,102 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>wasm: threads build hang fixed (wasi-libc init, threads that never exit, memory that never grows); wasm steps of check.sh time-limited — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="2a0574ffd0fe.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="wasm-threads-build-hang-fixed-wasi-libc-init-threads-that-never-exit-memory-that-never-grows-wasm-steps-of-check-sh-time-limited">wasm: threads build hang fixed (wasi-libc init, threads that never exit, memory that never grows); wasm steps of check.sh time-limited</h1>
+<p>Commit <code>2a0574ffd0fecfe1954bc5831a2bb4eedfc6bb9c</code> · 2026-11-05T00:19:01+00:00</p>
+<p>This commit is reachable from the released main history. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: Historical ancestor; no current branch tip</p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>wasm: threads build hang fixed (wasi-libc init, threads that never exit, memory that never grows); wasm steps of check.sh time-limited</p>
+<p><code>node wasm/test.mjs</code> hung intermittently inside check.sh (main 8977134). The
+main thread sat in a futex wait and the workers were idle. Under load there
+were three faults in the threads build, which the fixes below remove.</p>
+<ol>
+<li>No wasi-libc init. A Rust cdylib gets no <code>_initialize</code> (wasi-libc's
+crt1-reactor), so <code>__wasi_init_tp</code> never ran and the main thread's pthread
+record stayed zeroed. Threads were linked into wasi-libc's thread list
+through that record, and the list came apart: an exiting thread could
+find itself alone in it and call <code>exit(0)</code> (musl's last-thread path)
+instead of waking its joiner, so <code>join</code> waited forever. Traced runs
+(spawn/start/end hooks, 8 at a time on CPUs 0-7): 219 threads ended in
+<code>proc_exit(0)</code> over 23 traces, and 6 of 9 runs hung, as in m8's check.sh.
+Fix: an <code>_initialize</code> export (<code>__wasi_init_tp</code>, then the linker's ctors,
+as crt1-reactor does), which cubeopt.mjs already calls on the main
+thread before anything else.</li>
+<li>One thread per share and call. A worker becomes free only after its
+thread has returned to it, a moment after Rust saw the thread finish,
+so a solve right after another could find no idle worker (EAGAIN, an
+abort: 5 of 13 runs under load). A spawn cannot wait for one either: the
+spawning thread holds wasi-libc's thread-list lock, which an exiting
+thread needs (traced: 4 exits went through together the moment a
+waiting spawn gave up after 60 s).
+Fix: threads that never exit. <code>parallel::set_runner</code> lets a host run
+<code>on_threads</code> on threads of its own (unset natively: the same scoped
+threads as before). The threads build installs <code>wasm/src/threads.rs</code>, a
+pool started as needed and never ended. The module's share-mode solve
+now goes through <code>on_threads</code> (<code>Pool::new</code> plus <code>pool.run</code> on every
+share: <code>share::solve_all</code> without its scope).</li>
+<li>Shared memory growing while threads run. In V8, a bulk memory operation
+checks its bounds against the size its instance last saw, which a grow
+updates only later. A <code>memory.fill</code> of a block fresh from <code>malloc</code>
+trapped with &quot;memory access out of bounds&quot; (named build: in
+<code>share::Bufs::sized</code>, right after <code>malloc</code>). This hit 3 of 176 test.mjs
+runs and 1 of 100 t.mjs runs; with the heap grown once in <code>_initialize</code>,
+0 of 100.
+Fix: the threads build imports all of wasm32's memory from the start
+(<code>--initial-memory</code>, 4 GiB less one page, so that <code>__heap_end</code> fits in 32
+bits), so it never grows. wasi-libc's <code>malloc</code> has the whole heap, and
+<code>tables::Memory</code> uses <code>posix_memalign</code> there instead of <code>memory.grow</code>
+(C's allocator is not limited to <code>isize::MAX</code>, so h7 still fits). The
+engine maps the 4 GiB, and untouched pages cost no RAM.</li>
+</ol>
+<p>Also:</p>
+<ul>
+<li>A thread that traps now writes its error at once and, in Node, ends the
+process, instead of hanging silently. (A Node worker's console goes
+through the main thread, which may be the one waiting.)</li>
+<li>check.sh: the wasm library tests run under <code>timeout -s KILL 600</code> per test
+binary (in the cargo runner), and wasm/test.mjs under <code>timeout -s KILL 300</code>. A hang fails the check at once, with a message.</li>
+<li>README: other hosts must call <code>_initialize</code> first.</li>
+</ul>
+<p>Stress on this commit. Each chunk ran under locked.sh on CPUs 0-7, with 4 to
+6 processes at a time on 8 CPUs; every run had a 300 s kill timeout:</p>
+<ul>
+<li>wasm/test.mjs: 200 runs (4 at a time), all ok: 0 failed, 0 hung. (On
+8977134, the traced t.mjs runs below hung in 6 of 9 cases, killed after
+120 s, and the other 3 failed.)</li>
+<li>t.mjs (threads module: h0 with 3 threads, then 20 rounds of 6 share-mode
+solves and a batch, ~140 parallel jobs per run): 100 runs, all ok.</li>
+<li>The threads demo path, beside t.mjs (<code>demo.mjs --table h4 --threads 4</code>,
+10 depth-15 cubes one at a time, then <code>--batch</code>): 40 runs, all ok.</li>
+<li>h7 (3.6 GiB) still loads and solves in the threads build (4 threads).</li>
+<li>check.sh passes, including the wasm library tests under wasmtime and
+test.mjs. One earlier run hit the known scalar Worker::release flake
+(r8).</li>
+</ul>
+<p>x86: the hot code is untouched. Natively, <code>on_threads</code> (generators only)
+first reads an unset OnceLock.</p>
+<ul>
+<li>
+<p>Hot code vs main 7608a28 (objdump, addresses normalized):
+bench::stream_thread (1368 instructions, offset 16), share
+Worker::rounds (1231, offset 16) and the other hot functions are
+identical.</p>
+</li>
+<li>
+<p>Every function's stack frame (first <code>sub rsp</code>) in bench and solve is
+identical, including the share thread closures (0xfc0).</p>
+</li>
+<li>
+<p>bench stream on h11, 24 lanes, main vs this, solves/s:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>threads</th><th>build</th><th>median</th><th>runs</th></tr>
+</thead>
+<tbody>
+<tr><td>1 (ab1t, 6 pairs)</td><td>main</td><td>26.033</td><td>25.983 26.033 26.083 26.017 26.200 26.083</td></tr>
+<tr><td>1 (ab1t, 6 pairs)</td><td>this</td><td>26.100</td><td>26.100 26.083 26.117 26.017 26.183 26.267</td></tr>
+<tr><td>48 (ab48, 3 runs, outside load 0.1-0.2 cores)</td><td>main</td><td>1099.833</td><td>1083.333 1099.833 1103.967</td></tr>
+<tr><td>48 (ab48, 3 runs, outside load 0.1-0.2 cores)</td><td>this</td><td>1089.367</td><td>1091.800 1077.767 1089.367</td></tr>
+</tbody>
+</table></div>
+<p>1T: +0.3%. 48T: -1.0%, within the 48T noise. Both neutral.</p>
+</li>
+</ul>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

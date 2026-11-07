@@ -1,0 +1,16 @@
+status 0
+run c48rsopt7 1 distance20_random10_from6 2 1g pfpgo 1
+pagemode hugetlb arena 4294967296 only c48rs-opt7,c48rs-opt7-nat,c48rs-opt7-pgo,c48rs-opt7-pf,c48rs-opt7-pfna,c48rs-opt7-pfpg,c48rs-opt7,c48rs-opt7-nat,c48rs-opt7-pgo,c48rs-opt7-pf,c48rs-opt7-pfna,c48rs-opt7-pfpg-pgo
+start 2026-11-07 03:20:10
+wall_s 246.29
+cpu_s 220.67 0.43
+maxrss_kb 7180
+gate_wait_s 0
+ext_cores 0.0
+pages 4200076 5772 3204 0 4194304 1450646 c48rs-opt7-pfpg
+free_1g_pages 58 58
+memfree_gib_at_start 10.8
+thpwarm_pct -
+table /mnt/egg/super/xcr/cube48opt-rust/opt7/h48prun31h7.dat 3891363840
+thp always [madvise] never defrag always defer defer+madvise [madvise] never
+par 0 slot -

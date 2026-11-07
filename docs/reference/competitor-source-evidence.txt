@@ -1,0 +1,446 @@
+## nissy-core 1f7e8e937d0e71e7eb3b5deab38b34d0a0159d88 src/solvers/h48/gendata_h48.h
+
+262: 		LOG("[H48 gendata] Processing 'short cubes'. "
+263: 		    "This will take a while.\n");
+264: 
+265: 		/* Estimate velocity by checking how much is done after 1s */
+266: 		msleep(1000);
+267: 		velocity = count;
+268: 
+269: 		/* We plan to log 10 times */
+270: 		sleeptime = (int)((100*(nshort-velocity)) / velocity);
+271: 
+272: 		done = count;
+273: 		while (nshort - done > (velocity * sleeptime) / 1000) {
+274: 			msleep(sleeptime);
+275: 			wrapthread_mutex_lock(&shortcubes_mutex);
+276: 			done = count;
+277: 			wrapthread_mutex_unlock(&shortcubes_mutex);
+278: 			LOG("[H48 gendata] Processed %" PRIu64 " / %" PRIu64
+279: 			    " cubes\n", (done / 1000) * 1000, nshort);
+280: 		}
+281: 	} else {
+282: 		LOG("Status updates won't be available because the sleep() "
+283: 		    "functionality is not available on this platform.\n");
+284: 	}
+285: 
+286: 	for (i = 0; i < THREADS; i++)
+287: 		wrapthread_join(thread[i]);
+288: 
+289: 	h48map_destroy(&shortcubes);
+303: 	wrapthread_define_if_threads(uint64_t, mutex);
+304: 
+305: 	dfsarg = (h48_dfs_arg_t *)arg;
+306: 
+307: 	while (true) {
+308: 		wrapthread_mutex_lock(dfsarg->shortcubes_mutex);
+309: 
+310: 		kv = h48map_nextkvpair(dfsarg->shortcubes, dfsarg->next);
+311: 		if (*dfsarg->next == dfsarg->shortcubes->capacity) {
+312: 			wrapthread_mutex_unlock(dfsarg->shortcubes_mutex);
+313: 			break;
+314: 		}
+315: 		(*dfsarg->count)++;
+316: 		wrapthread_mutex_unlock(dfsarg->shortcubes_mutex);
+317: 
+318: 		if (kv.val < dfsarg->shortdepth) {
+319: 			coord = kv.key >> (uint64_t)(11 - dfsarg->h);
+320: 			coordext = H48_LINE_EXT(coord);
+321: 			coordmin = H48_LINE_MIN(coord);
+322: 
+323: 			mutex = H48_LINE(coord) % CHUNKS;
+## nissy-core 1f7e8e937d0e71e7eb3b5deab38b34d0a0159d88 src/solvers/h48/map.h
+
+65: 	return map->table[h48map_lookup(map, key)] >> MAP_KEYSHIFT;
+66: }
+67: 
+68: STATIC kvpair_t
+69: h48map_nextkvpair(h48map_t map[NON_NULL], uint64_t p[NON_NULL])
+70: {
+71: 	kvpair_t kv;
+72: 	uint64_t pair;
+73: 
+74: 	kv.key = MAP_KEYMASK;
+75: 	kv.val = MAP_UNSET_VAL;
+76: 
+77: 	for ( ; *p < map->capacity; (*p)++) {
+78: 		if (map->table[*p] != MAP_UNSET) {
+79: 			pair = map->table[(*p)++];
+80: 			kv.key = pair & MAP_KEYMASK;
+81: 			kv.val = pair >> MAP_KEYSHIFT;
+82: 			return kv;
+83: 		}
+84: 	}
+85: 
+86: 	return kv;
+87: }
+88: 
+89: #endif /* SOLVERS_H48_MAP_H */
+## nissy-core 1f7e8e937d0e71e7eb3b5deab38b34d0a0159d88 src/solvers/h48/solve.h
+
+415: 			   move(dfsarg->cube, dfsarg->tasks[i].moves[j]);
+416: 		dfsarg->inverse = inverse(dfsarg->cube);
+417: 
+418: 		dfsarg->nodes_visited++;
+419: 		if (dfsarg->tasks[i].pval + H48_STARTING_MOVES
+420: 		    > dfsarg->target_depth)
+421: 			continue;
+422: 
+423: 		dfsarg->lb_normal = 0;
+424: 		dfsarg->lb_inverse = 0;
+425: 		dfsarg->movemask_normal = allowedmask[
+426: 		    movebase(dfsarg->tasks[i].moves[H48_STARTING_MOVES-1])];
+427: 		dfsarg->movemask_inverse = MM18_ALLMOVES;
+428: 		dfsarg->tmask = dfsarg->tasks[i].tmask;
+429: 
+430: 		solve_h48_dfs(dfsarg);
+431: 
+432: 		/*
+433: 		We compute the "rank" of each taks, which is used in the next
+434: 		step of the IDFS to sort them. This heuristically leads us
+435: 		faster to a solution.  The rank is computed by taking the
+436: 		number of nodes visited, adjusted by a factor of about
+437: 		sqrt(2)/sqrt(3) because there are more sequences starting with
+438: 		U, R and F than with D, L and B, as we don't allow e.g. both
+439: 		U D and D U, but only U D.
+440: 		This trick was suggested by Chen Shuang, the implementation is
+441: 		inspired by Andrew Skalski's vcube.
+442: 		*/
+443: 		lastmove = dfsarg->tasks[i].moves[H48_STARTING_MOVES-1];
+444: 		d = (int64_t)dfsarg->nodes_visited - nprev;
+445: 		f = movebase(lastmove) % 2 == 0 ? 47525 : 58206;
+446: 		dfsarg->tasks[i].rank = d * f;
+447: 		nprev = dfsarg->nodes_visited;
+448: 	}
+449: 
+450: solve_h48_runthread_end:
+475: 
+476: 		solution_moves_reset(&moves);
+477: 		moves.nmoves = mtarg->nmoves;
+478: 		memcpy(moves.moves, mtarg->moves, mtarg->nmoves);
+479: 
+480: 		appret = appendsolution(&moves, mtarg->nmoves, mtarg->tmask,
+481: 		    solve_arg->solution_settings, solve_arg->solution_list);
+482: 		return appret < 0 ? appret : NISSY_OK;
+483: 	}
+484: 
+485: 	if (mtarg->nmoves == H48_STARTING_MOVES) {
+486: 		tasks[*ntasks].cube = mtarg->cube;
+487: 		tasks[*ntasks].pval =
+488: 		    h48_prune_lookup_nocoord(mtarg->cube, solve_arg);
+489: 		memcpy(tasks[*ntasks].moves, mtarg->moves,
+490: 		    H48_STARTING_MOVES * sizeof(uint8_t));
+491: 		memcpy(tasks[*ntasks].tmask, mtarg->tmask,
+492: 		    H48_STARTING_MOVES * sizeof(uint64_t));
+493: 		(*ntasks)++;
+494: 		return NISSY_OK;
+495: 	}
+496: 
+497: 	if (mtarg->nmoves == 0) {
+498: 		mm = MM18_ALLMOVES;
+499: 	} else {
+500: 		m = mtarg->moves[mtarg->nmoves-1];
+570: )
+571: {
+572: 	int i, ntasks;
+573: 	bool td;
+574: 	wrapthread_atomic int status, prev_status;
+575: 	size_t lastused;
+576: 	int8_t d;
+577: 	dfsarg_solve_h48_t arg[THREADS];
+578: 	solve_h48_task_t tasks[H48_STARTING_CUBES];
+579: 	dfsarg_solve_h48_maketasks_t mtarg;
+580: 	long double fallback_rate, lookups_per_node;
+581: 	uint64_t offset;
+582: 	uint64_t nodes_visited, table_lookups, table_fallbacks;
+583: 	tableinfo_t info, fbinfo2;
+584: 	const uint32_t *cocsepdata;
+585: 	const unsigned char *h48data;
+678: 	        status != NISSY_STATUS_STOP;
+679: 	    d++
+680: 	) {
+681: 		if (d >= H48_LOG_PROGRESS_MIN_DEPTH) {
+682: 			LOG("[H48 solve] Found %" PRIu64 " solutions, "
+683: 			    "searching at depth %" PRId8 "\n",
+684: 			    sollist.nsols, d);
+685: 		}
+686: 
+687: 		if (d >= H48_SORT_TASKS_MIN_DEPTH)
+688: 			qsort(tasks, ntasks, sizeof(solve_h48_task_t),
+689: 			    solve_h48_compare_tasks);
+690: 
+691: 		for (i = 0; i < threads; i++) {
+692: 			arg[i].target_depth = d;
+693: 			arg[i].thread_done = false;
+694: 			wrapthread_create(
+695: 			    &thread[i], solve_h48_runthread, &arg[i]);
+## nissy-core 1f7e8e937d0e71e7eb3b5deab38b34d0a0159d88 python/nissy_module.c
+
+240: 	if (!PyArg_ParseTuple(args, "s", &solver))
+241: 		return NULL;
+242: 
+243: 	size = nissy_solverinfo(solver, dataid);
+244: 	if (!check_error(size))
+245: 		return NULL;
+246: 
+247: 	buf = PyMem_Malloc(size);
+248: 
+249: 	Py_BEGIN_ALLOW_THREADS
+250: 	err = nissy_gendata(solver, size, buf);
+251: 	Py_END_ALLOW_THREADS
+252: 
+253: 	if (check_error(err))
+254: 		return PyByteArray_FromStringAndSize((char *)buf, size);
+255: 	else
+256: 		return NULL;
+257: }
+258: 
+259: PyDoc_STRVAR(checkdata_doc,
+260: "checkdata(data)\n"
+440: 	.m_slots = NULL,
+441: 	.m_traverse = NULL,
+442: 	.m_clear = NULL,
+443: 	.m_free = NULL
+444: };
+445: 
+446: static void
+447: log_stdout(const char *str, void *unused)
+448: {
+449: 	fprintf(stderr, "%s", str);
+450: }
+451: 
+452: PyMODINIT_FUNC PyInit_nissy(void) {
+453: 	PyObject *module;
+454: 
+455: 	nissy_setlogger(log_stdout, NULL);
+456: 	module = PyModule_Create(&nissy);
+457: 
+458: 	PyModule_AddStringConstant(module, "solved_cube", NISSY_SOLVED_CUBE);
+459: 	PyModule_AddIntConstant(module, "nissflag_normal", NISSY_NISSFLAG_NORMAL);
+460: 	PyModule_AddIntConstant(module, "nissflag_inverse", NISSY_NISSFLAG_INVERSE);
+## nissy-core 1f7e8e937d0e71e7eb3b5deab38b34d0a0159d88 build.sh
+
+40: # This is also used as default value in case an operation allows
+41: # specifying how many threads to use.
+42: # The number n must be between 1 and 128.
+43: # The default value is 16.
+44: THREADS=${THREADS-${NISSY_BUILD_THREADS}}
+45: 
+46: portable_nproc() {
+47: 	OS="$(uname -s)"
+48: 	case "$OS" in
+49: 	"Linux")
+50: 		nproc
+51: 		;;
+52: 	"Darwin" | "*BSD")
+53: 		sysctl -n hw.ncpu
+54: 		;;
+55: 	*)
+56: 		echo "32" # A safe, large default
+57: 		;;
+58: 	esac
+59: }
+60: 
+61: detectthreads() {
+62: 	echo "$(portable_nproc)"
+63: }
+64: 
+65: [ -z "$THREADS" ] && THREADS="$(detectthreads)"
+66: 
+67: # You can use this variable to build for a different architecture, for example
+## nissy-core 1f7e8e937d0e71e7eb3b5deab38b34d0a0159d88 src/nissy.c
+
+343: 
+344: 	if (maxsols == 0) {
+345: 		LOG("[solve] 'maxsols' is 0, returning no solution\n");
+346: 		return 0;
+347: 	}
+348: 
+349: 	if (threads > THREADS)
+350: 		LOG("[solve] Selected number of threads (%u) is above the "
+351: 		    "maximum value (%d), using %d threads instead\n",
+352: 		    threads, THREADS, THREADS);
+353: 	t = threads == 0 ? THREADS : MIN(THREADS, threads);
+354: 
+355: 	if ((size_t)data % 8 != 0) {
+356: 		LOG("[solve] Error: data buffer is not 8-byte aligned\n");
+## vcube 9f5bc2cce18f29437879ace825f22917f6705378 src/alloc.cpp
+
+33: 	return (n >> page_size) + !!(n & mask);
+34: }
+35: 
+36: static void * map_huge(size_t n, size_t page_size, int prot, int flags) {
+37: 	if (page_size) {
+38: 		n = num_pages(n, page_size);
+39: 		flags |= MAP_HUGETLB | (page_size << MAP_HUGE_SHIFT);
+40: 	}
+41: 	void *mem = mmap(NULL, n << page_size, prot, flags, -1, 0);
+42: 	return (mem == MAP_FAILED) ? NULL : mem;
+43: }
+44: 
+45: void * alloc::huge_impl(size_t n) {
+46: 	int prot = PROT_READ | PROT_WRITE;
+47: 	int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+48: 
+49: 	void *mem = map_huge(n, 30, prot, flags);   // 1GB pages
+50: 	if (!mem) {
+51: 		mem = map_huge(n, 21, prot, flags); // 2MB pages
+52: 	}
+53: 	if (!mem) {
+54: 		mem = map_huge(n, 0, prot, flags);  // Standard pages
+55: 	}
+56: 
+57: 	return mem;
+58: }
+59: 
+60: static void * map_shared(size_t n, uint32_t key, bool rdwr, size_t page_size) {
+75: }
+76: 
+77: void * alloc::shared_impl(size_t n, uint32_t key, bool rdwr) {
+78: 	void *mem = NULL;
+79: 	if (rdwr) {
+80: 		// Huge page setting is relevant only on create
+81: 		mem = map_shared(n, key, rdwr, 30);         // 1GB pages
+82: 		if (!mem) {
+83: 			mem = map_shared(n, key, rdwr, 21); // 2MB pages
+84: 		}
+85: 	}
+86: 	if (!mem) {
+87: 		mem = map_shared(n, key, rdwr, 0);
+88: 	}
+89: 	return mem;
+90: }
+## vcube 9f5bc2cce18f29437879ace825f22917f6705378 src/nxprune.cpp
+
+125: 	setPrune(mem);
+126: 
+127: 	return true;
+128: }
+129: 
+130: bool prune_base::loadShared(uint32_t key, const std::string &filename) {
+131: 	size_t sz = stride * N_CORNER_SYM;
+132: 
+133: 	auto mem = alloc::shared<uint8_t>(sz, key, false);
+134: 	if (!mem) {
+135: 		if (filename.empty()) {
+136: 			return false;
+137: 		}
+138: 
+139: 		mem = alloc::shared<uint8_t>(sz, key, true);
+140: 		if (!mem) {
+141: 			return false;
+142: 		}
+143: 
+144: 		FILE *fp = fopen(filename.c_str(), "r");
+145: 		if (!fp) {
+146: 			return false;
+147: 		}
+148: 
+149: 		size_t n = fread(mem, stride, N_CORNER_SYM, fp);
+150: 		if (fclose(fp)) {
+151: 			return false;
+152: 		}
+153: 
+154: 		if (n != N_CORNER_SYM) {
+155: 			return false;
+156: 		}
+157: 	}
+158: 
+159: 	setPrune(mem);
+160: 
+161: 	return true;
+162: }
+163: 
+164: std::vector<vcube::cube> prune_base::getCornerRepresentatives() const {
+165: 	std::vector<cube> cv;
+166: 	for (corient_t corient = 0; corient < N_CORIENT; corient++) {
+## vcube 9f5bc2cce18f29437879ace825f22917f6705378 src/vc-optimal.cpp
+
+80: 	static solver_variant S(int id) {
+81: 		char filename[64];
+82: 		sprintf(filename, "tables/nxprune_%d_%02d_%02d.dat",
+83: 				EP + 1, (EO + 1) * 4, Base);
+84: 		uint32_t shm_key = 0x76630000 |
+85: 			(Base << 8) |
+86: 			((EP + 1) << 4) |
+87: 			((EO + 1) * 4);
+88: 		return {
+89: 			id,
+90: 			solver<EP, EO, Base>,
+330: void solver(const std::string &table_filename, uint32_t shm_key) {
+331: 	using ECoord = nx::ecoord<EP, EO>;
+332: 	using Prune = nx::prune<ECoord, Base>;
+333: 
+334: 	Prune P;
+335: 
+336: 	std::string table_fullpath = cf.path + "/" + table_filename;
+337: 	if (!P.loadShared(shm_key)) {
+338: 		bool ok;
+339: 		if (cf.shm) {
+340: 			ok = P.loadShared(shm_key, table_fullpath);
+341: 		} else {
+342: 			ok = P.load(table_fullpath);
+343: 		}
+344: 		if (!ok) {
+345: 			nx::prune_generator gen(P, cf.workers);
+## cube20src f430921a48306874864b9f2ac8a059b43492fd3a nxopt.w
+
+741:             break ;
+742:          }
+743:       if (firstlevs[j].v == 0) {
+744:          firstlevs[j].v = mindp ;
+745:          mindp += C8_4 ;
+746:          memcpy(firstlevs[j].v, mindt, sizeof(mindt)) ;
+747:       }
+748:       if (siz > 0) {
+749:          firstlevs[j].p = (unsigned int *)malloc(MEMSIZE * (size_t)siz) ;
+750:          firstlevs[j].levoff = totsiz ;
+751:          totsiz += siz ;
+752:       } else {
+753:          firstlevs[j].p = firstlevs[mj].p ;
+754:          firstlevs[j].levoff = firstlevs[mj].levoff ;
+755:       }
+756:    }
+## cube_solver_test b9cca71cdf3f6e57bd3c7bfdc2491e5b806dda31 h48cmd.py
+
+10: 		print("usage: python3 cmd.py h48h? n_thread")
+11: 		return
+12: 	solver = sys.argv[1]
+13: 	n_thread = int(sys.argv[2])
+14: 	solver_data = None
+15: 	try:
+16: 		with open("tables/" + solver, "rb") as f:
+17: 			solver_data = bytearray(f.read())
+18: 	except IOError:
+19: 		print("table not exist, generate...")
+20: 		solver_data = nissy.gendata(solver)
+21: 		with open("tables/" + solver, "wb") as f:
+22: 			f.write(solver_data)
+23: 
+24: 	while True:
+25: 		scramble = ""
+26: 		try:
+27: 			scramble = input()
+28: 		except EOFError:
+29: 			break
+30: 		scramble = scramble.replace('1', '')
+31: 		print (scramble)
+32: 		tt = time.time()
+33: 		nissy.solve(nissy.applymoves(nissy.solved_cube, scramble), solver, nissy.nissflag_normal, 0, 20, 1, 0, n_thread, solver_data)
+34: 		print('Time: %0.6f s' % (time.time() - tt, ))
+35: 
+36: if __name__ == '__main__':
+37: 	main()
+## cube_solver_test b9cca71cdf3f6e57bd3c7bfdc2491e5b806dda31 runtest.sh
+
+118: 
+119: function cubeopt() (
+120: 	echo "test cube$3$2 $1"
+121: 	dataset=$(pwd)/dataset/$1.txt
+122: 	cd ../cubeopt
+123: 	cat $dataset | head -n$ntest |\
+124: 	./cube$3$2 -t $nthread -g $ngroup -m $maxl - |\
+125: 	awk '/(finished|unsolved)/ {
+126: 		split($5, s, "/");
+127: 		split($7, t, "=");
+128: 		cnt += 1;

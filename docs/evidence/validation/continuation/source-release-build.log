@@ -1,0 +1,217 @@
+
+COMMAND: ['rustc', '-Vv']
+rustc 1.99.1 (58cf8f9c3 2026-10-13)
+binary: rustc
+commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67
+commit-date: 2026-10-13
+host: x86_64-unknown-linux-gnu
+release: 1.99.1
+LLVM version: 23.1.1
+
+COMMAND: ['cargo', 'build', '--release', '--locked', '--offline', '--bin', 'solve', '--bin', 'gen']
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.27
+   Compiling thiserror v2.0.21
+   Compiling libc v0.2.191
+   Compiling utf8parse v0.2.2
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling colorchoice v1.0.5
+   Compiling anstyle-parse v1.0.0
+   Compiling anstyle-query v1.1.5
+   Compiling anstyle v1.0.14
+   Compiling serde_core v1.0.229
+   Compiling parking_lot_core v0.9.12 (/data2/build/egg-source-check-jomhn1so/egg-solver/vendor/parking_lot_core)
+   Compiling heck v0.5.0
+   Compiling anstream v1.0.0
+   Compiling strsim v0.11.1
+   Compiling zmij v1.0.23
+   Compiling clap_lex v1.1.1
+   Compiling portable-atomic v1.15.0
+   Compiling clap_builder v4.6.7
+   Compiling cfg-if v1.0.5
+   Compiling crossbeam-utils v0.8.23
+   Compiling scopeguard v1.2.0
+   Compiling serde v1.0.229
+   Compiling unicode-width v0.2.3
+   Compiling serde_json v1.0.154
+   Compiling log v0.4.35
+   Compiling anyhow v1.0.104
+   Compiling syn v3.0.9
+   Compiling smallvec v1.16.4
+   Compiling env_filter v2.0.0
+   Compiling lock_api v0.4.14
+   Compiling console v0.16.6
+   Compiling memchr v2.8.3
+   Compiling foldhash v0.2.0
+   Compiling equivalent v1.0.3
+   Compiling allocator-api2 v0.2.21
+   Compiling unit-prefix v0.5.2
+   Compiling itoa v1.0.18
+   Compiling parking_lot v0.12.5
+   Compiling indicatif v0.18.6
+   Compiling hashbrown v0.16.1
+   Compiling env_logger v0.11.11
+   Compiling thiserror-impl v2.0.21
+   Compiling clap_derive v4.6.7
+   Compiling serde_derive v1.0.229
+   Compiling egg-solver v0.1.0 (/data2/build/egg-source-check-jomhn1so/egg-solver)
+   Compiling clap v4.6.7
+   Compiling clap_complete v4.6.11
+    Finished `release` profile [optimized + debuginfo] target(s) in 16.63s
+
+COMMAND: ['/data2/build/egg-source-check-jomhn1so/target/release/solve', '--help']
+Solve Rubik's cube scrambles from stdin optimally (fewest moves, any face turn is one move)
+
+Usage: solve [OPTIONS] [TABLE] [SCRAMBLE]...
+
+Arguments:
+  [TABLE]
+          The table file (made by `gen`, e.g. `gen 8 auto h8`) [with --fast: the largest found]
+
+  [SCRAMBLE]...
+          With --fast: the scramble (moves as arguments, or one quoted string) [default: a random 25-move scramble]
+
+Options:
+      --table <TABLE>
+          The table file (as TABLE)
+          
+          [env: EGG_SOLVER_TABLE=]
+
+  -t, --threads <THREADS>
+          Threads
+          
+          [env: EGG_SOLVER_THREADS=]
+          [default: 8]
+
+  -l, --lanes <LANES>
+          Interleaved lanes per thread [default: from `<TABLE>.tune` if `bench tune` made one, else a default for the table's size]
+
+  -c, --concurrency <CONCURRENCY>
+          Cubes in progress at once: 1 solves one cube at a time with all threads (lowest latency); 0 the whole input as a batch (highest throughput)
+          
+          [default: 0]
+
+  -n, --count <COUNT>
+          Solve only the first COUNT scrambles
+
+      --json
+          Print JSON lines: one object per cube, then the total (with --fast: one object)
+
+      --fast
+          Solve one scramble (the arguments, or a random 25-move one) as fast as this machine can and show the time: the largest table found (hK, K from 11 down, in /mnt/huge, /data2/tables, /data/tables, ./tables), all threads on the one cube (-c 1), after a warm-up cube; the time is the cube's own (table load excluded). Don't run it beside other heavy jobs: they share the cores and the time
+
+      --warmup <SCRAMBLE>
+          With --fast: the cube solved first, to warm up threads, caches and TLBs ("" for none) [default: a fixed 25-move scramble]
+
+      --load <auto|map|copy|shm>
+          How to load the table: `map` the file, `copy` it into memory (with transparent huge pages), `shm`: attach its shared memory segment, made from the file first if there is none (Linux; the segment stays until reboot or `solve --shm-remove`, see README.md "Shared memory"), or `auto`: the table's segment if one is there, else map on hugetlbfs, /dev/shm and other systems than Linux, else copy
+          
+          [env: EGG_SOLVER_LOAD=]
+          [default: auto]
+
+      --shm
+          The same as `--load shm` (and overrides it)
+
+      --prefault <0|1>
+          With `map` and `shm`: read (map) the whole table at start (1), or each page on first use (0)
+          
+          [env: EGG_SOLVER_PREFAULT=]
+          [default: 1]
+
+      --shm-pages <LIST>
+          With `shm`: the page sizes a new segment may get, tried largest first (1g and 2m pages come from the kernel's hugetlb pool)
+          
+          [env: EGG_SOLVER_SHM_PAGES=]
+          [default: 1g,2m,4k]
+
+      --shm-key <KEY>
+          The shared memory segment's key [default: 0x636f (ASCII "co"), then the table's k and base, a byte each: 0x636f0709 for h7 base 9]
+          
+          [env: EGG_SOLVER_SHM_KEY=]
+
+      --shm-load <TABLE>
+          Load TABLE into its shared memory segment (as `--shm` does, if it is not there yet), print the segment and exit: later runs on TABLE attach it at once
+
+      --shm-remove <TABLE>
+          Remove TABLE's shared memory segment (as `ipcrm -M KEY`) and exit: its memory is freed once no process has it attached
+
+  -v, --verbose...
+          Log diagnostics to stderr (table loading and pages, threads, lanes); -vv for more. `RUST_LOG` (e.g. `debug`) overrides it
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+  -V, --version
+          Print version
+
+Output, one line per cube in completion order, then a summary:
+  solved <index> <length> <nodes> <seconds> <solution>
+  total <cubes> cubes wall <s> wall/cube <s> nodes/cube <n> threads <t> lanes <l> concurrency <c>
+<seconds> is the cube's time from its start to its solution (with -c 1, its
+latency). Every solution is verified: a wrong one is reported as BAD <index>
+and makes the exit status 1. With --json, the same as JSON lines:
+  {"type":"solved","index":..,"moves":..,"length":..,"nodes":..,"lookups":..,"seconds":..,"ok":true}
+  {"type":"total","cubes":..,"wall":..,"wall_per_cube":..,"nodes_per_cube":..,"threads":..,"lanes":..,"concurrency":..}
+
+With --fast:
+  table    <path>
+  threads  <t> (all on this one cube)
+  scramble <moves>
+  solution <moves>
+  length   <n> moves (optimal, verified)
+  time     <ms> ms   (<n> M nodes, <rate> M nodes/s)
+(with --json one object: table, threads, lanes, scramble, solution, length,
+nodes, lookups, seconds, ms, nodes_per_second).
+
+COMMAND: ['/data2/build/egg-source-check-jomhn1so/target/release/gen', '--help']
+Generate, check and convert pruning tables (`hK` files)
+
+Usage: gen [OPTIONS] <K> <BASE|auto> <OUT> [K:BASE:PATH]...
+       gen <COMMAND>
+
+Commands:
+  generate  Generate hK into a file (the default command)
+  stamp     Add a trailer to a table file made before trailers (in place: the trailer goes after the data, which is never written)
+  check     Recompute a table's distribution and checksum and compare them with its trailer
+  derive    hK of the source's base from a table of a larger k (min-collapse)
+  compare   Compare table A with table B (of the same base; B's k at least A's, collapsed to A's k on the fly)
+  help      Print this message or the help of the given subcommand(s)
+
+Arguments:
+  <K>               The table: hK for K = 0..11 (larger: faster solves, more memory: h8 3.6 GiB, h11 58 GiB)
+  <BASE|auto>       The base (0..12), or `auto` for the measured best for K
+  <OUT>             The table file to write (data, then a trailer with K, base, distribution and checksum)
+  [K:BASE:PATH]...  Smaller tables to derive in the same run (BFS only: K 0 or 11)
+
+Options:
+  -t, --threads <THREADS>  Threads [env: EGG_SOLVER_THREADS=] [default: 8]
+      --parts <N>          Generate N row ranges one after the other (memory: 1/N of the table; time: up to N times; depth-first generation only) [default: 1]
+      --dfs                Generate h0 by depth-first passes (as h1..h10), not by BFS: a check of one generator against the other
+      --force              Skip the checks before the run: room for the files (free space, or free huge pages on hugetlbfs) and memory (`MemAvailable`)
+  -v, --verbose...         Log diagnostics to stderr (table loading and pages, threads, lanes); -vv for more. `RUST_LOG` (e.g. `debug`) overrides it
+  -h, --help               Print help
+  -V, --version            Print version
+
+COMMAND: ['/data2/build/egg-source-check-jomhn1so/target/release/gen', '0', 'auto', '/data2/build/egg-source-check-jomhn1so/h0', '-t', '2']
+[gen] h0 base 7: 0.03 GiB, 2 threads
+[gen h0] depth 0: 1 entries
+[gen h0] depth 1: 1 entries (forward, 0.0s step, 0.0s total)
+[gen h0] depth 2: 4 entries (forward, 0.0s step, 0.0s total)
+[gen h0] depth 3: 34 entries (forward, 0.0s step, 0.0s total)
+[gen h0] depth 4: 331 entries (forward, 0.0s step, 0.0s total)
+[gen h0] depth 5: 3612 entries (forward, 0.0s step, 0.0s total)
+[gen h0] depth 6: 41605 entries (forward, 0.0s step, 0.0s total)
+[gen h0] depth 7: 474128 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 8: 4953846 entries (forward, 0.2s step, 0.3s total)
+[gen h0] depth 9: 34776317 entries (forward, 2.0s step, 2.3s total)
+[gen h0] >= 10: 77317571 entries
+generated in 2.4s, peak memory 0.03 GiB
+h0 base 7 distribution [519716, 4953846, 34776317, 77317571]
+
+COMMAND: ['/data2/build/egg-source-check-jomhn1so/target/release/gen', 'check', '/data2/build/egg-source-check-jomhn1so/h0', '--json']
+{"path":"/data2/build/egg-source-check-jomhn1so/h0","k":0,"base":7,"distribution":[519716,4953846,34776317,77317571],"checksum":"a8fdd6d28b8e9f83","trailer_distribution":[519716,4953846,34776317,77317571],"trailer_checksum":"a8fdd6d28b8e9f83","ok":true}
+
+COMMAND: ['/data2/build/egg-source-check-jomhn1so/target/release/solve', '/data2/build/egg-source-check-jomhn1so/h0', '--load', 'copy', '-t', '2', '-c', '1', '--json']
+{"type":"solved","index":0,"moves":"F2 U R U' R'","length":5,"nodes":41,"lookups":11,"seconds":0.000035242,"ok":true}
+{"type":"total","cubes":1,"wall":0.000887969,"wall_per_cube":0.000887969,"nodes_per_cube":41.0,"threads":2,"lanes":40,"concurrency":1}

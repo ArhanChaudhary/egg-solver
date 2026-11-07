@@ -1,0 +1,90 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>cube48opt10: pruning-table file layout vs our h10 — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../../history/index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="cube48opt10-table.md">Markdown source</a> · Offline document</p><details><summary>On this page</summary><ul><li><a href="#answer">Answer</a></li><li><a href="#facts">Facts</a></li><li><a href="#comparison-recipe">Comparison recipe</a></li></ul></details><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="cube48opt10-pruning-table-file-layout-vs-our-h10">cube48opt10: pruning-table file layout vs our h10</h1>
+<p>Method: static and read-only. I ran <code>nm -C --defined-only</code>, <code>readelf -S -s</code>, <code>strings -n 6</code> and
+<code>objdump -s -j .rodata</code> on <code>~/cube48opt10</code>, and <code>objdump -d</code> only on <code>load_pruning_table</code>,
+<code>save_pruning_table</code>, <code>myalloc</code>, <code>set_prun</code>, <code>set_prun_min4</code>, <code>set_prun_hash</code> and the call and
+constant lines of <code>init_pruning_hash_table</code>, <code>fill_hash_table</code>, <code>fill_hash_table_iter</code> and
+<code>main</code>. The binary was never run. Tags: <strong>[C]</strong> read directly from code or constants, <strong>[I]</strong>
+inferred.</p>
+<h2 id="answer">Answer</h2>
+<p><strong>Yes, the layout is the same.</strong> cube48opt10's file is the raw h10 table, with no header or
+trailer. It uses the same index layout, the same 2-bit code meaning, the same 16-byte groups with a
+4-bit minimum in slots 0-1, and the same base, 10. Our <code>/data2/tables/h10</code> is that same data region
+plus our 4 KiB trailer.</p>
+<p><strong>One known harmless byte difference.</strong> It affects the group-minimum nibble of groups whose entries
+are all greater than the base. cube48opt leaves those nibbles at 15, while ours stores 11 or 12.
+About 64% of groups in our file are like this. The solver never reads those nibbles, so a raw
+<code>cmp</code> will report differences there. Use the filtered compare in the last section.</p>
+<h2 id="facts">Facts</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>item</th><th>value</th><th>tag</th></tr>
+</thead>
+<tbody>
+<tr><td>File name</td><td><code>h48prun31h1.dat</code>: a fixed literal at .rodata 0x1895d, with no directory and no format specifier, opened relative to the <strong>CWD</strong>. The name says &quot;h1&quot; even though this build is K=10.</td><td>[C]</td></tr>
+<tr><td>Open modes</td><td><code>&quot;rb&quot;</code> (0x18873) in <code>load_pruning_table</code>; <code>&quot;wb&quot;</code> (0x18826) in the save path inlined in <code>init_pruning_hash_table</code></td><td>[C]</td></tr>
+<tr><td>I/O</td><td>A single <code>fread</code> / <code>fwrite(huge_prun_table, 1, 0x73f8c0000, fp)</code>, and success means count == size. Nothing is read or written before or after the data.</td><td>[C]</td></tr>
+<tr><td>Data size</td><td><strong>0x73f8c0000 = 31,130,910,720 bytes = 3393·70·2^10·128</strong>. The brief's 31,130,357,760 is an arithmetic slip: 237,510 × 131,072 = 31,130,910,720.</td><td>[C]</td></tr>
+<tr><td>Header / trailer</td><td><strong>None.</strong> Table data is bytes [0, 31,130,910,720), and the file size equals the data size.</td><td>[C]</td></tr>
+<tr><td>Load vs generate</td><td><code>init_pruning_hash_table</code> first calls <code>load_pruning_table(name, buf, size)</code>. If the full size is read, it skips generation. Otherwise it prints &quot;use hash table&quot;, generates, then writes the file (overwriting it). A stale <code>h48prun31h1.dat</code> in the CWD would therefore be loaded silently.</td><td>[C]</td></tr>
+<tr><td>Allocation</td><td><code>aligned_alloc(2 MiB, 0x73fa00000)</code> (the size rounded up to 2 MiB) plus <code>posix_madvise(...,14)</code> (14 = MADV_HUGEPAGE), and memset to 0xFF before the fill. A separate 0x1d0000000-byte (7.25 GiB) buffer is used during generation, so peak RAM is about 36 GiB.</td><td>[C] constants, [I] buffer role</td></tr>
+<tr><td>K</td><td><code>set_prun_hash</code> maps the h11 key to an index as `((X&gt;&gt;10)&lt;&lt;9)</td><td>(X&amp;0x1FF)<code>, which drops 1 EO bit (11−K = 1). </code>fill_hash_table_iter<code>has</code>and $0x3ff` (10-bit EO) masks, and the size above agrees.</td></tr>
+<tr><td><strong>Base</strong></td><td><strong>10.</strong> <code>set_prun_hash</code> computes <code>n = depth − 10</code> (<code>lea -0xa(%rsi)</code>) and stores <code>max(n,0)</code> as a 2-bit min. It updates the group nibble only when <code>depth &lt;= 10</code> (<code>cmp $0xa</code>). The DFS limit <code>cmp $0xc</code> (12 = base+2) is consistent with this.</td><td>[C], [I] for the 0xc meaning</td></tr>
+<tr><td>Entry encoding</td><td>Entry i is at u32 word <code>i&gt;&gt;4</code>, bit shift <code>2*(i&amp;15)</code>, little-endian. Code 0 means ≤ base (use the nibble), and 1/2/3 mean base+1/+2/≥ base+3. The group minimum is in the low 4 bits of the u32 word <code>(i&gt;&gt;4)&amp;~3</code>, which is the first byte of each 16-byte group. Initial values are code 3 and nibble 15 (from the memset).</td><td>[C]</td></tr>
+<tr><td>Ours</td><td><code>entry_position</code> uses u64 word <code>i&gt;&gt;5</code> and shift <code>2*(i&amp;31)</code>. On little-endian this addresses the same bytes and bits. The group minimum is <code>words[w&amp;!1] &amp; 15</code>, the same byte. Our trailer says <code>layout h48</code>, <code>k 10</code>, <code>base 10</code>, <code>bytes 31130910720</code>. The file is 31,130,914,816 bytes = data + 4096, and the trailer is at offset 31,130,910,720.</td><td>[C]</td></tr>
+<tr><td>Other code paths</td><td><code>main</code> calls only <code>init_pruning_hash_table</code> (twice, on two branches). <code>init_pruning_table</code> uses the same name and size but is not called from <code>main</code>. <code>init_pruning_near_table</code>, which uses <code>h48prun31h1.near.dat</code> and size 0x311dc00000, is also not called from <code>main</code>.</td><td>[C] direct calls, [I] that they are unreachable</td></tr>
+</tbody>
+</table></div>
+<h3 id="expected-benign-differences">Expected benign differences</h3>
+<ul>
+<li><strong>Group nibble when every entry in the group is above the base.</strong> In cube48opt10, every
+table write in the hash path goes through <code>set_prun_hash</code>, which writes the nibble only when
+<code>depth &lt;= 10</code> [C]. So its nibbles are in {0..10, 15}. Our generator lowers minima through BFS
+level 12, so ours are in {0..12, 15}.
+<ul>
+<li>A 6 MiB sample of our h10, taken at 6 offsets, gave these nibble counts: 6:7, 7:149,
+8:1634, 9:15915, 10:123158, <strong>11:233397, 12:18956</strong> [C].</li>
+<li>The nibble is only read when the probed code is 0, which implies that some entry in the
+group is ≤ base. So nibbles above the base are never read [C, <code>step1_query</code> semantics; our
+<code>collapse.rs</code> also counts them as &quot;unread_group_minima (harmless)&quot;].</li>
+</ul>
+</li>
+<li><strong>Slot 511 of each row</strong>, which no E placement maps to. cube48opt never writes it, so it stays
+at code 3 from the memset [C]. Ours is also 3: all 49,152 sampled rows had top bits 11 in byte
+127 [C].</li>
+<li><strong>Not verified statically:</strong> whether the corner-class numbering, the representative/ttrep
+choice, the msplit rank, the EO bit order and the eslot order all match exactly. Our
+<code>coord.rs</code> says it follows cube48opt's layout. The compare below will settle it. [I]</li>
+</ul>
+<h2 id="comparison-recipe">Comparison recipe</h2>
+<p>Run cube48opt10 in an <strong>empty dedicated directory</strong> (call it DIR). It needs about 31 GB of free
+disk there, and a stale file in that directory would be loaded instead of generated. Then:</p>
+<pre><code class="language-sh"># 1. size: must be exactly the data size (no header/trailer)
+stat -c %s DIR/h48prun31h1.dat                     # expect 31130910720
+
+# 2. raw byte compare of the data region only; skips our trailer bytes [31130910720, 31130914816)
+cmp -n 31130910720 /data2/tables/h10 DIR/h48prun31h1.dat
+#    expect: a difference at some offset ≡ 0 (mod 16), from the benign nibble difference above
+
+# 3. filtered compare: tolerate only (offset%16==0, same high nibble, ours&gt;10, theirs==15)
+nice -n 19 ionice -c3 cmp -l -n 31130910720 /data2/tables/h10 DIR/h48prun31h1.dat \
+ | gawk '{o=$1-1; a=strtonum(&quot;0&quot;$2); b=strtonum(&quot;0&quot;$3);
+          if (o%16==0 &amp;&amp; and(a,240)==and(b,240) &amp;&amp; and(a,15)&gt;10 &amp;&amp; and(b,15)==15) {benign++; next}
+          real++; if (real&lt;=20) printf &quot;off %d ours %02x theirs %02x\n&quot;, o, a, b}
+          END {printf &quot;benign nibble diffs %d, real diffs %d\n&quot;, benign, real}'
+</code></pre>
+<ul>
+<li><code>cmp -l</code> prints a 1-based decimal offset followed by the two bytes in octal. <code>strtonum(&quot;0&quot;x)</code>
+parses the octal.</li>
+<li>Expect roughly 1.2e9 lines of output. It is a streaming job: it reads 62 GB and is
+CPU-bound in gawk.</li>
+<li><code>real diffs 0</code> means <strong>the tables are identical except for unread nibbles</strong>.</li>
+</ul>
+<p><strong>Alternative, semantic compare</strong> [I for the invocation; the logic is C from <code>gen/collapse.rs</code>
+and <code>bin/gen.rs</code>]:</p>
+<ol>
+<li>Write a sidecar with <code>echo &quot;10 10&quot; &gt; DIR/h48prun31h1.dat.meta</code> (format: <code>k base</code>).</li>
+<li>Run <code>~/cube-opt/target/release/gen compare /data2/tables/h10 DIR/h48prun31h1.dat</code>.</li>
+</ol>
+<p>It prints <code>same</code> or <code>DIFFERENT</code>. It compares all 120,389,068,800 real entry codes and the group
+minima that are ≤ base. It uses <code>thread_count()</code> threads, so cap them on the shared machine.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

@@ -1,0 +1,16 @@
+status 0
+run cubeoptrsbatchh8 1 distance20_random10 10 1g shipped 1
+pagemode none arena 0 only -
+start 2026-11-05 23:33:09
+wall_s 146.09
+cpu_s 146.04 0.01
+maxrss_kb 12256
+gate_wait_s 0
+ext_cores 0.8
+pages 8400508 11900 9024 2048 8388608 639972 solve
+free_1g_pages 58 26
+memfree_gib_at_start 16.5
+thpwarm_pct -
+table /mnt/huge/h8 8589934592
+thp always [madvise] never defrag always defer defer+madvise [madvise] never
+par 5 slot 40-47

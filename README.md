@@ -1,0 +1,79 @@
+# egg-solver
+
+egg-solver is the fastest publically available optimal Rubik's Cube solver. **This project was entirely generted by AI** and was made possible under a few special conditions:
+
+- I recently attended YCombinator's [startup school](https://www.startupschool.org/) and was gifted 6 months of Anthropic's Claude Ultra plan;
+- as well $10,000 in Microsoft Azure credits
+- I have had an interest in computational Rubik's Cube theory
+
+I created a 48 core AMD EPYC 9V45 virtual machine with 94 GiB and two 300GB data disks. I gave Claude Code's Opus 5.5 (xhigh) model full access over the virtual machine and asked it to autonomously create the solver. Over the course of five days, I used $2,400 in Claude Code credits and $400 in Microsoft Azure credits to build this solver.
+
+## Acknowledgements
+
+egg-solver would not have been made possible without the following contributions to Rubik's Cube theory:
+- Richard Korf's [first optimal Rubik's Cube solver](https://www.cs.princeton.edu/courses/archive/fall06/cos402/papers/korfrubik.pdf)
+- Sebastiano Tronto's [h48](https://github.com/sebastianotronto/nissy-core) optimal solver for which most of this solver is based on
+- Tomas Rokicki's [nxopt](https://github.com/rokicki/cube20src/blob/master/nxopt.md) optimal solver
+- Chen Shaung's [cubeopt](https://github.com/cs0x7f/cubeopt-wasm) optimal solver
+- Andrew Skalski's [vcube](https://github.com/Voltara/vcube) optimal solver
+
+It is easy to believe that the AI was primarily responsible for making the solver this performant. This is untrue: the significant majority of Rubik's Cube solving techniques were developed and perfected by these individuals over many decades of research and experimentation. egg-solver is different from the other optimal solvers only in detail (in particular, a heavily optimized [micro-threading](https://en.wikipedia.org/wiki/Micro-thread_(multi-core)) implementation), not in broad strokes: we still use a meet-in-the-middle approach with a large in-memory pattern database.
+
+# Notice
+
+The rest of this document, as well as the mentioned user guide, was entirely written using AI.
+
+## Build and run
+
+Requires Rust and Cargo. The release build targets the CPU it is built on.
+
+```sh
+cargo build --release --locked
+mkdir -p tables
+target/release/gen 0 auto tables/h0
+printf '%s\n' "R U R' U' F2" | target/release/solve --table tables/h0
+```
+
+h0 is suitable for short examples. For arbitrary states, generate the largest
+table that fits comfortably in RAM: h7 = 3.6 GiB, h8 = 7.3 GiB,
+h10 = 29 GiB, h11 = 58 GiB. For example: `gen 7 auto tables/h7`.
+
+```sh
+# One cube, all selected threads:
+target/release/solve --fast --table tables/h7 "R U R' U' F2"
+# Batch: one scramble per line:
+target/release/solve --table tables/h7 < scrambles.txt
+# Check a table:
+target/release/gen check tables/h7
+```
+
+`-t N` selects threads; `-c 1` processes stdin one cube at a time;
+`--json` emits JSON. `--fast` requires `--table` and one scramble from
+arguments or stdin. Empty input is an error. `--warmup SCRAMBLE` is optional.
+
+`--load copy` loads the table into private RAM before searching. With
+`--load map` or shared memory, keep the backing storage unchanged while
+running. See `solve --help` and the [user guide](docs/reference/USER_GUIDE.md).
+
+## Measured comparison
+
+Recorded speedup over each competitor; higher is better. AMD EPYC 9V45,
+1 GiB pages, matched solve modes. GB below are decimal table sizes.
+
+| Competitor | egg table | GB: competitor / egg | Mode | 1 thread | 48 threads |
+|---|---|---:|---|---:|---:|
+| cubeopt30 | h7 | 2.60 / 3.89 | latency | 10.1× | 13.8× |
+| cube48opt10 | h10 | 31.13 / 31.13 | latency | 5.4× | 20.3× |
+| nissy H48 h11 | h11 | 60.67 / 62.26 | latency | 10.4× | 31.4× |
+| nxopt22 | h8 | 7.81 / 7.78 | throughput | 21.3× | 18.0× |
+| vcube208 | h8 | 7.81 / 7.78 | throughput | 14.2× | 12.3× |
+| cube48opt-rust Opt8 | h8 | 7.78 / 7.78 | throughput | 3.9× | 3.2× |
+
+These measurements used egg-solver `229b99f`. Later build differences,
+samples, variation and limitations are in the [full comparison](docs/comparisons/README.md).
+Larger nxopt configurations have not been benchmarked here.
+
+## Browser and documentation
+
+[Documentation](docs/README.md) · [Browser setup](docs/reference/USER_GUIDE.md#webassembly)
+· [GitHub Pages deployment](docs/guide/PUBLISHING.md) · [Development scripts](scripts/README.md)

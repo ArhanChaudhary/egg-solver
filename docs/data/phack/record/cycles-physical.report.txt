@@ -1,0 +1,66 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 11K of event 'cycles:u'
+# Event count (approx.): 598933409214
+#
+# Overhead  Symbol                                                                              IPC   [IPC Coverage]
+# ........  ..................................................................................  ....................
+#
+    97.36%  [.] cubeopt::lanes::run_lanes::<bench::run::{closure#1}::{closure#0}::{closure#0}>  -      -            
+            |          
+            |--1.43%--{closure#0} (inlined)
+            |          |          
+            |           --0.89%--{closure#0}<cubeopt::simd::v16_scalar::{impl#0}::and::{closure_env#0}> (inlined)
+            |                     {closure#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<cubeopt::simd::v16_scalar::{impl#0}::and::{closure_env#0}>> (inlined)
+            |                     try_from_fn_erased<core::ops::try_trait::NeverShortCircuit<u8>, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<cubeopt::simd::v16_scalar::{impl#0}::and::{closure_env#0}>>> (inlined)
+            |                     try_from_fn<core::ops::try_trait::NeverShortCircuit<u8>, 16, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<cubeopt::simd::v16_scalar::{impl#0}::and::{closure_env#0}>>> (inlined)
+            |                     from_fn<u8, 16, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<cubeopt::simd::v16_scalar::{impl#0}::and::{closure_env#0}>> (inlined)
+            |                     map2<cubeopt::simd::v16_scalar::{impl#0}::and::{closure_env#0}> (inlined)
+            |                     and (inlined)
+            |                     |          
+            |                      --0.61%--pieces (inlined)
+            |          
+            |--1.22%--advance (inlined)
+            |          |          
+            |           --0.76%--resolve_moved (inlined)
+            |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |                     {closure#0} (inlined)
+            |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+            |--0.72%--get<u8> (inlined)
+            |          get<u8, usize> (inlined)
+            |          {closure#0} (inlined)
+            |          {closure#0}<u8, u8, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}> (inlined)
+            |          call_mut<u8, core::ops::try_trait::NeverShortCircuit<u8>, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, u8, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}>> (inlined)
+            |          try_from_fn_erased<core::ops::try_trait::NeverShortCircuit<u8>, &mut core::array::drain::Drain<u8, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, u8, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}>>> (inlined)
+            |          try_from_fn<core::ops::try_trait::NeverShortCircuit<u8>, 16, &mut core::array::drain::Drain<u8, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, u8, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}>>> (inlined)
+            |          try_map<u8, 16, core::ops::try_trait::NeverShortCircuit<u8>, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, u8, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}>> (inlined)
+            |          map<u8, 16, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}, u8> (inlined)
+            |          lookup (inlined)
+            |          |          
+            |           --0.52%--compose (inlined)
+            |          
+             --0.64%--read<core::ptr::Unaligned<u32>> (inlined)
+                       read_unaligned<u32> (inlined)
+                       read_unaligned<u32> (inlined)
+                       index (inlined)
+                       |          
+                        --0.55%--advance (inlined)
+
+     0.94%  [.] <cubeopt::lanes::Lane>::setup_job                                               -      -            
+     0.86%  [.] <cubeopt::lanes::Lane>::setup_run                                               -      -            
+     0.50%  [.] <cubeopt::lanes::Lane>::next_run                                                -      -            
+     0.16%  [.] <cubeopt::lanes::Lane>::start_iteration                                         -      -            
+     0.13%  [.] <cubeopt::lanes::Lane>::extend_jobs                                             -      -            
+     0.03%  [k] 0xffffffffb1000e30                                                              -      -            
+     0.01%  [.] <cubeopt::lanes::Lane>::advance_cold                                            -      -            
+     0.01%  [.] 0x00000000000bab53                                                              -      -            
+     0.00%  [k] 0xffffffffb1000eb0                                                              -      -            
+
+
+#
+# (Tip: To trace only single function with Processor Trace use perf record --filter 'filter func @ program' -e intel_pt//u ./program ; perf script --insn-trace)
+#

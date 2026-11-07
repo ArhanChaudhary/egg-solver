@@ -1,0 +1,50 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEGATIVE m8: setup_run prefetches the job and child order of the run 4 entries ahead (neutral) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="fe8ee7e7fb1b.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="negative-m8-setup-run-prefetches-the-job-and-child-order-of-the-run-4-entries-ahead-neutral">NEGATIVE m8: setup_run prefetches the job and child order of the run 4 entries ahead (neutral)</h1>
+<p>Commit <code>fe8ee7e7fb1ba4c2c468a7b07903c0344527f149</code> · 2026-11-05T02:56:50+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>neg/m8-run-prefetch-4</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>NEGATIVE m8: setup_run prefetches the job and child order of the run 4 entries ahead (neutral)</p>
+<p>setup_run fetches the job and the ChildOrder of the next run entry while
+it starts the current run (c7): the job vectors are too big for L2 and
+the lanes interleave their streams. One entry ahead is too late when
+entries are skipped (an entry whose child already ran with an earlier
+entry's group <code>continue</code>s at once): in a 1T stream profile setup_run was
+~2.5% of the time, with 21% of its samples on the ChildOrder load and
+7.5% on the job's. Now it prefetches the entry RUN_PREFETCH = 4 ahead.
+(Each entry is still prefetched once; the first 3 entries of a part are
+not.)</p>
+<p>asm: setup_run 833 -&gt; 831 instructions; the hot loops are unchanged
+(instruction-identical, same addresses). Search identical (the order of
+runs is unchanged).</p>
+<p>1T stream (ab1.sh: paired, start order alternating; stream 10 60 1 24):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>run</th><th>7608a28</th><th>this</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>26.067</td><td>26.150</td></tr>
+<tr><td>2</td><td>25.967</td><td>25.967</td></tr>
+<tr><td>3</td><td>25.833</td><td>26.033</td></tr>
+<tr><td>4</td><td>26.183</td><td>26.283</td></tr>
+<tr><td>5</td><td>26.233</td><td>26.183</td></tr>
+<tr><td>6</td><td>26.033</td><td>26.283</td></tr>
+<tr><td>7</td><td>26.100</td><td>26.117</td></tr>
+<tr><td>8</td><td>26.217</td><td>26.183</td></tr>
+<tr><td>median</td><td>26.067</td><td>26.150 (+0.3%; pairs +0.32 0.00 +0.77 +0.38 -0.19 +0.96 +0.07 -0.13)</td></tr>
+<tr><td>48T stream (ab48.sh, stream 20 30 48 24; f1's exclusive holds ran in</td><td></td><td></td></tr>
+<tr><td>between, so the two runs of a pair were up to ~20 min apart):</td><td></td><td></td></tr>
+<tr><td>run</td><td>7608a28</td><td>this</td></tr>
+<tr><td>-----</td><td>---------</td><td>------</td></tr>
+<tr><td>1</td><td>1098.367</td><td>1098.533</td></tr>
+<tr><td>2</td><td>1089.000</td><td>1034.800</td></tr>
+<tr><td>3</td><td>1092.267</td><td>1086.233</td></tr>
+<tr><td>4</td><td>1080.967</td><td>1081.700</td></tr>
+<tr><td>5</td><td>1073.733</td><td>1092.967</td></tr>
+<tr><td>median</td><td>1089.000</td><td>1086.233 (-0.3%; pairs +0.02 -4.98 -0.55 +0.07 +1.79)</td></tr>
+<tr><td>Neutral at both thread counts: +0.3% at 1T is within the A/A noise</td><td></td><td></td></tr>
+<tr><td>(+-0.5%), and 48T shows nothing. Share mode does not run setup_run</td><td></td><td></td></tr>
+<tr><td>(its lanes use setup_job), so the share measurements were skipped. Not</td><td></td><td></td></tr>
+<tr><td>delivered. (On 7608a28; rebased onto 3a9a50a without conflicts.)</td><td></td><td></td></tr>
+</tbody>
+</table></div>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

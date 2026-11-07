@@ -1,0 +1,166 @@
+{
+  "commit": "842a5043abfd550313a86a3d9bb5254f4b457540",
+  "measured_commit": "229b99f",
+  "table": "/mnt/huge/h11",
+  "identity": "PASS",
+  "measured_at": "2026-11-07 15:18:18 UTC",
+  "stream_1t": {
+    "pairs": [
+      {
+        "measured": 25.733,
+        "final": 25.533
+      },
+      {
+        "measured": 25.783,
+        "final": 24.8
+      },
+      {
+        "measured": 25.0,
+        "final": 24.7
+      },
+      {
+        "measured": 24.95,
+        "final": 24.667
+      },
+      {
+        "measured": 25.533,
+        "final": 25.467
+      },
+      {
+        "measured": 25.633,
+        "final": 25.15
+      },
+      {
+        "measured": 25.8,
+        "final": 25.45
+      },
+      {
+        "measured": 25.483,
+        "final": 24.817
+      }
+    ],
+    "median_ratio": 0.9872170542635659,
+    "exceeds_half_percent_regression": true
+  },
+  "stream_48t": {
+    "pairs": [
+      {
+        "measured": 1063.633,
+        "final": 1054.567
+      },
+      {
+        "final": 1048.767,
+        "measured": 1053.2
+      },
+      {
+        "measured": 1047.233,
+        "final": 1033.067
+      },
+      {
+        "final": 1033.8,
+        "measured": 1058.533
+      },
+      {
+        "measured": 1050.933,
+        "final": 1040.267
+      }
+    ],
+    "median_ratio": 0.9898509229418051,
+    "exceeds_half_percent_regression": true
+  },
+  "latency": {
+    "random_state": {
+      "pairs": {
+        "1": {
+          "A": 1.618,
+          "B": 1.637
+        },
+        "2": {
+          "B": 1.595,
+          "A": 1.605
+        },
+        "3": {
+          "A": 1.632,
+          "B": 1.627
+        },
+        "4": {
+          "B": 1.62,
+          "A": 1.61
+        },
+        "5": {
+          "A": 1.638,
+          "B": 1.626
+        },
+        "6": {
+          "B": 1.643,
+          "A": 1.619
+        }
+      },
+      "median_ratio": 1.0015737273170138
+    },
+    "random_move_17f": {
+      "pairs": {
+        "1": {
+          "A": 0.528,
+          "B": 0.542
+        },
+        "2": {
+          "B": 0.545,
+          "A": 0.529
+        },
+        "3": {
+          "A": 0.538,
+          "B": 0.543
+        },
+        "4": {
+          "B": 0.544,
+          "A": 0.531
+        },
+        "5": {
+          "A": 0.529,
+          "B": 0.546
+        },
+        "6": {
+          "B": 0.557,
+          "A": 0.53
+        }
+      },
+      "median_ratio": 1.0283804491035116
+    },
+    "random_state_depth17": {
+      "pairs": {
+        "1": {
+          "A": 0.63,
+          "B": 0.635
+        },
+        "2": {
+          "B": 0.635,
+          "A": 0.611
+        },
+        "3": {
+          "A": 0.616,
+          "B": 0.629
+        },
+        "4": {
+          "B": 0.62,
+          "A": 0.615
+        },
+        "5": {
+          "A": 0.63,
+          "B": 0.632
+        },
+        "6": {
+          "B": 0.639,
+          "A": 0.629
+        }
+      },
+      "median_ratio": 1.012014166246591
+    }
+  },
+  "sha256": {
+    "measured-bench": "1dcd092c5bd2dfd86038f34de36268f0e28d79b910ce12ceb2af1e99a3160527",
+    "measured-solve": "dd07c8c0721659ad94506c91d8f4786255be0d26596964ba612833e514974dbb",
+    "final-bench": "84ba48dcf3353d187af6327fb07d8eebf847bf99f5c506ad7e1be27250caedcb",
+    "final-solve": "f8f7c5bb96e97fdb94e7e7c511e122fae4b7112197a18cf4bf3e87ae9dff502b"
+  }
+}

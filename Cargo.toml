@@ -1,0 +1,117 @@
+[package]
+name = "egg-solver"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+crossbeam-utils = "0.8"
+hashbrown = "0.16"
+libc = "0.2"
+# The library's error types (`tables::TableError`, `cubie::FaceletError`).
+thiserror = "2"
+# Command-line crates, for the binaries only (the `cli` feature): argument
+# parsing and shell completions, errors with context, logging (`-v`,
+# `RUST_LOG`), `--json` output and `gen`'s progress bars.
+clap = { version = "4.6", features = ["derive", "env"], optional = true }
+clap_complete = { version = "4.6", optional = true }
+anyhow = { version = "1", optional = true }
+log = { version = "0.4", optional = true }
+env_logger = { version = "0.11", default-features = false, features = ["auto-color"], optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+serde_json = { version = "1", optional = true }
+indicatif = { version = "0.18", optional = true }
+# Kernel micro-benchmarks (benches/kernels.rs, `cargo bench --features
+# bench`): a feature, not a dev-dependency, so that tests never build it.
+criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"], optional = true }
+
+[build-dependencies]
+# (build.rs includes src/cubie.rs.)
+thiserror = "2"
+
+# parking_lot only where it can park a thread on stable Rust (not on wasm:
+# see lanes/share.rs).
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+parking_lot = "0.12"
+
+[features]
+default = ["cli"]
+# The binaries and `egg_solver::cli` (the library alone needs none of it: the
+# wasm module builds without it).
+cli = [
+    "dep:clap",
+    "dep:clap_complete",
+    "dep:anyhow",
+    "dep:log",
+    "dep:env_logger",
+    "dep:serde",
+    "dep:serde_json",
+    "dep:indicatif",
+]
+# Force the portable scalar backend (to test it on any machine).
+scalar = []
+# The criterion benchmarks.
+bench = ["dep:criterion"]
+
+[[bin]]
+name = "egg-solver"
+path = "src/main.rs"
+required-features = ["cli"]
+
+[[bin]]
+name = "solve"
+required-features = ["cli"]
+
+[[bin]]
+name = "bench"
+required-features = ["cli"]
+
+[[bin]]
+name = "gen"
+required-features = ["cli"]
+
+[[test]]
+name = "cli"
+required-features = ["cli"]
+
+[[bench]]
+name = "kernels"
+harness = false
+required-features = ["bench"]
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+debug = 1
+
+[profile.test]
+opt-level = 3
+
+[lints.rust]
+# Set by build.rs for the library (not for the build script's own copy of
+# src/cubie.rs): the cube model's constants are generated.
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(cubie_generated)"] }
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# Hot kernels use `#[inline(always)]` deliberately (measured).
+inline_always = "allow"
+
+# The WebAssembly module (`wasm/`, see docs/reference/USER_GUIDE.md "WebAssembly"); `cargo
+# build` here still builds only this package.
+[workspace]
+members = [".", "wasm"]
+# Keep the minimally patched dependency outside first-party fmt/test members.
+exclude = ["vendor/parking_lot_core"]
+
+# The WebAssembly module's build (`wasm/build.sh`): release without debug
+# info, for a small `.wasm`.
+[profile.wasm-release]
+inherits = "release"
+debug = 0
+strip = true
+
+# Backport upstream explicit futex pointer arguments; see the retained vendor note.
+[patch.crates-io]
+parking_lot_core = { path = "vendor/parking_lot_core" }

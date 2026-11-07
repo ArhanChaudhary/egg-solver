@@ -1,0 +1,141 @@
+   Compiling egg-solver v0.1.0 (/data/agents/pmu-opt/source)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1m 12s
+     Running unittests src/lib.rs (/data2/build/egg-solver-pmu-opt/release/deps/egg_solver-a8fc7b8b844a6ee3)
+
+running 54 tests
+test coord::tests::rank_tables ... ok
+test coord::tests::cocsep_x3_is_3_cocsep ... ok
+test cubie::tests::move_orders ... ok
+test cli::preflight::tests::needs_and_margins ... ok
+test cubie::tests::moves_match_sticker_model ... ok
+test cubie::tests::parse_and_format ... ok
+test cubie::tests::facelets ... ok
+test cli::preflight::tests::folders ... ok
+test coord::tests::edge_key_sym_matches ... ok
+test cubie::tests::generated_constants_match_model ... ok
+test coord::tests::edge_key_roundtrip ... ok
+test cubie::tests::sexy_move_order_6 ... ok
+test cubie::tests::sticker_roundtrip ... ok
+test cubie::tests::symmetry_conjugation_matches_stickers ... ok
+test lanes::share::tests::first_pass_dropped_entries_are_counted_down ... ok
+test gen::collapse::tests::min_codes_is_fieldwise_min ... ok
+test lanes::share::tests::lead_of_matches_scalar_lead ... ok
+test lanes::share::tests::first_pass_reports_no_longer_solution_while_reporting_one ... ok
+test lanes::tests::quantize18_codes_unseen_children ... ok
+test lanes::tests::sort_jobs_matches_stable_sort ... ok
+test lanes::share::tests::mutex_contention_parks_and_wakes ... ok
+test parallel::tests::on_threads_joins_all_failed_workers_before_returning_error ... ok
+test portable_check::coord::cross_check::portable_matches_x86 ... ok
+test portable_check::coord::tests::pext_replacements_match ... ok
+test parallel::tests::on_threads_runs_each_share_once_in_order ... ok
+test simd::tests::simd_matches_cubie ... ok
+test portable_check::tests::portable_cube_matches_cubie ... ok
+test lanes::share::tests::share_fresh_cube_solved_by_others_at_once ... ok
+test symstart::tests::move_conjugates_compose ... ok
+test symstart::tests::random_cubes_are_not_filtered ... ok
+test symstart::tests::superflip_jobs ... ok
+test symstart::tests::antisymmetric_cube ... ok
+test tables::file::tests::previous_table_magic_is_accepted ... ok
+test lanes::share::tests::staged_sort_matches_sort_jobs ... ok
+test tables::file::tests::trailer_roundtrip ... ok
+test tables::file::tests::trailer_write_keeps_data ... ok
+test lanes::share::tests::split_runs_cover_each_child_once ... ok
+test lanes::tests::split_runs_cover_each_child_once ... ok
+test lanes::share::tests::share_protocol_with_tiny_search ... ok
+test tables::file::tests::checksum_sees_every_byte ... ok
+test lanes::share::tests::share_first_pass_reports_the_shortest_solution ... ok
+test tables::shm::tests::keys_and_page_lists ... ok
+test solver::tests::hot_index_matches_reference_index ... ok
+test tables::tests::atomic_updates_finish_before_byte_reads ... ok
+test tables::tests::cocsep_classes_and_distribution ... ok
+test tables::tests::opened_table_file_is_read_only ... ok
+test tables::shm::segment_tests::another_table_under_the_key_is_never_used ... ok
+test tables::tests::table_from_file_memory_is_checked ... ok
+test tables::tests::table_meta_and_size_are_checked ... ok
+test tables::shm::segment_tests::huge_pages_fall_back_with_a_note ... ok
+test tables::shm::segment_tests::segment_trailer_round_trip ... ok
+test tables::shm::segment_tests::preflight_verdicts ... ok
+test tables::shm::segment_tests::unfinished_segments_are_found ... ok
+test tables::shm::segment_tests::segment_is_made_once_then_attached ... ok
+
+test result: ok. 54 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.33s
+
+     Running unittests src/bin/bench.rs (/data2/build/egg-solver-pmu-opt/release/deps/bench-cbcc2f517bb5b615)
+
+running 3 tests
+test tests::seconds_reject_unrepresentable_durations ... ok
+test tests::legacy_forms_become_subcommands ... ok
+test tests::random_sets ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (/data2/build/egg-solver-pmu-opt/release/deps/egg_solver-784c2e40d558311c)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/gen.rs (/data2/build/egg-solver-pmu-opt/release/deps/gen-cf41c455b6c81e99)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/bin/solve.rs (/data2/build/egg-solver-pmu-opt/release/deps/solve-1da4328aca31d237)
+
+running 1 test
+test tests::random_scrambles ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s
+
+     Running tests/cli.rs (/data2/build/egg-solver-pmu-opt/release/deps/cli-d7cdd88c7ed685ba)
+
+running 14 tests
+test help_version_and_completions ... ok
+test egg_solver_legacy_form ... ok
+test exit_statuses ... ok
+test previous_environment_names_remain_fallbacks ... ok
+test solve_json_env_and_logging ... ok
+test bench_legacy_batch_forms ... ok
+test solve_shared_memory_fallbacks ... ok
+test solve_fast ... ok
+test bench_subcommands_match_legacy ... ok
+test solve_shared_memory ... ok
+test solve_legacy_forms ... ok
+test bench_legacy_stream_forms ... ok
+test gen_legacy_forms ... ok
+test preflight_failures ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.20s
+
+     Running tests/correctness.rs (/data2/build/egg-solver-pmu-opt/release/deps/correctness-31923e93a6f1ff6e)
+
+running 16 tests
+test h0_table_matches_brute_force ... ok
+test dfs_generator_matches_bfs_and_brute_force ... ok
+test lanes_short_scrambles_are_optimal ... ok
+test share_first_pass_finds_the_shortest_solutions ... ok
+test conjugates_have_equal_lengths_in_all_modes ... ok
+test short_scrambles_are_optimal ... ok
+test symmetric_positions ... ok
+test share_short_scrambles_are_optimal ... ok
+test table_value_is_symmetry_invariant ... ok
+test share_splits_and_donates ... ok
+test solves_known_depth_15 ... ok
+test share_few_cubes ... ok
+test lanes_solve_known_depth_15 ... ok
+test symmetric_start_keeps_optimal_lengths ... ok
+test share_stress ... ok
+test share_solve_known_depth_15 has been running for over 60 seconds
+test share_solve_known_depth_15 ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 66.10s
+
+     Running tests/no_runtime_panics.rs (/data2/build/egg-solver-pmu-opt/release/deps/no_runtime_panics-06fb481d5b861b29)
+
+running 2 tests
+test scanner_finds_runtime_panics_only ... ok
+test shipped_code_has_no_intentional_panics ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+

@@ -1,0 +1,62 @@
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on build directory
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.88s
+     Running unittests src/lib.rs (/data2/build/egg-solver-target/miri-current-miri-portable/miri/x86_64-unknown-linux-gnu/debug/build/egg-solver/46faae831e71f596/out/egg_solver-46faae831e71f596)
+warning: Miri does not support optimizations: the opt-level is ignored. The only effect of selecting a Cargo profile that enables optimizations (such as --release) is to apply its remaining settings, such as whether debug assertions and overflow checks are enabled.
+
+
+running 9 tests
+test cli::preflight::tests::folders ... ok
+test cli::preflight::tests::needs_and_margins ... ok
+test gen::collapse::tests::min_codes_is_fieldwise_min ... ok
+test lanes::share::tests::lead_of_matches_scalar_lead ... ok
+test lanes::share::tests::mutex_contention_parks_and_wakes ... warning: integer-to-pointer cast
+    --> vendor/parking_lot_core/src/word_lock.rs:320:9
+     |
+ 320 |         (self & QUEUE_MASK) as *const ThreadData
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ integer-to-pointer cast
+     |
+     = help: this program is using integer-to-pointer casts or (equivalently) `ptr::with_exposed_provenance`, which means that Miri might miss pointer bugs in this program
+     = help: see https://doc.rust-lang.org/nightly/std/ptr/fn.with_exposed_provenance.html for more details on that operation
+     = help: to ensure that Miri does not miss bugs in your program, use Strict Provenance APIs (https://doc.rust-lang.org/nightly/std/ptr/index.html#strict-provenance, https://crates.io/crates/sptr) instead
+     = help: you can then set `MIRIFLAGS=-Zmiri-strict-provenance` to ensure you are not relying on `with_exposed_provenance` semantics
+     = help: alternatively, `MIRIFLAGS=-Zmiri-permissive-provenance` disables this warning
+     = note: this is on thread `unnamed-6`
+     = note: stack backtrace:
+             0: <usize as parking_lot_core::word_lock::LockState>::queue_head
+                 at vendor/parking_lot_core/src/word_lock.rs:320:9: 320:49
+             1: parking_lot_core::word_lock::WordLock::unlock
+                 at vendor/parking_lot_core/src/word_lock.rs:104:39: 104:57
+             2: parking_lot_core::parking_lot::park::<{closure@parking_lot::RawMutex::lock_slow::{closure#0}}, {closure@parking_lot::RawMutex::lock_slow::{closure#1}}, {closure@parking_lot::RawMutex::lock_slow::{closure#2}}>::{closure#0}
+                 at vendor/parking_lot_core/src/parking_lot.rs:624:9: 624:30
+             3: parking_lot_core::parking_lot::with_thread_data::<parking_lot_core::parking_lot::ParkResult, {closure@parking_lot_core::parking_lot::park<{closure@parking_lot::RawMutex::lock_slow::{closure#0}}, {closure@parking_lot::RawMutex::lock_slow::{closure#1}}, {closure@parking_lot::RawMutex::lock_slow::{closure#2}}>::{closure#0}}>
+                 at vendor/parking_lot_core/src/parking_lot.rs:207:5: 207:36
+             4: parking_lot_core::parking_lot::park::<{closure@parking_lot::RawMutex::lock_slow::{closure#0}}, {closure@parking_lot::RawMutex::lock_slow::{closure#1}}, {closure@parking_lot::RawMutex::lock_slow::{closure#2}}>
+                 at vendor/parking_lot_core/src/parking_lot.rs:600:5: 705:7
+             5: parking_lot::RawMutex::lock_slow
+                 at /home/super/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot-0.12.5/src/raw_mutex.rs:262:17: 269:18
+             6: <parking_lot::RawMutex as parking_lot::lock_api::RawMutex>::lock
+                 at /home/super/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot-0.12.5/src/raw_mutex.rs:72:13: 72:33
+             7: lanes::share::tests::mutex_contention_parks_and_wakes::{closure#0}::{closure#0}
+                 at src/lanes/share.rs:4080:18: 4080:30
+note: the last function in that backtrace got called indirectly due to this code
+    --> src/lanes/share.rs:4078:13
+     |
+4078 | /             scope.spawn(|| {
+4079 | |                 entered.store(true, Release);
+4080 | |                 *value.lock() += 1;
+4081 | |             });
+     | |______________^
+
+ok
+test parallel::tests::on_threads_joins_all_failed_workers_before_returning_error ... ok
+test parallel::tests::on_threads_runs_each_share_once_in_order ... ok
+test safe_api_tests::safe_api_checks_table_memory_and_metadata ... ok
+test safe_api_tests::safe_api_rejects_invalid_cubes_and_coordinates ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 41 filtered out; finished in 157.16s
+
+warning: 2 warnings emitted
+

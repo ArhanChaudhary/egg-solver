@@ -1,0 +1,102 @@
+{
+  "name": "events-physical-41-r2",
+  "config": {
+    "cpus": [
+      1,
+      3,
+      5,
+      7,
+      9,
+      11,
+      0,
+      2,
+      4,
+      6,
+      8,
+      10
+    ],
+    "threads": 12,
+    "memory_policy": "interleave"
+  },
+  "lanes": 24,
+  "page_request": "thp",
+  "mode": "stream",
+  "aux": "ITLB_MISSES.WALK_CYCLES",
+  "isolated_event": false,
+  "command": [
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/numactl",
+    "--physcpubind=1,3,5,7,9,11,0,2,4,6,8,10",
+    "--interleave=0,1",
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/perf",
+    "stat",
+    "--no-big-num",
+    "-x",
+    ";",
+    "--delay=-1",
+    "--control=fifo:/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/.ctl-events-physical-41-r2,/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/.ack-events-physical-41-r2",
+    "-o",
+    "/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/stat/events-physical-41-r2.csv",
+    "-e",
+    "{cycles:u,instructions:u,cpu/config=0x485,name=egp_itlb_misses_walk_cycles/u}",
+    "--",
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/bench",
+    "stream",
+    "/home/arhan/tmp/egg-solver-perf-work/tables/h6",
+    "--warmup",
+    "8.0",
+    "--window",
+    "20.0",
+    "--threads",
+    "12",
+    "--lanes",
+    "24",
+    "--seed",
+    "2026",
+    "--load",
+    "copy",
+    "--json"
+  ],
+  "exit_code": 0,
+  "valid": true,
+  "wall_seconds": 35.01458067493513,
+  "counted_window_seconds": 20.000238016,
+  "benchmark": {
+    "type": "stream",
+    "threads": 12,
+    "lanes": 24,
+    "window": 20.0,
+    "share": null,
+    "cubes": 31,
+    "throughput": 1.55,
+    "nodes_per_cube": 4361019.451612903,
+    "lookups_per_cube": 3704454.935483871,
+    "lengths": {
+      "16": 3,
+      "17": 28
+    }
+  },
+  "counters": [
+    {
+      "event": "cycles:u",
+      "count": 583044687636.0,
+      "unit": "",
+      "counter_runtime_ns": 239959813693.0,
+      "running_percent": 100.0
+    },
+    {
+      "event": "instructions:u",
+      "count": 1028146928505.0,
+      "unit": "",
+      "counter_runtime_ns": 239959813693.0,
+      "running_percent": 100.0
+    },
+    {
+      "event": "egp_itlb_misses_walk_cycles",
+      "count": 11959640.0,
+      "unit": "",
+      "counter_runtime_ns": 239959813693.0,
+      "running_percent": 100.0
+    }
+  ],
+  "record": false
+}

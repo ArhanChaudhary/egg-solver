@@ -1,0 +1,28 @@
+ld-linux-x86-64 (3999299, #threads: 25)
+-------------------------------------------------------------------
+se.exec_start                                :    3127194726.811095
+se.vruntime                                  :        841439.539204
+se.sum_exec_runtime                          :           135.011618
+se.nr_migrations                             :                    3
+nr_switches                                  :                   33
+nr_voluntary_switches                        :                   32
+nr_involuntary_switches                      :                    1
+se.load.weight                               :              1048576
+se.avg.load_sum                              :                   96
+se.avg.runnable_sum                          :                98304
+se.avg.util_sum                              :                98304
+se.avg.load_avg                              :                    0
+se.avg.runnable_avg                          :                    0
+se.avg.util_avg                              :                    0
+se.avg.last_update_time                      :     3127109343640576
+se.avg.util_est                              :                  314
+policy                                       :                    0
+prio                                         :                  120
+clock-delta                                  :                   49
+mm->numa_scan_seq                            :                   12
+numa_pages_migrated                          :                    0
+numa_preferred_nid                           :                   -1
+total_numa_faults                            :                    0
+current_node=1, numa_group_id=0
+numa_faults node=0 task_private=0 task_shared=0 group_private=0 group_shared=0
+numa_faults node=1 task_private=0 task_shared=0 group_private=0 group_shared=0

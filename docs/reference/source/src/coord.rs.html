@@ -1,0 +1,574 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>coord.rs — source evidence</title><style>body{font:15px system-ui;margin:2rem}pre{font:13px/1.6 monospace;overflow:auto}.line:target{background:#fff0a0}a{color:#42617a;text-decoration:none}</style><h1>coord.rs</h1><p>Source evidence snapshot. Original file SHA-256: <code>1d4f678a5b2ec32fd733facf2bccb2553f9d9d17573b3faff4f7d9df06c164b7</code>. <a href="coord.rs">Raw source</a></p><pre><span class="line" id="L1"><a href="#L1">    1</a> //! Coordinates: the numbers that index the pruning tables.</span>
+<span class="line" id="L2"><a href="#L2">    2</a> //!</span>
+<span class="line" id="L3"><a href="#L3">    3</a> //! A pruning table stores, for each value of a coordinate (a function of</span>
+<span class="line" id="L4"><a href="#L4">    4</a> //! the cube state), a lower bound on the number of moves to solve any cube</span>
+<span class="line" id="L5"><a href="#L5">    5</a> //! with that value. The H48 coordinates (from nissy and cube48opt):</span>
+<span class="line" id="L6"><a href="#L6">    6</a> //!</span>
+<span class="line" id="L7"><a href="#L7">    7</a> //! * cocsep: corner orientation (3^7) x corner tetrad separation: which 4</span>
+<span class="line" id="L8"><a href="#L8">    8</a> //!   of the 8 positions hold the corners `UFL UBR DFR DBL` (C(8,4) = 70;</span>
+<span class="line" id="L9"><a href="#L9">    9</a> //!   half turns keep these 4 among themselves). Reduced by the 48</span>
+<span class="line" id="L10"><a href="#L10">   10</a> //!   symmetries to 3393 classes.</span>
+<span class="line" id="L11"><a href="#L11">   11</a> //! * msplit: which 4 of the 8 non-E-slice positions hold S-slice edges (70).</span>
+<span class="line" id="L12"><a href="#L12">   12</a> //! * eo: edge orientation (2^11; the 12th flip follows from the others).</span>
+<span class="line" id="L13"><a href="#L13">   13</a> //! * eslot: which 4 positions hold E-slice edges (C(12,4) = 495 values),</span>
+<span class="line" id="L14"><a href="#L14">   14</a> //!   packed into 512 slots so that slots 64k and 64k+1 are free for a 4-bit</span>
+<span class="line" id="L15"><a href="#L15">   15</a> //!   group minimum.</span>
+<span class="line" id="L16"><a href="#L16">   16</a> //!</span>
+<span class="line" id="L17"><a href="#L17">   17</a> //! The full h11 key (computed after conjugating the cube by the symmetry</span>
+<span class="line" id="L18"><a href="#L18">   18</a> //! that maps its corners to the class representative) is</span>
+<span class="line" id="L19"><a href="#L19">   19</a> //! `X = ((class * 70 + msplit) &lt;&lt; 20) | (eo11 &lt;&lt; 9) | eslot`. The table</span>
+<span class="line" id="L20"><a href="#L20">   20</a> //! `hk` (k = 0..=11) keeps only the top `k` eo bits: its index is</span>
+<span class="line" id="L21"><a href="#L21">   21</a> //! `((X &gt;&gt; (11 - k)) &amp; !0x1FF) | (X &amp; 0x1FF)` (cube48opt&#x27;s layout).</span>
+<span class="line" id="L22"><a href="#L22">   22</a> //!</span>
+<span class="line" id="L23"><a href="#L23">   23</a> //! The hot path (`cocsep_x3`, `index_sym`) reads the cube&#x27;s bytes with</span>
+<span class="line" id="L24"><a href="#L24">   24</a> //! `pext` (gather the bits under a mask) and `movemask` (gather the top bit</span>
+<span class="line" id="L25"><a href="#L25">   25</a> //! of each byte), then looks the parts up in small tables.</span>
+<span class="line" id="L26"><a href="#L26">   26</a> </span>
+<span class="line" id="L27"><a href="#L27">   27</a> use crate::simd::Cube;</span>
+<span class="line" id="L28"><a href="#L28">   28</a> #[cfg(backend = &quot;x86&quot;)]</span>
+<span class="line" id="L29"><a href="#L29">   29</a> use std::arch::x86_64::{</span>
+<span class="line" id="L30"><a href="#L30">   30</a>     _mm256_add_epi8, _mm256_movemask_epi8, _mm256_shuffle_epi8, _mm256_slli_epi16,</span>
+<span class="line" id="L31"><a href="#L31">   31</a>     _mm256_xor_si256, _pdep_u32, _pext_u32, _pext_u64,</span>
+<span class="line" id="L32"><a href="#L32">   32</a> };</span>
+<span class="line" id="L33"><a href="#L33">   33</a> // The portable backend&#x27;s versions of the parts that use BMI2 and movemasks</span>
+<span class="line" id="L34"><a href="#L34">   34</a> // here (same results; see `portable/coord.rs`).</span>
+<span class="line" id="L35"><a href="#L35">   35</a> #[cfg(not(backend = &quot;x86&quot;))]</span>
+<span class="line" id="L36"><a href="#L36">   36</a> pub use crate::simd::coord::edge_masks;</span>
+<span class="line" id="L37"><a href="#L37">   37</a> #[cfg(not(backend = &quot;x86&quot;))]</span>
+<span class="line" id="L38"><a href="#L38">   38</a> use crate::simd::coord::{corner_fields, edge_parts_sym_raw, pdep12, pext12, pext_contiguous};</span>
+<span class="line" id="L39"><a href="#L39">   39</a> </span>
+<span class="line" id="L40"><a href="#L40">   40</a> /// Corner orientations (the 8th follows from the others).</span>
+<span class="line" id="L41"><a href="#L41">   41</a> pub const N_CO: usize = 2187;</span>
+<span class="line" id="L42"><a href="#L42">   42</a> /// Corner tetrad separations.</span>
+<span class="line" id="L43"><a href="#L43">   43</a> pub const N_CSEP: usize = 70;</span>
+<span class="line" id="L44"><a href="#L44">   44</a> /// cocsep coordinates: 153090.</span>
+<span class="line" id="L45"><a href="#L45">   45</a> pub const N_COCSEP: usize = N_CO * N_CSEP;</span>
+<span class="line" id="L46"><a href="#L46">   46</a> /// Symmetry classes of cocsep coordinates.</span>
+<span class="line" id="L47"><a href="#L47">   47</a> pub const N_CLASSES: usize = 3393;</span>
+<span class="line" id="L48"><a href="#L48">   48</a> /// msplit values.</span>
+<span class="line" id="L49"><a href="#L49">   49</a> pub const N_MSPLIT: usize = 70;</span>
+<span class="line" id="L50"><a href="#L50">   50</a> /// Edge orientations (11 bits).</span>
+<span class="line" id="L51"><a href="#L51">   51</a> pub const N_EO: usize = 2048;</span>
+<span class="line" id="L52"><a href="#L52">   52</a> /// eslot slots (495 used).</span>
+<span class="line" id="L53"><a href="#L53">   53</a> pub const N_SLOTS: usize = 512;</span>
+<span class="line" id="L54"><a href="#L54">   54</a> </span>
+<span class="line" id="L55"><a href="#L55">   55</a> /// Binomial coefficient `n` choose `k` (for small `n`: no overflow checks).</span>
+<span class="line" id="L56"><a href="#L56">   56</a> const fn binomial(n: u32, k: u32) -&gt; u32 {</span>
+<span class="line" id="L57"><a href="#L57">   57</a>     if k &gt; n {</span>
+<span class="line" id="L58"><a href="#L58">   58</a>         return 0;</span>
+<span class="line" id="L59"><a href="#L59">   59</a>     }</span>
+<span class="line" id="L60"><a href="#L60">   60</a>     let mut result = 1;</span>
+<span class="line" id="L61"><a href="#L61">   61</a>     let mut i = 0;</span>
+<span class="line" id="L62"><a href="#L62">   62</a>     while i &lt; k {</span>
+<span class="line" id="L63"><a href="#L63">   63</a>         // (Exact: a product of i + 1 consecutive numbers is divisible by (i + 1)!.)</span>
+<span class="line" id="L64"><a href="#L64">   64</a>         result = result * (n - i) / (i + 1);</span>
+<span class="line" id="L65"><a href="#L65">   65</a>         i += 1;</span>
+<span class="line" id="L66"><a href="#L66">   66</a>     }</span>
+<span class="line" id="L67"><a href="#L67">   67</a>     result</span>
+<span class="line" id="L68"><a href="#L68">   68</a> }</span>
+<span class="line" id="L69"><a href="#L69">   69</a> </span>
+<span class="line" id="L70"><a href="#L70">   70</a> /// Colexicographic rank of a bit mask among the masks with as many set</span>
+<span class="line" id="L71"><a href="#L71">   71</a> /// bits: the sum of `binomial(p, j)` over its `j`-th set bit `p`.</span>
+<span class="line" id="L72"><a href="#L72">   72</a> const fn colex_rank(mask: u32) -&gt; u32 {</span>
+<span class="line" id="L73"><a href="#L73">   73</a>     let mut rank = 0;</span>
+<span class="line" id="L74"><a href="#L74">   74</a>     let mut ones = 0;</span>
+<span class="line" id="L75"><a href="#L75">   75</a>     let mut bit = 0;</span>
+<span class="line" id="L76"><a href="#L76">   76</a>     while bit &lt; 32 {</span>
+<span class="line" id="L77"><a href="#L77">   77</a>         if mask &gt;&gt; bit &amp; 1 == 1 {</span>
+<span class="line" id="L78"><a href="#L78">   78</a>             ones += 1;</span>
+<span class="line" id="L79"><a href="#L79">   79</a>             rank += binomial(bit, ones);</span>
+<span class="line" id="L80"><a href="#L80">   80</a>         }</span>
+<span class="line" id="L81"><a href="#L81">   81</a>         bit += 1;</span>
+<span class="line" id="L82"><a href="#L82">   82</a>     }</span>
+<span class="line" id="L83"><a href="#L83">   83</a>     rank</span>
+<span class="line" id="L84"><a href="#L84">   84</a> }</span>
+<span class="line" id="L85"><a href="#L85">   85</a> </span>
+<span class="line" id="L86"><a href="#L86">   86</a> /// E-slice mask -&gt; slot, and slot -&gt; mask: masks in descending order fill</span>
+<span class="line" id="L87"><a href="#L87">   87</a> /// slots 2..510, skipping slots 64k and 64k+1 (reserved for the group</span>
+<span class="line" id="L88"><a href="#L88">   88</a> /// minimum).</span>
+<span class="line" id="L89"><a href="#L89">   89</a> const fn eslot_tables() -&gt; ([u16; 4096], [u16; 512]) {</span>
+<span class="line" id="L90"><a href="#L90">   90</a>     let mut slot_of = [0xFFFFu16; 4096];</span>
+<span class="line" id="L91"><a href="#L91">   91</a>     let mut mask_of = [0u16; 512];</span>
+<span class="line" id="L92"><a href="#L92">   92</a>     let mut slot: u16 = 2;</span>
+<span class="line" id="L93"><a href="#L93">   93</a>     let mut mask: u16 = 4096;</span>
+<span class="line" id="L94"><a href="#L94">   94</a>     while mask &gt; 0 {</span>
+<span class="line" id="L95"><a href="#L95">   95</a>         mask -= 1;</span>
+<span class="line" id="L96"><a href="#L96">   96</a>         if mask.count_ones() == 4 {</span>
+<span class="line" id="L97"><a href="#L97">   97</a>             slot_of[mask as usize] = slot;</span>
+<span class="line" id="L98"><a href="#L98">   98</a>             mask_of[slot as usize] = mask;</span>
+<span class="line" id="L99"><a href="#L99">   99</a>             if (slot + 1).is_multiple_of(64) {</span>
+<span class="line" id="L100"><a href="#L100">  100</a>                 slot += 3;</span>
+<span class="line" id="L101"><a href="#L101">  101</a>             } else {</span>
+<span class="line" id="L102"><a href="#L102">  102</a>                 slot += 1;</span>
+<span class="line" id="L103"><a href="#L103">  103</a>             }</span>
+<span class="line" id="L104"><a href="#L104">  104</a>         }</span>
+<span class="line" id="L105"><a href="#L105">  105</a>     }</span>
+<span class="line" id="L106"><a href="#L106">  106</a>     (slot_of, mask_of)</span>
+<span class="line" id="L107"><a href="#L107">  107</a> }</span>
+<span class="line" id="L108"><a href="#L108">  108</a> const ESLOT_TABLES: ([u16; 4096], [u16; 512]) = eslot_tables();</span>
+<span class="line" id="L109"><a href="#L109">  109</a> </span>
+<span class="line" id="L110"><a href="#L110">  110</a> /// Rank (0..70) of each 8-bit mask with 4 set bits; 0xFF for other masks.</span>
+<span class="line" id="L111"><a href="#L111">  111</a> #[expect(</span>
+<span class="line" id="L112"><a href="#L112">  112</a>     clippy::cast_possible_truncation,</span>
+<span class="line" id="L113"><a href="#L113">  113</a>     reason = &quot;ranks of 8-bit masks are below 70 (no `try_from` in const fns)&quot;</span>
+<span class="line" id="L114"><a href="#L114">  114</a> )]</span>
+<span class="line" id="L115"><a href="#L115">  115</a> const fn rank8_table() -&gt; [u8; 256] {</span>
+<span class="line" id="L116"><a href="#L116">  116</a>     let mut table = [0u8; 256];</span>
+<span class="line" id="L117"><a href="#L117">  117</a>     let mut mask: u8 = 0;</span>
+<span class="line" id="L118"><a href="#L118">  118</a>     loop {</span>
+<span class="line" id="L119"><a href="#L119">  119</a>         table[mask as usize] = if mask.count_ones() == 4 {</span>
+<span class="line" id="L120"><a href="#L120">  120</a>             colex_rank(mask as u32) as u8</span>
+<span class="line" id="L121"><a href="#L121">  121</a>         } else {</span>
+<span class="line" id="L122"><a href="#L122">  122</a>             0xFF</span>
+<span class="line" id="L123"><a href="#L123">  123</a>         };</span>
+<span class="line" id="L124"><a href="#L124">  124</a>         if mask == u8::MAX {</span>
+<span class="line" id="L125"><a href="#L125">  125</a>             return table;</span>
+<span class="line" id="L126"><a href="#L126">  126</a>         }</span>
+<span class="line" id="L127"><a href="#L127">  127</a>         mask += 1;</span>
+<span class="line" id="L128"><a href="#L128">  128</a>     }</span>
+<span class="line" id="L129"><a href="#L129">  129</a> }</span>
+<span class="line" id="L130"><a href="#L130">  130</a> </span>
+<span class="line" id="L131"><a href="#L131">  131</a> /// The mask of each rank of `rank8_table`.</span>
+<span class="line" id="L132"><a href="#L132">  132</a> const fn unrank8_table() -&gt; [u8; 70] {</span>
+<span class="line" id="L133"><a href="#L133">  133</a>     let mut table = [0u8; 70];</span>
+<span class="line" id="L134"><a href="#L134">  134</a>     let mut mask: u8 = 0;</span>
+<span class="line" id="L135"><a href="#L135">  135</a>     loop {</span>
+<span class="line" id="L136"><a href="#L136">  136</a>         if mask.count_ones() == 4 {</span>
+<span class="line" id="L137"><a href="#L137">  137</a>             table[colex_rank(mask as u32) as usize] = mask;</span>
+<span class="line" id="L138"><a href="#L138">  138</a>         }</span>
+<span class="line" id="L139"><a href="#L139">  139</a>         if mask == u8::MAX {</span>
+<span class="line" id="L140"><a href="#L140">  140</a>             return table;</span>
+<span class="line" id="L141"><a href="#L141">  141</a>         }</span>
+<span class="line" id="L142"><a href="#L142">  142</a>         mask += 1;</span>
+<span class="line" id="L143"><a href="#L143">  143</a>     }</span>
+<span class="line" id="L144"><a href="#L144">  144</a> }</span>
+<span class="line" id="L145"><a href="#L145">  145</a> </span>
+<span class="line" id="L146"><a href="#L146">  146</a> /// Base-3 value of `n` corner orientations given as 2-bit fields (as</span>
+<span class="line" id="L147"><a href="#L147">  147</a> /// gathered by `pext`), times `scale`.</span>
+<span class="line" id="L148"><a href="#L148">  148</a> const fn co_rank_table(scale: u16, n: usize) -&gt; [u16; 256] {</span>
+<span class="line" id="L149"><a href="#L149">  149</a>     let mut table = [0u16; 256];</span>
+<span class="line" id="L150"><a href="#L150">  150</a>     let mut fields: u16 = 0;</span>
+<span class="line" id="L151"><a href="#L151">  151</a>     while fields &lt; (1 &lt;&lt; (2 * n)) {</span>
+<span class="line" id="L152"><a href="#L152">  152</a>         let mut rank = 0;</span>
+<span class="line" id="L153"><a href="#L153">  153</a>         let mut power = 1;</span>
+<span class="line" id="L154"><a href="#L154">  154</a>         let mut i = 0;</span>
+<span class="line" id="L155"><a href="#L155">  155</a>         while i &lt; n {</span>
+<span class="line" id="L156"><a href="#L156">  156</a>             rank += ((fields &gt;&gt; (2 * i)) &amp; 3) * power;</span>
+<span class="line" id="L157"><a href="#L157">  157</a>             power *= 3;</span>
+<span class="line" id="L158"><a href="#L158">  158</a>             i += 1;</span>
+<span class="line" id="L159"><a href="#L159">  159</a>         }</span>
+<span class="line" id="L160"><a href="#L160">  160</a>         table[fields as usize] = rank * scale;</span>
+<span class="line" id="L161"><a href="#L161">  161</a>         fields += 1;</span>
+<span class="line" id="L162"><a href="#L162">  162</a>     }</span>
+<span class="line" id="L163"><a href="#L163">  163</a>     table</span>
+<span class="line" id="L164"><a href="#L164">  164</a> }</span>
+<span class="line" id="L165"><a href="#L165">  165</a> </span>
+<span class="line" id="L166"><a href="#L166">  166</a> /// Compile-time copy of `ESLOT` (consts cannot read statics).</span>
+<span class="line" id="L167"><a href="#L167">  167</a> pub(crate) const ESLOT_CONST: [u16; 4096] = ESLOT_TABLES.0;</span>
+<span class="line" id="L168"><a href="#L168">  168</a> /// Compile-time copy of `RANK8`.</span>
+<span class="line" id="L169"><a href="#L169">  169</a> pub(crate) const RANK8_CONST: [u8; 256] = rank8_table();</span>
+<span class="line" id="L170"><a href="#L170">  170</a> /// eslot of each E-slice position mask (12 bits).</span>
+<span class="line" id="L171"><a href="#L171">  171</a> pub static ESLOT: [u16; 4096] = ESLOT_CONST;</span>
+<span class="line" id="L172"><a href="#L172">  172</a> /// E-slice position mask of each eslot.</span>
+<span class="line" id="L173"><a href="#L173">  173</a> pub static SLOT_EMASK: [u16; 512] = ESLOT_TABLES.1;</span>
+<span class="line" id="L174"><a href="#L174">  174</a> /// Rank of each 8-bit mask with 4 set bits (tetrads, msplit).</span>
+<span class="line" id="L175"><a href="#L175">  175</a> pub static RANK8: [u8; 256] = RANK8_CONST;</span>
+<span class="line" id="L176"><a href="#L176">  176</a> /// Inverse of `RANK8`.</span>
+<span class="line" id="L177"><a href="#L177">  177</a> pub static UNRANK8: [u8; 70] = unrank8_table();</span>
+<span class="line" id="L178"><a href="#L178">  178</a> </span>
+<span class="line" id="L179"><a href="#L179">  179</a> /// `co_rank_table` pre-multiplied by `N_CSEP` (saves a multiply on the</span>
+<span class="line" id="L180"><a href="#L180">  180</a> /// cube -&gt; cocsep data dependency chain; part of m1-micro&#x27;s +2.2% at 48T).</span>
+<span class="line" id="L181"><a href="#L181">  181</a> #[expect(</span>
+<span class="line" id="L182"><a href="#L182">  182</a>     clippy::cast_possible_truncation,</span>
+<span class="line" id="L183"><a href="#L183">  183</a>     reason = &quot;`N_CSEP` is 70 (no `try_from` in const fns)&quot;</span>
+<span class="line" id="L184"><a href="#L184">  184</a> )]</span>
+<span class="line" id="L185"><a href="#L185">  185</a> const fn co_rank_table_x70(scale: u32, n: usize) -&gt; [u32; 256] {</span>
+<span class="line" id="L186"><a href="#L186">  186</a>     let ranks = co_rank_table(1, n);</span>
+<span class="line" id="L187"><a href="#L187">  187</a>     let mut table = [0u32; 256];</span>
+<span class="line" id="L188"><a href="#L188">  188</a>     let mut i = 0;</span>
+<span class="line" id="L189"><a href="#L189">  189</a>     while i &lt; 256 {</span>
+<span class="line" id="L190"><a href="#L190">  190</a>         table[i] = ranks[i] as u32 * scale * N_CSEP as u32;</span>
+<span class="line" id="L191"><a href="#L191">  191</a>         i += 1;</span>
+<span class="line" id="L192"><a href="#L192">  192</a>     }</span>
+<span class="line" id="L193"><a href="#L193">  193</a>     table</span>
+<span class="line" id="L194"><a href="#L194">  194</a> }</span>
+<span class="line" id="L195"><a href="#L195">  195</a> /// cocsep part of the orientations of corners 0..4.</span>
+<span class="line" id="L196"><a href="#L196">  196</a> pub(crate) const CO_LOW: [u32; 256] = co_rank_table_x70(1, 4);</span>
+<span class="line" id="L197"><a href="#L197">  197</a> /// cocsep part of the orientations of corners 4..7 (3^4 times higher).</span>
+<span class="line" id="L198"><a href="#L198">  198</a> pub(crate) const CO_HIGH: [u32; 64] = {</span>
+<span class="line" id="L199"><a href="#L199">  199</a>     let full = co_rank_table_x70(81, 3);</span>
+<span class="line" id="L200"><a href="#L200">  200</a>     let mut table = [0u32; 64];</span>
+<span class="line" id="L201"><a href="#L201">  201</a>     let mut i = 0;</span>
+<span class="line" id="L202"><a href="#L202">  202</a>     while i &lt; 64 {</span>
+<span class="line" id="L203"><a href="#L203">  203</a>         table[i] = full[i];</span>
+<span class="line" id="L204"><a href="#L204">  204</a>         i += 1;</span>
+<span class="line" id="L205"><a href="#L205">  205</a>     }</span>
+<span class="line" id="L206"><a href="#L206">  206</a>     table</span>
+<span class="line" id="L207"><a href="#L207">  207</a> };</span>
+<span class="line" id="L208"><a href="#L208">  208</a> </span>
+<span class="line" id="L209"><a href="#L209">  209</a> /// The corner bits of a cube: the orientations of corners 0..7 (2 bits</span>
+<span class="line" id="L210"><a href="#L210">  210</a> /// each, 14 bits) and the tetrad mask (8 bits), by two `pext`s.</span>
+<span class="line" id="L211"><a href="#L211">  211</a> #[cfg(backend = &quot;x86&quot;)]</span>
+<span class="line" id="L212"><a href="#L212">  212</a> #[inline(always)]</span>
+<span class="line" id="L213"><a href="#L213">  213</a> fn corner_fields(cube: Cube) -&gt; (u64, u64) {</span>
+<span class="line" id="L214"><a href="#L214">  214</a>     let corners = cube.corners_u64();</span>
+<span class="line" id="L215"><a href="#L215">  215</a>     let (co_fields, tetrads): (u64, u64);</span>
+<span class="line" id="L216"><a href="#L216">  216</a>     unsafe {</span>
+<span class="line" id="L217"><a href="#L217">  217</a>         let tabs = &amp;crate::simd::HOT_TABLES;</span>
+<span class="line" id="L218"><a href="#L218">  218</a>         // (Miri cannot run inline asm: the same pexts as intrinsics.)</span>
+<span class="line" id="L219"><a href="#L219">  219</a>         #[cfg(miri)]</span>
+<span class="line" id="L220"><a href="#L220">  220</a>         {</span>
+<span class="line" id="L221"><a href="#L221">  221</a>             co_fields = _pext_u64(corners, tabs.co_pext_mask);</span>
+<span class="line" id="L222"><a href="#L222">  222</a>             tetrads = _pext_u64(corners, tabs.tetrad_pext_mask);</span>
+<span class="line" id="L223"><a href="#L223">  223</a>         }</span>
+<span class="line" id="L224"><a href="#L224">  224</a>         // (The masks are memory operands: no 64-bit immediates to load;</span>
+<span class="line" id="L225"><a href="#L225">  225</a>         // +1.7% when added, part of m4-micro&#x27;s +7.7% at 48T.)</span>
+<span class="line" id="L226"><a href="#L226">  226</a>         #[cfg(not(miri))]</span>
+<span class="line" id="L227"><a href="#L227">  227</a>         std::arch::asm!(</span>
+<span class="line" id="L228"><a href="#L228">  228</a>             &quot;pext {co2}, {x}, qword ptr [{t} + {oc}]&quot;,</span>
+<span class="line" id="L229"><a href="#L229">  229</a>             &quot;pext {sep}, {x}, qword ptr [{t} + {os}]&quot;,</span>
+<span class="line" id="L230"><a href="#L230">  230</a>             co2 = out(reg) co_fields,</span>
+<span class="line" id="L231"><a href="#L231">  231</a>             sep = lateout(reg) tetrads,</span>
+<span class="line" id="L232"><a href="#L232">  232</a>             x = in(reg) corners,</span>
+<span class="line" id="L233"><a href="#L233">  233</a>             t = in(reg) tabs,</span>
+<span class="line" id="L234"><a href="#L234">  234</a>             oc = const std::mem::offset_of!(crate::simd::HotTables, co_pext_mask),</span>
+<span class="line" id="L235"><a href="#L235">  235</a>             os = const std::mem::offset_of!(crate::simd::HotTables, tetrad_pext_mask),</span>
+<span class="line" id="L236"><a href="#L236">  236</a>             options(pure, readonly, nostack, preserves_flags)</span>
+<span class="line" id="L237"><a href="#L237">  237</a>         );</span>
+<span class="line" id="L238"><a href="#L238">  238</a>         // (A range hint, not an index here: the lookups of `cocsep` and</span>
+<span class="line" id="L239"><a href="#L239">  239</a>         // `cocsep_x3` are unchecked already.)</span>
+<span class="line" id="L240"><a href="#L240">  240</a>         std::hint::assert_unchecked(co_fields &lt; 1 &lt;&lt; 14 &amp;&amp; tetrads &lt; 1 &lt;&lt; 8);</span>
+<span class="line" id="L241"><a href="#L241">  241</a>     }</span>
+<span class="line" id="L242"><a href="#L242">  242</a>     (co_fields, tetrads)</span>
+<span class="line" id="L243"><a href="#L243">  243</a> }</span>
+<span class="line" id="L244"><a href="#L244">  244</a> </span>
+<span class="line" id="L245"><a href="#L245">  245</a> /// cocsep coordinate in 0..153090.</span>
+<span class="line" id="L246"><a href="#L246">  246</a> #[must_use]</span>
+<span class="line" id="L247"><a href="#L247">  247</a> #[inline(always)]</span>
+<span class="line" id="L248"><a href="#L248">  248</a> #[expect(</span>
+<span class="line" id="L249"><a href="#L249">  249</a>     clippy::cast_possible_truncation,</span>
+<span class="line" id="L250"><a href="#L250">  250</a>     reason = &quot;hot path: `usize` is 64 bits and the pext results are below 2^14&quot;</span>
+<span class="line" id="L251"><a href="#L251">  251</a> )]</span>
+<span class="line" id="L252"><a href="#L252">  252</a> pub fn cocsep(cube: Cube) -&gt; usize {</span>
+<span class="line" id="L253"><a href="#L253">  253</a>     let (co_fields, tetrads) = corner_fields(cube);</span>
+<span class="line" id="L254"><a href="#L254">  254</a>     unsafe {</span>
+<span class="line" id="L255"><a href="#L255">  255</a>         let tabs = &amp;crate::simd::HOT_TABLES;</span>
+<span class="line" id="L256"><a href="#L256">  256</a>         (*tabs.co_low.get_unchecked((co_fields &amp; 0xFF) as usize)</span>
+<span class="line" id="L257"><a href="#L257">  257</a>             + *tabs.co_high.get_unchecked((co_fields &gt;&gt; 8) as usize)</span>
+<span class="line" id="L258"><a href="#L258">  258</a>             + u32::from(*tabs.rank8.get_unchecked(tetrads as usize))) as usize</span>
+<span class="line" id="L259"><a href="#L259">  259</a>     }</span>
+<span class="line" id="L260"><a href="#L260">  260</a> }</span>
+<span class="line" id="L261"><a href="#L261">  261</a> </span>
+<span class="line" id="L262"><a href="#L262">  262</a> /// `3 * cocsep(cube)` (the byte offset of its packed entry), from tables</span>
+<span class="line" id="L263"><a href="#L263">  263</a> /// scaled by 3 (no multiply on the index path; part of m6-micro&#x27;s index</span>
+<span class="line" id="L264"><a href="#L264">  264</a> /// patch: +0.7% at 1T, -0.4% at 48T).</span>
+<span class="line" id="L265"><a href="#L265">  265</a> #[must_use]</span>
+<span class="line" id="L266"><a href="#L266">  266</a> #[inline(always)]</span>
+<span class="line" id="L267"><a href="#L267">  267</a> #[expect(</span>
+<span class="line" id="L268"><a href="#L268">  268</a>     clippy::cast_possible_truncation,</span>
+<span class="line" id="L269"><a href="#L269">  269</a>     reason = &quot;hot path: `usize` is 64 bits and the pext results are below 2^14&quot;</span>
+<span class="line" id="L270"><a href="#L270">  270</a> )]</span>
+<span class="line" id="L271"><a href="#L271">  271</a> pub fn cocsep_x3(cube: Cube) -&gt; usize {</span>
+<span class="line" id="L272"><a href="#L272">  272</a>     let (co_fields, tetrads) = corner_fields(cube);</span>
+<span class="line" id="L273"><a href="#L273">  273</a>     unsafe {</span>
+<span class="line" id="L274"><a href="#L274">  274</a>         let tabs = &amp;crate::simd::HOT_TABLES;</span>
+<span class="line" id="L275"><a href="#L275">  275</a>         (*tabs.co_low_x3.get_unchecked((co_fields &amp; 0xFF) as usize)</span>
+<span class="line" id="L276"><a href="#L276">  276</a>             + *tabs.co_high_x3.get_unchecked((co_fields &gt;&gt; 8) as usize)</span>
+<span class="line" id="L277"><a href="#L277">  277</a>             + u32::from(*tabs.tetrads_x3.get_unchecked(tetrads as usize))) as usize</span>
+<span class="line" id="L278"><a href="#L278">  278</a>     }</span>
+<span class="line" id="L279"><a href="#L279">  279</a> }</span>
+<span class="line" id="L280"><a href="#L280">  280</a> </span>
+<span class="line" id="L281"><a href="#L281">  281</a> /// Edge masks: (E-slice positions, S-slice positions, flipped edges), 12</span>
+<span class="line" id="L282"><a href="#L282">  282</a> /// bits each.</span>
+<span class="line" id="L283"><a href="#L283">  283</a> #[cfg(backend = &quot;x86&quot;)]</span>
+<span class="line" id="L284"><a href="#L284">  284</a> #[must_use]</span>
+<span class="line" id="L285"><a href="#L285">  285</a> #[inline(always)]</span>
+<span class="line" id="L286"><a href="#L286">  286</a> pub fn edge_masks(cube: Cube) -&gt; (u32, u32, u32) {</span>
+<span class="line" id="L287"><a href="#L287">  287</a>     // (Shifting a bit of each byte into the top bit lets `movemask` gather</span>
+<span class="line" id="L288"><a href="#L288">  288</a>     // it; edges are bytes 16..28.)</span>
+<span class="line" id="L289"><a href="#L289">  289</a>     let mask = |bits: i32| (bits.cast_unsigned() &gt;&gt; 16) &amp; 0xFFF;</span>
+<span class="line" id="L290"><a href="#L290">  290</a>     unsafe {</span>
+<span class="line" id="L291"><a href="#L291">  291</a>         (</span>
+<span class="line" id="L292"><a href="#L292">  292</a>             mask(_mm256_movemask_epi8(_mm256_slli_epi16(cube.0, 4))),</span>
+<span class="line" id="L293"><a href="#L293">  293</a>             mask(_mm256_movemask_epi8(_mm256_slli_epi16(cube.0, 5))),</span>
+<span class="line" id="L294"><a href="#L294">  294</a>             mask(_mm256_movemask_epi8(_mm256_slli_epi16(cube.0, 3))),</span>
+<span class="line" id="L295"><a href="#L295">  295</a>         )</span>
+<span class="line" id="L296"><a href="#L296">  296</a>     }</span>
+<span class="line" id="L297"><a href="#L297">  297</a> }</span>
+<span class="line" id="L298"><a href="#L298">  298</a> </span>
+<span class="line" id="L299"><a href="#L299">  299</a> /// Edge part of the h11 key of an (already transformed) cube:</span>
+<span class="line" id="L300"><a href="#L300">  300</a> /// `(msplit &lt;&lt; 20) | (eo11 &lt;&lt; 9) | eslot`.</span>
+<span class="line" id="L301"><a href="#L301">  301</a> #[must_use]</span>
+<span class="line" id="L302"><a href="#L302">  302</a> #[inline(always)]</span>
+<span class="line" id="L303"><a href="#L303">  303</a> #[cfg_attr(not(backend = &quot;x86&quot;), allow(unused_unsafe))]</span>
+<span class="line" id="L304"><a href="#L304">  304</a> pub fn edge_key(cube: Cube) -&gt; u64 {</span>
+<span class="line" id="L305"><a href="#L305">  305</a>     let (e_slice, s_slice, flips) = edge_masks(cube);</span>
+<span class="line" id="L306"><a href="#L306">  306</a>     unsafe {</span>
+<span class="line" id="L307"><a href="#L307">  307</a>         // (msplit ranks the S-slice positions among the non-E positions.)</span>
+<span class="line" id="L308"><a href="#L308">  308</a>         #[cfg(backend = &quot;x86&quot;)]</span>
+<span class="line" id="L309"><a href="#L309">  309</a>         let s_among_non_e = _pext_u32(s_slice, !e_slice &amp; 0xFFF);</span>
+<span class="line" id="L310"><a href="#L310">  310</a>         #[cfg(not(backend = &quot;x86&quot;))]</span>
+<span class="line" id="L311"><a href="#L311">  311</a>         let s_among_non_e = pext12(s_slice, !e_slice &amp; 0xFFF);</span>
+<span class="line" id="L312"><a href="#L312">  312</a>         let msplit = u64::from(RANK8[s_among_non_e as usize]);</span>
+<span class="line" id="L313"><a href="#L313">  313</a>         let eslot = u64::from(ESLOT[e_slice as usize]);</span>
+<span class="line" id="L314"><a href="#L314">  314</a>         (msplit &lt;&lt; 20) | (u64::from(flips &gt;&gt; 1) &lt;&lt; 9) | eslot</span>
+<span class="line" id="L315"><a href="#L315">  315</a>     }</span>
+<span class="line" id="L316"><a href="#L316">  316</a> }</span>
+<span class="line" id="L317"><a href="#L317">  317</a> </span>
+<span class="line" id="L318"><a href="#L318">  318</a> /// Edge part of the h11 key of `cube` conjugated by symmetry `sym`; equals</span>
+<span class="line" id="L319"><a href="#L319">  319</a> /// `edge_key(cube.transform_edges(sym))`. Only the edge classes and</span>
+<span class="line" id="L320"><a href="#L320">  320</a> /// orientations of the conjugate are built: one shuffle classifies each</span>
+<span class="line" id="L321"><a href="#L321">  321</a> /// piece `p` as `T[p]` (E/S flags, eo of T), xor adds the cube&#x27;s eo and</span>
+<span class="line" id="L322"><a href="#L322">  322</a> /// Tinv&#x27;s (by source position: one three-way xor), and a second shuffle</span>
+<span class="line" id="L323"><a href="#L323">  323</a> /// applies the position permutation `Tinv`. (Instead of a full</span>
+<span class="line" id="L324"><a href="#L324">  324</a> /// conjugation: +5.5% at 48T when added, edge-conj.)</span>
+<span class="line" id="L325"><a href="#L325">  325</a> #[must_use]</span>
+<span class="line" id="L326"><a href="#L326">  326</a> #[inline(always)]</span>
+<span class="line" id="L327"><a href="#L327">  327</a> pub fn edge_key_sym(cube: Cube, sym: usize) -&gt; Option&lt;u64&gt; {</span>
+<span class="line" id="L328"><a href="#L328">  328</a>     let (msplit, eo11, eslot) = edge_parts_sym(cube, sym)?;</span>
+<span class="line" id="L329"><a href="#L329">  329</a>     Some((msplit &lt;&lt; 20) | (eo11 &lt;&lt; 9) | eslot)</span>
+<span class="line" id="L330"><a href="#L330">  330</a> }</span>
+<span class="line" id="L331"><a href="#L331">  331</a> </span>
+<span class="line" id="L332"><a href="#L332">  332</a> /// (msplit, eo11, eslot) of `cube` conjugated by `sym` (see `edge_key_sym`).</span>
+<span class="line" id="L333"><a href="#L333">  333</a> #[must_use]</span>
+<span class="line" id="L334"><a href="#L334">  334</a> #[inline(always)]</span>
+<span class="line" id="L335"><a href="#L335">  335</a> pub fn edge_parts_sym(cube: Cube, sym: usize) -&gt; Option&lt;(u64, u64, u64)&gt; {</span>
+<span class="line" id="L336"><a href="#L336">  336</a>     if sym &gt;= 48 {</span>
+<span class="line" id="L337"><a href="#L337">  337</a>         return None;</span>
+<span class="line" id="L338"><a href="#L338">  338</a>     }</span>
+<span class="line" id="L339"><a href="#L339">  339</a>     let (msplit, eo_bits, eslot) = edge_parts_sym_raw(cube, sym);</span>
+<span class="line" id="L340"><a href="#L340">  340</a>     Some((msplit, u64::from(eo_bits &gt;&gt; 17), eslot))</span>
+<span class="line" id="L341"><a href="#L341">  341</a> }</span>
+<span class="line" id="L342"><a href="#L342">  342</a> </span>
+<span class="line" id="L343"><a href="#L343">  343</a> /// `edge_parts_sym` with the eo part unshifted: the eo of edges 0..11 in</span>
+<span class="line" id="L344"><a href="#L344">  344</a> /// bits 16..28 (all else zero).</span>
+<span class="line" id="L345"><a href="#L345">  345</a> #[cfg(backend = &quot;x86&quot;)]</span>
+<span class="line" id="L346"><a href="#L346">  346</a> #[expect(</span>
+<span class="line" id="L347"><a href="#L347">  347</a>     clippy::cast_possible_truncation,</span>
+<span class="line" id="L348"><a href="#L348">  348</a>     reason = &quot;x86-64: the u64 pext result indexes a 256-entry table&quot;</span>
+<span class="line" id="L349"><a href="#L349">  349</a> )]</span>
+<span class="line" id="L350"><a href="#L350">  350</a> #[inline(always)]</span>
+<span class="line" id="L351"><a href="#L351">  351</a> fn edge_parts_sym_raw(cube: Cube, sym: usize) -&gt; (u64, u32, u64) {</span>
+<span class="line" id="L352"><a href="#L352">  352</a>     unsafe {</span>
+<span class="line" id="L353"><a href="#L353">  353</a>         let tabs = &amp;crate::simd::HOT_TABLES;</span>
+<span class="line" id="L354"><a href="#L354">  354</a>         let entry = tabs.sym_edges.get_unchecked(sym);</span>
+<span class="line" id="L355"><a href="#L355">  355</a>         let classify = crate::simd::load(&amp;entry.classes);</span>
+<span class="line" id="L356"><a href="#L356">  356</a>         let positions = crate::simd::load(&amp;entry.perm);</span>
+<span class="line" id="L357"><a href="#L357">  357</a>         // Tinv&#x27;s eo (by source position) is folded into the xor that adds</span>
+<span class="line" id="L358"><a href="#L358">  358</a>         // the cube&#x27;s eo: one vpternlog, and no xor after the position</span>
+<span class="line" id="L359"><a href="#L359">  359</a>         // shuffle (part of m7&#x27;s µop stack: +1.5% at 1T averaged over code</span>
+<span class="line" id="L360"><a href="#L360">  360</a>         // offsets, even at 48T).</span>
+<span class="line" id="L361"><a href="#L361">  361</a>         let position_eo = crate::simd::load(&amp;entry.perm_eo);</span>
+<span class="line" id="L362"><a href="#L362">  362</a>         let classes = _mm256_xor_si256(</span>
+<span class="line" id="L363"><a href="#L363">  363</a>             _mm256_xor_si256(_mm256_shuffle_epi8(classify, cube.0), cube.0),</span>
+<span class="line" id="L364"><a href="#L364">  364</a>             position_eo,</span>
+<span class="line" id="L365"><a href="#L365">  365</a>         );</span>
+<span class="line" id="L366"><a href="#L366">  366</a>         let conj = _mm256_shuffle_epi8(classes, positions);</span>
+<span class="line" id="L367"><a href="#L367">  367</a>         // Masks of edge positions 0..12, in bits 16..28 (all else zero).</span>
+<span class="line" id="L368"><a href="#L368">  368</a>         let e_mask = _mm256_movemask_epi8(conj).cast_unsigned();</span>
+<span class="line" id="L369"><a href="#L369">  369</a>         // asm: LLVM would turn movemask(conj + conj) into vptestmb + kmovd,</span>
+<span class="line" id="L370"><a href="#L370">  370</a>         // which is ~1.5 cycles longer on Zen 5 (this mask feeds the pext;</span>
+<span class="line" id="L371"><a href="#L371">  371</a>         // part of m1-micro&#x27;s +2.2% at 48T).</span>
+<span class="line" id="L372"><a href="#L372">  372</a>         let doubled = _mm256_add_epi8(conj, conj);</span>
+<span class="line" id="L373"><a href="#L373">  373</a>         // (A 64-bit output: the 32-bit write zero-extends, and the 64-bit</span>
+<span class="line" id="L374"><a href="#L374">  374</a>         // pext below then needs no zero extension of `s_mask`.)</span>
+<span class="line" id="L375"><a href="#L375">  375</a>         let s_mask: u64;</span>
+<span class="line" id="L376"><a href="#L376">  376</a>         #[cfg(miri)]</span>
+<span class="line" id="L377"><a href="#L377">  377</a>         {</span>
+<span class="line" id="L378"><a href="#L378">  378</a>             s_mask = u64::from(_mm256_movemask_epi8(doubled).cast_unsigned());</span>
+<span class="line" id="L379"><a href="#L379">  379</a>         }</span>
+<span class="line" id="L380"><a href="#L380">  380</a>         #[cfg(not(miri))]</span>
+<span class="line" id="L381"><a href="#L381">  381</a>         std::arch::asm!(&quot;vpmovmskb {s:e}, {zz}&quot;, s = out(reg) s_mask, zz = in(ymm_reg) doubled,</span>
+<span class="line" id="L382"><a href="#L382">  382</a>             options(pure, nomem, nostack, preserves_flags));</span>
+<span class="line" id="L383"><a href="#L383">  383</a>         let eo_bits = _mm256_movemask_epi8(_mm256_slli_epi16(conj, 3)).cast_unsigned();</span>
+<span class="line" id="L384"><a href="#L384">  384</a>         // The non-E positions (`e_mask` is within bits 16..28): the mask of</span>
+<span class="line" id="L385"><a href="#L385">  385</a>         // the pext, and (shifted) the index of the complemented eslot</span>
+<span class="line" id="L386"><a href="#L386">  386</a>         // table, which saves a copy of `e_mask`.</span>
+<span class="line" id="L387"><a href="#L387">  387</a>         let non_e = e_mask ^ 0x0FFF_0000;</span>
+<span class="line" id="L388"><a href="#L388">  388</a>         // (64-bit pext: no zero extension of the index.)</span>
+<span class="line" id="L389"><a href="#L389">  389</a>         let msplit = u64::from(</span>
+<span class="line" id="L390"><a href="#L390">  390</a>             *tabs</span>
+<span class="line" id="L391"><a href="#L391">  391</a>                 .rank8</span>
+<span class="line" id="L392"><a href="#L392">  392</a>                 .get_unchecked(_pext_u64(s_mask, u64::from(non_e)) as usize),</span>
+<span class="line" id="L393"><a href="#L393">  393</a>         );</span>
+<span class="line" id="L394"><a href="#L394">  394</a>         let eslot = u64::from(*tabs.eslot_complement.get_unchecked((non_e &gt;&gt; 16) as usize));</span>
+<span class="line" id="L395"><a href="#L395">  395</a>         (msplit, eo_bits, eslot)</span>
+<span class="line" id="L396"><a href="#L396">  396</a>     }</span>
+<span class="line" id="L397"><a href="#L397">  397</a> }</span>
+<span class="line" id="L398"><a href="#L398">  398</a> </span>
+<span class="line" id="L399"><a href="#L399">  399</a> /// `index_from_parts(class, edge_parts_sym(cube, sym), k)`, with the shifts</span>
+<span class="line" id="L400"><a href="#L400">  400</a> /// by `k` done as a multiply by `row_mul` = `1 &lt;&lt; (k + 9)` and a pext by</span>
+<span class="line" id="L401"><a href="#L401">  401</a> /// `eo_mask` = the top `k` eo bits, `((1 &lt;&lt; k) - 1) &lt;&lt; (28 - k)` (memory</span>
+<span class="line" id="L402"><a href="#L402">  402</a> /// operands: no variable shift counts to keep in registers). (The index</span>
+<span class="line" id="L403"><a href="#L403">  403</a> /// straight from the parts: part of packed-cocsep&#x27;s +2.8% at 48T; the</span>
+<span class="line" id="L404"><a href="#L404">  404</a> /// multiply and pext: part of m6-micro&#x27;s index patch.)</span>
+<span class="line" id="L405"><a href="#L405">  405</a> #[must_use]</span>
+<span class="line" id="L406"><a href="#L406">  406</a> #[inline(always)]</span>
+<span class="line" id="L407"><a href="#L407">  407</a> pub(crate) fn index_sym(cube: Cube, sym: usize, class: usize, row_mul: u64, eo_mask: u32) -&gt; u64 {</span>
+<span class="line" id="L408"><a href="#L408">  408</a>     let (msplit, eo_bits, eslot) = edge_parts_sym_raw(cube, sym);</span>
+<span class="line" id="L409"><a href="#L409">  409</a>     let row = class as u64 * N_MSPLIT as u64 + msplit;</span>
+<span class="line" id="L410"><a href="#L410">  410</a>     #[cfg(backend = &quot;x86&quot;)]</span>
+<span class="line" id="L411"><a href="#L411">  411</a>     let eo = u64::from(unsafe { _pext_u32(eo_bits, eo_mask) });</span>
+<span class="line" id="L412"><a href="#L412">  412</a>     #[cfg(not(backend = &quot;x86&quot;))]</span>
+<span class="line" id="L413"><a href="#L413">  413</a>     let eo = u64::from(pext_contiguous(eo_bits, eo_mask));</span>
+<span class="line" id="L414"><a href="#L414">  414</a>     (row * row_mul) | (eo &lt;&lt; 9) | eslot</span>
+<span class="line" id="L415"><a href="#L415">  415</a> }</span>
+<span class="line" id="L416"><a href="#L416">  416</a> </span>
+<span class="line" id="L417"><a href="#L417">  417</a> /// hk index of class `class` and edge parts `(msplit, eo11, eslot)`; equals</span>
+<span class="line" id="L418"><a href="#L418">  418</a> /// `reduce_key((class * 70 + msplit) &lt;&lt; 20 | eo11 &lt;&lt; 9 | eslot, k)` but with</span>
+<span class="line" id="L419"><a href="#L419">  419</a> /// a shorter dependency chain from msplit.</span>
+<span class="line" id="L420"><a href="#L420">  420</a> #[must_use]</span>
+<span class="line" id="L421"><a href="#L421">  421</a> #[inline(always)]</span>
+<span class="line" id="L422"><a href="#L422">  422</a> pub fn index_from_parts(class: usize, parts: (u64, u64, u64), k: u32) -&gt; u64 {</span>
+<span class="line" id="L423"><a href="#L423">  423</a>     let (msplit, eo11, eslot) = parts;</span>
+<span class="line" id="L424"><a href="#L424">  424</a>     let row = class as u64 * N_MSPLIT as u64 + msplit;</span>
+<span class="line" id="L425"><a href="#L425">  425</a>     (row &lt;&lt; (k + 9)) | ((eo11 &gt;&gt; (11 - k)) &lt;&lt; 9) | eslot</span>
+<span class="line" id="L426"><a href="#L426">  426</a> }</span>
+<span class="line" id="L427"><a href="#L427">  427</a> </span>
+<span class="line" id="L428"><a href="#L428">  428</a> /// Full h11 key from a corner class and transformed edges.</span>
+<span class="line" id="L429"><a href="#L429">  429</a> #[must_use]</span>
+<span class="line" id="L430"><a href="#L430">  430</a> #[inline(always)]</span>
+<span class="line" id="L431"><a href="#L431">  431</a> pub fn h11_key(class: usize, edges: Cube) -&gt; u64 {</span>
+<span class="line" id="L432"><a href="#L432">  432</a>     ((class as u64 * N_MSPLIT as u64) &lt;&lt; 20) + edge_key(edges)</span>
+<span class="line" id="L433"><a href="#L433">  433</a> }</span>
+<span class="line" id="L434"><a href="#L434">  434</a> </span>
+<span class="line" id="L435"><a href="#L435">  435</a> /// Reduce an h11 key to an hk index (drop the low `11 - k` eo bits).</span>
+<span class="line" id="L436"><a href="#L436">  436</a> #[must_use]</span>
+<span class="line" id="L437"><a href="#L437">  437</a> #[inline(always)]</span>
+<span class="line" id="L438"><a href="#L438">  438</a> pub fn reduce_key(key: u64, k: u32) -&gt; u64 {</span>
+<span class="line" id="L439"><a href="#L439">  439</a>     ((key &gt;&gt; (11 - k)) &amp; !0x1FF) | (key &amp; 0x1FF)</span>
+<span class="line" id="L440"><a href="#L440">  440</a> }</span>
+<span class="line" id="L441"><a href="#L441">  441</a> </span>
+<span class="line" id="L442"><a href="#L442">  442</a> /// Inverse of `reduce_key` for k in {0, 11}: (class, h11 edge key).</span>
+<span class="line" id="L443"><a href="#L443">  443</a> #[must_use]</span>
+<span class="line" id="L444"><a href="#L444">  444</a> #[inline(always)]</span>
+<span class="line" id="L445"><a href="#L445">  445</a> pub fn split_index(index: u64, k: u32) -&gt; (usize, u64) {</span>
+<span class="line" id="L446"><a href="#L446">  446</a>     let eslot = index &amp; 0x1FF;</span>
+<span class="line" id="L447"><a href="#L447">  447</a>     let rest = index &gt;&gt; 9;</span>
+<span class="line" id="L448"><a href="#L448">  448</a>     let eo = (rest &amp; u64::MAX.unbounded_shr(64 - k)) &lt;&lt; (11 - k);</span>
+<span class="line" id="L449"><a href="#L449">  449</a>     let row = rest &gt;&gt; k;</span>
+<span class="line" id="L450"><a href="#L450">  450</a>     let class = (row / N_MSPLIT as u64) as usize;</span>
+<span class="line" id="L451"><a href="#L451">  451</a>     let msplit = row % N_MSPLIT as u64;</span>
+<span class="line" id="L452"><a href="#L452">  452</a>     (class, (msplit &lt;&lt; 20) | (eo &lt;&lt; 9) | eslot)</span>
+<span class="line" id="L453"><a href="#L453">  453</a> }</span>
+<span class="line" id="L454"><a href="#L454">  454</a> </span>
+<span class="line" id="L455"><a href="#L455">  455</a> /// A cube with the corners of `corners` and the edges of an h11 edge key:</span>
+<span class="line" id="L456"><a href="#L456">  456</a> /// some cube of that coordinate.</span>
+<span class="line" id="L457"><a href="#L457">  457</a> #[must_use]</span>
+<span class="line" id="L458"><a href="#L458">  458</a> pub fn cube_from_edge_key(corners: Cube, edge_key: u64) -&gt; Option&lt;Cube&gt; {</span>
+<span class="line" id="L459"><a href="#L459">  459</a>     let eslot = (edge_key &amp; 0x1FF) as usize;</span>
+<span class="line" id="L460"><a href="#L460">  460</a>     if edge_key &gt;&gt; 20 &gt;= N_MSPLIT as u64 || SLOT_EMASK[eslot] == 0 {</span>
+<span class="line" id="L461"><a href="#L461">  461</a>         return None;</span>
+<span class="line" id="L462"><a href="#L462">  462</a>     }</span>
+<span class="line" id="L463"><a href="#L463">  463</a>     Some(cube_from_edge_key_internal(corners, edge_key))</span>
+<span class="line" id="L464"><a href="#L464">  464</a> }</span>
+<span class="line" id="L465"><a href="#L465">  465</a> </span>
+<span class="line" id="L466"><a href="#L466">  466</a> /// Internal inverse for an existing coordinate (a real slot, msplit &lt; 70).</span>
+<span class="line" id="L467"><a href="#L467">  467</a> pub(crate) fn cube_from_edge_key_internal(corners: Cube, edge_key: u64) -&gt; Cube {</span>
+<span class="line" id="L468"><a href="#L468">  468</a>     let eslot = (edge_key &amp; 0x1FF) as usize;</span>
+<span class="line" id="L469"><a href="#L469">  469</a>     let eo11 = ((edge_key &gt;&gt; 9) &amp; 0x7FF) as u32;</span>
+<span class="line" id="L470"><a href="#L470">  470</a>     let msplit = (edge_key &gt;&gt; 20) as usize;</span>
+<span class="line" id="L471"><a href="#L471">  471</a>     let e_slice = u32::from(SLOT_EMASK[eslot]);</span>
+<span class="line" id="L472"><a href="#L472">  472</a>     #[cfg(backend = &quot;x86&quot;)]</span>
+<span class="line" id="L473"><a href="#L473">  473</a>     let s_slice = unsafe { _pdep_u32(u32::from(UNRANK8[msplit]), !e_slice &amp; 0xFFF) };</span>
+<span class="line" id="L474"><a href="#L474">  474</a>     #[cfg(not(backend = &quot;x86&quot;))]</span>
+<span class="line" id="L475"><a href="#L475">  475</a>     let s_slice = pdep12(u32::from(UNRANK8[msplit]), !e_slice &amp; 0xFFF);</span>
+<span class="line" id="L476"><a href="#L476">  476</a>     // (The 12th flip makes the number of flips even.)</span>
+<span class="line" id="L477"><a href="#L477">  477</a>     let eo12 = (eo11 &lt;&lt; 1) | (eo11.count_ones() &amp; 1);</span>
+<span class="line" id="L478"><a href="#L478">  478</a>     let mut bytes = corners.to_bytes();</span>
+<span class="line" id="L479"><a href="#L479">  479</a>     // Next piece of each slice: E 8..12, S 4..8, M 0..4.</span>
+<span class="line" id="L480"><a href="#L480">  480</a>     let (mut next_e, mut next_s, mut next_m) = (8u8, 4u8, 0u8);</span>
+<span class="line" id="L481"><a href="#L481">  481</a>     for position in 0..12 {</span>
+<span class="line" id="L482"><a href="#L482">  482</a>         let next = if e_slice &gt;&gt; position &amp; 1 == 1 {</span>
+<span class="line" id="L483"><a href="#L483">  483</a>             &amp;mut next_e</span>
+<span class="line" id="L484"><a href="#L484">  484</a>         } else if s_slice &gt;&gt; position &amp; 1 == 1 {</span>
+<span class="line" id="L485"><a href="#L485">  485</a>             &amp;mut next_s</span>
+<span class="line" id="L486"><a href="#L486">  486</a>         } else {</span>
+<span class="line" id="L487"><a href="#L487">  487</a>             &amp;mut next_m</span>
+<span class="line" id="L488"><a href="#L488">  488</a>         };</span>
+<span class="line" id="L489"><a href="#L489">  489</a>         let piece = *next;</span>
+<span class="line" id="L490"><a href="#L490">  490</a>         *next += 1;</span>
+<span class="line" id="L491"><a href="#L491">  491</a>         let flipped = u8::from(eo12 &gt;&gt; position &amp; 1 == 1);</span>
+<span class="line" id="L492"><a href="#L492">  492</a>         bytes[16 + position] = piece | (flipped &lt;&lt; 4);</span>
+<span class="line" id="L493"><a href="#L493">  493</a>     }</span>
+<span class="line" id="L494"><a href="#L494">  494</a>     bytes[8..16].fill(0);</span>
+<span class="line" id="L495"><a href="#L495">  495</a>     bytes[28..32].fill(0);</span>
+<span class="line" id="L496"><a href="#L496">  496</a>     Cube::from_bytes_internal(bytes)</span>
+<span class="line" id="L497"><a href="#L497">  497</a> }</span>
+<span class="line" id="L498"><a href="#L498">  498</a> </span>
+<span class="line" id="L499"><a href="#L499">  499</a> #[cfg(test)]</span>
+<span class="line" id="L500"><a href="#L500">  500</a> mod tests {</span>
+<span class="line" id="L501"><a href="#L501">  501</a>     use super::*;</span>
+<span class="line" id="L502"><a href="#L502">  502</a>     use crate::cubie::*;</span>
+<span class="line" id="L503"><a href="#L503">  503</a> </span>
+<span class="line" id="L504"><a href="#L504">  504</a>     #[test]</span>
+<span class="line" id="L505"><a href="#L505">  505</a>     fn rank_tables() {</span>
+<span class="line" id="L506"><a href="#L506">  506</a>         assert_eq!(binomial(12, 4), 495);</span>
+<span class="line" id="L507"><a href="#L507">  507</a>         let mut seen = vec![false; 512];</span>
+<span class="line" id="L508"><a href="#L508">  508</a>         for m in 0..4096u32 {</span>
+<span class="line" id="L509"><a href="#L509">  509</a>             if m.count_ones() == 4 {</span>
+<span class="line" id="L510"><a href="#L510">  510</a>                 let r = usize::from(ESLOT[m as usize]);</span>
+<span class="line" id="L511"><a href="#L511">  511</a>                 assert!(r &lt; 511 &amp;&amp; r % 64 &gt;= 2 &amp;&amp; !seen[r]);</span>
+<span class="line" id="L512"><a href="#L512">  512</a>                 seen[r] = true;</span>
+<span class="line" id="L513"><a href="#L513">  513</a>                 assert_eq!(u32::from(SLOT_EMASK[r]), m);</span>
+<span class="line" id="L514"><a href="#L514">  514</a>             }</span>
+<span class="line" id="L515"><a href="#L515">  515</a>         }</span>
+<span class="line" id="L516"><a href="#L516">  516</a>         assert_eq!(seen.iter().filter(|&amp;&amp;x| x).count(), 495);</span>
+<span class="line" id="L517"><a href="#L517">  517</a>         for m in 0..256u32 {</span>
+<span class="line" id="L518"><a href="#L518">  518</a>             if m.count_ones() == 4 {</span>
+<span class="line" id="L519"><a href="#L519">  519</a>                 assert_eq!(u32::from(UNRANK8[usize::from(RANK8[m as usize])]), m);</span>
+<span class="line" id="L520"><a href="#L520">  520</a>             }</span>
+<span class="line" id="L521"><a href="#L521">  521</a>         }</span>
+<span class="line" id="L522"><a href="#L522">  522</a>     }</span>
+<span class="line" id="L523"><a href="#L523">  523</a> </span>
+<span class="line" id="L524"><a href="#L524">  524</a>     #[test]</span>
+<span class="line" id="L525"><a href="#L525">  525</a>     fn edge_key_sym_matches() {</span>
+<span class="line" id="L526"><a href="#L526">  526</a>         let mut rng = Rng(13);</span>
+<span class="line" id="L527"><a href="#L527">  527</a>         // (Fewer under Miri, which is slow.)</span>
+<span class="line" id="L528"><a href="#L528">  528</a>         for _ in 0..if cfg!(miri) { 20 } else { 500 } {</span>
+<span class="line" id="L529"><a href="#L529">  529</a>             let c = Cube::from_cubie(&amp;CubieCube::random(&amp;mut rng));</span>
+<span class="line" id="L530"><a href="#L530">  530</a>             for t in 0..48 {</span>
+<span class="line" id="L531"><a href="#L531">  531</a>                 let ek = edge_key(c.transform_edges(t));</span>
+<span class="line" id="L532"><a href="#L532">  532</a>                 assert_eq!(edge_key_sym(c, t), Some(ek));</span>
+<span class="line" id="L533"><a href="#L533">  533</a>                 for k in 0..=11 {</span>
+<span class="line" id="L534"><a href="#L534">  534</a>                     let x = ((1234 * N_MSPLIT as u64) &lt;&lt; 20) + ek;</span>
+<span class="line" id="L535"><a href="#L535">  535</a>                     assert_eq!(</span>
+<span class="line" id="L536"><a href="#L536">  536</a>                         index_from_parts(1234, edge_parts_sym(c, t).unwrap(), k),</span>
+<span class="line" id="L537"><a href="#L537">  537</a>                         reduce_key(x, k)</span>
+<span class="line" id="L538"><a href="#L538">  538</a>                     );</span>
+<span class="line" id="L539"><a href="#L539">  539</a>                 }</span>
+<span class="line" id="L540"><a href="#L540">  540</a>             }</span>
+<span class="line" id="L541"><a href="#L541">  541</a>         }</span>
+<span class="line" id="L542"><a href="#L542">  542</a>     }</span>
+<span class="line" id="L543"><a href="#L543">  543</a> </span>
+<span class="line" id="L544"><a href="#L544">  544</a>     #[test]</span>
+<span class="line" id="L545"><a href="#L545">  545</a>     fn cocsep_x3_is_3_cocsep() {</span>
+<span class="line" id="L546"><a href="#L546">  546</a>         let mut rng = Rng(17);</span>
+<span class="line" id="L547"><a href="#L547">  547</a>         for _ in 0..2000 {</span>
+<span class="line" id="L548"><a href="#L548">  548</a>             let c = Cube::from_cubie(&amp;CubieCube::random(&amp;mut rng));</span>
+<span class="line" id="L549"><a href="#L549">  549</a>             assert_eq!(cocsep_x3(c), 3 * cocsep(c));</span>
+<span class="line" id="L550"><a href="#L550">  550</a>         }</span>
+<span class="line" id="L551"><a href="#L551">  551</a>     }</span>
+<span class="line" id="L552"><a href="#L552">  552</a> </span>
+<span class="line" id="L553"><a href="#L553">  553</a>     #[test]</span>
+<span class="line" id="L554"><a href="#L554">  554</a>     fn edge_key_roundtrip() {</span>
+<span class="line" id="L555"><a href="#L555">  555</a>         let mut rng = Rng(11);</span>
+<span class="line" id="L556"><a href="#L556">  556</a>         for _ in 0..1000 {</span>
+<span class="line" id="L557"><a href="#L557">  557</a>             let c = Cube::from_cubie(&amp;CubieCube::random(&amp;mut rng));</span>
+<span class="line" id="L558"><a href="#L558">  558</a>             let ek = edge_key(c);</span>
+<span class="line" id="L559"><a href="#L559">  559</a>             let d = cube_from_edge_key(c, ek).unwrap();</span>
+<span class="line" id="L560"><a href="#L560">  560</a>             assert_eq!(edge_key(d), ek);</span>
+<span class="line" id="L561"><a href="#L561">  561</a>             assert!(ek &lt; (N_MSPLIT &lt;&lt; 20) as u64);</span>
+<span class="line" id="L562"><a href="#L562">  562</a>             for k in [0, 11] {</span>
+<span class="line" id="L563"><a href="#L563">  563</a>                 let x = h11_key(17, c);</span>
+<span class="line" id="L564"><a href="#L564">  564</a>                 let (cl, ek2) = split_index(reduce_key(x, k), k);</span>
+<span class="line" id="L565"><a href="#L565">  565</a>                 assert_eq!(cl, 17);</span>
+<span class="line" id="L566"><a href="#L566">  566</a>                 if k == 11 {</span>
+<span class="line" id="L567"><a href="#L567">  567</a>                     assert_eq!(ek2, ek);</span>
+<span class="line" id="L568"><a href="#L568">  568</a>                 } else {</span>
+<span class="line" id="L569"><a href="#L569">  569</a>                     assert_eq!(ek2, ek &amp; !(0x7FF &lt;&lt; 9));</span>
+<span class="line" id="L570"><a href="#L570">  570</a>                 }</span>
+<span class="line" id="L571"><a href="#L571">  571</a>             }</span>
+<span class="line" id="L572"><a href="#L572">  572</a>         }</span>
+<span class="line" id="L573"><a href="#L573">  573</a>     }</span>
+<span class="line" id="L574"><a href="#L574">  574</a> }</span></pre></html>

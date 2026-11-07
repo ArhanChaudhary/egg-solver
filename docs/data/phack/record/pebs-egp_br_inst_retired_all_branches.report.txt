@@ -1,0 +1,25 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 380K of event 'egp_br_inst_retired_all_branches'
+# Event count (approx.): 761718867
+#
+# Overhead  Symbol                                                                              IPC   [IPC Coverage]
+# ........  ..................................................................................  ....................
+#
+    95.35%  [.] cubeopt::lanes::run_lanes::<bench::run::{closure#1}::{closure#0}::{closure#0}>  -      -            
+     2.08%  [.] <cubeopt::lanes::Lane>::setup_job                                               -      -            
+     1.83%  [.] <cubeopt::lanes::Lane>::setup_run                                               -      -            
+     0.28%  [.] <cubeopt::lanes::Lane>::next_run                                                -      -            
+     0.27%  [.] <cubeopt::lanes::Lane>::start_iteration                                         -      -            
+     0.17%  [.] <cubeopt::lanes::Lane>::extend_jobs                                             -      -            
+     0.01%  [.] 0x00000000000bab79                                                              -      -            
+     0.00%  [.] <cubeopt::lanes::Lane>::advance_cold                                            -      -            
+     0.00%  [.] 0x00000000000bb356                                                              -      -            
+
+
+#
+# (Tip: To collect Processor Trace with samples use perf record -e '{intel_pt//,cycles}' ; perf script --call-trace or --insn-trace --xed -F +ipc (remove --xed if no xed))
+#

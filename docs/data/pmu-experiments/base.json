@@ -1,0 +1,8 @@
+{
+  "commit": "93867a4597ab821b4064a0d407d3c89e133c9013",
+  "hypotheses": [
+    "byte decoder shortens packed lookup dependency and removes wide loads",
+    "outline advance reduces duplicated instruction footprint"
+  ],
+  "host_pmu": false
+}

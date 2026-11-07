@@ -1,0 +1,46 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEGATIVE: LLVM codegen flags (-C llvm-args=...): none faster at 1T — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="4d2718ba6a11.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="negative-llvm-codegen-flags-c-llvm-args-none-faster-at-1t">NEGATIVE: LLVM codegen flags (-C llvm-args=...): none faster at 1T</h1>
+<p>Commit <code>4d2718ba6a11662dcce5fa6b2ca1bee6ecad7e1d</code> · 2026-11-03T21:25:11+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>neg/a7-llvm-args</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>NEGATIVE: LLVM codegen flags (-C llvm-args=...): none faster at 1T</p>
+<p>Toolchain-only change (.cargo/config.toml); this patch carries the
+-x86-early-ifcvt variant, all variants are in the table. Every flag below
+changes the hot stream closure (lines of its disassembly that differ from
+main's, out of 5168, in the &quot;diff&quot; column) but none is faster; the
+layout/alignment-only ones move by up to -1%: 64-byte function alignment
+alone, which only moves the hot loop (no instruction differs), costs 0.8%,
+so about +-1% is the alignment lottery of this loop, not a gain.
+Not timed because the hot loop is identical: -enable-post-misched=false
+(no post-RA scheduler on znver5), -x86-pad-for-align (10 lines),
+-x86-machine-combiner=false (38 lines).</p>
+<p>1T stream (stream 10 60 1 20; each group's binaries run concurrently, one
+per L3 slot, 3 runs; deltas against the same group's main median):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>group</th><th>flag</th><th>diff</th><th>runs</th><th>median</th><th>vs main</th></tr>
+</thead>
+<tbody>
+<tr><td>B</td><td>main</td><td></td><td>20.550 20.600 20.433</td><td>20.550</td><td></td></tr>
+<tr><td>B</td><td>-x86-cmov-converter=false</td><td>367</td><td>20.550 20.600 20.433</td><td>20.550</td><td>0.0%</td></tr>
+<tr><td>C</td><td>main</td><td></td><td>20.533 20.550 20.317</td><td>20.533</td><td></td></tr>
+<tr><td>C</td><td>-enable-ext-tsp-block-placement</td><td>6079</td><td>20.533 20.633 20.317</td><td>20.533</td><td>0.0%</td></tr>
+<tr><td>C</td><td>-x86-early-ifcvt</td><td>2021</td><td>20.433 20.500 20.300</td><td>20.433</td><td>-0.5%</td></tr>
+<tr><td>C</td><td>-align-loops=64</td><td>405</td><td>20.433 20.550 19.967</td><td>20.433</td><td>-0.5%</td></tr>
+<tr><td>D</td><td>main</td><td></td><td>20.567 20.500 20.567</td><td>20.567</td><td></td></tr>
+<tr><td>D</td><td>-align-loops=32</td><td>338</td><td>20.567 20.400 20.550</td><td>20.550</td><td>-0.1%</td></tr>
+<tr><td>D</td><td>-enable-misched=false</td><td>2772</td><td>20.517 20.350 20.567</td><td>20.517</td><td>-0.2%</td></tr>
+<tr><td>D</td><td>-inline-threshold=1000</td><td>6300</td><td>20.533 20.650 20.567</td><td>20.567</td><td>0.0%</td></tr>
+<tr><td>E</td><td>main</td><td></td><td>20.617 20.450 20.467</td><td>20.467</td><td></td></tr>
+<tr><td>E</td><td>-disable-tail-duplicate</td><td>268</td><td>20.400 20.350 20.367</td><td>20.367</td><td>-0.5%</td></tr>
+<tr><td>E</td><td>-tail-dup-size=4</td><td>480</td><td>20.367 20.400 20.433</td><td>20.400</td><td>-0.3%</td></tr>
+<tr><td>E</td><td>-greedy-reverse-local-assignment</td><td>2388</td><td>20.400 20.467 20.433</td><td>20.433</td><td>-0.2%</td></tr>
+<tr><td>G</td><td>main</td><td></td><td>20.600 20.550 20.567</td><td>20.567</td><td></td></tr>
+<tr><td>G</td><td>-align-all-nofallthru-blocks=5</td><td>451</td><td>20.567 20.283 20.483</td><td>20.483</td><td>-0.4%</td></tr>
+<tr><td>J</td><td>main</td><td></td><td>20.600 20.533 20.517</td><td>20.533</td><td></td></tr>
+<tr><td>J</td><td>-align-all-functions=6 (offsets only)</td><td>268</td><td>20.367 20.333 20.400</td><td>20.367</td><td>-0.8%</td></tr>
+</tbody>
+</table></div>
+<p>All numbers are on 78ce33e; the build config is unchanged in cb8cb70.</p>
+<p>48T: not run (nothing to confirm at 1T).</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

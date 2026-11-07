@@ -1,0 +1,63 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling utf8parse v0.2.2
+   Compiling libc v0.2.191
+   Compiling thiserror v2.0.21
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling anstyle-query v1.1.5
+   Compiling anstyle-parse v1.0.0
+   Compiling anstyle v1.0.14
+   Compiling colorchoice v1.0.5
+   Compiling serde_core v1.0.229
+   Compiling strsim v0.11.1
+   Compiling anstream v1.0.0
+   Compiling heck v0.5.0
+   Compiling clap_lex v1.1.1
+   Compiling zmij v1.0.23
+   Compiling portable-atomic v1.15.0
+   Compiling parking_lot_core v0.9.12 (/data/agents/pmu-westmere/source/vendor/parking_lot_core)
+   Compiling clap_builder v4.6.7
+   Compiling serde_json v1.0.154
+   Compiling unicode-width v0.2.3
+   Compiling cfg-if v1.0.5
+   Compiling scopeguard v1.2.0
+   Compiling crossbeam-utils v0.8.23
+   Compiling serde v1.0.229
+   Compiling log v0.4.35
+   Compiling anyhow v1.0.104
+   Compiling smallvec v1.16.4
+   Compiling env_filter v2.0.0
+   Compiling lock_api v0.4.14
+   Compiling syn v3.0.9
+   Compiling unit-prefix v0.5.2
+   Compiling allocator-api2 v0.2.21
+   Compiling foldhash v0.2.0
+   Compiling memchr v2.8.3
+   Compiling itoa v1.0.18
+   Compiling equivalent v1.0.3
+   Compiling env_logger v0.11.11
+   Compiling console v0.16.6
+   Compiling hashbrown v0.16.1
+   Compiling parking_lot v0.12.5
+   Compiling indicatif v0.18.6
+   Compiling thiserror-impl v2.0.21
+   Compiling clap_derive v4.6.7
+   Compiling serde_derive v1.0.229
+   Compiling egg-solver v0.1.0 (/data/agents/pmu-westmere/source)
+   Compiling clap v4.6.7
+   Compiling clap_complete v4.6.11
+    Finished `test` profile [optimized + debuginfo] target(s) in 4.30s
+     Running unittests src/lib.rs (/data2/build/egg-solver-pmu-westmere/miri/x86_64-unknown-linux-gnu/debug/build/egg-solver/36fc6cb7fc130a1e/out/egg_solver-36fc6cb7fc130a1e)
+warning: Miri does not support optimizations: the opt-level is ignored. The only effect of selecting a Cargo profile that enables optimizations (such as --release) is to apply its remaining settings, such as whether debug assertions and overflow checks are enabled.
+
+
+running 3 tests
+test simd::tests::v16_matches_scalar ... ok
+test simd::v16_ssse3::tests::every_lookup_index_matches_reference ... ok
+test simd::v16_ssse3::tests::unaligned_input_and_every_bit_mask ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 46 filtered out; finished in 9.05s
+
+warning: 1 warning emitted
+

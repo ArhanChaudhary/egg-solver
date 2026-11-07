@@ -1,0 +1,48 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEGATIVE m8: index without the multiply after the msplit lookup, both fix-up candidates in apply_move, runs prefetched 4 ahead (neutral as a stack) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="df0c43c49ba0.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="negative-m8-index-without-the-multiply-after-the-msplit-lookup-both-fix-up-candidates-in-apply-move-runs-prefetched-4-ahead-neutral-as-a-stack">NEGATIVE m8: index without the multiply after the msplit lookup, both fix-up candidates in apply_move, runs prefetched 4 ahead (neutral as a stack)</h1>
+<p>Commit <code>df0c43c49ba0d83add1f80eb1d10bc3295284a82</code> · 2026-11-04T19:48:48+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>neg/m8-index-rows-applymove-runprefetch</code>, <code>archive/m8-stack2</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>NEGATIVE m8: index without the multiply after the msplit lookup, both fix-up candidates in apply_move, runs prefetched 4 ahead (neutral as a stack)</p>
+<p>Three latency/stall cuts, measured as one stack on top of m8's unsafe pass</p>
+<ul>
+<li>rp (r9F, def2cd0):</li>
+</ul>
+<ul>
+<li>ix: <code>coord::index_sym_rows</code>: msplit comes from a per-k table already
+shifted to its place in the hk index (<code>MSPLIT_ROWS[k][x] = RANK8[x] &lt;&lt; (k + 9)</code>, a 12 KB static of which 1 KB is used), and the class's row is
+<code>class * (70 &lt;&lt; (k + 9))</code> in parallel: the index is <code>row_base + msplit_row | eo &lt;&lt; 9 | eslot</code>, with no 3-cycle imul after the msplit
+lookup (cube -&gt; index -&gt; prefetch chain -3 cycles; the calibration of
+0.15-0.2% per cycle predicted ~+0.5% at 1T). Portable twin
+(<code>edge_parts_sym_rows</code>), all index tests pass.</li>
+<li>pm (x-vc's parallel mod-3 idea): apply_move adds <code>move_orients[mv]</code> and
+<code>move_orients[mv] - ORIENT_WRAP</code> (a new 576-byte table) to the shuffled
+cube in parallel: one step less on the X-passed moved-side index chain,
+same µops.</li>
+<li>e1: setup_run prefetches the job and child order of the run entry 4
+ahead instead of 1 (setup_run stalls on them: 21% of its samples on the
+ChildOrder load, 7.5% on the job).</li>
+</ul>
+<p>asm: stream_thread 1368 -&gt; 1361 instructions but stack operands 146 -&gt;
+153; Worker::rounds 1231 -&gt; 1230, 124 -&gt; 128. Cachegrind (v3): 145.9 -&gt;
+145.97 instructions per node.</p>
+<p>1T, paired against r9F at its pads (16/16), both pads of the stack set to
+P (ab1.sh / abs.sh, alternating):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>pad</th><th>stream</th><th>share</th></tr>
+</thead>
+<tbody>
+<tr><td>0</td><td>+0.00 -1.14%</td><td>-0.08 -1.06%</td></tr>
+<tr><td>16</td><td>-2.15 -0.65%</td><td>+1.31 -3.43%</td></tr>
+<tr><td>32</td><td>-1.16 -1.01%</td><td>+0.63 -0.29%</td></tr>
+<tr><td>48</td><td>+0.54 +7.07 +0.81 -0.34 +0.32 -0.72% (median +0.4)</td><td>-0.56 +2.84 +0.34 -0.14 +0.79 -0.15% (median +0.1)</td></tr>
+<tr><td>At its best pad (48) the stack is within the noise; elsewhere negative.</td><td></td><td></td></tr>
+<tr><td>Not ablated further (machine time). The extra spills in both loops</td><td></td><td></td></tr>
+<tr><td>probably eat the shorter chain.</td><td></td><td></td></tr>
+</tbody>
+</table></div>
+<p>e1 alone was screened earlier, but that build turned out to be a stale
+copy of its base (an A/A run: +0.40 -0.48 +1.74 +0.54%), so e1 alone is
+unmeasured.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

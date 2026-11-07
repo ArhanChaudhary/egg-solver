@@ -1,0 +1,567 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 3K of event 'cycles:u'
+# Event count (approx.): 60497701683
+#
+# Overhead  Symbol                                                                              IPC   [IPC Coverage]
+# ........  ..................................................................................  ....................
+#
+    97.34%  [.] cubeopt::lanes::run_lanes::<bench::run::{closure#1}::{closure#0}::{closure#0}>  -      -            
+            |          
+            |--15.91%--{closure#0} (inlined)
+            |          |          
+            |          |--9.00%--{closure#0}<cubeopt::simd::v16_scalar::{impl#0}::and::{closure_env#0}> (inlined)
+            |          |          {closure#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<cubeopt::simd::v16_scalar::{impl#0}::and::{closure_env#0}>> (inlined)
+            |          |          try_from_fn_erased<core::ops::try_trait::NeverShortCircuit<u8>, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<cubeopt::simd::v16_scalar::{impl#0}::and::{closure_env#0}>>> (inlined)
+            |          |          try_from_fn<core::ops::try_trait::NeverShortCircuit<u8>, 16, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<cubeopt::simd::v16_scalar::{impl#0}::and::{closure_env#0}>>> (inlined)
+            |          |          from_fn<u8, 16, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<cubeopt::simd::v16_scalar::{impl#0}::and::{closure_env#0}>> (inlined)
+            |          |          map2<cubeopt::simd::v16_scalar::{impl#0}::and::{closure_env#0}> (inlined)
+            |          |          and (inlined)
+            |          |          |          
+            |          |          |--6.51%--pieces (inlined)
+            |          |          |          |          
+            |          |          |          |--3.59%--edge_parts_sym_raw (inlined)
+            |          |          |          |          index_sym (inlined)
+            |          |          |          |          index (inlined)
+            |          |          |          |          |          
+            |          |          |          |          |--2.74%--advance (inlined)
+            |          |          |          |          |          |          
+            |          |          |          |          |          |--2.24%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |          |          |          |          |          {closure#0} (inlined)
+            |          |          |          |          |          |          __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          |          |          |          |          
+            |          |          |          |          |           --0.50%--resolve_moved (inlined)
+            |          |          |          |          |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |          |          |          |                     {closure#0} (inlined)
+            |          |          |          |          |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          |          |          |          
+            |          |          |          |           --0.71%--push_advance (inlined)
+            |          |          |          |                     resolve_moved (inlined)
+            |          |          |          |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |          |          |                     {closure#0} (inlined)
+            |          |          |          |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          |          |          
+            |          |          |           --2.92%--compose (inlined)
+            |          |          |                     |          
+            |          |          |                     |--1.99%--premove_inverse_unchecked (inlined)
+            |          |          |                     |          push_advance (inlined)
+            |          |          |                     |          resolve_moved (inlined)
+            |          |          |                     |          run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |          |                     |          {closure#0} (inlined)
+            |          |          |                     |          __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          |                     |          
+            |          |          |                      --0.93%--child_lookup (inlined)
+            |          |          |                                advance (inlined)
+            |          |          |                                |          
+            |          |          |                                 --0.71%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |          |                                           {closure#0} (inlined)
+            |          |          |                                           __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          |          
+            |          |          |--1.89%--compose (inlined)
+            |          |          |          |          
+            |          |          |           --1.51%--child_lookup (inlined)
+            |          |          |                     advance (inlined)
+            |          |          |                     |          
+            |          |          |                      --1.11%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |          |                                {closure#0} (inlined)
+            |          |          |                                __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          |          
+            |          |           --0.60%--select_bytes (inlined)
+            |          |                     select_mask (inlined)
+            |          |                     child_lookup (inlined)
+            |          |                     advance (inlined)
+            |          |          
+            |          |--4.15%--{closure#0}<cubeopt::simd::v16_scalar::{impl#0}::xor::{closure_env#0}> (inlined)
+            |          |          {closure#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<cubeopt::simd::v16_scalar::{impl#0}::xor::{closure_env#0}>> (inlined)
+            |          |          try_from_fn_erased<core::ops::try_trait::NeverShortCircuit<u8>, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<cubeopt::simd::v16_scalar::{impl#0}::xor::{closure_env#0}>>> (inlined)
+            |          |          try_from_fn<core::ops::try_trait::NeverShortCircuit<u8>, 16, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<cubeopt::simd::v16_scalar::{impl#0}::xor::{closure_env#0}>>> (inlined)
+            |          |          from_fn<u8, 16, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<cubeopt::simd::v16_scalar::{impl#0}::xor::{closure_env#0}>> (inlined)
+            |          |          map2<cubeopt::simd::v16_scalar::{impl#0}::xor::{closure_env#0}> (inlined)
+            |          |          xor (inlined)
+            |          |          edge_parts_sym_raw (inlined)
+            |          |          index_sym (inlined)
+            |          |          index (inlined)
+            |          |          |          
+            |          |          |--2.92%--advance (inlined)
+            |          |          |          |          
+            |          |          |          |--1.91%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |          |          |          {closure#0} (inlined)
+            |          |          |          |          __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          |          |          
+            |          |          |           --1.01%--resolve_moved (inlined)
+            |          |          |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |          |                     {closure#0} (inlined)
+            |          |          |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          |          
+            |          |          |--0.65%--resolve_other (inlined)
+            |          |          |          run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |          |          {closure#0} (inlined)
+            |          |          |          __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          |          
+            |          |           --0.58%--push_advance (inlined)
+            |          |                     resolve_moved (inlined)
+            |          |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |                     {closure#0} (inlined)
+            |          |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          
+            |          |--1.23%--{closure#0}<cubeopt::simd::v16_scalar::{impl#0}::or::{closure_env#0}> (inlined)
+            |          |          {closure#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<cubeopt::simd::v16_scalar::{impl#0}::or::{closure_env#0}>> (inlined)
+            |          |          try_from_fn_erased<core::ops::try_trait::NeverShortCircuit<u8>, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<cubeopt::simd::v16_scalar::{impl#0}::or::{closure_env#0}>>> (inlined)
+            |          |          try_from_fn<core::ops::try_trait::NeverShortCircuit<u8>, 16, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<cubeopt::simd::v16_scalar::{impl#0}::or::{closure_env#0}>>> (inlined)
+            |          |          from_fn<u8, 16, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<cubeopt::simd::v16_scalar::{impl#0}::or::{closure_env#0}>> (inlined)
+            |          |          map2<cubeopt::simd::v16_scalar::{impl#0}::or::{closure_env#0}> (inlined)
+            |          |          or (inlined)
+            |          |          |          
+            |          |          |--0.65%--select_bytes (inlined)
+            |          |          |          select_mask (inlined)
+            |          |          |          child_lookup (inlined)
+            |          |          |          advance (inlined)
+            |          |          |          
+            |          |           --0.58%--select (inlined)
+            |          |                     select (inlined)
+            |          |                     child_node (inlined)
+            |          |                     push_advance (inlined)
+            |          |                     resolve_moved (inlined)
+            |          |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |                     {closure#0} (inlined)
+            |          |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          
+            |          |--0.88%--{closure#0}<u8, u8, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}> (inlined)
+            |          |          call_mut<u8, core::ops::try_trait::NeverShortCircuit<u8>, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, u8, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}>> (inlined)
+            |          |          try_from_fn_erased<core::ops::try_trait::NeverShortCircuit<u8>, &mut core::array::drain::Drain<u8, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, u8, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}>>> (inlined)
+            |          |          try_from_fn<core::ops::try_trait::NeverShortCircuit<u8>, 16, &mut core::array::drain::Drain<u8, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, u8, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}>>> (inlined)
+            |          |          try_map<u8, 16, core::ops::try_trait::NeverShortCircuit<u8>, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, u8, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}>> (inlined)
+            |          |          map<u8, 16, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}, u8> (inlined)
+            |          |          lookup (inlined)
+            |          |          |          
+            |          |           --0.83%--edge_parts_sym_raw (inlined)
+            |          |                     index_sym (inlined)
+            |          |                     index (inlined)
+            |          |                     |          
+            |          |                      --0.78%--advance (inlined)
+            |          |                                |          
+            |          |                                 --0.60%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |                                           {closure#0} (inlined)
+            |          |                                           __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          
+            |           --0.65%--{closure#0}<cubeopt::simd::v16_scalar::{impl#0}::and_not::{closure_env#0}> (inlined)
+            |                     {closure#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<cubeopt::simd::v16_scalar::{impl#0}::and_not::{closure_env#0}>> (inlined)
+            |                     try_from_fn_erased<core::ops::try_trait::NeverShortCircuit<u8>, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<cubeopt::simd::v16_scalar::{impl#0}::and_not::{closure_env#0}>>> (inlined)
+            |                     try_from_fn<core::ops::try_trait::NeverShortCircuit<u8>, 16, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<cubeopt::simd::v16_scalar::{impl#0}::and_not::{closure_env#0}>>> (inlined)
+            |                     from_fn<u8, 16, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<cubeopt::simd::v16_scalar::{impl#0}::and_not::{closure_env#0}>> (inlined)
+            |                     map2<cubeopt::simd::v16_scalar::{impl#0}::and_not::{closure_env#0}> (inlined)
+            |                     and_not (inlined)
+            |                     select_bytes (inlined)
+            |                     select_mask (inlined)
+            |                     child_lookup (inlined)
+            |                     advance (inlined)
+            |          
+            |--11.06%--advance (inlined)
+            |          |          
+            |          |--6.41%--resolve_moved (inlined)
+            |          |          run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |          {closure#0} (inlined)
+            |          |          __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          
+            |           --4.65%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |                     |          
+            |                     |--2.92%--{closure#0} (inlined)
+            |                     |          __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |                     |          
+            |                      --1.73%--0x17
+            |          
+            |--7.11%--get<u8> (inlined)
+            |          get<u8, usize> (inlined)
+            |          {closure#0} (inlined)
+            |          {closure#0}<u8, u8, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}> (inlined)
+            |          call_mut<u8, core::ops::try_trait::NeverShortCircuit<u8>, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, u8, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}>> (inlined)
+            |          try_from_fn_erased<core::ops::try_trait::NeverShortCircuit<u8>, &mut core::array::drain::Drain<u8, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, u8, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}>>> (inlined)
+            |          try_from_fn<core::ops::try_trait::NeverShortCircuit<u8>, 16, &mut core::array::drain::Drain<u8, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, u8, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}>>> (inlined)
+            |          try_map<u8, 16, core::ops::try_trait::NeverShortCircuit<u8>, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, u8, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}>> (inlined)
+            |          map<u8, 16, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}, u8> (inlined)
+            |          lookup (inlined)
+            |          |          
+            |          |--4.93%--compose (inlined)
+            |          |          |          
+            |          |           --4.55%--child_lookup (inlined)
+            |          |                     advance (inlined)
+            |          |                     |          
+            |          |                     |--3.47%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |                     |          {closure#0} (inlined)
+            |          |                     |          __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |                     |          
+            |          |                      --1.08%--resolve_moved (inlined)
+            |          |                                run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |                                {closure#0} (inlined)
+            |          |                                __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          
+            |           --2.01%--edge_parts_sym_raw (inlined)
+            |                     index_sym (inlined)
+            |                     index (inlined)
+            |                     |          
+            |                      --1.21%--advance (inlined)
+            |                                |          
+            |                                 --1.03%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |                                           {closure#0} (inlined)
+            |                                           __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+            |--6.48%--read<core::ptr::Unaligned<u32>> (inlined)
+            |          read_unaligned<u32> (inlined)
+            |          read_unaligned<u32> (inlined)
+            |          index (inlined)
+            |          |          
+            |          |--5.10%--advance (inlined)
+            |          |          |          
+            |          |          |--3.80%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |          |          {closure#0} (inlined)
+            |          |          |          __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          |          
+            |          |           --1.31%--resolve_moved (inlined)
+            |          |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |                     {closure#0} (inlined)
+            |          |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          
+            |           --1.38%--resolve_other (inlined)
+            |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |                     {closure#0} (inlined)
+            |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+            |--5.00%--value (inlined)
+            |          pending_value (inlined)
+            |          run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          {closure#0} (inlined)
+            |          __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+            |--4.86%--copied<u8> (inlined)
+            |          {closure#0} (inlined)
+            |          {closure#0}<u8, u8, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}> (inlined)
+            |          call_mut<u8, core::ops::try_trait::NeverShortCircuit<u8>, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, u8, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}>> (inlined)
+            |          try_from_fn_erased<core::ops::try_trait::NeverShortCircuit<u8>, &mut core::array::drain::Drain<u8, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, u8, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}>>> (inlined)
+            |          try_from_fn<core::ops::try_trait::NeverShortCircuit<u8>, 16, &mut core::array::drain::Drain<u8, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, u8, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}>>> (inlined)
+            |          try_map<u8, 16, core::ops::try_trait::NeverShortCircuit<u8>, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, u8, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}>> (inlined)
+            |          map<u8, 16, cubeopt::simd::v16_scalar::{impl#0}::lookup::{closure_env#0}, u8> (inlined)
+            |          lookup (inlined)
+            |          |          
+            |          |--3.40%--edge_parts_sym_raw (inlined)
+            |          |          index_sym (inlined)
+            |          |          index (inlined)
+            |          |          |          
+            |          |          |--2.49%--advance (inlined)
+            |          |          |          |          
+            |          |          |          |--1.61%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |          |          |          {closure#0} (inlined)
+            |          |          |          |          __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          |          |          
+            |          |          |           --0.88%--resolve_moved (inlined)
+            |          |          |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |          |                     {closure#0} (inlined)
+            |          |          |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          |          
+            |          |           --0.66%--push_advance (inlined)
+            |          |                     resolve_moved (inlined)
+            |          |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |                     {closure#0} (inlined)
+            |          |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          
+            |          |--0.75%--compose (inlined)
+            |          |          
+            |           --0.71%--apply_move_unchecked (inlined)
+            |                     resolve_other (inlined)
+            |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |                     {closure#0} (inlined)
+            |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+            |--4.31%--bit_mask<6> (inlined)
+            |          bit_masks_764 (inlined)
+            |          edge_parts_sym_raw (inlined)
+            |          index_sym (inlined)
+            |          index (inlined)
+            |          |          
+            |          |--3.22%--advance (inlined)
+            |          |          |          
+            |          |          |--2.46%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |          |          {closure#0} (inlined)
+            |          |          |          __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          |          
+            |          |           --0.75%--resolve_moved (inlined)
+            |          |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |                     {closure#0} (inlined)
+            |          |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          
+            |           --0.64%--push_advance (inlined)
+            |                     resolve_moved (inlined)
+            |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |                     {closure#0} (inlined)
+            |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+            |--4.23%--from_fn<u8, 16, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<fn(u8, u8) -> u8>> (inlined)
+            |          map2<fn(u8, u8) -> u8> (inlined)
+            |          min (inlined)
+            |          wrap (inlined)
+            |          |          
+            |           --3.75%--compose (inlined)
+            |                     |          
+            |                     |--3.12%--child_lookup (inlined)
+            |                     |          advance (inlined)
+            |                     |          |          
+            |                     |          |--2.34%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |                     |          |          {closure#0} (inlined)
+            |                     |          |          __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |                     |          |          
+            |                     |           --0.78%--resolve_moved (inlined)
+            |                     |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |                     |                     {closure#0} (inlined)
+            |                     |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |                     |          
+            |                      --0.63%--premove_inverse_unchecked (inlined)
+            |                                push_advance (inlined)
+            |                                resolve_moved (inlined)
+            |                                run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |                                {closure#0} (inlined)
+            |                                __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+            |--3.70%--wrapping_add (inlined)
+            |          call<fn(u8, u8) -> u8, (u8, u8)> (inlined)
+            |          {closure#0}<fn(u8, u8) -> u8> (inlined)
+            |          {closure#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<fn(u8, u8) -> u8>> (inlined)
+            |          try_from_fn_erased<core::ops::try_trait::NeverShortCircuit<u8>, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<fn(u8, u8) -> u8>>> (inlined)
+            |          try_from_fn<core::ops::try_trait::NeverShortCircuit<u8>, 16, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<fn(u8, u8) -> u8>>> (inlined)
+            |          from_fn<u8, 16, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<fn(u8, u8) -> u8>> (inlined)
+            |          map2<fn(u8, u8) -> u8> (inlined)
+            |          wrapping_add (inlined)
+            |          |          
+            |          |--2.62%--compose (inlined)
+            |          |          |          
+            |          |          |--1.59%--child_lookup (inlined)
+            |          |          |          advance (inlined)
+            |          |          |          |          
+            |          |          |           --1.31%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |          |                     {closure#0} (inlined)
+            |          |          |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          |          
+            |          |           --1.03%--premove_inverse_unchecked (inlined)
+            |          |                     push_advance (inlined)
+            |          |                     resolve_moved (inlined)
+            |          |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |                     {closure#0} (inlined)
+            |          |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          
+            |           --1.08%--apply_move_unchecked (inlined)
+            |                     resolve_other (inlined)
+            |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |                     {closure#0} (inlined)
+            |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+            |--3.47%--min<u8> (inlined)
+            |          call<fn(u8, u8) -> u8, (u8, u8)> (inlined)
+            |          {closure#0}<fn(u8, u8) -> u8> (inlined)
+            |          {closure#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<fn(u8, u8) -> u8>> (inlined)
+            |          try_from_fn_erased<core::ops::try_trait::NeverShortCircuit<u8>, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<fn(u8, u8) -> u8>>> (inlined)
+            |          try_from_fn<core::ops::try_trait::NeverShortCircuit<u8>, 16, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<fn(u8, u8) -> u8>>> (inlined)
+            |          from_fn<u8, 16, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<fn(u8, u8) -> u8>> (inlined)
+            |          map2<fn(u8, u8) -> u8> (inlined)
+            |          min (inlined)
+            |          wrap (inlined)
+            |          |          
+            |          |--2.92%--compose (inlined)
+            |          |          |          
+            |          |          |--2.21%--child_lookup (inlined)
+            |          |          |          advance (inlined)
+            |          |          |          |          
+            |          |          |          |--1.66%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |          |          |          {closure#0} (inlined)
+            |          |          |          |          __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          |          |          
+            |          |          |           --0.55%--resolve_moved (inlined)
+            |          |          |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |          |                     {closure#0} (inlined)
+            |          |          |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          |          
+            |          |           --0.70%--premove_inverse_unchecked (inlined)
+            |          |                     push_advance (inlined)
+            |          |                     resolve_moved (inlined)
+            |          |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |                     {closure#0} (inlined)
+            |          |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          
+            |           --0.55%--apply_move_unchecked (inlined)
+            |                     resolve_other (inlined)
+            |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |                     {closure#0} (inlined)
+            |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+            |--2.97%--load (inlined)
+            |          |          
+            |          |--1.86%--edge_parts_sym_raw (inlined)
+            |          |          index_sym (inlined)
+            |          |          index (inlined)
+            |          |          |          
+            |          |           --1.18%--advance (inlined)
+            |          |                     |          
+            |          |                      --0.88%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |                                {closure#0} (inlined)
+            |          |                                __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          
+            |           --0.70%--load (inlined)
+            |                     child_lookup (inlined)
+            |                     advance (inlined)
+            |                     |          
+            |                      --0.50%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |                                {closure#0} (inlined)
+            |                                __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+            |--2.76%--push_advance (inlined)
+            |          resolve_moved (inlined)
+            |          run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          {closure#0} (inlined)
+            |          __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+            |--2.62%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          |          
+            |          |--1.86%--{closure#0} (inlined)
+            |          |          __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          |          
+            |           --0.75%--0x17
+            |          
+            |--2.39%--wrapping_sub (inlined)
+            |          |          
+            |           --2.31%--call<fn(u8, u8) -> u8, (u8, u8)> (inlined)
+            |                     {closure#0}<fn(u8, u8) -> u8> (inlined)
+            |                     {closure#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<fn(u8, u8) -> u8>> (inlined)
+            |                     try_from_fn_erased<core::ops::try_trait::NeverShortCircuit<u8>, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<fn(u8, u8) -> u8>>> (inlined)
+            |                     try_from_fn<core::ops::try_trait::NeverShortCircuit<u8>, 16, core::ops::try_trait::{impl#0}::wrap_mut_1::{closure_env#0}<u8, usize, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<fn(u8, u8) -> u8>>> (inlined)
+            |                     from_fn<u8, 16, cubeopt::simd::v16_scalar::{impl#0}::map2::{closure_env#0}<fn(u8, u8) -> u8>> (inlined)
+            |                     map2<fn(u8, u8) -> u8> (inlined)
+            |                     wrapping_sub (inlined)
+            |                     wrap (inlined)
+            |                     |          
+            |                      --2.11%--compose (inlined)
+            |                                |          
+            |                                 --1.63%--child_lookup (inlined)
+            |                                           advance (inlined)
+            |                                           |          
+            |                                            --1.21%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |                                                      {closure#0} (inlined)
+            |                                                      __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+            |--2.29%--bit_mask<7> (inlined)
+            |          bit_masks_764 (inlined)
+            |          edge_parts_sym_raw (inlined)
+            |          index_sym (inlined)
+            |          index (inlined)
+            |          |          
+            |           --1.53%--advance (inlined)
+            |                     |          
+            |                      --1.26%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |                                {closure#0} (inlined)
+            |                                __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+            |--2.06%--bit_mask<4> (inlined)
+            |          bit_masks_764 (inlined)
+            |          edge_parts_sym_raw (inlined)
+            |          index_sym (inlined)
+            |          index (inlined)
+            |          |          
+            |           --1.48%--advance (inlined)
+            |                     |          
+            |                      --1.28%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |                                {closure#0} (inlined)
+            |                                __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+            |--1.67%--edge_parts_sym_raw (inlined)
+            |          index_sym (inlined)
+            |          index (inlined)
+            |          |          
+            |           --1.31%--advance (inlined)
+            |                     |          
+            |                      --1.06%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |                                {closure#0} (inlined)
+            |                                __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+            |--1.59%--resolve_other (inlined)
+            |          run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          {closure#0} (inlined)
+            |          __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+            |--1.41%--resolve_moved (inlined)
+            |          run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |          {closure#0} (inlined)
+            |          __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+            |--1.38%--shl (inlined)
+            |          |          
+            |           --1.11%--pext12 (inlined)
+            |                     edge_parts_sym_raw (inlined)
+            |                     index_sym (inlined)
+            |                     index (inlined)
+            |                     |          
+            |                      --1.06%--advance (inlined)
+            |                                |          
+            |                                 --0.83%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |                                           {closure#0} (inlined)
+            |                                           __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+            |--1.31%--pext12 (inlined)
+            |          edge_parts_sym_raw (inlined)
+            |          index_sym (inlined)
+            |          index (inlined)
+            |          |          
+            |           --0.73%--advance (inlined)
+            |                     |          
+            |                      --0.63%--run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |                                {closure#0} (inlined)
+            |                                __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+            |--1.28%--get_unchecked<cubeopt::simd::SymEdgeLine> (inlined)
+            |          get_unchecked<cubeopt::simd::SymEdgeLine, usize> (inlined)
+            |          edge_parts_sym_raw (inlined)
+            |          index_sym (inlined)
+            |          index (inlined)
+            |          |          
+            |           --1.13%--push_advance (inlined)
+            |                     resolve_moved (inlined)
+            |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |                     {closure#0} (inlined)
+            |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+            |--0.93%--get_unchecked<[u8; 64]> (inlined)
+            |          get_unchecked<[u8; 64], usize> (inlined)
+            |          pext12 (inlined)
+            |          edge_parts_sym_raw (inlined)
+            |          index_sym (inlined)
+            |          index (inlined)
+            |          |          
+            |           --0.63%--advance (inlined)
+            |          
+            |--0.58%--max<i8> (inlined)
+            |          max_child_bound (inlined)
+            |          |          
+            |           --0.56%--note_value (inlined)
+            |          
+            |--0.58%--compose (inlined)
+            |          |          
+            |           --0.55%--premove_inverse_unchecked (inlined)
+            |                     push_advance (inlined)
+            |                     resolve_moved (inlined)
+            |                     run_lanes<bench::run::{closure#1}::{closure#0}::{closure_env#0}> (inlined)
+            |                     {closure#0} (inlined)
+            |                     __rust_begin_short_backtrace<bench::run::{closure#1}::{closure_env#0}, ()> (inlined)
+            |          
+             --0.55%--cocsep_x3 (inlined)
+                       index (inlined)
+
+     0.95%  [.] <cubeopt::lanes::Lane>::setup_job                                               -      -            
+     0.86%  [.] <cubeopt::lanes::Lane>::setup_run                                               -      -            
+     0.55%  [.] <cubeopt::lanes::Lane>::next_run                                                -      -            
+     0.15%  [.] <cubeopt::lanes::Lane>::start_iteration                                         -      -            
+     0.13%  [.] <cubeopt::lanes::Lane>::extend_jobs                                             -      -            
+     0.03%  [k] 0xffffffffb1000b80                                                              -      -            
+     0.00%  [.] __poll                                                                          -      -            
+
+
+#
+# (Tip: For tracepoint events, try: perf report -s trace_fields)
+#

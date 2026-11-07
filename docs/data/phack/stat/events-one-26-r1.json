@@ -1,0 +1,90 @@
+{
+  "name": "events-one-26-r1",
+  "config": {
+    "cpus": [
+      1
+    ],
+    "threads": 1,
+    "memory_policy": "local"
+  },
+  "lanes": 24,
+  "page_request": "thp",
+  "mode": "stream",
+  "aux": "MEM_LOAD_RETIRED.LLC_MISS",
+  "isolated_event": false,
+  "command": [
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/numactl",
+    "--physcpubind=1",
+    "--membind=1",
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/perf",
+    "stat",
+    "--no-big-num",
+    "-x",
+    ";",
+    "--delay=-1",
+    "--control=fifo:/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/.ctl-events-one-26-r1,/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/.ack-events-one-26-r1",
+    "-o",
+    "/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/stat/events-one-26-r1.csv",
+    "-e",
+    "{cycles:u,instructions:u,cpu/config=0x10cb,name=egp_mem_load_retired_llc_miss/u}",
+    "--",
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/bench",
+    "stream",
+    "/home/arhan/tmp/egg-solver-perf-work/tables/h6",
+    "--warmup",
+    "8.0",
+    "--window",
+    "20.0",
+    "--threads",
+    "1",
+    "--lanes",
+    "24",
+    "--seed",
+    "2026",
+    "--load",
+    "copy",
+    "--json"
+  ],
+  "exit_code": 0,
+  "valid": true,
+  "wall_seconds": 34.10599591722712,
+  "counted_window_seconds": 20.000161448,
+  "benchmark": {
+    "type": "stream",
+    "threads": 1,
+    "lanes": 24,
+    "window": 20.0,
+    "share": null,
+    "cubes": 3,
+    "throughput": 0.15,
+    "nodes_per_cube": 5145132.0,
+    "lookups_per_cube": 4366999.666666667,
+    "lengths": {
+      "17": 3
+    }
+  },
+  "counters": [
+    {
+      "event": "cycles:u",
+      "count": 60665472676.0,
+      "unit": "",
+      "counter_runtime_ns": 19993664835.0,
+      "running_percent": 100.0
+    },
+    {
+      "event": "instructions:u",
+      "count": 106953150255.0,
+      "unit": "",
+      "counter_runtime_ns": 19993664835.0,
+      "running_percent": 100.0
+    },
+    {
+      "event": "egp_mem_load_retired_llc_miss",
+      "count": 121404.0,
+      "unit": "",
+      "counter_runtime_ns": 19993664835.0,
+      "running_percent": 100.0
+    }
+  ],
+  "record": false
+}

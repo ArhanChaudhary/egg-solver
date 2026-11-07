@@ -1,0 +1,33 @@
+use sse, bmi2
+use huge page
+uniq_sym_states = 3393
+read pruning table from file h48prun31h1.dat
+ 0           43
+ 1           29
+ 2          111
+ 3          733
+ 4         6435
+ 5        48670
+ 6       395266
+ 7      3155073
+ 8     25865565
+ 9    196289112
+10    909157773
+11  11222950329
+12  64306616699
+13  43724582962
+Avg: 12.249, 120389068800 entry
+B2 L  B2 R' F' U' B' L  D' F' L  U  L2 B2 L' D2 B2 D2 R2 B2 
+Cube1 finished in 20, 352841394/249 node(s), tt=18282.332 ms, 51.81ns/node, 43.38ns/probe, 0.260 inv/node, 1.194 probe/node 296 split(s)
+R  U2 R  D2 R2 B2 L' D' B' F  U  B' R' U2 L' D  R2 F' U2 L2 
+Cube2 finished in 20, 287631678/283 node(s), tt=14788.369 ms, 51.41ns/node, 43.17ns/probe, 0.253 inv/node, 1.191 probe/node 293 split(s)
+D2 R2 F2 D2 F2 D2 R' F2 D' L2 R  B  L' F  U  R' B  F2 R2 F' 
+Cube3 finished in 20, 334812215/254 node(s), tt=17162.948 ms, 51.26ns/node, 43.00ns/probe, 0.257 inv/node, 1.192 probe/node 243 split(s)
+D' F' U  B2 R2 F  R' U2 B' L  D  F  R  D2 R2 L2 D' R2 F2 D' 
+Cube4 finished in 20, 334902946/263 node(s), tt=17132.155 ms, 51.16ns/node, 42.72ns/probe, 0.262 inv/node, 1.197 probe/node 336 split(s)
+U2 R2 F2 D' U  F2 U2 B  U  B' R  U' F  L  B  R' F  L2 D' B  
+Cube5 finished in 20, 341960291/255 node(s), tt=17473.466 ms, 51.10ns/node, 42.64ns/probe, 0.264 inv/node, 1.198 probe/node 268 split(s)
+D  B2 D' B2 R2 D' R2 U  L  R' D  B' D  R  F' D2 R2 U' F' R  
+Cube6 finished in 20, 313113817/247 node(s), tt=15904.660 ms, 50.80ns/node, 42.53ns/probe, 0.258 inv/node, 1.194 probe/node 241 split(s)
+B  D' L' F' L  F  B  U' D2 F' R2 B' U  F2 R' L  U2 R2 F2 B2 
+Cube7 finished in 20, 162555613/252 node(s), tt=8214.413 ms, 50.53ns/node, 42.36ns/probe, 0.256 inv/node, 1.193 probe/node 273 split(s)

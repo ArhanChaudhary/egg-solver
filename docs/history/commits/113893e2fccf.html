@@ -1,0 +1,74 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEG share: SpinRw waits with crossbeam's Backoff — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="113893e2fccf.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="neg-share-spinrw-waits-with-crossbeam-s-backoff">NEG share: SpinRw waits with crossbeam's Backoff</h1>
+<p>Commit <code>113893e2fccf73d7571b8e66a0ab14e0ede27e27</code> · 2026-11-05T05:18:58+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>neg/d1-backoff-spinrw</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>NEG share: SpinRw waits with crossbeam's Backoff</p>
+<p>SpinRw's wait (spin_wait: one spin_loop per check, yield after 256 checks)
+replaced by crossbeam_utils::Backoff::snooze (1, 2, 4 ... 64 spin_loops per
+check, yield after 7 checks, i.e. 127 spins). Exponential backoff cuts the
+traffic on a contended line, but the open list's lock is held only briefly
+(publish, find_open's scan and cleanup): a waiter in a 64-pause snooze sees
+the release late, and a writer sees the last reader leave late. Rejected:
+-c 1 latency +3% to +7% at 48T (7 of 8 depth-17 pairs slower); bench
+share within noise.</p>
+<p>Search identical (no bad solutions). The hot functions (Worker::rounds,
+the share thread closure: frame 0x1f40, bench::stream_thread) are
+unchanged against 7608a28; publish, find_open, restart and idle_wait_loop
+change (the lock is inlined there).</p>
+<p>48T share (d1, one exclusive hold per rep, binaries in rotating order,
+quiet gate; solve -t 48 -c 1 -n 500; ext &lt;= 0.6 cores):
+solve -c 1, random_state (ms/cube):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>rep</th><th>main</th><th>bo</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>1.649</td><td>1.637</td></tr>
+<tr><td>2</td><td>1.617</td><td>1.722</td></tr>
+<tr><td>3</td><td>1.745</td><td>1.692</td></tr>
+<tr><td>4</td><td>1.622</td><td>1.702</td></tr>
+<tr><td>5</td><td>1.74</td><td>1.62</td></tr>
+<tr><td>6</td><td>1.798</td><td>1.902</td></tr>
+<tr><td>7</td><td>1.658</td><td>1.724</td></tr>
+<tr><td>8</td><td>1.612</td><td>1.682</td></tr>
+<tr><td>median</td><td>1.6535</td><td>1.697 (+2.6%; pairs -0.7 +6.5 -3.0 +4.9 -6.9 +5.8 +4.0 +4.3; median pair +4.2%)</td></tr>
+<tr><td>solve -c 1, random_move_17f (ms/cube):</td><td></td><td></td></tr>
+<tr><td>rep</td><td>main</td><td>bo</td></tr>
+<tr><td>-----</td><td>------</td><td>------</td></tr>
+<tr><td>1</td><td>0.542</td><td>0.595</td></tr>
+<tr><td>2</td><td>0.571</td><td>0.567</td></tr>
+<tr><td>3</td><td>0.544</td><td>0.551</td></tr>
+<tr><td>4</td><td>0.56</td><td>0.569</td></tr>
+<tr><td>5</td><td>0.57</td><td>0.619</td></tr>
+<tr><td>6</td><td>0.581</td><td>0.61</td></tr>
+<tr><td>7</td><td>0.575</td><td>0.578</td></tr>
+<tr><td>8</td><td>0.557</td><td>0.589</td></tr>
+<tr><td>median</td><td>0.565</td><td>0.5835 (+3.3%; pairs +9.8 -0.7 +1.3 +1.6 +8.6 +5.0 +0.5 +5.7; median pair +3.3%)</td></tr>
+<tr><td>solve -c 1, random_state_depth17 (ms/cube):</td><td></td><td></td></tr>
+<tr><td>rep</td><td>main</td><td>bo</td></tr>
+<tr><td>-----</td><td>------</td><td>------</td></tr>
+<tr><td>1</td><td>0.606</td><td>0.635</td></tr>
+<tr><td>2</td><td>0.648</td><td>0.706</td></tr>
+<tr><td>3</td><td>0.617</td><td>0.668</td></tr>
+<tr><td>4</td><td>0.621</td><td>0.681</td></tr>
+<tr><td>5</td><td>0.623</td><td>0.641</td></tr>
+<tr><td>6</td><td>0.653</td><td>0.686</td></tr>
+<tr><td>7</td><td>0.658</td><td>0.716</td></tr>
+<tr><td>8</td><td>0.622</td><td>0.631</td></tr>
+<tr><td>median</td><td>0.6225</td><td>0.6745 (+8.4%; pairs +4.8 +9.0 +8.3 +9.7 +2.9 +5.1 +8.8 +1.4; median pair +6.7%)</td></tr>
+<tr><td>bench share random:1000:2026 (solves/s):</td><td></td><td></td></tr>
+<tr><td>rep</td><td>main</td><td>bo</td></tr>
+<tr><td>-----</td><td>------</td><td>------</td></tr>
+<tr><td>1</td><td>962.916</td><td>964.255</td></tr>
+<tr><td>2</td><td>970.203</td><td>969.169</td></tr>
+<tr><td>3</td><td>986.879</td><td>972.013</td></tr>
+<tr><td>4</td><td>977.928</td><td>970.79</td></tr>
+<tr><td>5</td><td>966.408</td><td>969.666</td></tr>
+<tr><td>6</td><td>898.479</td><td>901.636</td></tr>
+<tr><td>7</td><td>905.897</td><td>910.827</td></tr>
+<tr><td>8</td><td>962.297</td><td>978.117</td></tr>
+<tr><td>median</td><td>964.662</td><td>969.418 (+0.5%; pairs +0.1 -0.1 -1.5 -0.7 +0.3 +0.4 +0.5 +1.6; median pair +0.2%)</td></tr>
+</tbody>
+</table></div>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

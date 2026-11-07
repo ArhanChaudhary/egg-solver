@@ -1,0 +1,201 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Solvers — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../../history/index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="Home.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="solvers">Solvers</h1>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>Solver</th><th>Language</th><th>Variations</th></tr>
+</thead>
+<tbody>
+<tr><td><a href="https://github.com/rokicki/cube20src">nxopt</a></td><td>c++</td><td>nxopt11, nxopt21, nxopt31, nxopt22</td></tr>
+<tr><td><a href="https://github.com/Voltara/vcube/">vcube</a></td><td>c++</td><td>vcube104, vcube108, vcube112, vcube208, vcube308</td></tr>
+<tr><td><a href="https://www.cflmath.com/Rubik/optimal_solver.html">reid's optimal solver</a></td><td>c</td><td>reid</td></tr>
+<tr><td><a href="https://github.com/hkociemba/RubiksCube-OptimalSolver">Kociemba's optimal solver</a></td><td>python</td><td>kocpy</td></tr>
+<tr><td><a href="https://kociemba.org/cube.htm">Cube Explorer</a></td><td>pascal</td><td>CE, CEhuge</td></tr>
+<tr><td>Open Source <a href="https://github.com/cs0x7f/CubeExplorer/tree/fpc">Cube Explorer</a></td><td>pascal</td><td>kocce0, kocce1, kocce2</td></tr>
+<tr><td><a href="https://github.com/mfeather1/3ColorCube">3ColorCube</a></td><td>javascript</td><td>3Color835M, 3ColorOpt</td></tr>
+<tr><td><a href="https://github.com/TAR-ALEX/stickersolve">stickersolve</a></td><td>c++</td><td>sticker</td></tr>
+<tr><td><a href="https://github.com/abdelmaged92/Rubiks-Cube-Optimal-Solver">Rubiks-Cube-Optimal-Solver</a></td><td>java</td><td>optjava</td></tr>
+<tr><td><a href="https://github.com/sebastianotronto/nissy-classic">nissy-classic</a></td><td>c</td><td>nissyc</td></tr>
+<tr><td><a href="https://github.com/sebastianotronto/nissy-core">nissy-core</a></td><td>c</td><td>h48h0, h48h1, .., h48h11</td></tr>
+<tr><td><a href="https://github.com/cs0x7f/cubeopt">cubeopt</a></td><td>c++</td><td>cubeopt, cube48opt, cubenp</td></tr>
+</tbody>
+</table></div>
+<h1 id="space-node-product">Space-node product</h1>
+<p>Pruning table size * number of nodes visited, less is better.</p>
+<p>Average of 100 solves, in units of 1e15 Bytes (1PB).</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>Solver</th><th>Table/MB</th><th>15f</th><th>16f</th><th>17f</th><th>inf</th></tr>
+</thead>
+<tbody>
+<tr><td>nxopt11</td><td>20.3366</td><td>0.085</td><td>1.030</td><td>13.757</td><td></td></tr>
+<tr><td>nxopt21</td><td>325.386</td><td>0.147</td><td>1.367</td><td>16.563</td><td></td></tr>
+<tr><td>nxopt31</td><td>2603.08</td><td>0.315</td><td>2.246</td><td>20.307</td><td>183.431</td></tr>
+<tr><td>nxopt22</td><td>7809.26</td><td>0.664</td><td>2.936</td><td>28.020</td><td>216.542</td></tr>
+<tr><td>vcube104</td><td>20.3366</td><td>0.087</td><td>1.028</td><td>13.720</td><td></td></tr>
+<tr><td>vcube108</td><td>325.386</td><td>0.140</td><td>1.398</td><td>17.019</td><td></td></tr>
+<tr><td>vcube112</td><td>2603.08</td><td>0.279</td><td>2.306</td><td>20.400</td><td>182.078</td></tr>
+<tr><td>vcube208</td><td>7809.26</td><td>0.586</td><td>2.874</td><td>28.184</td><td>217.277</td></tr>
+<tr><td>vcube308</td><td>22777.0</td><td>0.501</td><td>3.439</td><td>28.038</td><td>221.597</td></tr>
+<tr><td>reid</td><td>35.22*2</td><td>0.907</td><td>11.360</td><td>95.391</td><td></td></tr>
+<tr><td>kocpy</td><td>833.172</td><td>0.916</td><td>11.057</td><td>110.312</td><td></td></tr>
+<tr><td>kocce0</td><td>28.1816</td><td>0.166</td><td>2.021</td><td>20.483</td><td></td></tr>
+<tr><td>kocce1</td><td>705.886</td><td>0.514</td><td>6.263</td><td>62.805</td><td>451.286</td></tr>
+<tr><td>kocce2</td><td>1972.71</td><td>0.532</td><td>6.269</td><td>63.334</td><td>450.707</td></tr>
+<tr><td>CE</td><td>28.1816</td><td>0.169</td><td>2.021</td><td>20.483</td><td></td></tr>
+<tr><td>CEhuge</td><td>1972.71</td><td>0.509</td><td>6.269</td><td>63.334</td><td>436.803</td></tr>
+<tr><td>3Color835M</td><td>1043.65</td><td>1.514</td><td>15.561</td><td>163.006</td><td></td></tr>
+<tr><td>3ColorOpt</td><td>2959.11</td><td>1.497</td><td>14.085</td><td>138.270</td><td>763.862</td></tr>
+<tr><td>sticker</td><td>12884.9</td><td>7.524</td><td>52.351</td><td>508.051</td><td></td></tr>
+<tr><td>nissyc</td><td>2465.89</td><td>0.284</td><td>3.134</td><td>33.405</td><td>249.992</td></tr>
+<tr><td>optjava</td><td>1972.71</td><td>0.696</td><td>7.654</td><td>76.829</td><td>545.364</td></tr>
+<tr><td>h48h0</td><td>31.6839</td><td>0.385</td><td>2.674</td><td></td><td></td></tr>
+<tr><td>h48h1</td><td>61.3072</td><td>0.414</td><td>2.649</td><td></td><td></td></tr>
+<tr><td>h48h2</td><td>120.553</td><td>0.465</td><td>2.621</td><td>29.264</td><td></td></tr>
+<tr><td>h48h3</td><td>239.047</td><td>0.559</td><td>2.875</td><td>28.383</td><td></td></tr>
+<tr><td>h48h4</td><td>476.033</td><td>0.824</td><td>3.660</td><td>33.336</td><td></td></tr>
+<tr><td>h48h5</td><td>950.006</td><td>1.085</td><td>5.305</td><td>32.799</td><td>285.473</td></tr>
+<tr><td>h48h6</td><td>1897.95</td><td>1.646</td><td>7.148</td><td>33.918</td><td>274.457</td></tr>
+<tr><td>h48h7</td><td>3793.84</td><td>2.713</td><td>5.990</td><td>37.688</td><td>277.246</td></tr>
+<tr><td>h48h8</td><td>7585.62</td><td>5.158</td><td>10.491</td><td>54.859</td><td>343.333</td></tr>
+<tr><td>h48h9</td><td>15169.1</td><td>8.904</td><td>14.881</td><td>56.217</td><td>312.741</td></tr>
+<tr><td>cubeopt10</td><td>20.3366</td><td>0.076</td><td>0.920</td><td>12.304</td><td></td></tr>
+<tr><td>cubeopt01</td><td>88.9728</td><td>0.155</td><td>1.911</td><td>21.347</td><td></td></tr>
+<tr><td>cubeopt20</td><td>325.386</td><td>0.122</td><td>1.340</td><td>15.355</td><td></td></tr>
+<tr><td>cubeopt11</td><td>1423.56</td><td>0.212</td><td>2.117</td><td>22.377</td><td>213.026</td></tr>
+<tr><td>cubeopt30</td><td>2603.08</td><td>0.185</td><td>1.859</td><td>18.323</td><td>175.937</td></tr>
+<tr><td>cube48opt1</td><td>30.4012</td><td>0.205</td><td>2.369</td><td>25.802</td><td></td></tr>
+<tr><td>cube48opt2</td><td>121.605</td><td>0.203</td><td>2.083</td><td>23.104</td><td></td></tr>
+<tr><td>cube48opt3</td><td>243.210</td><td>0.208</td><td>2.127</td><td>22.780</td><td></td></tr>
+<tr><td>cube48opt4</td><td>486.420</td><td>0.230</td><td>1.948</td><td>21.867</td><td></td></tr>
+<tr><td>cube48opt5</td><td>972.840</td><td>0.228</td><td>1.927</td><td>22.786</td><td>200.037</td></tr>
+<tr><td>cube48opt6</td><td>1945.68</td><td>0.230</td><td>1.985</td><td>22.940</td><td>197.870</td></tr>
+<tr><td>cube48opt7</td><td>3891.36</td><td>0.241</td><td>1.965</td><td>23.780</td><td>199.615</td></tr>
+<tr><td>cube48opt8</td><td>7782.72</td><td>0.335</td><td>2.483</td><td>26.780</td><td>197.300</td></tr>
+<tr><td>cube48opt9</td><td>15565.4</td><td>0.342</td><td>2.755</td><td>27.722</td><td>200.622</td></tr>
+<tr><td>cubenp10</td><td>22.7620</td><td>0.052</td><td>0.634</td><td>8.532</td><td></td></tr>
+<tr><td>cubenp01</td><td>99.5841</td><td>0.112</td><td>1.318</td><td>15.085</td><td></td></tr>
+<tr><td>cubenp20</td><td>364.193</td><td>0.083</td><td>0.870</td><td>10.307</td><td></td></tr>
+<tr><td>cubenp11</td><td>1593.34</td><td>0.158</td><td>1.585</td><td>16.383</td><td></td></tr>
+<tr><td>cubenp30</td><td>2913.54</td><td>0.125</td><td>1.227</td><td>12.718</td><td>114.453</td></tr>
+</tbody>
+</table></div>
+<h1 id="number-of-nodes-visited">Number of nodes visited</h1>
+<p>Average of 100 solves, in units of 1 million, less is better.</p>
+<p>&quot;X-move&quot; denotes random-move scramble of specific number of moves, &quot;inf-move&quot; denotes random-state scramble.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>Solver</th><th>15-move</th><th>16-move</th><th>17-move</th><th>inf-move</th></tr>
+</thead>
+<tbody>
+<tr><td>nxopt11</td><td>4.180</td><td>50.627</td><td>676.488</td><td></td></tr>
+<tr><td>nxopt21</td><td>0.451</td><td>4.200</td><td>50.902</td><td></td></tr>
+<tr><td>nxopt31</td><td>0.121</td><td>0.863</td><td>7.801</td><td>70.467</td></tr>
+<tr><td>nxopt22</td><td>0.085</td><td>0.376</td><td>3.588</td><td>27.729</td></tr>
+<tr><td>vcube104</td><td>4.295</td><td>50.568</td><td>674.668</td><td></td></tr>
+<tr><td>vcube108</td><td>0.431</td><td>4.297</td><td>52.306</td><td></td></tr>
+<tr><td>vcube112</td><td>0.107</td><td>0.886</td><td>7.837</td><td>69.947</td></tr>
+<tr><td>vcube208</td><td>0.075</td><td>0.368</td><td>3.609</td><td>27.823</td></tr>
+<tr><td>vcube308</td><td>0.022</td><td>0.151</td><td>1.231</td><td>9.729</td></tr>
+<tr><td>reid</td><td>12.877</td><td>161.25</td><td>1353.948</td><td></td></tr>
+<tr><td>kocpy</td><td>1.100</td><td>13.271</td><td>132.400</td><td></td></tr>
+<tr><td>kocce0</td><td>5.899</td><td>71.722</td><td>726.828</td><td></td></tr>
+<tr><td>kocce1</td><td>0.729</td><td>8.873</td><td>88.973</td><td>639.318</td></tr>
+<tr><td>kocce2</td><td>0.270</td><td>3.178</td><td>32.105</td><td>228.471</td></tr>
+<tr><td>CE</td><td>6.004</td><td>71.721</td><td>726.827</td><td></td></tr>
+<tr><td>CEhuge</td><td>0.258</td><td>3.178</td><td>32.105</td><td>221.423</td></tr>
+<tr><td>3Color835M</td><td>1.451</td><td>14.910</td><td>156.188</td><td></td></tr>
+<tr><td>3ColorOpt</td><td>0.506</td><td>4.760</td><td>46.727</td><td>258.139</td></tr>
+<tr><td>sticker</td><td>0.584</td><td>4.063</td><td>39.430</td><td></td></tr>
+<tr><td>nissyc</td><td>0.115</td><td>1.271</td><td>13.547</td><td>101.380</td></tr>
+<tr><td>optjava</td><td>0.353</td><td>3.880</td><td>38.946</td><td>276.454</td></tr>
+<tr><td>h48h0</td><td>12.141</td><td>84.394</td><td></td><td></td></tr>
+<tr><td>h48h1</td><td>6.759</td><td>43.212</td><td></td><td></td></tr>
+<tr><td>h48h2</td><td>3.860</td><td>21.745</td><td>242.747</td><td></td></tr>
+<tr><td>h48h3</td><td>2.337</td><td>12.025</td><td>118.734</td><td></td></tr>
+<tr><td>h48h4</td><td>1.732</td><td>7.689</td><td>70.029</td><td></td></tr>
+<tr><td>h48h5</td><td>1.142</td><td>5.584</td><td>34.525</td><td>300.496</td></tr>
+<tr><td>h48h6</td><td>0.867</td><td>3.766</td><td>17.871</td><td>144.607</td></tr>
+<tr><td>h48h7</td><td>0.715</td><td>1.579</td><td>9.934</td><td>73.078</td></tr>
+<tr><td>h48h8</td><td>0.680</td><td>1.383</td><td>7.232</td><td>45.261</td></tr>
+<tr><td>h48h9</td><td>0.587</td><td>0.981</td><td>3.706</td><td>20.617</td></tr>
+<tr><td>cubeopt10</td><td>3.733</td><td>45.261</td><td>605.024</td><td></td></tr>
+<tr><td>cubeopt01</td><td>1.743</td><td>21.482</td><td>239.927</td><td></td></tr>
+<tr><td>cubeopt20</td><td>0.375</td><td>4.119</td><td>47.191</td><td></td></tr>
+<tr><td>cubeopt11</td><td>0.149</td><td>1.487</td><td>15.719</td><td>149.643</td></tr>
+<tr><td>cubeopt30</td><td>0.071</td><td>0.714</td><td>7.039</td><td>67.588</td></tr>
+<tr><td>cube48opt1</td><td>6.747</td><td>77.913</td><td>848.722</td><td></td></tr>
+<tr><td>cube48opt2</td><td>1.666</td><td>17.132</td><td>189.996</td><td></td></tr>
+<tr><td>cube48opt3</td><td>0.855</td><td>8.746</td><td>93.665</td><td></td></tr>
+<tr><td>cube48opt4</td><td>0.472</td><td>4.005</td><td>44.955</td><td></td></tr>
+<tr><td>cube48opt5</td><td>0.234</td><td>1.981</td><td>23.422</td><td>205.622</td></tr>
+<tr><td>cube48opt6</td><td>0.118</td><td>1.020</td><td>11.790</td><td>101.697</td></tr>
+<tr><td>cube48opt7</td><td>0.062</td><td>0.505</td><td>6.111</td><td>51.297</td></tr>
+<tr><td>cube48opt8</td><td>0.043</td><td>0.319</td><td>3.441</td><td>25.351</td></tr>
+<tr><td>cube48opt9</td><td>0.022</td><td>0.177</td><td>1.781</td><td>12.889</td></tr>
+<tr><td>cubenp10</td><td>2.302</td><td>27.869</td><td>374.873</td><td></td></tr>
+<tr><td>cubenp01</td><td>1.125</td><td>13.239</td><td>151.479</td><td></td></tr>
+<tr><td>cubenp20</td><td>0.229</td><td>2.388</td><td>28.302</td><td></td></tr>
+<tr><td>cubenp11</td><td>0.099</td><td>0.995</td><td>10.282</td><td></td></tr>
+<tr><td>cubenp30</td><td>0.043</td><td>0.421</td><td>4.365</td><td>39.283</td></tr>
+</tbody>
+</table></div>
+<h1 id="average-time-per-node">Average time per node</h1>
+<p>Average of 100 solves, in units of 1 nanosecond, less is better.</p>
+<p>Please note that the following results are highly dependent on the executing environment.</p>
+<h2 id="intel-core-i7-10750h-6-core-12-thread">Intel Core i7-10750H (6-core 12-thread)</h2>
+<p>transparent hugepage is set to &quot;always&quot;</p>
+<p>Single-thread results</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>Solver</th><th>ns/node</th><th>sec/solv</th><th>GB*sec</th></tr>
+</thead>
+<tbody>
+<tr><td>nxopt31</td><td>162.57</td><td>11.456</td><td>29.821</td></tr>
+<tr><td>nxopt22</td><td>220.52</td><td>6.115</td><td>47.752</td></tr>
+<tr><td>vcube112</td><td>106.64</td><td>7.459</td><td>19.417</td></tr>
+<tr><td>vcube208</td><td>147.54</td><td>4.105</td><td>32.057</td></tr>
+<tr><td>vcube308</td><td>210.14</td><td>2.044</td><td>46.566</td></tr>
+<tr><td>kocce2</td><td>123.37</td><td>28.187</td><td>55.605</td></tr>
+<tr><td>h48h5</td><td>80.20</td><td>24.099</td><td>22.894</td></tr>
+<tr><td>h48h6</td><td>74.39</td><td>10.758</td><td>20.417</td></tr>
+<tr><td>h48h7</td><td>76.95</td><td>5.624</td><td>21.335</td></tr>
+<tr><td>h48h8</td><td>80.10</td><td>3.625</td><td>27.500</td></tr>
+<tr><td>h48h9</td><td>98.18</td><td>2.024</td><td>30.706</td></tr>
+<tr><td>cubeopt30</td><td>70.74</td><td>4.781</td><td>12.445</td></tr>
+<tr><td>cubenp30</td><td>106.40</td><td>4.180</td><td>12.152</td></tr>
+<tr><td>cube48opt5</td><td>40.51</td><td>8.329</td><td>8.103</td></tr>
+<tr><td>cube48opt6</td><td>40.43</td><td>4.112</td><td>8.001</td></tr>
+<tr><td>cube48opt7</td><td>41.02</td><td>2.104</td><td>8.188</td></tr>
+<tr><td>cube48opt8</td><td>46.45</td><td>1.178</td><td>9.164</td></tr>
+<tr><td>cube48opt9</td><td>48.26</td><td>0.622</td><td>9.681</td></tr>
+</tbody>
+</table></div>
+<p>12-thread results</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>Solver</th><th>ns/node</th><th>sec/solv</th><th>GB*sec</th></tr>
+</thead>
+<tbody>
+<tr><td>nxopt31</td><td>20.747</td><td>1.462</td><td>3.806</td></tr>
+<tr><td>nxopt22</td><td>28.762</td><td>0.798</td><td>6.228</td></tr>
+<tr><td>vcube112</td><td>17.904</td><td>1.252</td><td>3.260</td></tr>
+<tr><td>vcube208</td><td>22.424</td><td>0.624</td><td>4.872</td></tr>
+<tr><td>vcube308</td><td>30.253</td><td>0.294</td><td>6.704</td></tr>
+<tr><td>kocce2</td><td>15.231</td><td>3.480</td><td>6.865</td></tr>
+<tr><td>h48h5</td><td>15.230</td><td>4.577</td><td>4.348</td></tr>
+<tr><td>h48h6</td><td>14.877</td><td>2.151</td><td>4.083</td></tr>
+<tr><td>h48h7</td><td>14.883</td><td>1.088</td><td>4.126</td></tr>
+<tr><td>h48h8</td><td>15.462</td><td>0.700</td><td>5.309</td></tr>
+<tr><td>h48h9</td><td>16.353</td><td>0.337</td><td>5.114</td></tr>
+<tr><td>cubeopt30</td><td>11.392</td><td>0.770</td><td>2.004</td></tr>
+<tr><td>cubenp30</td><td>17.040</td><td>0.669</td><td>1.946</td></tr>
+<tr><td>cube48opt5</td><td>6.920</td><td>1.423</td><td>1.384</td></tr>
+<tr><td>cube48opt6</td><td>6.852</td><td>0.697</td><td>1.356</td></tr>
+<tr><td>cube48opt7</td><td>6.927</td><td>0.355</td><td>1.383</td></tr>
+<tr><td>cube48opt8</td><td>6.788</td><td>0.172</td><td>1.339</td></tr>
+<tr><td>cube48opt9</td><td>7.445</td><td>0.096</td><td>1.494</td></tr>
+<tr><td>CEhuge[1]</td><td>19.570</td><td>4.333</td><td>8.548</td></tr>
+<tr><td>optjava</td><td>33.587</td><td>9.285</td><td>18.317</td></tr>
+</tbody>
+</table></div>
+<p>[1] Huge page is not enabled in windows.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

@@ -1,0 +1,597 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>solve.rs — source evidence</title><style>body{font:15px system-ui;margin:2rem}pre{font:13px/1.6 monospace;overflow:auto}.line:target{background:#fff0a0}a{color:#42617a;text-decoration:none}</style><h1>solve.rs</h1><p>Source evidence snapshot. Original file SHA-256: <code>cc4795f69fae8b81707e0c79ca7437658881e940f1170e179298e4f27303c0ed</code>. <a href="solve.rs">Raw source</a></p><pre><span class="line" id="L1"><a href="#L1">    1</a> //! Solve scrambles read from stdin (one per line, e.g. `R3 B1 F2 L2 U3`, as</span>
+<span class="line" id="L2"><a href="#L2">    2</a> //! in `cube_solver_test`) optimally with the work-sharing lanes</span>
+<span class="line" id="L3"><a href="#L3">    3</a> //! (`lanes::share`).</span>
+<span class="line" id="L4"><a href="#L4">    4</a> //!</span>
+<span class="line" id="L5"><a href="#L5">    5</a> //! ```text</span>
+<span class="line" id="L6"><a href="#L6">    6</a> //! Usage: solve [OPTIONS] &lt;TABLE&gt; &lt; scrambles</span>
+<span class="line" id="L7"><a href="#L7">    7</a> //!   -t  threads (default: all cores)</span>
+<span class="line" id="L8"><a href="#L8">    8</a> //!   -l  interleaved lanes per thread (default: from `&lt;table&gt;.tune` if</span>
+<span class="line" id="L9"><a href="#L9">    9</a> //!       `bench &lt;table&gt; tune` made one, else `tables::file::untuned_lanes`)</span>
+<span class="line" id="L10"><a href="#L10">   10</a> //!   -c  cubes in progress at once: 1 solves one cube at a time with all</span>
+<span class="line" id="L11"><a href="#L11">   11</a> //!       threads (latency); 0 (default) solves the whole input as a batch</span>
+<span class="line" id="L12"><a href="#L12">   12</a> //!   -n  solve only the first `count` scrambles</span>
+<span class="line" id="L13"><a href="#L13">   13</a> //! ```</span>
+<span class="line" id="L14"><a href="#L14">   14</a> //! (`solve --help` has all options.)</span>
+<span class="line" id="L15"><a href="#L15">   15</a> //!</span>
+<span class="line" id="L16"><a href="#L16">   16</a> //! Output, one line per cube in completion order, then a summary:</span>
+<span class="line" id="L17"><a href="#L17">   17</a> //!</span>
+<span class="line" id="L18"><a href="#L18">   18</a> //! ```text</span>
+<span class="line" id="L19"><a href="#L19">   19</a> //! solved &lt;index&gt; &lt;length&gt; &lt;nodes&gt; &lt;seconds&gt; &lt;solution&gt;</span>
+<span class="line" id="L20"><a href="#L20">   20</a> //! total &lt;cubes&gt; cubes wall &lt;seconds&gt; wall/cube &lt;seconds&gt; nodes/cube &lt;n&gt; ...</span>
+<span class="line" id="L21"><a href="#L21">   21</a> //! ```</span>
+<span class="line" id="L22"><a href="#L22">   22</a> //!</span>
+<span class="line" id="L23"><a href="#L23">   23</a> //! `seconds` is the cube&#x27;s time from its start to its solution (with -c 1,</span>
+<span class="line" id="L24"><a href="#L24">   24</a> //! its latency). Every solution is verified; a wrong one is reported as</span>
+<span class="line" id="L25"><a href="#L25">   25</a> //! `BAD &lt;index&gt;` and makes the exit status 1. With `--json`, the same as</span>
+<span class="line" id="L26"><a href="#L26">   26</a> //! JSON lines (`Line`).</span>
+<span class="line" id="L27"><a href="#L27">   27</a> //!</span>
+<span class="line" id="L28"><a href="#L28">   28</a> //! `solve --fast [SCRAMBLE]...` solves one scramble as fast as this machine</span>
+<span class="line" id="L29"><a href="#L29">   29</a> //! can (what fast.sh did): the largest table found, all threads on the one</span>
+<span class="line" id="L30"><a href="#L30">   30</a> //! cube (`-c 1`), a warm-up cube first; see `run_fast`.</span>
+<span class="line" id="L31"><a href="#L31">   31</a> //!</span>
+<span class="line" id="L32"><a href="#L32">   32</a> //! `solve --shm-load TABLE` loads a table into a shared memory segment that</span>
+<span class="line" id="L33"><a href="#L33">   33</a> //! later runs attach at once (`--shm`; README.md &quot;Shared memory&quot;), `solve</span>
+<span class="line" id="L34"><a href="#L34">   34</a> //! --shm-remove TABLE` removes it.</span>
+<span class="line" id="L35"><a href="#L35">   35</a> </span>
+<span class="line" id="L36"><a href="#L36">   36</a> // No intentional panics in shipped code (user request; asserts, which no</span>
+<span class="line" id="L37"><a href="#L37">   37</a> // lint covers, are checked by tests/no_runtime_panics.rs).</span>
+<span class="line" id="L38"><a href="#L38">   38</a> #![cfg_attr(</span>
+<span class="line" id="L39"><a href="#L39">   39</a>     not(test),</span>
+<span class="line" id="L40"><a href="#L40">   40</a>     deny(</span>
+<span class="line" id="L41"><a href="#L41">   41</a>         clippy::unwrap_used,</span>
+<span class="line" id="L42"><a href="#L42">   42</a>         clippy::expect_used,</span>
+<span class="line" id="L43"><a href="#L43">   43</a>         clippy::panic,</span>
+<span class="line" id="L44"><a href="#L44">   44</a>         clippy::unreachable,</span>
+<span class="line" id="L45"><a href="#L45">   45</a>         clippy::todo,</span>
+<span class="line" id="L46"><a href="#L46">   46</a>         clippy::unimplemented</span>
+<span class="line" id="L47"><a href="#L47">   47</a>     )</span>
+<span class="line" id="L48"><a href="#L48">   48</a> )]</span>
+<span class="line" id="L49"><a href="#L49">   49</a> </span>
+<span class="line" id="L50"><a href="#L50">   50</a> use anyhow::Context as _;</span>
+<span class="line" id="L51"><a href="#L51">   51</a> use clap::Parser;</span>
+<span class="line" id="L52"><a href="#L52">   52</a> use egg_solver::cli::{self, BadInput, LoadArgs, Verbosity};</span>
+<span class="line" id="L53"><a href="#L53">   53</a> use egg_solver::cubie::{format_moves, parse_moves, CubieCube, Rng};</span>
+<span class="line" id="L54"><a href="#L54">   54</a> use egg_solver::lanes::share::Pool;</span>
+<span class="line" id="L55"><a href="#L55">   55</a> use egg_solver::solver::{Solver, Stats};</span>
+<span class="line" id="L56"><a href="#L56">   56</a> use egg_solver::tables::Cocsep;</span>
+<span class="line" id="L57"><a href="#L57">   57</a> use std::hash::{Hash as _, Hasher as _};</span>
+<span class="line" id="L58"><a href="#L58">   58</a> use std::io::{BufRead, Write};</span>
+<span class="line" id="L59"><a href="#L59">   59</a> use std::path::Path;</span>
+<span class="line" id="L60"><a href="#L60">   60</a> use std::process::ExitCode;</span>
+<span class="line" id="L61"><a href="#L61">   61</a> use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};</span>
+<span class="line" id="L62"><a href="#L62">   62</a> use std::sync::{Mutex, PoisonError};</span>
+<span class="line" id="L63"><a href="#L63">   63</a> use std::time::Instant;</span>
+<span class="line" id="L64"><a href="#L64">   64</a> </span>
+<span class="line" id="L65"><a href="#L65">   65</a> // `share::Worker::rounds`&#x27;s section starts on a page boundary, `SHARE_LINE`</span>
+<span class="line" id="L66"><a href="#L66">   66</a> // bytes before the library&#x27;s 64-byte pad (a binary&#x27;s module asm comes before</span>
+<span class="line" id="L67"><a href="#L67">   67</a> // the library&#x27;s), so the round loop starts at page offset 0x310, as on main,</span>
+<span class="line" id="L68"><a href="#L68">   68</a> // whatever code or data is added before it (`.text` starts after the</span>
+<span class="line" id="L69"><a href="#L69">   69</a> // unwind tables, which grow with every function). Only in `solve`: `bench`</span>
+<span class="line" id="L70"><a href="#L70">   70</a> // keeps main&#x27;s layout (s9).</span>
+<span class="line" id="L71"><a href="#L71">   71</a> #[cfg(all(target_arch = &quot;x86_64&quot;, target_os = &quot;linux&quot;))]</span>
+<span class="line" id="L72"><a href="#L72">   72</a> const SHARE_LINE: usize = 0x300;</span>
+<span class="line" id="L73"><a href="#L73">   73</a> #[cfg(all(target_arch = &quot;x86_64&quot;, target_os = &quot;linux&quot;))]</span>
+<span class="line" id="L74"><a href="#L74">   74</a> core::arch::global_asm!(</span>
+<span class="line" id="L75"><a href="#L75">   75</a>     &quot;.pushsection .text.hot_share,\&quot;ax\&quot;,@progbits&quot;,</span>
+<span class="line" id="L76"><a href="#L76">   76</a>     &quot;.p2align 12&quot;,</span>
+<span class="line" id="L77"><a href="#L77">   77</a>     &quot;.skip {pad}, 0xcc&quot;,</span>
+<span class="line" id="L78"><a href="#L78">   78</a>     &quot;.popsection&quot;,</span>
+<span class="line" id="L79"><a href="#L79">   79</a>     pad = const SHARE_LINE,</span>
+<span class="line" id="L80"><a href="#L80">   80</a> );</span>
+<span class="line" id="L81"><a href="#L81">   81</a> </span>
+<span class="line" id="L82"><a href="#L82">   82</a> /// `share::solve_all` with `Pool::run_pinned`: each worker&#x27;s state and stack</span>
+<span class="line" id="L83"><a href="#L83">   83</a> /// frames at fixed offsets within a page (main&#x27;s offsets, so -c 1 is</span>
+<span class="line" id="L84"><a href="#L84">   84</a> /// unchanged; see `Pool::run_pinned`).</span>
+<span class="line" id="L85"><a href="#L85">   85</a> fn solve_all_pinned(</span>
+<span class="line" id="L86"><a href="#L86">   86</a>     solver: &amp;Solver,</span>
+<span class="line" id="L87"><a href="#L87">   87</a>     cubes: &amp;(dyn Fn(usize) -&gt; Option&lt;CubieCube&gt; + Sync),</span>
+<span class="line" id="L88"><a href="#L88">   88</a>     threads: usize,</span>
+<span class="line" id="L89"><a href="#L89">   89</a>     lanes: usize,</span>
+<span class="line" id="L90"><a href="#L90">   90</a>     max_active: usize,</span>
+<span class="line" id="L91"><a href="#L91">   91</a>     done: &amp;(dyn Fn(usize, Option&lt;Vec&lt;u8&gt;&gt;, Stats, f64) + Sync),</span>
+<span class="line" id="L92"><a href="#L92">   92</a> ) -&gt; anyhow::Result&lt;()&gt; {</span>
+<span class="line" id="L93"><a href="#L93">   93</a>     let pool = Pool::new(cubes, max_active, threads);</span>
+<span class="line" id="L94"><a href="#L94">   94</a>     let stop = AtomicBool::new(false);</span>
+<span class="line" id="L95"><a href="#L95">   95</a>     std::thread::scope(|scope| {</span>
+<span class="line" id="L96"><a href="#L96">   96</a>         let mut spawned = Vec::with_capacity(threads.max(1));</span>
+<span class="line" id="L97"><a href="#L97">   97</a>         let mut result = Ok(());</span>
+<span class="line" id="L98"><a href="#L98">   98</a>         for _ in 0..threads.max(1) {</span>
+<span class="line" id="L99"><a href="#L99">   99</a>             let thread = std::thread::Builder::new()</span>
+<span class="line" id="L100"><a href="#L100">  100</a>                 .spawn_scoped(scope, || pool.run_pinned(solver, lanes, &amp;stop, done));</span>
+<span class="line" id="L101"><a href="#L101">  101</a>             match thread {</span>
+<span class="line" id="L102"><a href="#L102">  102</a>                 Ok(thread) =&gt; spawned.push(thread),</span>
+<span class="line" id="L103"><a href="#L103">  103</a>                 Err(error) =&gt; {</span>
+<span class="line" id="L104"><a href="#L104">  104</a>                     stop.store(true, Ordering::Relaxed);</span>
+<span class="line" id="L105"><a href="#L105">  105</a>                     result = Err(anyhow::Error::from(error).context(&quot;cannot start a thread&quot;));</span>
+<span class="line" id="L106"><a href="#L106">  106</a>                     break;</span>
+<span class="line" id="L107"><a href="#L107">  107</a>                 }</span>
+<span class="line" id="L108"><a href="#L108">  108</a>             }</span>
+<span class="line" id="L109"><a href="#L109">  109</a>         }</span>
+<span class="line" id="L110"><a href="#L110">  110</a>         let mut all_ok = true;</span>
+<span class="line" id="L111"><a href="#L111">  111</a>         for thread in spawned {</span>
+<span class="line" id="L112"><a href="#L112">  112</a>             if thread.join().is_err() {</span>
+<span class="line" id="L113"><a href="#L113">  113</a>                 stop.store(true, Ordering::Relaxed);</span>
+<span class="line" id="L114"><a href="#L114">  114</a>                 all_ok = false;</span>
+<span class="line" id="L115"><a href="#L115">  115</a>             }</span>
+<span class="line" id="L116"><a href="#L116">  116</a>         }</span>
+<span class="line" id="L117"><a href="#L117">  117</a>         result?;</span>
+<span class="line" id="L118"><a href="#L118">  118</a>         anyhow::ensure!(all_ok, &quot;a thread panicked&quot;);</span>
+<span class="line" id="L119"><a href="#L119">  119</a>         Ok(())</span>
+<span class="line" id="L120"><a href="#L120">  120</a>     })</span>
+<span class="line" id="L121"><a href="#L121">  121</a> }</span>
+<span class="line" id="L122"><a href="#L122">  122</a> </span>
+<span class="line" id="L123"><a href="#L123">  123</a> /// Solve Rubik&#x27;s cube scrambles from stdin optimally (fewest moves, any</span>
+<span class="line" id="L124"><a href="#L124">  124</a> /// face turn is one move).</span>
+<span class="line" id="L125"><a href="#L125">  125</a> #[derive(Parser, Debug)]</span>
+<span class="line" id="L126"><a href="#L126">  126</a> #[command(name = &quot;solve&quot;, version, after_long_help = OUTPUT_HELP)]</span>
+<span class="line" id="L127"><a href="#L127">  127</a> struct Args {</span>
+<span class="line" id="L128"><a href="#L128">  128</a>     /// The table file (made by `gen`, e.g. `gen 8 auto h8`) [with --fast:</span>
+<span class="line" id="L129"><a href="#L129">  129</a>     /// the largest found].</span>
+<span class="line" id="L130"><a href="#L130">  130</a>     #[arg(required_unless_present_any = [</span>
+<span class="line" id="L131"><a href="#L131">  131</a>         &quot;completions&quot;,</span>
+<span class="line" id="L132"><a href="#L132">  132</a>         &quot;fast&quot;,</span>
+<span class="line" id="L133"><a href="#L133">  133</a>         &quot;table_flag&quot;,</span>
+<span class="line" id="L134"><a href="#L134">  134</a>         &quot;shm_load&quot;,</span>
+<span class="line" id="L135"><a href="#L135">  135</a>         &quot;shm_remove&quot;,</span>
+<span class="line" id="L136"><a href="#L136">  136</a>     ])]</span>
+<span class="line" id="L137"><a href="#L137">  137</a>     table: Option&lt;String&gt;,</span>
+<span class="line" id="L138"><a href="#L138">  138</a>     /// The table file (as TABLE).</span>
+<span class="line" id="L139"><a href="#L139">  139</a>     #[arg(</span>
+<span class="line" id="L140"><a href="#L140">  140</a>         long = &quot;table&quot;,</span>
+<span class="line" id="L141"><a href="#L141">  141</a>         id = &quot;table_flag&quot;,</span>
+<span class="line" id="L142"><a href="#L142">  142</a>         value_name = &quot;TABLE&quot;,</span>
+<span class="line" id="L143"><a href="#L143">  143</a>         env = egg_solver::env::name(&quot;EGG_SOLVER_TABLE&quot;)</span>
+<span class="line" id="L144"><a href="#L144">  144</a>     )]</span>
+<span class="line" id="L145"><a href="#L145">  145</a>     table_flag: Option&lt;String&gt;,</span>
+<span class="line" id="L146"><a href="#L146">  146</a>     /// Threads.</span>
+<span class="line" id="L147"><a href="#L147">  147</a>     #[arg(</span>
+<span class="line" id="L148"><a href="#L148">  148</a>         short,</span>
+<span class="line" id="L149"><a href="#L149">  149</a>         long,</span>
+<span class="line" id="L150"><a href="#L150">  150</a>         env = egg_solver::env::name(&quot;EGG_SOLVER_THREADS&quot;),</span>
+<span class="line" id="L151"><a href="#L151">  151</a>         default_value_t = egg_solver::thread_count(),</span>
+<span class="line" id="L152"><a href="#L152">  152</a>         value_parser = cli::positive(),</span>
+<span class="line" id="L153"><a href="#L153">  153</a>     )]</span>
+<span class="line" id="L154"><a href="#L154">  154</a>     threads: usize,</span>
+<span class="line" id="L155"><a href="#L155">  155</a>     /// Interleaved lanes per thread [default: from `&lt;TABLE&gt;.tune` if `bench</span>
+<span class="line" id="L156"><a href="#L156">  156</a>     /// tune` made one, else a default for the table&#x27;s size].</span>
+<span class="line" id="L157"><a href="#L157">  157</a>     #[arg(short, long, value_parser = cli::positive())]</span>
+<span class="line" id="L158"><a href="#L158">  158</a>     lanes: Option&lt;usize&gt;,</span>
+<span class="line" id="L159"><a href="#L159">  159</a>     /// Cubes in progress at once: 1 solves one cube at a time with all</span>
+<span class="line" id="L160"><a href="#L160">  160</a>     /// threads (lowest latency); 0 the whole input as a batch (highest</span>
+<span class="line" id="L161"><a href="#L161">  161</a>     /// throughput).</span>
+<span class="line" id="L162"><a href="#L162">  162</a>     #[arg(short, long, default_value_t = 0)]</span>
+<span class="line" id="L163"><a href="#L163">  163</a>     concurrency: usize,</span>
+<span class="line" id="L164"><a href="#L164">  164</a>     /// Solve only the first COUNT scrambles.</span>
+<span class="line" id="L165"><a href="#L165">  165</a>     #[arg(short = &#x27;n&#x27;, long)]</span>
+<span class="line" id="L166"><a href="#L166">  166</a>     count: Option&lt;usize&gt;,</span>
+<span class="line" id="L167"><a href="#L167">  167</a>     /// Print JSON lines: one object per cube, then the total (with --fast:</span>
+<span class="line" id="L168"><a href="#L168">  168</a>     /// one object).</span>
+<span class="line" id="L169"><a href="#L169">  169</a>     #[arg(long)]</span>
+<span class="line" id="L170"><a href="#L170">  170</a>     json: bool,</span>
+<span class="line" id="L171"><a href="#L171">  171</a>     /// Solve one scramble (the arguments, or a random 25-move one) as fast</span>
+<span class="line" id="L172"><a href="#L172">  172</a>     /// as this machine can and show the time: the largest table found (hK,</span>
+<span class="line" id="L173"><a href="#L173">  173</a>     /// K from 11 down, in /mnt/huge, /data2/tables, /data/tables, ./tables),</span>
+<span class="line" id="L174"><a href="#L174">  174</a>     /// all threads on the one cube (-c 1), after a warm-up cube; the time</span>
+<span class="line" id="L175"><a href="#L175">  175</a>     /// is the cube&#x27;s own (table load excluded). Don&#x27;t run it beside other</span>
+<span class="line" id="L176"><a href="#L176">  176</a>     /// heavy jobs: they share the cores and the time.</span>
+<span class="line" id="L177"><a href="#L177">  177</a>     #[arg(long, conflicts_with_all = [&quot;concurrency&quot;, &quot;count&quot;])]</span>
+<span class="line" id="L178"><a href="#L178">  178</a>     fast: bool,</span>
+<span class="line" id="L179"><a href="#L179">  179</a>     /// With --fast: the scramble (moves as arguments, or one quoted</span>
+<span class="line" id="L180"><a href="#L180">  180</a>     /// string) [default: a random 25-move scramble].</span>
+<span class="line" id="L181"><a href="#L181">  181</a>     #[arg(value_name = &quot;SCRAMBLE&quot;, requires = &quot;fast&quot;)]</span>
+<span class="line" id="L182"><a href="#L182">  182</a>     scramble: Vec&lt;String&gt;,</span>
+<span class="line" id="L183"><a href="#L183">  183</a>     /// With --fast: the cube solved first, to warm up threads, caches and</span>
+<span class="line" id="L184"><a href="#L184">  184</a>     /// TLBs (&quot;&quot; for none) [default: a fixed 25-move scramble].</span>
+<span class="line" id="L185"><a href="#L185">  185</a>     #[arg(long, value_name = &quot;SCRAMBLE&quot;, requires = &quot;fast&quot;)]</span>
+<span class="line" id="L186"><a href="#L186">  186</a>     warmup: Option&lt;String&gt;,</span>
+<span class="line" id="L187"><a href="#L187">  187</a>     #[command(flatten)]</span>
+<span class="line" id="L188"><a href="#L188">  188</a>     load: LoadArgs,</span>
+<span class="line" id="L189"><a href="#L189">  189</a>     /// Load TABLE into its shared memory segment (as `--shm` does, if it is</span>
+<span class="line" id="L190"><a href="#L190">  190</a>     /// not there yet), print the segment and exit: later runs on TABLE</span>
+<span class="line" id="L191"><a href="#L191">  191</a>     /// attach it at once.</span>
+<span class="line" id="L192"><a href="#L192">  192</a>     #[arg(</span>
+<span class="line" id="L193"><a href="#L193">  193</a>         long,</span>
+<span class="line" id="L194"><a href="#L194">  194</a>         value_name = &quot;TABLE&quot;,</span>
+<span class="line" id="L195"><a href="#L195">  195</a>         conflicts_with_all = [&quot;fast&quot;, &quot;shm_remove&quot;],</span>
+<span class="line" id="L196"><a href="#L196">  196</a>         display_order = 95</span>
+<span class="line" id="L197"><a href="#L197">  197</a>     )]</span>
+<span class="line" id="L198"><a href="#L198">  198</a>     shm_load: Option&lt;String&gt;,</span>
+<span class="line" id="L199"><a href="#L199">  199</a>     /// Remove TABLE&#x27;s shared memory segment (as `ipcrm -M KEY`) and exit: its</span>
+<span class="line" id="L200"><a href="#L200">  200</a>     /// memory is freed once no process has it attached.</span>
+<span class="line" id="L201"><a href="#L201">  201</a>     #[arg(</span>
+<span class="line" id="L202"><a href="#L202">  202</a>         long,</span>
+<span class="line" id="L203"><a href="#L203">  203</a>         value_name = &quot;TABLE&quot;,</span>
+<span class="line" id="L204"><a href="#L204">  204</a>         conflicts_with = &quot;fast&quot;,</span>
+<span class="line" id="L205"><a href="#L205">  205</a>         display_order = 96</span>
+<span class="line" id="L206"><a href="#L206">  206</a>     )]</span>
+<span class="line" id="L207"><a href="#L207">  207</a>     shm_remove: Option&lt;String&gt;,</span>
+<span class="line" id="L208"><a href="#L208">  208</a>     #[command(flatten)]</span>
+<span class="line" id="L209"><a href="#L209">  209</a>     verbosity: Verbosity,</span>
+<span class="line" id="L210"><a href="#L210">  210</a>     /// Print a shell completion script.</span>
+<span class="line" id="L211"><a href="#L211">  211</a>     #[arg(long, value_name = &quot;SHELL&quot;, exclusive = true, hide = true)]</span>
+<span class="line" id="L212"><a href="#L212">  212</a>     completions: Option&lt;clap_complete::Shell&gt;,</span>
+<span class="line" id="L213"><a href="#L213">  213</a> }</span>
+<span class="line" id="L214"><a href="#L214">  214</a> </span>
+<span class="line" id="L215"><a href="#L215">  215</a> const OUTPUT_HELP: &amp;str = &quot;\</span>
+<span class="line" id="L216"><a href="#L216">  216</a> Output, one line per cube in completion order, then a summary:</span>
+<span class="line" id="L217"><a href="#L217">  217</a>   solved &lt;index&gt; &lt;length&gt; &lt;nodes&gt; &lt;seconds&gt; &lt;solution&gt;</span>
+<span class="line" id="L218"><a href="#L218">  218</a>   total &lt;cubes&gt; cubes wall &lt;s&gt; wall/cube &lt;s&gt; nodes/cube &lt;n&gt; threads &lt;t&gt; lanes &lt;l&gt; concurrency &lt;c&gt;</span>
+<span class="line" id="L219"><a href="#L219">  219</a> &lt;seconds&gt; is the cube&#x27;s time from its start to its solution (with -c 1, its</span>
+<span class="line" id="L220"><a href="#L220">  220</a> latency). Every solution is verified: a wrong one is reported as BAD &lt;index&gt;</span>
+<span class="line" id="L221"><a href="#L221">  221</a> and makes the exit status 1. With --json, the same as JSON lines:</span>
+<span class="line" id="L222"><a href="#L222">  222</a>   {\&quot;type\&quot;:\&quot;solved\&quot;,\&quot;index\&quot;:..,\&quot;moves\&quot;:..,\&quot;length\&quot;:..,\&quot;nodes\&quot;:..,\&quot;lookups\&quot;:..,\&quot;seconds\&quot;:..,\&quot;ok\&quot;:true}</span>
+<span class="line" id="L223"><a href="#L223">  223</a>   {\&quot;type\&quot;:\&quot;total\&quot;,\&quot;cubes\&quot;:..,\&quot;wall\&quot;:..,\&quot;wall_per_cube\&quot;:..,\&quot;nodes_per_cube\&quot;:..,\&quot;threads\&quot;:..,\&quot;lanes\&quot;:..,\&quot;concurrency\&quot;:..}</span>
+<span class="line" id="L224"><a href="#L224">  224</a> </span>
+<span class="line" id="L225"><a href="#L225">  225</a> With --fast:</span>
+<span class="line" id="L226"><a href="#L226">  226</a>   table    &lt;path&gt;</span>
+<span class="line" id="L227"><a href="#L227">  227</a>   threads  &lt;t&gt; (all on this one cube)</span>
+<span class="line" id="L228"><a href="#L228">  228</a>   scramble &lt;moves&gt;</span>
+<span class="line" id="L229"><a href="#L229">  229</a>   solution &lt;moves&gt;</span>
+<span class="line" id="L230"><a href="#L230">  230</a>   length   &lt;n&gt; moves (optimal, verified)</span>
+<span class="line" id="L231"><a href="#L231">  231</a>   time     &lt;ms&gt; ms   (&lt;n&gt; M nodes, &lt;rate&gt; M nodes/s)</span>
+<span class="line" id="L232"><a href="#L232">  232</a> (with --json one object: table, threads, lanes, scramble, solution, length,</span>
+<span class="line" id="L233"><a href="#L233">  233</a> nodes, lookups, seconds, ms, nodes_per_second).&quot;;</span>
+<span class="line" id="L234"><a href="#L234">  234</a> </span>
+<span class="line" id="L235"><a href="#L235">  235</a> /// A line of `--json` output.</span>
+<span class="line" id="L236"><a href="#L236">  236</a> #[derive(serde::Serialize)]</span>
+<span class="line" id="L237"><a href="#L237">  237</a> #[serde(tag = &quot;type&quot;, rename_all = &quot;snake_case&quot;)]</span>
+<span class="line" id="L238"><a href="#L238">  238</a> enum Line {</span>
+<span class="line" id="L239"><a href="#L239">  239</a>     /// A solved cube (`index`: its line among the scrambles, from 0).</span>
+<span class="line" id="L240"><a href="#L240">  240</a>     Solved {</span>
+<span class="line" id="L241"><a href="#L241">  241</a>         index: usize,</span>
+<span class="line" id="L242"><a href="#L242">  242</a>         moves: String,</span>
+<span class="line" id="L243"><a href="#L243">  243</a>         length: usize,</span>
+<span class="line" id="L244"><a href="#L244">  244</a>         nodes: u64,</span>
+<span class="line" id="L245"><a href="#L245">  245</a>         lookups: u64,</span>
+<span class="line" id="L246"><a href="#L246">  246</a>         seconds: f64,</span>
+<span class="line" id="L247"><a href="#L247">  247</a>         /// Whether the solution solves the cube (always, unless a bug).</span>
+<span class="line" id="L248"><a href="#L248">  248</a>         ok: bool,</span>
+<span class="line" id="L249"><a href="#L249">  249</a>     },</span>
+<span class="line" id="L250"><a href="#L250">  250</a>     /// The summary, after all cubes.</span>
+<span class="line" id="L251"><a href="#L251">  251</a>     Total {</span>
+<span class="line" id="L252"><a href="#L252">  252</a>         cubes: usize,</span>
+<span class="line" id="L253"><a href="#L253">  253</a>         wall: f64,</span>
+<span class="line" id="L254"><a href="#L254">  254</a>         wall_per_cube: f64,</span>
+<span class="line" id="L255"><a href="#L255">  255</a>         nodes_per_cube: f64,</span>
+<span class="line" id="L256"><a href="#L256">  256</a>         threads: usize,</span>
+<span class="line" id="L257"><a href="#L257">  257</a>         lanes: usize,</span>
+<span class="line" id="L258"><a href="#L258">  258</a>         concurrency: usize,</span>
+<span class="line" id="L259"><a href="#L259">  259</a>     },</span>
+<span class="line" id="L260"><a href="#L260">  260</a> }</span>
+<span class="line" id="L261"><a href="#L261">  261</a> </span>
+<span class="line" id="L262"><a href="#L262">  262</a> /// Print `value` as one line of JSON (stdout flushes at the newline).</span>
+<span class="line" id="L263"><a href="#L263">  263</a> fn print_json(value: &amp;impl serde::Serialize) -&gt; anyhow::Result&lt;()&gt; {</span>
+<span class="line" id="L264"><a href="#L264">  264</a>     println!(&quot;{}&quot;, serde_json::to_string(value)?);</span>
+<span class="line" id="L265"><a href="#L265">  265</a>     Ok(())</span>
+<span class="line" id="L266"><a href="#L266">  266</a> }</span>
+<span class="line" id="L267"><a href="#L267">  267</a> </span>
+<span class="line" id="L268"><a href="#L268">  268</a> fn main() -&gt; ExitCode {</span>
+<span class="line" id="L269"><a href="#L269">  269</a>     let args = Args::parse();</span>
+<span class="line" id="L270"><a href="#L270">  270</a>     if let Some(shell) = args.completions {</span>
+<span class="line" id="L271"><a href="#L271">  271</a>         cli::print_completions::&lt;Args&gt;(shell);</span>
+<span class="line" id="L272"><a href="#L272">  272</a>         return ExitCode::SUCCESS;</span>
+<span class="line" id="L273"><a href="#L273">  273</a>     }</span>
+<span class="line" id="L274"><a href="#L274">  274</a>     args.verbosity.init_logging();</span>
+<span class="line" id="L275"><a href="#L275">  275</a>     let result = if let Some(path) = &amp;args.shm_load {</span>
+<span class="line" id="L276"><a href="#L276">  276</a>         // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).</span>
+<span class="line" id="L277"><a href="#L277">  277</a>         unsafe { args.load.shm_load(path) }</span>
+<span class="line" id="L278"><a href="#L278">  278</a>     } else if let Some(path) = &amp;args.shm_remove {</span>
+<span class="line" id="L279"><a href="#L279">  279</a>         // SAFETY: the table segment follows the documented storage contract.</span>
+<span class="line" id="L280"><a href="#L280">  280</a>         unsafe { args.load.shm_remove(path) }</span>
+<span class="line" id="L281"><a href="#L281">  281</a>     } else if args.fast {</span>
+<span class="line" id="L282"><a href="#L282">  282</a>         run_fast(&amp;args)</span>
+<span class="line" id="L283"><a href="#L283">  283</a>     } else {</span>
+<span class="line" id="L284"><a href="#L284">  284</a>         run(&amp;args)</span>
+<span class="line" id="L285"><a href="#L285">  285</a>     };</span>
+<span class="line" id="L286"><a href="#L286">  286</a>     cli::exit_status(&quot;solve&quot;, result)</span>
+<span class="line" id="L287"><a href="#L287">  287</a> }</span>
+<span class="line" id="L288"><a href="#L288">  288</a> </span>
+<span class="line" id="L289"><a href="#L289">  289</a> /// The cubes of the scrambles on stdin, one per line (blank lines</span>
+<span class="line" id="L290"><a href="#L290">  290</a> /// skipped), at most `count`.</span>
+<span class="line" id="L291"><a href="#L291">  291</a> fn read_scrambles(count: usize) -&gt; anyhow::Result&lt;Vec&lt;CubieCube&gt;&gt; {</span>
+<span class="line" id="L292"><a href="#L292">  292</a>     let mut cubes = Vec::new();</span>
+<span class="line" id="L293"><a href="#L293">  293</a>     for (n, line) in std::io::stdin().lock().lines().enumerate() {</span>
+<span class="line" id="L294"><a href="#L294">  294</a>         let line = line.context(&quot;cannot read stdin&quot;)?;</span>
+<span class="line" id="L295"><a href="#L295">  295</a>         if line.trim().is_empty() {</span>
+<span class="line" id="L296"><a href="#L296">  296</a>             continue;</span>
+<span class="line" id="L297"><a href="#L297">  297</a>         }</span>
+<span class="line" id="L298"><a href="#L298">  298</a>         if cubes.len() &gt;= count {</span>
+<span class="line" id="L299"><a href="#L299">  299</a>             break;</span>
+<span class="line" id="L300"><a href="#L300">  300</a>         }</span>
+<span class="line" id="L301"><a href="#L301">  301</a>         let cube = parse_moves(&amp;line)</span>
+<span class="line" id="L302"><a href="#L302">  302</a>             .and_then(|moves| CubieCube::SOLVED.apply_moves(&amp;moves))</span>
+<span class="line" id="L303"><a href="#L303">  303</a>             .ok_or_else(|| BadInput(format!(&quot;line {}: cannot parse {line:?}&quot;, n + 1)))?;</span>
+<span class="line" id="L304"><a href="#L304">  304</a>         cubes.push(cube);</span>
+<span class="line" id="L305"><a href="#L305">  305</a>     }</span>
+<span class="line" id="L306"><a href="#L306">  306</a>     Ok(cubes)</span>
+<span class="line" id="L307"><a href="#L307">  307</a> }</span>
+<span class="line" id="L308"><a href="#L308">  308</a> </span>
+<span class="line" id="L309"><a href="#L309">  309</a> #[expect(clippy::cast_precision_loss, reason = &quot;statistics&quot;)]</span>
+<span class="line" id="L310"><a href="#L310">  310</a> fn run(args: &amp;Args) -&gt; anyhow::Result&lt;ExitCode&gt; {</span>
+<span class="line" id="L311"><a href="#L311">  311</a>     let path = (args.table.as_deref())</span>
+<span class="line" id="L312"><a href="#L312">  312</a>         .or(args.table_flag.as_deref())</span>
+<span class="line" id="L313"><a href="#L313">  313</a>         .context(&quot;no table&quot;)?;</span>
+<span class="line" id="L314"><a href="#L314">  314</a>     let cubes = read_scrambles(args.count.unwrap_or(usize::MAX))?;</span>
+<span class="line" id="L315"><a href="#L315">  315</a>     let corners = Cocsep::generate()?;</span>
+<span class="line" id="L316"><a href="#L316">  316</a>     // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).</span>
+<span class="line" id="L317"><a href="#L317">  317</a>     let table = unsafe { args.load.open(path) }?;</span>
+<span class="line" id="L318"><a href="#L318">  318</a>     let threads = args.threads;</span>
+<span class="line" id="L319"><a href="#L319">  319</a>     let lanes = cli::lanes(args.lanes, path, table.meta().k, threads);</span>
+<span class="line" id="L320"><a href="#L320">  320</a>     let concurrency = args.concurrency;</span>
+<span class="line" id="L321"><a href="#L321">  321</a>     log::info!(</span>
+<span class="line" id="L322"><a href="#L322">  322</a>         &quot;{} cubes, at most {concurrency} at once (0: all)&quot;,</span>
+<span class="line" id="L323"><a href="#L323">  323</a>         cubes.len()</span>
+<span class="line" id="L324"><a href="#L324">  324</a>     );</span>
+<span class="line" id="L325"><a href="#L325">  325</a>     let solver = Solver::new(&amp;corners, &amp;table);</span>
+<span class="line" id="L326"><a href="#L326">  326</a>     let get = |i: usize| cubes.get(i).copied();</span>
+<span class="line" id="L327"><a href="#L327">  327</a>     let max_active = if concurrency == 0 {</span>
+<span class="line" id="L328"><a href="#L328">  328</a>         usize::MAX</span>
+<span class="line" id="L329"><a href="#L329">  329</a>     } else {</span>
+<span class="line" id="L330"><a href="#L330">  330</a>         concurrency</span>
+<span class="line" id="L331"><a href="#L331">  331</a>     };</span>
+<span class="line" id="L332"><a href="#L332">  332</a>     let json = args.json;</span>
+<span class="line" id="L333"><a href="#L333">  333</a>     let stdout = Mutex::new(std::io::stdout());</span>
+<span class="line" id="L334"><a href="#L334">  334</a>     let nodes = AtomicU64::new(0);</span>
+<span class="line" id="L335"><a href="#L335">  335</a>     let bad = AtomicBool::new(false);</span>
+<span class="line" id="L336"><a href="#L336">  336</a>     let n_done = AtomicUsize::new(0);</span>
+<span class="line" id="L337"><a href="#L337">  337</a>     let done = |i: usize, solution: Option&lt;Vec&lt;u8&gt;&gt;, stats: Stats, seconds: f64| {</span>
+<span class="line" id="L338"><a href="#L338">  338</a>         // (No solution, or one that does not solve the cube: BAD.)</span>
+<span class="line" id="L339"><a href="#L339">  339</a>         let solves_cube = |moves: &amp;[u8]| {</span>
+<span class="line" id="L340"><a href="#L340">  340</a>             cubes.get(i).and_then(|cube| cube.apply_moves(moves)) == Some(CubieCube::SOLVED)</span>
+<span class="line" id="L341"><a href="#L341">  341</a>         };</span>
+<span class="line" id="L342"><a href="#L342">  342</a>         let ok = solution.as_deref().is_some_and(solves_cube);</span>
+<span class="line" id="L343"><a href="#L343">  343</a>         let solution = solution.unwrap_or_default();</span>
+<span class="line" id="L344"><a href="#L344">  344</a>         nodes.fetch_add(stats.nodes, Ordering::Relaxed);</span>
+<span class="line" id="L345"><a href="#L345">  345</a>         n_done.fetch_add(1, Ordering::Relaxed);</span>
+<span class="line" id="L346"><a href="#L346">  346</a>         let mut out = stdout.lock().unwrap_or_else(PoisonError::into_inner);</span>
+<span class="line" id="L347"><a href="#L347">  347</a>         if !ok {</span>
+<span class="line" id="L348"><a href="#L348">  348</a>             bad.store(true, Ordering::Relaxed);</span>
+<span class="line" id="L349"><a href="#L349">  349</a>         }</span>
+<span class="line" id="L350"><a href="#L350">  350</a>         if json {</span>
+<span class="line" id="L351"><a href="#L351">  351</a>             let line = Line::Solved {</span>
+<span class="line" id="L352"><a href="#L352">  352</a>                 index: i,</span>
+<span class="line" id="L353"><a href="#L353">  353</a>                 moves: format_moves(&amp;solution),</span>
+<span class="line" id="L354"><a href="#L354">  354</a>                 length: solution.len(),</span>
+<span class="line" id="L355"><a href="#L355">  355</a>                 nodes: stats.nodes,</span>
+<span class="line" id="L356"><a href="#L356">  356</a>                 lookups: stats.lookups,</span>
+<span class="line" id="L357"><a href="#L357">  357</a>                 seconds,</span>
+<span class="line" id="L358"><a href="#L358">  358</a>                 ok,</span>
+<span class="line" id="L359"><a href="#L359">  359</a>             };</span>
+<span class="line" id="L360"><a href="#L360">  360</a>             let _ = serde_json::to_writer(&amp;mut *out, &amp;line);</span>
+<span class="line" id="L361"><a href="#L361">  361</a>             let _ = writeln!(out);</span>
+<span class="line" id="L362"><a href="#L362">  362</a>         } else {</span>
+<span class="line" id="L363"><a href="#L363">  363</a>             if !ok {</span>
+<span class="line" id="L364"><a href="#L364">  364</a>                 let _ = writeln!(out, &quot;BAD {i}&quot;);</span>
+<span class="line" id="L365"><a href="#L365">  365</a>             }</span>
+<span class="line" id="L366"><a href="#L366">  366</a>             let _ = writeln!(</span>
+<span class="line" id="L367"><a href="#L367">  367</a>                 out,</span>
+<span class="line" id="L368"><a href="#L368">  368</a>                 &quot;solved {i} {} {} {seconds:.6} {}&quot;,</span>
+<span class="line" id="L369"><a href="#L369">  369</a>                 solution.len(),</span>
+<span class="line" id="L370"><a href="#L370">  370</a>                 stats.nodes,</span>
+<span class="line" id="L371"><a href="#L371">  371</a>                 format_moves(&amp;solution)</span>
+<span class="line" id="L372"><a href="#L372">  372</a>             );</span>
+<span class="line" id="L373"><a href="#L373">  373</a>         }</span>
+<span class="line" id="L374"><a href="#L374">  374</a>         let _ = out.flush();</span>
+<span class="line" id="L375"><a href="#L375">  375</a>     };</span>
+<span class="line" id="L376"><a href="#L376">  376</a>     let start = Instant::now();</span>
+<span class="line" id="L377"><a href="#L377">  377</a>     solve_all_pinned(&amp;solver, &amp;get, threads, lanes, max_active, &amp;done)?;</span>
+<span class="line" id="L378"><a href="#L378">  378</a>     let wall = start.elapsed().as_secs_f64();</span>
+<span class="line" id="L379"><a href="#L379">  379</a>     let n = cubes.len();</span>
+<span class="line" id="L380"><a href="#L380">  380</a>     let reported = n_done.load(Ordering::Relaxed);</span>
+<span class="line" id="L381"><a href="#L381">  381</a>     anyhow::ensure!(reported == n, &quot;{reported} of {n} cubes reported&quot;);</span>
+<span class="line" id="L382"><a href="#L382">  382</a>     let wall_per_cube = wall / n.max(1) as f64;</span>
+<span class="line" id="L383"><a href="#L383">  383</a>     let nodes_per_cube = nodes.load(Ordering::Relaxed) as f64 / n.max(1) as f64;</span>
+<span class="line" id="L384"><a href="#L384">  384</a>     if json {</span>
+<span class="line" id="L385"><a href="#L385">  385</a>         print_json(&amp;Line::Total {</span>
+<span class="line" id="L386"><a href="#L386">  386</a>             cubes: n,</span>
+<span class="line" id="L387"><a href="#L387">  387</a>             wall,</span>
+<span class="line" id="L388"><a href="#L388">  388</a>             wall_per_cube,</span>
+<span class="line" id="L389"><a href="#L389">  389</a>             nodes_per_cube,</span>
+<span class="line" id="L390"><a href="#L390">  390</a>             threads,</span>
+<span class="line" id="L391"><a href="#L391">  391</a>             lanes,</span>
+<span class="line" id="L392"><a href="#L392">  392</a>             concurrency,</span>
+<span class="line" id="L393"><a href="#L393">  393</a>         })?;</span>
+<span class="line" id="L394"><a href="#L394">  394</a>     } else {</span>
+<span class="line" id="L395"><a href="#L395">  395</a>         println!(</span>
+<span class="line" id="L396"><a href="#L396">  396</a>             &quot;total {n} cubes wall {wall:.6} wall/cube {wall_per_cube:.6} nodes/cube {nodes_per_cube:.0} threads {threads} lanes {lanes} concurrency {concurrency}&quot;</span>
+<span class="line" id="L397"><a href="#L397">  397</a>         );</span>
+<span class="line" id="L398"><a href="#L398">  398</a>     }</span>
+<span class="line" id="L399"><a href="#L399">  399</a>     Ok(if bad.load(Ordering::Relaxed) {</span>
+<span class="line" id="L400"><a href="#L400">  400</a>         ExitCode::FAILURE</span>
+<span class="line" id="L401"><a href="#L401">  401</a>     } else {</span>
+<span class="line" id="L402"><a href="#L402">  402</a>         ExitCode::SUCCESS</span>
+<span class="line" id="L403"><a href="#L403">  403</a>     })</span>
+<span class="line" id="L404"><a href="#L404">  404</a> }</span>
+<span class="line" id="L405"><a href="#L405">  405</a> </span>
+<span class="line" id="L406"><a href="#L406">  406</a> /// `--fast`&#x27;s warm-up cube (fast.sh&#x27;s).</span>
+<span class="line" id="L407"><a href="#L407">  407</a> const WARMUP: &amp;str = &quot;R U2 F&#x27; L D2 B R&#x27; U F2 D&#x27; L2 B&#x27; U R2 F D L&#x27; B2 U&#x27; R F&#x27; D2 L B U2&quot;;</span>
+<span class="line" id="L408"><a href="#L408">  408</a> </span>
+<span class="line" id="L409"><a href="#L409">  409</a> /// Where `--fast` looks for tables (for each K, from 11 down).</span>
+<span class="line" id="L410"><a href="#L410">  410</a> const TABLE_DIRS: [&amp;str; 4] = [&quot;/mnt/huge&quot;, &quot;/data2/tables&quot;, &quot;/data/tables&quot;, &quot;tables&quot;];</span>
+<span class="line" id="L411"><a href="#L411">  411</a> </span>
+<span class="line" id="L412"><a href="#L412">  412</a> /// The largest table: hK of the largest K in `TABLE_DIRS`.</span>
+<span class="line" id="L413"><a href="#L413">  413</a> fn largest_table() -&gt; Option&lt;String&gt; {</span>
+<span class="line" id="L414"><a href="#L414">  414</a>     (0..=11).rev().find_map(|k| {</span>
+<span class="line" id="L415"><a href="#L415">  415</a>         TABLE_DIRS</span>
+<span class="line" id="L416"><a href="#L416">  416</a>             .iter()</span>
+<span class="line" id="L417"><a href="#L417">  417</a>             .map(|dir| format!(&quot;{dir}/h{k}&quot;))</span>
+<span class="line" id="L418"><a href="#L418">  418</a>             .find(|path| Path::new(path).is_file())</span>
+<span class="line" id="L419"><a href="#L419">  419</a>     })</span>
+<span class="line" id="L420"><a href="#L420">  420</a> }</span>
+<span class="line" id="L421"><a href="#L421">  421</a> </span>
+<span class="line" id="L422"><a href="#L422">  422</a> /// A random scramble of `length` moves: no face twice in a row, and no X Y X</span>
+<span class="line" id="L423"><a href="#L423">  423</a> /// with Y opposite X (e.g. U D U, which is U2 D).</span>
+<span class="line" id="L424"><a href="#L424">  424</a> fn random_scramble(rng: &amp;mut Rng, length: usize) -&gt; String {</span>
+<span class="line" id="L425"><a href="#L425">  425</a>     // (Opposite faces have the same index mod 3: U D, R L, F B.)</span>
+<span class="line" id="L426"><a href="#L426">  426</a>     const FACES: [char; 6] = [&#x27;U&#x27;, &#x27;R&#x27;, &#x27;F&#x27;, &#x27;D&#x27;, &#x27;L&#x27;, &#x27;B&#x27;];</span>
+<span class="line" id="L427"><a href="#L427">  427</a>     const SUFFIXES: [&amp;str; 3] = [&quot;&quot;, &quot;2&quot;, &quot;&#x27;&quot;];</span>
+<span class="line" id="L428"><a href="#L428">  428</a>     let below = |rng: &amp;mut Rng, n: usize| rng.below_usize(n);</span>
+<span class="line" id="L429"><a href="#L429">  429</a>     let (mut previous, mut before) = (None, None);</span>
+<span class="line" id="L430"><a href="#L430">  430</a>     let mut moves = Vec::with_capacity(length);</span>
+<span class="line" id="L431"><a href="#L431">  431</a>     for _ in 0..length {</span>
+<span class="line" id="L432"><a href="#L432">  432</a>         let face = loop {</span>
+<span class="line" id="L433"><a href="#L433">  433</a>             let face = below(rng, 6);</span>
+<span class="line" id="L434"><a href="#L434">  434</a>             let opposite_return =</span>
+<span class="line" id="L435"><a href="#L435">  435</a>                 previous.is_some_and(|p: usize| p % 3 == face % 3) &amp;&amp; before == Some(face);</span>
+<span class="line" id="L436"><a href="#L436">  436</a>             if previous != Some(face) &amp;&amp; !opposite_return {</span>
+<span class="line" id="L437"><a href="#L437">  437</a>                 break face;</span>
+<span class="line" id="L438"><a href="#L438">  438</a>             }</span>
+<span class="line" id="L439"><a href="#L439">  439</a>         };</span>
+<span class="line" id="L440"><a href="#L440">  440</a>         moves.push(format!(&quot;{}{}&quot;, FACES[face], SUFFIXES[below(rng, 3)]));</span>
+<span class="line" id="L441"><a href="#L441">  441</a>         (before, previous) = (previous, Some(face));</span>
+<span class="line" id="L442"><a href="#L442">  442</a>     }</span>
+<span class="line" id="L443"><a href="#L443">  443</a>     moves.join(&quot; &quot;)</span>
+<span class="line" id="L444"><a href="#L444">  444</a> }</span>
+<span class="line" id="L445"><a href="#L445">  445</a> </span>
+<span class="line" id="L446"><a href="#L446">  446</a> /// A seed from the clock and the process id. (The monotonic clock: reading</span>
+<span class="line" id="L447"><a href="#L447">  447</a> /// `SystemTime` would change the code of the worker threads&#x27; `Instant::now`</span>
+<span class="line" id="L448"><a href="#L448">  448</a> /// calls, which then pass the clock id instead of having it folded in.)</span>
+<span class="line" id="L449"><a href="#L449">  449</a> fn time_seed() -&gt; u64 {</span>
+<span class="line" id="L450"><a href="#L450">  450</a>     let mut hasher = std::hash::DefaultHasher::new();</span>
+<span class="line" id="L451"><a href="#L451">  451</a>     std::time::Instant::now().hash(&amp;mut hasher);</span>
+<span class="line" id="L452"><a href="#L452">  452</a>     std::process::id().hash(&amp;mut hasher);</span>
+<span class="line" id="L453"><a href="#L453">  453</a>     hasher.finish()</span>
+<span class="line" id="L454"><a href="#L454">  454</a> }</span>
+<span class="line" id="L455"><a href="#L455">  455</a> </span>
+<span class="line" id="L456"><a href="#L456">  456</a> /// `--fast`&#x27;s JSON object.</span>
+<span class="line" id="L457"><a href="#L457">  457</a> #[derive(serde::Serialize)]</span>
+<span class="line" id="L458"><a href="#L458">  458</a> struct FastReport&lt;&#x27;a&gt; {</span>
+<span class="line" id="L459"><a href="#L459">  459</a>     table: &amp;&#x27;a str,</span>
+<span class="line" id="L460"><a href="#L460">  460</a>     threads: usize,</span>
+<span class="line" id="L461"><a href="#L461">  461</a>     lanes: usize,</span>
+<span class="line" id="L462"><a href="#L462">  462</a>     scramble: &amp;&#x27;a str,</span>
+<span class="line" id="L463"><a href="#L463">  463</a>     solution: String,</span>
+<span class="line" id="L464"><a href="#L464">  464</a>     length: usize,</span>
+<span class="line" id="L465"><a href="#L465">  465</a>     nodes: u64,</span>
+<span class="line" id="L466"><a href="#L466">  466</a>     lookups: u64,</span>
+<span class="line" id="L467"><a href="#L467">  467</a>     seconds: f64,</span>
+<span class="line" id="L468"><a href="#L468">  468</a>     ms: f64,</span>
+<span class="line" id="L469"><a href="#L469">  469</a>     nodes_per_second: f64,</span>
+<span class="line" id="L470"><a href="#L470">  470</a> }</span>
+<span class="line" id="L471"><a href="#L471">  471</a> </span>
+<span class="line" id="L472"><a href="#L472">  472</a> /// `solve --fast`: one scramble as fast as this machine can (fast.sh, as a</span>
+<span class="line" id="L473"><a href="#L473">  473</a> /// flag): the largest table, all threads on the one cube (`-c 1`), a</span>
+<span class="line" id="L474"><a href="#L474">  474</a> /// warm-up cube first in the same process (threads, page tables and TLBs</span>
+<span class="line" id="L475"><a href="#L475">  475</a> /// are hot when the scramble starts). Prints fast.sh&#x27;s lines; the time is</span>
+<span class="line" id="L476"><a href="#L476">  476</a> /// the scramble&#x27;s own solve time.</span>
+<span class="line" id="L477"><a href="#L477">  477</a> #[expect(clippy::cast_precision_loss, reason = &quot;statistics&quot;)]</span>
+<span class="line" id="L478"><a href="#L478">  478</a> fn run_fast(args: &amp;Args) -&gt; anyhow::Result&lt;ExitCode&gt; {</span>
+<span class="line" id="L479"><a href="#L479">  479</a>     // (A first argument that is a move, not a file, starts the scramble.)</span>
+<span class="line" id="L480"><a href="#L480">  480</a>     let mut words = args.scramble.clone();</span>
+<span class="line" id="L481"><a href="#L481">  481</a>     let mut table_arg = args.table.clone();</span>
+<span class="line" id="L482"><a href="#L482">  482</a>     if let Some(first) =</span>
+<span class="line" id="L483"><a href="#L483">  483</a>         table_arg.take_if(|first| !Path::new(first).is_file() &amp;&amp; parse_moves(first).is_some())</span>
+<span class="line" id="L484"><a href="#L484">  484</a>     {</span>
+<span class="line" id="L485"><a href="#L485">  485</a>         words.insert(0, first);</span>
+<span class="line" id="L486"><a href="#L486">  486</a>     }</span>
+<span class="line" id="L487"><a href="#L487">  487</a>     let path = (table_arg.or_else(|| args.table_flag.clone()))</span>
+<span class="line" id="L488"><a href="#L488">  488</a>         .or_else(largest_table)</span>
+<span class="line" id="L489"><a href="#L489">  489</a>         .context(&quot;no table found; generate one, e.g.: target/release/gen 8 auto tables/h8&quot;)?;</span>
+<span class="line" id="L490"><a href="#L490">  490</a>     let scramble = if words.is_empty() {</span>
+<span class="line" id="L491"><a href="#L491">  491</a>         random_scramble(&amp;mut Rng(time_seed()), 25)</span>
+<span class="line" id="L492"><a href="#L492">  492</a>     } else {</span>
+<span class="line" id="L493"><a href="#L493">  493</a>         words.join(&quot; &quot;)</span>
+<span class="line" id="L494"><a href="#L494">  494</a>     };</span>
+<span class="line" id="L495"><a href="#L495">  495</a>     let parse = |text: &amp;str| {</span>
+<span class="line" id="L496"><a href="#L496">  496</a>         parse_moves(text)</span>
+<span class="line" id="L497"><a href="#L497">  497</a>             .and_then(|moves| CubieCube::SOLVED.apply_moves(&amp;moves))</span>
+<span class="line" id="L498"><a href="#L498">  498</a>             .ok_or_else(|| BadInput(format!(&quot;cannot parse {text:?}&quot;)))</span>
+<span class="line" id="L499"><a href="#L499">  499</a>     };</span>
+<span class="line" id="L500"><a href="#L500">  500</a>     let mut cubes = Vec::new();</span>
+<span class="line" id="L501"><a href="#L501">  501</a>     let warmup = args.warmup.as_deref().unwrap_or(WARMUP);</span>
+<span class="line" id="L502"><a href="#L502">  502</a>     if !warmup.trim().is_empty() {</span>
+<span class="line" id="L503"><a href="#L503">  503</a>         cubes.push(parse(warmup)?);</span>
+<span class="line" id="L504"><a href="#L504">  504</a>     }</span>
+<span class="line" id="L505"><a href="#L505">  505</a>     cubes.push(parse(&amp;scramble)?);</span>
+<span class="line" id="L506"><a href="#L506">  506</a>     let threads = args.threads;</span>
+<span class="line" id="L507"><a href="#L507">  507</a>     if !args.json {</span>
+<span class="line" id="L508"><a href="#L508">  508</a>         println!(&quot;table    {path}&quot;);</span>
+<span class="line" id="L509"><a href="#L509">  509</a>         println!(&quot;threads  {threads} (all on this one cube)&quot;);</span>
+<span class="line" id="L510"><a href="#L510">  510</a>         println!(&quot;scramble {scramble}&quot;);</span>
+<span class="line" id="L511"><a href="#L511">  511</a>     }</span>
+<span class="line" id="L512"><a href="#L512">  512</a>     let corners = Cocsep::generate()?;</span>
+<span class="line" id="L513"><a href="#L513">  513</a>     // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).</span>
+<span class="line" id="L514"><a href="#L514">  514</a>     let table = unsafe { args.load.open(&amp;path) }?;</span>
+<span class="line" id="L515"><a href="#L515">  515</a>     let lanes = cli::lanes(args.lanes, &amp;path, table.meta().k, threads);</span>
+<span class="line" id="L516"><a href="#L516">  516</a>     let solver = Solver::new(&amp;corners, &amp;table);</span>
+<span class="line" id="L517"><a href="#L517">  517</a>     let get = |i: usize| cubes.get(i).copied();</span>
+<span class="line" id="L518"><a href="#L518">  518</a>     // (The scramble, after the warm-up cube if any.)</span>
+<span class="line" id="L519"><a href="#L519">  519</a>     let (last, &amp;cube) = cubes</span>
+<span class="line" id="L520"><a href="#L520">  520</a>         .iter()</span>
+<span class="line" id="L521"><a href="#L521">  521</a>         .enumerate()</span>
+<span class="line" id="L522"><a href="#L522">  522</a>         .next_back()</span>
+<span class="line" id="L523"><a href="#L523">  523</a>         .context(&quot;no scramble&quot;)?;</span>
+<span class="line" id="L524"><a href="#L524">  524</a>     let result = Mutex::new(None);</span>
+<span class="line" id="L525"><a href="#L525">  525</a>     let done = |i: usize, solution: Option&lt;Vec&lt;u8&gt;&gt;, stats: Stats, seconds: f64| {</span>
+<span class="line" id="L526"><a href="#L526">  526</a>         if i == last {</span>
+<span class="line" id="L527"><a href="#L527">  527</a>             *result.lock().unwrap_or_else(PoisonError::into_inner) =</span>
+<span class="line" id="L528"><a href="#L528">  528</a>                 Some((solution, stats, seconds));</span>
+<span class="line" id="L529"><a href="#L529">  529</a>         }</span>
+<span class="line" id="L530"><a href="#L530">  530</a>     };</span>
+<span class="line" id="L531"><a href="#L531">  531</a>     solve_all_pinned(&amp;solver, &amp;get, threads, lanes, 1, &amp;done)?;</span>
+<span class="line" id="L532"><a href="#L532">  532</a>     let result = result.into_inner().unwrap_or_else(PoisonError::into_inner);</span>
+<span class="line" id="L533"><a href="#L533">  533</a>     let (solution, stats, seconds) = result.context(&quot;not solved&quot;)?;</span>
+<span class="line" id="L534"><a href="#L534">  534</a>     let solution = solution.context(&quot;no solution within 20 moves: is the table damaged?&quot;)?;</span>
+<span class="line" id="L535"><a href="#L535">  535</a>     anyhow::ensure!(</span>
+<span class="line" id="L536"><a href="#L536">  536</a>         cube.apply_moves(&amp;solution) == Some(CubieCube::SOLVED),</span>
+<span class="line" id="L537"><a href="#L537">  537</a>         &quot;BAD: {} does not solve the scramble&quot;,</span>
+<span class="line" id="L538"><a href="#L538">  538</a>         format_moves(&amp;solution)</span>
+<span class="line" id="L539"><a href="#L539">  539</a>     );</span>
+<span class="line" id="L540"><a href="#L540">  540</a>     // (The seconds of solve&#x27;s line, as fast.sh read them.)</span>
+<span class="line" id="L541"><a href="#L541">  541</a>     let seconds: f64 = format!(&quot;{seconds:.6}&quot;).parse()?;</span>
+<span class="line" id="L542"><a href="#L542">  542</a>     let rate = if seconds &gt; 0.0 {</span>
+<span class="line" id="L543"><a href="#L543">  543</a>         stats.nodes as f64 / seconds</span>
+<span class="line" id="L544"><a href="#L544">  544</a>     } else {</span>
+<span class="line" id="L545"><a href="#L545">  545</a>         0.0</span>
+<span class="line" id="L546"><a href="#L546">  546</a>     };</span>
+<span class="line" id="L547"><a href="#L547">  547</a>     if args.json {</span>
+<span class="line" id="L548"><a href="#L548">  548</a>         print_json(&amp;FastReport {</span>
+<span class="line" id="L549"><a href="#L549">  549</a>             table: &amp;path,</span>
+<span class="line" id="L550"><a href="#L550">  550</a>             threads,</span>
+<span class="line" id="L551"><a href="#L551">  551</a>             lanes,</span>
+<span class="line" id="L552"><a href="#L552">  552</a>             scramble: &amp;scramble,</span>
+<span class="line" id="L553"><a href="#L553">  553</a>             solution: format_moves(&amp;solution),</span>
+<span class="line" id="L554"><a href="#L554">  554</a>             length: solution.len(),</span>
+<span class="line" id="L555"><a href="#L555">  555</a>             nodes: stats.nodes,</span>
+<span class="line" id="L556"><a href="#L556">  556</a>             lookups: stats.lookups,</span>
+<span class="line" id="L557"><a href="#L557">  557</a>             seconds,</span>
+<span class="line" id="L558"><a href="#L558">  558</a>             ms: seconds * 1000.0,</span>
+<span class="line" id="L559"><a href="#L559">  559</a>             nodes_per_second: rate,</span>
+<span class="line" id="L560"><a href="#L560">  560</a>         })?;</span>
+<span class="line" id="L561"><a href="#L561">  561</a>     } else {</span>
+<span class="line" id="L562"><a href="#L562">  562</a>         println!(&quot;solution {}&quot;, format_moves(&amp;solution));</span>
+<span class="line" id="L563"><a href="#L563">  563</a>         println!(&quot;length   {} moves (optimal, verified)&quot;, solution.len());</span>
+<span class="line" id="L564"><a href="#L564">  564</a>         println!(</span>
+<span class="line" id="L565"><a href="#L565">  565</a>             &quot;time     {:.3} ms   ({:.1} M nodes, {:.0} M nodes/s)&quot;,</span>
+<span class="line" id="L566"><a href="#L566">  566</a>             seconds * 1000.0,</span>
+<span class="line" id="L567"><a href="#L567">  567</a>             stats.nodes as f64 / 1e6,</span>
+<span class="line" id="L568"><a href="#L568">  568</a>             rate / 1e6</span>
+<span class="line" id="L569"><a href="#L569">  569</a>         );</span>
+<span class="line" id="L570"><a href="#L570">  570</a>     }</span>
+<span class="line" id="L571"><a href="#L571">  571</a>     Ok(ExitCode::SUCCESS)</span>
+<span class="line" id="L572"><a href="#L572">  572</a> }</span>
+<span class="line" id="L573"><a href="#L573">  573</a> </span>
+<span class="line" id="L574"><a href="#L574">  574</a> #[cfg(test)]</span>
+<span class="line" id="L575"><a href="#L575">  575</a> mod tests {</span>
+<span class="line" id="L576"><a href="#L576">  576</a>     use super::{random_scramble, Rng};</span>
+<span class="line" id="L577"><a href="#L577">  577</a>     use egg_solver::cubie::parse_moves;</span>
+<span class="line" id="L578"><a href="#L578">  578</a> </span>
+<span class="line" id="L579"><a href="#L579">  579</a>     /// 25 moves, no face twice in a row, no X Y X on opposite faces.</span>
+<span class="line" id="L580"><a href="#L580">  580</a>     #[test]</span>
+<span class="line" id="L581"><a href="#L581">  581</a>     fn random_scrambles() {</span>
+<span class="line" id="L582"><a href="#L582">  582</a>         let mut rng = Rng(7);</span>
+<span class="line" id="L583"><a href="#L583">  583</a>         for _ in 0..1000 {</span>
+<span class="line" id="L584"><a href="#L584">  584</a>             let scramble = random_scramble(&amp;mut rng, 25);</span>
+<span class="line" id="L585"><a href="#L585">  585</a>             let moves = parse_moves(&amp;scramble).unwrap();</span>
+<span class="line" id="L586"><a href="#L586">  586</a>             assert_eq!(moves.len(), 25, &quot;{scramble}&quot;);</span>
+<span class="line" id="L587"><a href="#L587">  587</a>             let faces: Vec&lt;u8&gt; = moves.iter().map(|m| m / 3).collect();</span>
+<span class="line" id="L588"><a href="#L588">  588</a>             for w in faces.windows(2) {</span>
+<span class="line" id="L589"><a href="#L589">  589</a>                 assert_ne!(w[0], w[1], &quot;{scramble}&quot;);</span>
+<span class="line" id="L590"><a href="#L590">  590</a>             }</span>
+<span class="line" id="L591"><a href="#L591">  591</a>             for w in faces.windows(3) {</span>
+<span class="line" id="L592"><a href="#L592">  592</a>                 let opposite = w[0] / 2 == w[1] / 2;</span>
+<span class="line" id="L593"><a href="#L593">  593</a>                 assert!(!(opposite &amp;&amp; w[0] == w[2]), &quot;{scramble}&quot;);</span>
+<span class="line" id="L594"><a href="#L594">  594</a>             }</span>
+<span class="line" id="L595"><a href="#L595">  595</a>         }</span>
+<span class="line" id="L596"><a href="#L596">  596</a>     }</span>
+<span class="line" id="L597"><a href="#L597">  597</a> }</span></pre></html>

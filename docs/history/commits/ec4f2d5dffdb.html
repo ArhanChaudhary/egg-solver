@@ -1,0 +1,2219 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NEGATIVE (c7): keep the solver's free side choice at full-length job roots; inverse-side jobs run whole — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="ec4f2d5dffdb.md">Markdown source</a> · Offline document</p><h1 id="negative-c7-keep-the-solver-s-free-side-choice-at-full-length-job-roots-inverse-side-jobs-run-whole">NEGATIVE (c7): keep the solver's free side choice at full-length job roots; inverse-side jobs run whole</h1>
+<p>Commit <code>ec4f2d5dffdb8c459d0ce7c871a0cfaadb12ff84</code> · 2026-11-03T22:14:59+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: <code>neg/c7-free-side-inv-whole</code></p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>NEGATIVE (c7): keep the solver's free side choice at full-length job roots; inverse-side jobs run whole</p>
+<p>Variant of c7-childsplit (on 78ce33e) that does not force the normal side at T=17: a job whose root
+branched on the inverse side there (normal side tight, ln == r; ~10% of jobs, ~8% of the solutions)
+keeps <code>JobX::INV</code>; its first split iteration runs it whole on the normal side as one first-part entry
+keyed by its best child. FIRST 0.1, MERGE 8 steps, no face bias, select-based slot.</p>
+<p>Nodes/cube (count.sh): 1000:2026 3089690 (-6.25%), 3000:777 3096967 (-4.70%); combined -5.09% vs
+-5.68% for the forced normal side with the same FIRST/MERGE (3113996 / 3063220) and -6.98% for
+c7-childsplit's final setting. Also tried: splitting inverse-side jobs on the inverse side (18
+children; the 6 inverse half turns have no statistic): -4.8% (2026, exact slot); giving those
+half turns the job's best key: -5.2%, the face's best key: -5.4%, best - 1 octave: -4.9% (2026).
+(Forcing the normal side costs +1.26% nodes in main's search, all of it at T=17.)
+1T at this stage (c5, paired perf windows, unpaired with main): +5.0% throughput; superseded.</p>
+<hr />
+<p>--- a/src/lanes.rs
++++ b/src/lanes.rs
+@@ -31,6 +31,17 @@</p>
+<p>const MAXD: usize = 26;</p>
+<p>+/// Job length at which jobs stop being extended (<code>Solver::job_len</code>).
++const MAX_JOB_LEN: usize = 4;
++
++/// The first part of a split iteration runs about this fraction of the
++/// root children: the ones with the best statistics.
++const FIRST: f64 = 0.1;
++
++/// A first-part run takes the job's candidates whose <code>ck</code> is at most this
++/// much below its child's (fewer runs).
++const MERGE: u8 = 8;
++
+/// (128 bytes: two cache lines.)
+#[derive(Clone, Copy)]
+#[repr(align(64))]
+@@ -126,6 +137,103 @@
+std::mem::swap(jobs, out);
+}</p>
+<p>+/// Per-job state of the stream mode's child ordering (parallel to
++/// <code>Lane::jobs</code> once the jobs have their full length).
++#[derive(Clone, Copy)]
++#[repr(C, align(32))]
++struct JobX {</p>
+<ul>
+<li>/// Quantized statistic (<code>quant</code>) of each root child's subtree in the</li>
+<li>/// job's last run of that child; 0 if unknown. The children are the</li>
+<li>/// moves of the side the root branches on (<code>INV</code>).</li>
+<li>ck: [u8; 18],</li>
+<li>/// <code>Node::tw</code> of the root (on that side) after its last run (0xFF:</li>
+<li>/// unknown). Position-only, so valid in any iteration: a run of an X'</li>
+<li>/// child without its X sibling takes the value from here.</li>
+<li>tw: [u8; 6],</li>
+<li>/// Bits 0..18: children run in iteration <code>done &gt;&gt; 24</code>; <code>INV</code>.</li>
+<li>done: u32,</li>
+<li>_pad: u32,
++}</li>
+<li></li>
+</ul>
+<p>+/// <code>JobX::done</code>: the root branches on the inverse side (the side its first
++/// full-length run chose; kept so that <code>ck</code> stays meaningful).
++const INV: u32 = 1 &lt;&lt; 23;
++
++const JOBX0: JobX = JobX {</p>
+<ul>
+<li>ck: [0; 18],</li>
+<li>tw: [0xFF; 6],</li>
+<li>done: 0,</li>
+<li>_pad: 0,
++};</li>
+<li></li>
+</ul>
+<p>+/// A run entry (<code>Lane::runs</code>): key (bits 24..32), job (bits 5..24) and a
++/// child move (bits 0..5), or <code>RUN_ALL</code> for the job's children not run yet.
++const RUN_ALL: u32 = 31;
++
++/// Monotone 8-bit code of a non-negative statistic: 4 steps per octave
++/// (exponent and top two mantissa bits of the f32), 0 below 1.
++#[inline(always)]
++fn quant(x: f32) -&gt; u8 {</p>
+<ul>
+<li>((x.to_bits() &gt;&gt; 21) as i32 - 127 * 4).clamp(0, 255) as u8
++}</li>
+<li></li>
+</ul>
+<p>+/// <code>quant</code> of 18 statistics.
++#[inline(always)]
++fn quant18(x: &amp;[f32; 18]) -&gt; [u8; 18] {</p>
+<ul>
+<li>let mut r = [0u8; 18];</li>
+<li>unsafe {</li>
+<li>
+<pre><code>   use std::arch::x86_64::*;
+</code></pre>
+</li>
+<li>
+<pre><code>   let v = _mm512_loadu_ps(x.as_ptr());
+</code></pre>
+</li>
+<li>
+<pre><code>   let q = _mm512_sub_epi32(
+</code></pre>
+</li>
+<li>
+<pre><code>       _mm512_srli_epi32(_mm512_castps_si512(v), 21),
+</code></pre>
+</li>
+<li>
+<pre><code>       _mm512_set1_epi32(127 * 4),
+</code></pre>
+</li>
+<li>
+<pre><code>   );
+</code></pre>
+</li>
+<li>
+<pre><code>   let q = _mm512_max_epi32(q, _mm512_setzero_si512());
+</code></pre>
+</li>
+<li>
+<pre><code>   _mm_storeu_si128(r.as_mut_ptr() as *mut __m128i, _mm512_cvtusepi32_epi8(q));
+</code></pre>
+</li>
+<li>}</li>
+<li>r[16] = quant(x[16]);</li>
+<li>r[17] = quant(x[17]);</li>
+<li>r
++}</li>
+<li></li>
+</ul>
+<p>+/// The sum of 18 statistics (a tree of additions: off the latency of a
++/// sequential sum).
++#[inline(always)]
++fn sum18(x: &amp;[f32; 18]) -&gt; f32 {</p>
+<ul>
+<li>unsafe {</li>
+<li>
+<pre><code>   use std::arch::x86_64::*;
+</code></pre>
+</li>
+<li>
+<pre><code>   _mm512_reduce_add_ps(_mm512_loadu_ps(x.as_ptr())) + (x[16] + x[17])
+</code></pre>
+</li>
+<li>}
++}</li>
+<li></li>
+</ul>
+<p>+/// Bit mask of the moves m with <code>ck[m] &gt; theta</code>.
++#[inline(always)]
++fn ck_above(ck: &amp;[u8; 18], theta: u8) -&gt; u32 {</p>
+<ul>
+<li>unsafe {</li>
+<li>
+<pre><code>   use std::arch::x86_64::*;
+</code></pre>
+</li>
+<li>
+<pre><code>   let v = _mm_loadu_si128(ck.as_ptr() as *const __m128i);
+</code></pre>
+</li>
+<li>
+<pre><code>   let lo = _mm_cmpgt_epu8_mask(v, _mm_set1_epi8(theta as i8)) as u32;
+</code></pre>
+</li>
+<li>
+<pre><code>   lo | ((ck[16] &gt; theta) as u32) &lt;&lt; 16 | ((ck[17] &gt; theta) as u32) &lt;&lt; 17
+</code></pre>
+</li>
+<li>}
++}</li>
+<li></li>
+</ul>
+<p>+/// The largest <code>ck[m]</code> over the moves m in <code>mask</code> (0 if none).
++#[inline(always)]
++fn max18(ck: &amp;[u8; 18], mask: u32) -&gt; u8 {</p>
+<ul>
+<li>let lo = unsafe {</li>
+<li>
+<pre><code>   use std::arch::x86_64::*;
+</code></pre>
+</li>
+<li>
+<pre><code>   let v = _mm_maskz_mov_epi8(mask as u16, _mm_loadu_si128(ck.as_ptr() as *const __m128i));
+</code></pre>
+</li>
+<li>
+<pre><code>   let v = _mm_max_epu8(v, _mm_srli_si128(v, 8));
+</code></pre>
+</li>
+<li>
+<pre><code>   let v = _mm_max_epu8(v, _mm_srli_si128(v, 4));
+</code></pre>
+</li>
+<li>
+<pre><code>   let v = _mm_max_epu8(v, _mm_srli_si128(v, 2));
+</code></pre>
+</li>
+<li>
+<pre><code>   let v = _mm_max_epu8(v, _mm_srli_si128(v, 1));
+</code></pre>
+</li>
+<li>
+<pre><code>   _mm_cvtsi128_si32(v) as u8
+</code></pre>
+</li>
+<li>};</li>
+<li>let b16 = if mask &gt;&gt; 16 &amp; 1 != 0 { ck[16] } else { 0 };</li>
+<li>let b17 = if mask &gt;&gt; 17 &amp; 1 != 0 { ck[17] } else { 0 };</li>
+<li>lo.max(b16).max(b17)
++}</li>
+<li></li>
+</ul>
+<p>/// Job statistic contribution of a lookup value h: 8^(16-h). Steeper than
+/// cube48opt's 2^(12-h); measured ~2% fewer nodes (saturating beyond 8^).
+const fn mk_heur_terms() -&gt; [f32; 64] {
+@@ -174,6 +282,29 @@
+WaitOther = 1,
+}</p>
+<p>+/// Stream mode's run state of a lane (see <code>Lane::start_iteration</code>).
++struct RunState {</p>
+<ul>
+<li>/// Child ordering state of the jobs (stream mode, full-length jobs).</li>
+<li>jx: Vec<JobX>,</li>
+<li>/// Whether runs record <code>jx</code> (the jobs have their full length).</li>
+<li>full: bool,</li>
+<li>/// Per-child statistics of the jobs one move short of full length</li>
+<li>/// (their children are the next iteration's jobs).</li>
+<li>pstat: Vec&lt;[f32; 18]&gt;,</li>
+<li>/// Part of the iteration: 0 whole jobs (<code>job_pos</code>), 1 the first part of</li>
+<li>/// a split iteration (<code>runs</code>), 2 its rest (<code>runs</code>).</li>
+<li>part: u8,</li>
+<li>/// Run entries of the current part, in order, and scratch.</li>
+<li>runs: Vec<u32>,</li>
+<li>runs_tmp: Vec<u32>,</li>
+<li>run_pos: usize,</li>
+<li>/// First part: candidate children have <code>ck &gt; theta</code>.</li>
+<li>theta: u8,</li>
+<li>/// The current run: job index and children.</li>
+<li>cur_job: usize,</li>
+<li>cur_mask: u32,
++}</li>
+<li></li>
+</ul>
+<p>pub struct Lane {
+pub cube_index: usize,
+/// When the current cube was started.
+@@ -184,6 +315,8 @@
+/// Scratch buffer for job extension and sorting.
+jobs_tmp: Vec<Job>,
+job_pos: usize,</p>
+<ul>
+<li>/// Stream mode's run state (cold: kept out of the lane's hot lines).</li>
+<li>rs: Box<RunState>,
+target: u8,
+stack: [Node; MAXD],
+sp: usize,
+@@ -197,7 +330,11 @@
+k_idx: u64,
+k_cd: u8,
+k_po: u8,</li>
+<li>/// Statistic of the last finished job (<code>Lane::shared</code> lanes).
+heur: f32,</li>
+<li>/// Statistic per root child of the current run, by <code>stack[1].m</code></li>
+<li>/// (lookups at the root itself count for the last child pushed).</li>
+<li>cheur: [f32; 18],
+pub stats: Stats,
+pub solution: Vec<u8>,
+/// Lane of <code>share</code>: <code>advance</code> returns <code>Step::JobDone</code> at the end of a
+@@ -237,6 +374,18 @@
+jobs: Vec::new(),
+jobs_tmp: Vec::new(),
+job_pos: 0,</li>
+<li>
+<pre><code>       rs: Box::new(RunState {
+</code></pre>
+</li>
+<li>
+<pre><code>           jx: Vec::new(),
+</code></pre>
+</li>
+<li>
+<pre><code>           full: false,
+</code></pre>
+</li>
+<li>
+<pre><code>           pstat: Vec::new(),
+</code></pre>
+</li>
+<li>
+<pre><code>           part: 0,
+</code></pre>
+</li>
+<li>
+<pre><code>           runs: Vec::new(),
+</code></pre>
+</li>
+<li>
+<pre><code>           runs_tmp: Vec::new(),
+</code></pre>
+</li>
+<li>
+<pre><code>           run_pos: 0,
+</code></pre>
+</li>
+<li>
+<pre><code>           theta: 0,
+</code></pre>
+</li>
+<li>
+<pre><code>           cur_job: 0,
+</code></pre>
+</li>
+<li>
+<pre><code>           cur_mask: 0,
+</code></pre>
+</li>
+<li>
+<pre><code>       }),
+       target: 0,
+       stack: [n; MAXD],
+       sp: 0,
+</code></pre>
+</li>
+</ul>
+<p>@@ -249,6 +398,7 @@
+k_cd: 0,
+k_po: 0,
+heur: 0.0,</p>
+<ul>
+<li>
+<pre><code>       cheur: [0.0; 18],
+       stats: Stats::default(),
+       solution: Vec::new(),
+       shared: false,
+</code></pre>
+</li>
+</ul>
+<p>@@ -287,6 +437,7 @@
+stat: 0.0,
+});
+self.target = ln.max(li).max(1);</p>
+<ul>
+<li>
+<pre><code>   self.rs.full = false;
+   self.start_iteration(s);
+   false
+</code></pre>
+}
+@@ -310,7 +461,8 @@
+out[slot / 2].li = v;
+}
+};</li>
+</ul>
+<ul>
+<li>
+<pre><code>   for j in &amp;self.jobs {
+</code></pre>
+</li>
+</ul>
+<ul>
+<li>
+<pre><code>   let use_p = self.rs.pstat.len() == self.jobs.len();
+</code></pre>
+</li>
+<li>
+<pre><code>   for (pi, j) in self.jobs.iter().enumerate() {
+       let (c, ci) = self.job_cubes(j);
+       let mut mm = if j.len == 0 {
+           ALL_MOVES
+</code></pre>
+</li>
+</ul>
+<p>@@ -323,6 +475,9 @@
+let mut n = *j;
+n.moves[n.len as usize] = m as u8;
+n.len += 1;</p>
+<ul>
+<li>
+<pre><code>           if use_p {
+</code></pre>
+</li>
+<li>
+<pre><code>               n.stat = self.rs.pstat[pi][m];
+</code></pre>
+</li>
+<li>
+<pre><code>           }
+           let pos = out.len();
+           out.push(n);
+           let (idx, cd) = s.index(c.apply_move(m));
+</code></pre>
+</li>
+</ul>
+<p>@@ -355,23 +510,345 @@
+self.jobs_tmp = std::mem::replace(&amp;mut self.jobs, out);
+}</p>
+<ul>
+<li>/// Start the iteration with target <code>self.target</code> (or a later one, if</li>
+<li>/// it has no runs).</li>
+<li>///</li>
+<li>/// An iteration on the jobs of the previous one (they have their full</li>
+<li>/// length; with h11, T &gt;= 18: the likely last iterations, and every one</li>
+<li>/// but the last is exhaustive, where the order does not matter) is</li>
+<li>/// split: first the root children with the best statistics from the</li>
+<li>/// previous iteration, about <code>FIRST</code> of all, by decreasing statistic</li>
+<li>/// across jobs (<code>build_first</code>), then each job's remaining children, by</li>
+<li>/// decreasing best statistic (<code>build_rest</code>). Other iterations run whole</li>
+<li>/// jobs by decreasing statistic, as solver does.
+fn start_iteration(&amp;mut self, s: &amp;Solver) {
+loop {
+// The stack depth stays below the target (relied on by the
+// unchecked indexing in <code>advance</code>); 20 moves always suffice.
+assert!((self.target as usize) &lt; MAXD);
+let jl = s.job_len(self.target);</li>
+<li>
+<pre><code>       let mut ext = false;
+       while (self.jobs[0].len as usize) &lt; jl {
+           self.extend_jobs(s);
+</code></pre>
+</li>
+<li>
+<pre><code>           ext = true;
+       }
+</code></pre>
+</li>
+</ul>
+<ul>
+<li>
+<pre><code>       if jl &gt; 0 {
+</code></pre>
+</li>
+<li>
+<pre><code>           sort_jobs(&amp;mut self.jobs, &amp;mut self.jobs_tmp);
+</code></pre>
+</li>
+</ul>
+<ul>
+<li>
+<pre><code>       let was_full = self.rs.full;
+</code></pre>
+</li>
+<li>
+<pre><code>       self.rs.full = jl == MAX_JOB_LEN &amp;&amp; !self.shared;
+</code></pre>
+</li>
+<li>
+<pre><code>       self.rs.pstat.clear();
+</code></pre>
+</li>
+<li>
+<pre><code>       if false {
+</code></pre>
+</li>
+<li>
+<pre><code>           self.rs.pstat.resize(self.jobs.len(), [0.0; 18]);
+       }
+</code></pre>
+</li>
+</ul>
+<ul>
+<li>
+<pre><code>       self.job_pos = 0;
+</code></pre>
+</li>
+<li>
+<pre><code>       if self.setup_job() {
+</code></pre>
+</li>
+</ul>
+<ul>
+<li>
+<pre><code>       if self.rs.full &amp;&amp; was_full &amp;&amp; !ext {
+</code></pre>
+</li>
+<li>
+<pre><code>           self.build_first();
+</code></pre>
+</li>
+<li>
+<pre><code>           self.rs.part = 1;
+</code></pre>
+</li>
+<li>
+<pre><code>       } else {
+</code></pre>
+</li>
+<li>
+<pre><code>           if jl &gt; 0 {
+</code></pre>
+</li>
+<li>
+<pre><code>               sort_jobs(&amp;mut self.jobs, &amp;mut self.jobs_tmp);
+</code></pre>
+</li>
+<li>
+<pre><code>           }
+</code></pre>
+</li>
+<li>
+<pre><code>           if self.rs.full {
+</code></pre>
+</li>
+<li>
+<pre><code>               // (Every job's entry is written in this iteration: by
+</code></pre>
+</li>
+<li>
+<pre><code>               // its run, or as `JOBX0` if it is skipped.)
+</code></pre>
+</li>
+<li>
+<pre><code>               self.rs.jx.resize(self.jobs.len(), JOBX0);
+</code></pre>
+</li>
+<li>
+<pre><code>           }
+</code></pre>
+</li>
+<li>
+<pre><code>           self.rs.part = 0;
+</code></pre>
+</li>
+<li>
+<pre><code>           self.job_pos = 0;
+</code></pre>
+</li>
+<li>
+<pre><code>       }
+</code></pre>
+</li>
+<li>
+<pre><code>       if self.setup_run() {
+           return;
+       }
+</code></pre>
+</li>
+<li>
+<pre><code>       debug_assert!(self.iteration_covered());
+</code></pre>
+</li>
+<li>
+<pre><code>       self.target += 1;
+</code></pre>
+</li>
+<li>
+<pre><code>   }
+</code></pre>
+</li>
+<li>}</li>
+<li></li>
+<li>/// The threshold on <code>ck</code> that selects about <code>FIRST</code> of all root</li>
+<li>/// children (estimated from a sample of the jobs).</li>
+<li>fn choose_theta(&amp;self) -&gt; u8 {</li>
+<li>
+<pre><code>   let n = self.rs.jx.len();
+</code></pre>
+</li>
+<li>
+<pre><code>   let step = if n &gt;= 4096 { 8 } else { 1 };
+</code></pre>
+</li>
+<li>
+<pre><code>   let mut hist = [0u32; 256];
+</code></pre>
+</li>
+<li>
+<pre><code>   let mut total = 0u32;
+</code></pre>
+</li>
+<li>
+<pre><code>   for x in self.rs.jx.iter().step_by(step) {
+</code></pre>
+</li>
+<li>
+<pre><code>       for &amp;q in &amp;x.ck {
+</code></pre>
+</li>
+<li>
+<pre><code>           hist[q as usize] += 1;
+</code></pre>
+</li>
+<li>
+<pre><code>       }
+</code></pre>
+</li>
+<li>
+<pre><code>       total += 18;
+</code></pre>
+</li>
+<li>
+<pre><code>   }
+</code></pre>
+</li>
+<li>
+<pre><code>   total -= hist[0];
+</code></pre>
+</li>
+<li>
+<pre><code>   let limit = (total as f64 * FIRST) as u32;
+</code></pre>
+</li>
+<li>
+<pre><code>   let mut acc = 0;
+</code></pre>
+</li>
+<li>
+<pre><code>   for v in (1..256).rev() {
+</code></pre>
+</li>
+<li>
+<pre><code>       acc += hist[v];
+</code></pre>
+</li>
+<li>
+<pre><code>       if acc &gt; limit {
+</code></pre>
+</li>
+<li>
+<pre><code>           return v as u8;
+</code></pre>
+</li>
+<li>
+<pre><code>       }
+</code></pre>
+</li>
+<li>
+<pre><code>   }
+</code></pre>
+</li>
+<li>
+<pre><code>   0
+</code></pre>
+</li>
+<li>}</li>
+<li></li>
+<li>/// The first part of a split iteration: one entry per root child with</li>
+<li>/// <code>ck &gt; theta</code>, by decreasing <code>ck</code> (ties in job and move order).</li>
+<li>fn build_first(&amp;mut self) {</li>
+<li>
+<pre><code>   self.rs.theta = self.choose_theta();
+</code></pre>
+</li>
+<li>
+<pre><code>   let theta = self.rs.theta;
+</code></pre>
+</li>
+<li>
+<pre><code>   let n = self.rs.jx.len();
+</code></pre>
+</li>
+<li>
+<pre><code>   self.rs.runs_tmp.clear();
+</code></pre>
+</li>
+<li>
+<pre><code>   self.rs.runs_tmp.reserve(n + 64);
+</code></pre>
+</li>
+<li>
+<pre><code>   let mut cnt = [0u32; 256];
+</code></pre>
+</li>
+<li>
+<pre><code>   let mut k = 0;
+</code></pre>
+</li>
+<li>
+<pre><code>   for ji in 0..n {
+</code></pre>
+</li>
+<li>
+<pre><code>       if self.rs.jx[ji].done &amp; INV != 0 {
+</code></pre>
+</li>
+<li>
+<pre><code>           let x = &amp;mut self.rs.jx[ji];
+</code></pre>
+</li>
+<li>
+<pre><code>           x.done &amp;= !INV;
+</code></pre>
+</li>
+<li>
+<pre><code>           x.tw = [0xFF; 6];
+</code></pre>
+</li>
+<li>
+<pre><code>           let key = max18(&amp;x.ck, ALL_MOVES);
+</code></pre>
+</li>
+<li>
+<pre><code>           if key &gt; theta {
+</code></pre>
+</li>
+<li>
+<pre><code>               if self.rs.runs_tmp.capacity() &lt; k + 32 {
+</code></pre>
+</li>
+<li>
+<pre><code>                   unsafe { self.rs.runs_tmp.set_len(k) };
+</code></pre>
+</li>
+<li>
+<pre><code>                   self.rs.runs_tmp.reserve(n + 64);
+</code></pre>
+</li>
+<li>
+<pre><code>               }
+</code></pre>
+</li>
+<li>
+<pre><code>               unsafe {
+</code></pre>
+</li>
+<li>
+<pre><code>                   self.rs
+</code></pre>
+</li>
+<li>
+<pre><code>                       .runs_tmp
+</code></pre>
+</li>
+<li>
+<pre><code>                       .as_mut_ptr()
+</code></pre>
+</li>
+<li>
+<pre><code>                       .add(k)
+</code></pre>
+</li>
+<li>
+<pre><code>                       .write((key as u32) &lt;&lt; 24 | (ji as u32) &lt;&lt; 5 | RUN_ALL);
+</code></pre>
+</li>
+<li>
+<pre><code>               }
+</code></pre>
+</li>
+<li>
+<pre><code>               k += 1;
+</code></pre>
+</li>
+<li>
+<pre><code>           }
+</code></pre>
+</li>
+<li>
+<pre><code>           // (kept for the rest's order: `ck` of a child of the side)
+</code></pre>
+</li>
+<li>
+<pre><code>           let m0 = moves_after(&amp;self.jobs[ji]).trailing_zeros() as usize;
+</code></pre>
+</li>
+<li>
+<pre><code>           let x = &amp;mut self.rs.jx[ji];
+</code></pre>
+</li>
+<li>
+<pre><code>           x.ck = [0; 18];
+</code></pre>
+</li>
+<li>
+<pre><code>           x.ck[m0] = key;
+</code></pre>
+</li>
+<li>
+<pre><code>           continue;
+</code></pre>
+</li>
+<li>
+<pre><code>       }
+</code></pre>
+</li>
+<li>
+<pre><code>       // SAFETY: ji &lt; n.
+</code></pre>
+</li>
+<li>
+<pre><code>       let x = unsafe { self.rs.jx.get_unchecked(ji) };
+</code></pre>
+</li>
+<li>
+<pre><code>       let cand = ck_above(&amp;x.ck, theta);
+</code></pre>
+</li>
+<li>
+<pre><code>       if self.rs.runs_tmp.capacity() &lt; k + 32 {
+</code></pre>
+</li>
+<li>
+<pre><code>           // SAFETY: the first k entries were written.
+</code></pre>
+</li>
+<li>
+<pre><code>           unsafe { self.rs.runs_tmp.set_len(k) };
+</code></pre>
+</li>
+<li>
+<pre><code>           self.rs.runs_tmp.reserve(n + 64);
+</code></pre>
+</li>
+<li>
+<pre><code>       }
+</code></pre>
+</li>
+<li>
+<pre><code>       // SAFETY: k + 18 &lt;= capacity; entries are written before
+</code></pre>
+</li>
+<li>
+<pre><code>       // `set_len` covers them.
+</code></pre>
+</li>
+<li>
+<pre><code>       unsafe {
+</code></pre>
+</li>
+<li>
+<pre><code>           use std::arch::x86_64::*;
+</code></pre>
+</li>
+<li>
+<pre><code>           let out = self.rs.runs_tmp.as_mut_ptr().add(k);
+</code></pre>
+</li>
+<li>
+<pre><code>           let ck = _mm_loadu_si128(x.ck.as_ptr() as *const __m128i);
+</code></pre>
+</li>
+<li>
+<pre><code>           let e = _mm512_or_si512(
+</code></pre>
+</li>
+<li>
+<pre><code>               _mm512_slli_epi32(_mm512_cvtepu8_epi32(ck), 24),
+</code></pre>
+</li>
+<li>
+<pre><code>               _mm512_add_epi32(
+</code></pre>
+</li>
+<li>
+<pre><code>                   _mm512_set1_epi32((ji as i32) &lt;&lt; 5),
+</code></pre>
+</li>
+<li>
+<pre><code>                   _mm512_setr_epi32(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+</code></pre>
+</li>
+<li>
+<pre><code>               ),
+</code></pre>
+</li>
+<li>
+<pre><code>           );
+</code></pre>
+</li>
+<li>
+<pre><code>           let c16 = cand as u16;
+</code></pre>
+</li>
+<li>
+<pre><code>           _mm512_mask_compressstoreu_epi32(out as *mut i32, c16, e);
+</code></pre>
+</li>
+<li>
+<pre><code>           let mut k2 = k + c16.count_ones() as usize;
+</code></pre>
+</li>
+<li>
+<pre><code>           for m in 16..18 {
+</code></pre>
+</li>
+<li>
+<pre><code>               let e = (x.ck[m] as u32) &lt;&lt; 24 | (ji as u32) &lt;&lt; 5 | m as u32;
+</code></pre>
+</li>
+<li>
+<pre><code>               out.add(k2 - k).write(e);
+</code></pre>
+</li>
+<li>
+<pre><code>               k2 += (cand &gt;&gt; m &amp; 1) as usize;
+</code></pre>
+</li>
+<li>
+<pre><code>           }
+</code></pre>
+</li>
+<li>
+<pre><code>           k = k2;
+</code></pre>
+</li>
+<li>
+<pre><code>       }
+</code></pre>
+</li>
+<li>
+<pre><code>   }
+</code></pre>
+</li>
+<li>
+<pre><code>   // SAFETY: the first k entries were written.
+</code></pre>
+</li>
+<li>
+<pre><code>   unsafe { self.rs.runs_tmp.set_len(k) };
+</code></pre>
+</li>
+<li>
+<pre><code>   for &amp;e in &amp;self.rs.runs_tmp {
+</code></pre>
+</li>
+<li>
+<pre><code>       cnt[(e &gt;&gt; 24) as usize] += 1;
+</code></pre>
+</li>
+<li>
+<pre><code>   }
+</code></pre>
+</li>
+<li>
+<pre><code>   sort_runs(&amp;mut self.rs.runs, &amp;self.rs.runs_tmp, &amp;mut cnt);
+</code></pre>
+</li>
+<li>
+<pre><code>   self.rs.run_pos = 0;
+</code></pre>
+</li>
+<li>}</li>
+<li></li>
+<li>/// The rest of a split iteration: one entry per job with children not</li>
+<li>/// run yet, by decreasing best <code>ck</code> of those.</li>
+<li>fn build_rest(&amp;mut self) {</li>
+<li>
+<pre><code>   let n = self.rs.jx.len();
+</code></pre>
+</li>
+<li>
+<pre><code>   let tag = (self.target as u32) &lt;&lt; 24;
+</code></pre>
+</li>
+<li>
+<pre><code>   self.rs.runs_tmp.clear();
+</code></pre>
+</li>
+<li>
+<pre><code>   self.rs.runs_tmp.reserve(n);
+</code></pre>
+</li>
+<li>
+<pre><code>   let mut cnt = [0u32; 256];
+</code></pre>
+</li>
+<li>
+<pre><code>   for ji in 0..n {
+</code></pre>
+</li>
+<li>
+<pre><code>       let x = &amp;self.rs.jx[ji];
+</code></pre>
+</li>
+<li>
+<pre><code>       let rest = self.side_moves(ji) &amp; !done_now(x, tag);
+</code></pre>
+</li>
+<li>
+<pre><code>       if rest != 0 {
+</code></pre>
+</li>
+<li>
+<pre><code>           let key = max18(&amp;x.ck, rest);
+</code></pre>
+</li>
+<li>
+<pre><code>           cnt[key as usize] += 1;
+</code></pre>
+</li>
+<li>
+<pre><code>           self.rs
+</code></pre>
+</li>
+<li>
+<pre><code>               .runs_tmp
+</code></pre>
+</li>
+<li>
+<pre><code>               .push((key as u32) &lt;&lt; 24 | (ji as u32) &lt;&lt; 5 | RUN_ALL);
+</code></pre>
+</li>
+<li>
+<pre><code>       }
+</code></pre>
+</li>
+<li>
+<pre><code>   }
+</code></pre>
+</li>
+<li>
+<pre><code>   sort_runs(&amp;mut self.rs.runs, &amp;self.rs.runs_tmp, &amp;mut cnt);
+</code></pre>
+</li>
+<li>
+<pre><code>   self.rs.run_pos = 0;
+</code></pre>
+</li>
+<li>}</li>
+<li></li>
+<li>/// The root children of job <code>ji</code> in a split iteration (on its side).</li>
+<li>#[inline(always)]</li>
+<li>fn side_moves(&amp;self, ji: usize) -&gt; u32 {</li>
+<li>
+<pre><code>   if self.rs.jx[ji].done &amp; INV != 0 {
+</code></pre>
+</li>
+<li>
+<pre><code>       ALL_MOVES
+</code></pre>
+</li>
+<li>
+<pre><code>   } else {
+</code></pre>
+</li>
+<li>
+<pre><code>       moves_after(&amp;self.jobs[ji])
+</code></pre>
+</li>
+<li>
+<pre><code>   }
+</code></pre>
+</li>
+<li>}</li>
+<li></li>
+<li>/// Whether every child of every feasible job root was run in this</li>
+<li>/// iteration (split iterations; for debug assertions at their end).</li>
+<li>fn iteration_covered(&amp;self) -&gt; bool {</li>
+<li>
+<pre><code>   if self.rs.part == 0 {
+</code></pre>
+</li>
+<li>
+<pre><code>       return true;
+</code></pre>
+</li>
+<li>
+<pre><code>   }
+</code></pre>
+</li>
+<li>
+<pre><code>   let tag = (self.target as u32) &lt;&lt; 24;
+</code></pre>
+</li>
+<li>
+<pre><code>   (0..self.rs.jx.len()).all(|ji| self.side_moves(ji) &amp; !done_now(&amp;self.rs.jx[ji], tag) == 0)
+</code></pre>
+</li>
+<li>}</li>
+<li></li>
+<li>/// Record the run just finished: the job's statistic, and in split</li>
+<li>/// iterations' setting its children's statistics, <code>tw</code> and <code>done</code>.</li>
+<li>#[inline(always)]</li>
+<li>fn finish_run(&amp;mut self) {</li>
+<li>
+<pre><code>   let ji = self.rs.cur_job;
+</code></pre>
+</li>
+<li>
+<pre><code>   let stat: f32 = sum18(&amp;self.cheur);
+</code></pre>
+</li>
+<li>
+<pre><code>   self.jobs[ji].stat = stat;
+</code></pre>
+</li>
+<li>
+<pre><code>   if !self.rs.pstat.is_empty() {
+</code></pre>
+</li>
+<li>
+<pre><code>       self.rs.pstat[ji] = self.cheur;
+</code></pre>
+</li>
+<li>
+<pre><code>   }
+</code></pre>
+</li>
+<li>
+<pre><code>   if self.rs.full {
+</code></pre>
+</li>
+<li>
+<pre><code>       let root = &amp;self.stack[0];
+</code></pre>
+</li>
+<li>
+<pre><code>       let mask = self.rs.cur_mask;
+</code></pre>
+</li>
+<li>
+<pre><code>       let tag = (self.target as u32) &lt;&lt; 24;
+</code></pre>
+</li>
+<li>
+<pre><code>       let q = quant18(&amp;self.cheur);
+</code></pre>
+</li>
+<li>
+<pre><code>       let inv = if root.normal { 0 } else { INV };
+</code></pre>
+</li>
+<li>
+<pre><code>       let x = if self.rs.part == 0 {
+</code></pre>
+</li>
+<li>
+<pre><code>           // A whole run: the entry is all new (not read: it is not
+</code></pre>
+</li>
+<li>
+<pre><code>           // in the cache).
+</code></pre>
+</li>
+<li>
+<pre><code>           JobX {
+</code></pre>
+</li>
+<li>
+<pre><code>               ck: q,
+</code></pre>
+</li>
+<li>
+<pre><code>               tw: root.tw,
+</code></pre>
+</li>
+<li>
+<pre><code>               done: tag | inv | ALL_MOVES,
+</code></pre>
+</li>
+<li>
+<pre><code>               _pad: 0,
+</code></pre>
+</li>
+<li>
+<pre><code>           }
+</code></pre>
+</li>
+<li>
+<pre><code>       } else {
+</code></pre>
+</li>
+<li>
+<pre><code>           let x = &amp;self.rs.jx[ji];
+</code></pre>
+</li>
+<li>
+<pre><code>           let mut ck = x.ck;
+</code></pre>
+</li>
+<li>
+<pre><code>           for m in 0..18 {
+</code></pre>
+</li>
+<li>
+<pre><code>               if mask &gt;&gt; m &amp; 1 != 0 {
+</code></pre>
+</li>
+<li>
+<pre><code>                   ck[m] = q[m];
+</code></pre>
+</li>
+<li>
+<pre><code>               }
+</code></pre>
+</li>
+<li>
+<pre><code>           }
+</code></pre>
+</li>
+<li>
+<pre><code>           JobX {
+</code></pre>
+</li>
+<li>
+<pre><code>               ck,
+</code></pre>
+</li>
+<li>
+<pre><code>               tw: root.tw,
+</code></pre>
+</li>
+<li>
+<pre><code>               done: tag | inv | done_now(x, tag) | mask,
+</code></pre>
+</li>
+<li>
+<pre><code>               _pad: 0,
+</code></pre>
+</li>
+<li>
+<pre><code>           }
+</code></pre>
+</li>
+<li>
+<pre><code>       };
+</code></pre>
+</li>
+<li>
+<pre><code>       self.rs.jx[ji] = x;
+</code></pre>
+</li>
+<li>
+<pre><code>   }
+</code></pre>
+</li>
+<li>}</li>
+<li></li>
+<li>/// The run finished: record it and set up the next one (of the next</li>
+<li>/// iteration if this one is exhausted). Out of line and cold, to keep</li>
+<li>/// the search loop's registers.</li>
+<li>#[cold]</li>
+<li>#[inline(never)]</li>
+<li>fn next_run(&amp;mut self, s: &amp;Solver) {</li>
+<li>
+<pre><code>   self.finish_run();
+</code></pre>
+</li>
+<li>
+<pre><code>   if self.rs.part == 0 {
+</code></pre>
+</li>
+<li>
+<pre><code>       self.job_pos += 1;
+</code></pre>
+</li>
+<li>
+<pre><code>   }
+</code></pre>
+</li>
+<li>
+<pre><code>   if !self.setup_run() {
+</code></pre>
+</li>
+<li>
+<pre><code>       debug_assert!(self.iteration_covered());
+       self.target += 1;
+</code></pre>
+</li>
+<li>
+<pre><code>       self.start_iteration(s);
+</code></pre>
+</li>
+<li>
+<pre><code>   }
+</code></pre>
+</li>
+<li>}</li>
+<li></li>
+<li>/// Set up the root node of the next run of this iteration. Returns</li>
+<li>/// false if the iteration is exhausted.</li>
+<li>fn setup_run(&amp;mut self) -&gt; bool {</li>
+<li>
+<pre><code>   if self.rs.part == 0 {
+</code></pre>
+</li>
+<li>
+<pre><code>       return self.setup_job();
+</code></pre>
+</li>
+<li>
+<pre><code>   }
+</code></pre>
+</li>
+<li>
+<pre><code>   let tag = (self.target as u32) &lt;&lt; 24;
+</code></pre>
+</li>
+<li>
+<pre><code>   loop {
+</code></pre>
+</li>
+<li>
+<pre><code>       if self.rs.run_pos == self.rs.runs.len() {
+</code></pre>
+</li>
+<li>
+<pre><code>           if self.rs.part == 2 {
+</code></pre>
+</li>
+<li>
+<pre><code>               return false;
+</code></pre>
+</li>
+<li>
+<pre><code>           }
+</code></pre>
+</li>
+<li>
+<pre><code>           self.build_rest();
+</code></pre>
+</li>
+<li>
+<pre><code>           self.rs.part = 2;
+</code></pre>
+</li>
+<li>
+<pre><code>           continue;
+</code></pre>
+</li>
+<li>
+<pre><code>       }
+</code></pre>
+</li>
+<li>
+<pre><code>       let e = self.rs.runs[self.rs.run_pos];
+</code></pre>
+</li>
+<li>
+<pre><code>       self.rs.run_pos += 1;
+</code></pre>
+</li>
+<li>
+<pre><code>       // The job vectors are too big for L2 and 20 lanes interleave
+</code></pre>
+</li>
+<li>
+<pre><code>       // their streams: fetch the next entry's job early.
+</code></pre>
+</li>
+<li>
+<pre><code>       unsafe {
+</code></pre>
+</li>
+<li>
+<pre><code>           use std::arch::x86_64::*;
+</code></pre>
+</li>
+<li>
+<pre><code>           let next = *self
+</code></pre>
+</li>
+<li>
+<pre><code>               .rs
+</code></pre>
+</li>
+<li>
+<pre><code>               .runs
+</code></pre>
+</li>
+<li>
+<pre><code>               .get_unchecked(self.rs.run_pos.min(self.rs.runs.len() - 1));
+</code></pre>
+</li>
+<li>
+<pre><code>           let nj = (next &gt;&gt; 5 &amp; 0x7_FFFF) as usize;
+</code></pre>
+</li>
+<li>
+<pre><code>           _mm_prefetch(self.rs.jx.as_ptr().add(nj) as *const i8, _MM_HINT_T0);
+</code></pre>
+</li>
+<li>
+<pre><code>           _mm_prefetch(self.jobs.as_ptr().add(nj) as *const i8, _MM_HINT_T0);
+</code></pre>
+</li>
+<li>
+<pre><code>       }
+</code></pre>
+</li>
+<li>
+<pre><code>       let ji = (e &gt;&gt; 5 &amp; 0x7_FFFF) as usize;
+</code></pre>
+</li>
+<li>
+<pre><code>       let m = e &amp; 31;
+</code></pre>
+</li>
+<li>
+<pre><code>       let x = self.rs.jx[ji];
+</code></pre>
+</li>
+<li>
+<pre><code>       let done = done_now(&amp;x, tag);
+</code></pre>
+</li>
+<li>
+<pre><code>       let side = self.side_moves(ji);
+</code></pre>
+</li>
+<li>
+<pre><code>       let mut mask;
+</code></pre>
+</li>
+<li>
+<pre><code>       if m == RUN_ALL {
+</code></pre>
+</li>
+<li>
+<pre><code>           mask = side &amp; !done;
+</code></pre>
+</li>
+<li>
+<pre><code>       } else {
+</code></pre>
+</li>
+<li>
+<pre><code>           if done &gt;&gt; m &amp; 1 != 0 {
+</code></pre>
+</li>
+<li>
+<pre><code>               continue; // run with an earlier entry's group
+</code></pre>
+</li>
+<li>
+<pre><code>           }
+</code></pre>
+</li>
+<li>
+<pre><code>           // the child, with the job's candidates at most `MERGE` below
+</code></pre>
+</li>
+<li>
+<pre><code>           // it (those above were run before)
+</code></pre>
+</li>
+<li>
+<pre><code>           let lo = x.ck[m as usize]
+</code></pre>
+</li>
+<li>
+<pre><code>               .saturating_sub(MERGE + 1)
+</code></pre>
+</li>
+<li>
+<pre><code>               .max(self.rs.theta);
+</code></pre>
+</li>
+<li>
+<pre><code>           mask = (ck_above(&amp;x.ck, lo) &amp; !done) | 1 &lt;&lt; m;
+</code></pre>
+</li>
+<li>
+<pre><code>       }
+</code></pre>
+</li>
+<li>
+<pre><code>       // An X' child needs its X sibling's other-side value (`tw`):
+</code></pre>
+</li>
+<li>
+<pre><code>       // from this run or recorded by an earlier one (always the case:
+</code></pre>
+</li>
+<li>
+<pre><code>       // every full-length job ran whole before its first split
+</code></pre>
+</li>
+<li>
+<pre><code>       // iteration). Else the X sibling runs too.
+</code></pre>
+</li>
+<li>
+<pre><code>       let unknown = tw_unknown(&amp;x.tw);
+</code></pre>
+</li>
+<li>
+<pre><code>       mask |= (mask &amp; unknown) &gt;&gt; 2 &amp; !done;
+</code></pre>
+</li>
+<li>
+<pre><code>       let j = self.jobs[ji];
+</code></pre>
+</li>
+<li>
+<pre><code>       let r = self.target - j.len;
+</code></pre>
+</li>
+<li>
+<pre><code>       debug_assert!(j.ln &lt; r &amp;&amp; j.li &lt; r);
+</code></pre>
+</li>
+<li>
+<pre><code>       let (c, ci) = self.job_cubes(&amp;j);
+</code></pre>
+</li>
+<li>
+<pre><code>       let inv = x.done &amp; INV != 0;
+</code></pre>
+</li>
+<li>
+<pre><code>       let mm_n = moves_after(&amp;j);
+</code></pre>
+</li>
+<li>
+<pre><code>       self.cheur = [0.0; 18];
+</code></pre>
+</li>
+<li>
+<pre><code>       self.rs.cur_job = ji;
+</code></pre>
+</li>
+<li>
+<pre><code>       self.rs.cur_mask = mask;
+</code></pre>
+</li>
+<li>
+<pre><code>       self.sp = 0;
+</code></pre>
+</li>
+<li>
+<pre><code>       self.stack[0] = Node {
+</code></pre>
+</li>
+<li>
+<pre><code>           a: Cube::select(inv, ci, c),
+</code></pre>
+</li>
+<li>
+<pre><code>           b: Cube::select(inv, c, ci),
+</code></pre>
+</li>
+<li>
+<pre><code>           lo: if inv { j.ln } else { j.li },
+</code></pre>
+</li>
+<li>
+<pre><code>           mm_o: if inv { mm_n } else { ALL_MOVES },
+</code></pre>
+</li>
+<li>
+<pre><code>           todo: side &amp; mask,
+</code></pre>
+</li>
+<li>
+<pre><code>           skip: 0,
+</code></pre>
+</li>
+<li>
+<pre><code>           r,
+</code></pre>
+</li>
+<li>
+<pre><code>           normal: !inv,
+</code></pre>
+</li>
+<li>
+<pre><code>           fmax: [0; 6],
+</code></pre>
+</li>
+<li>
+<pre><code>           lb: 0,
+</code></pre>
+</li>
+<li>
+<pre><code>           m: 0,
+</code></pre>
+</li>
+<li>
+<pre><code>           m_normal: true,
+</code></pre>
+</li>
+<li>
+<pre><code>           tw: x.tw,
+</code></pre>
+</li>
+<li>
+<pre><code>       };
+</code></pre>
+</li>
+<li>
+<pre><code>       return true;
+   }
+</code></pre>
+}</li>
+</ul>
+<p>@@ -386,15 +863,24 @@
+unsafe {
+use std::arch::x86_64::*;
+_mm_prefetch(self.jobs.as_ptr().add(ahead) as *const i8, _MM_HINT_T0);</p>
+<ul>
+<li>
+<pre><code>           if self.rs.full {
+</code></pre>
+</li>
+<li>
+<pre><code>               // (written at the end of the run)
+</code></pre>
+</li>
+<li>
+<pre><code>               _mm_prefetch(self.rs.jx.as_ptr().add(ahead) as *const i8, _MM_HINT_ET0);
+</code></pre>
+</li>
+<li>
+<pre><code>           }
+       }
+       let r = self.target - j.len;
+</code></pre>
+</li>
+</ul>
+<ul>
+<li>
+<pre><code>       self.heur = 0.0;
+</code></pre>
+</li>
+</ul>
+<ul>
+<li>
+<pre><code>       self.cheur = [0.0; 18];
+       let (c, ci) = self.job_cubes(&amp;j);
+       if j.ln &gt; r || j.li &gt; r || (j.len &gt; 0 &amp;&amp; c.is_solved()) {
+           self.jobs[self.job_pos].stat = 0.0;
+</code></pre>
+</li>
+<li>
+<pre><code>           if self.rs.full {
+</code></pre>
+</li>
+<li>
+<pre><code>               self.rs.jx[self.job_pos] = JOBX0;
+</code></pre>
+</li>
+<li>
+<pre><code>           }
+           self.job_pos += 1;
+           continue;
+       }
+</code></pre>
+</li>
+<li>
+<pre><code>       self.rs.cur_job = self.job_pos;
+</code></pre>
+</li>
+<li>
+<pre><code>       self.rs.cur_mask = ALL_MOVES;
+       let mut mm_n = if j.len == 0 {
+           ALL_MOVES
+       } else {
+</code></pre>
+</li>
+</ul>
+<p>@@ -450,15 +936,12 @@
+if sp == 0 {
+// job finished
+if self.shared {</p>
+<ul>
+<li>
+<pre><code>                   self.heur = sum18(&amp;self.cheur);
+</code></pre>
+</li>
+<li>
+<pre><code>                   self.cheur = [0.0; 18];
+                   self.stats.nodes += nodes;
+                   return Step::JobDone;
+               }
+</code></pre>
+</li>
+</ul>
+<ul>
+<li>
+<pre><code>               self.jobs[self.job_pos].stat = self.heur;
+</code></pre>
+</li>
+<li>
+<pre><code>               self.job_pos += 1;
+</code></pre>
+</li>
+<li>
+<pre><code>               if !self.setup_job() {
+</code></pre>
+</li>
+<li>
+<pre><code>                   self.target += 1;
+</code></pre>
+</li>
+<li>
+<pre><code>                   self.start_iteration(s);
+</code></pre>
+</li>
+<li>
+<pre><code>               }
+</code></pre>
+</li>
+</ul>
+<ul>
+<li>
+<pre><code>               self.next_run(s);
+               sp = self.sp;
+               let n = &amp;self.stack[sp];
+               (todo, lb, r) = (n.todo, n.lb, n.r);
+</code></pre>
+</li>
+</ul>
+<p>@@ -626,7 +1109,13 @@
+self.stats.lookups += 1;
+let po = self.k_po;
+debug_assert!(po &lt; 16 &amp;&amp; pm &lt; 16);</p>
+<ul>
+<li>
+<pre><code>   self.heur += HEUR_PAIR[(po as usize &amp; 15) &lt;&lt; 4 | (pm as usize &amp; 15)];
+</code></pre>
+</li>
+</ul>
+<ul>
+<li>
+<pre><code>   // SAFETY: moves are below 18.
+</code></pre>
+</li>
+<li>
+<pre><code>   unsafe {
+</code></pre>
+</li>
+<li>
+<pre><code>       let c =
+</code></pre>
+</li>
+<li>
+<pre><code>           std::hint::select_unpredictable(self.sp == 0, self.k_m, self.stack[1].m) as usize;
+</code></pre>
+</li>
+<li>
+<pre><code>       std::hint::assert_unchecked(c &lt; 18);
+</code></pre>
+</li>
+<li>
+<pre><code>       self.cheur[c] += HEUR_PAIR[(po as usize &amp; 15) &lt;&lt; 4 | (pm as usize &amp; 15)];
+</code></pre>
+</li>
+<li>
+<pre><code>   }
+   let r1 = self.stack[self.sp].r - 1;
+   let face = self.k_face as usize;
+   self.note_value(face, pm.max(po));
+</code></pre>
+</li>
+</ul>
+<p>@@ -722,7 +1211,7 @@
+}</p>
+<pre><code> fn reconstruct(&amp;self) -&gt; Vec&lt;u8&gt; {
+</code></pre>
+<ul>
+<li>
+<pre><code>   let j = &amp;self.jobs[self.job_pos];
+</code></pre>
+</li>
+</ul>
+<ul>
+<li>
+<pre><code>   let j = &amp;self.jobs[self.rs.cur_job];
+   let mut normal: Vec&lt;u8&gt; = j.moves[..j.len as usize].to_vec();
+   let mut pre: Vec&lt;u8&gt; = Vec::new();
+   for n in &amp;self.stack[1..=self.sp] {
+</code></pre>
+</li>
+</ul>
+<p>@@ -778,6 +1267,53 @@
+}
+}</p>
+<p>+/// The moves allowed at a job's root by its last move.
++#[inline(always)]
++fn moves_after(j: &amp;Job) -&gt; u32 {</p>
+<ul>
+<li>if j.len == 0 {</li>
+<li>
+<pre><code>   ALL_MOVES
+</code></pre>
+</li>
+<li>} else {</li>
+<li>
+<pre><code>   ALLOWED_AFTER[(j.moves[j.len as usize - 1] / 3) as usize]
+</code></pre>
+</li>
+<li>}
++}</li>
+<li></li>
+</ul>
+<p>+/// <code>JobX::done</code>'s children run in the iteration of <code>tag</code> (<code>target &lt;&lt; 24</code>).
++#[inline(always)]
++fn done_now(x: &amp;JobX, tag: u32) -&gt; u32 {</p>
+<ul>
+<li>if x.done &amp; 0xFF00_0000 == tag {</li>
+<li>
+<pre><code>   x.done &amp; ALL_MOVES
+</code></pre>
+</li>
+<li>} else {</li>
+<li>
+<pre><code>   0
+</code></pre>
+</li>
+<li>}
++}</li>
+<li></li>
+</ul>
+<p>+/// The X' moves of the faces whose <code>tw</code> is unknown.
++#[inline(always)]
++fn tw_unknown(tw: &amp;[u8; 6]) -&gt; u32 {</p>
+<ul>
+<li>let mut m = 0;</li>
+<li>for f in 0..6 {</li>
+<li>
+<pre><code>   m |= ((tw[f] == 0xFF) as u32) &lt;&lt; (3 * f + 2);
+</code></pre>
+</li>
+<li>}</li>
+<li>m
++}</li>
+<li></li>
+</ul>
+<p>+/// Counting sort of run entries by decreasing key (stable); <code>cnt</code> holds
++/// the number of entries per key.
++fn sort_runs(runs: &amp;mut Vec<u32>, tmp: &amp;[u32], cnt: &amp;mut [u32; 256]) {</p>
+<ul>
+<li>let mut sum = 0;</li>
+<li>for c in cnt.iter_mut().rev() {</li>
+<li>
+<pre><code>   (*c, sum) = (sum, sum + *c);
+</code></pre>
+</li>
+<li>}</li>
+<li>runs.clear();</li>
+<li>runs.resize(tmp.len(), 0);</li>
+<li>for &amp;e in tmp {</li>
+<li>
+<pre><code>   let k = (e &gt;&gt; 24) as usize;
+</code></pre>
+</li>
+<li>
+<pre><code>   // SAFETY: cnt[k] &lt; runs.len() by construction.
+</code></pre>
+</li>
+<li>
+<pre><code>   unsafe { *runs.get_unchecked_mut(cnt[k] as usize) = e };
+</code></pre>
+</li>
+<li>
+<pre><code>   cnt[k] += 1;
+</code></pre>
+</li>
+<li>}
++}</li>
+<li></li>
+</ul>
+<p>/// Solve cubes <code>cubes(i)</code> for i taken from the shared counter <code>next</code>, with
+/// <code>nlanes</code> interleaved lanes on this thread. Calls <code>done(index, solution, /// stats, seconds)</code> for every solved cube. Stops when <code>cubes</code> returns None
+@@ -871,6 +1407,105 @@
+mod tests {
+use super::*;</p>
+<ul>
+<li>/// Drive the stream mode's runs (<code>start_iteration</code>'s parts, <code>setup_run</code>,</li>
+<li>/// <code>finish_run</code>) over random full-length jobs with simulated outcomes</li>
+<li>/// for a whole iteration and then split ones, and check the coverage:</li>
+<li>/// every child of every job root runs exactly once per iteration, split</li>
+<li>/// runs branch on the side the job's statistics refer to, and an X'</li>
+<li>/// child runs with its X sibling or with X's other-side value known.</li>
+<li>#[test]</li>
+<li>fn split_runs_cover_each_child_once() {</li>
+<li>
+<pre><code>   let mut rng = crate::cubie::Rng(11);
+</code></pre>
+</li>
+<li>
+<pre><code>   for trial in 0..40 {
+</code></pre>
+</li>
+<li>
+<pre><code>       let mut l = Lane::new();
+</code></pre>
+</li>
+<li>
+<pre><code>       let n = [1usize, 7, 300, 2000][trial % 4];
+</code></pre>
+</li>
+<li>
+<pre><code>       l.jobs = (0..n)
+</code></pre>
+</li>
+<li>
+<pre><code>           .map(|_| {
+</code></pre>
+</li>
+<li>
+<pre><code>               let mut moves = [0u8; 4];
+</code></pre>
+</li>
+<li>
+<pre><code>               let mut mm = ALL_MOVES;
+</code></pre>
+</li>
+<li>
+<pre><code>               for mv in moves.iter_mut() {
+</code></pre>
+</li>
+<li>
+<pre><code>                   let ms: Vec&lt;u32&gt; = (0..18).filter(|&amp;m| mm &gt;&gt; m &amp; 1 != 0).collect();
+</code></pre>
+</li>
+<li>
+<pre><code>                   let m = ms[rng.next_u64() as usize % ms.len()];
+</code></pre>
+</li>
+<li>
+<pre><code>                   *mv = m as u8;
+</code></pre>
+</li>
+<li>
+<pre><code>                   mm = ALLOWED_AFTER[(m / 3) as usize];
+</code></pre>
+</li>
+<li>
+<pre><code>               }
+</code></pre>
+</li>
+<li>
+<pre><code>               // bounds below the first target's remaining depth (13),
+</code></pre>
+</li>
+<li>
+<pre><code>               // some tight (half turns masked, inverse roots)
+</code></pre>
+</li>
+<li>
+<pre><code>               let b = |r: u64| if r % 3 == 0 { 13 } else { (r % 13) as u8 };
+</code></pre>
+</li>
+<li>
+<pre><code>               Job {
+</code></pre>
+</li>
+<li>
+<pre><code>                   moves,
+</code></pre>
+</li>
+<li>
+<pre><code>                   len: 4,
+</code></pre>
+</li>
+<li>
+<pre><code>                   ln: b(rng.next_u64()),
+</code></pre>
+</li>
+<li>
+<pre><code>                   li: b(rng.next_u64()),
+</code></pre>
+</li>
+<li>
+<pre><code>                   stat: 0.0,
+</code></pre>
+</li>
+<li>
+<pre><code>               }
+</code></pre>
+</li>
+<li>
+<pre><code>           })
+</code></pre>
+</li>
+<li>
+<pre><code>           .collect();
+</code></pre>
+</li>
+<li>
+<pre><code>       l.target = 17;
+</code></pre>
+</li>
+<li>
+<pre><code>       l.rs.full = true;
+</code></pre>
+</li>
+<li>
+<pre><code>       for iter in 0..3 {
+</code></pre>
+</li>
+<li>
+<pre><code>           if iter == 0 {
+</code></pre>
+</li>
+<li>
+<pre><code>               l.rs.jx.clear();
+</code></pre>
+</li>
+<li>
+<pre><code>               l.rs.jx.resize(n, JOBX0);
+</code></pre>
+</li>
+<li>
+<pre><code>               l.rs.part = 0;
+</code></pre>
+</li>
+<li>
+<pre><code>               l.job_pos = 0;
+</code></pre>
+</li>
+<li>
+<pre><code>           } else {
+</code></pre>
+</li>
+<li>
+<pre><code>               l.build_first();
+</code></pre>
+</li>
+<li>
+<pre><code>               l.rs.part = 1;
+</code></pre>
+</li>
+<li>
+<pre><code>           }
+</code></pre>
+</li>
+<li>
+<pre><code>           let r = l.target - 4;
+</code></pre>
+</li>
+<li>
+<pre><code>           let mut ran = vec![0u32; n];
+</code></pre>
+</li>
+<li>
+<pre><code>           let mut runs = vec![0usize; n];
+</code></pre>
+</li>
+<li>
+<pre><code>           while l.setup_run() {
+</code></pre>
+</li>
+<li>
+<pre><code>               let ji = l.rs.cur_job;
+</code></pre>
+</li>
+<li>
+<pre><code>               let root = l.stack[0];
+</code></pre>
+</li>
+<li>
+<pre><code>               assert_eq!(root.r, r);
+</code></pre>
+</li>
+<li>
+<pre><code>               assert_eq!(root.todo &amp; ran[ji], 0, &quot;child run twice&quot;);
+</code></pre>
+</li>
+<li>
+<pre><code>               if iter &gt; 0 {
+</code></pre>
+</li>
+<li>
+<pre><code>                   assert_eq!(root.normal, l.rs.jx[ji].done &amp; INV == 0, &quot;side&quot;);
+</code></pre>
+</li>
+<li>
+<pre><code>                   for f in 0..6 {
+</code></pre>
+</li>
+<li>
+<pre><code>                       let (x, xp) = (1 &lt;&lt; (3 * f), 4 &lt;&lt; (3 * f));
+</code></pre>
+</li>
+<li>
+<pre><code>                       if root.todo &amp; xp != 0 &amp;&amp; root.todo &amp; x == 0 {
+</code></pre>
+</li>
+<li>
+<pre><code>                           assert_ne!(root.tw[f], 0xFF, &quot;X' without X or its value&quot;);
+</code></pre>
+</li>
+<li>
+<pre><code>                       }
+</code></pre>
+</li>
+<li>
+<pre><code>                   }
+</code></pre>
+</li>
+<li>
+<pre><code>               }
+</code></pre>
+</li>
+<li>
+<pre><code>               ran[ji] |= root.todo;
+</code></pre>
+</li>
+<li>
+<pre><code>               runs[ji] += 1;
+</code></pre>
+</li>
+<li>
+<pre><code>               // simulated outcome: statistics and X values
+</code></pre>
+</li>
+<li>
+<pre><code>               for m in 0..18 {
+</code></pre>
+</li>
+<li>
+<pre><code>                   if root.todo &gt;&gt; m &amp; 1 != 0 {
+</code></pre>
+</li>
+<li>
+<pre><code>                       let y = rng.next_u64();
+</code></pre>
+</li>
+<li>
+<pre><code>                       l.cheur[m] = if y % 4 == 0 {
+</code></pre>
+</li>
+<li>
+<pre><code>                           0.0
+</code></pre>
+</li>
+<li>
+<pre><code>                       } else {
+</code></pre>
+</li>
+<li>
+<pre><code>                           HEUR_TERMS[(y % 40) as usize] * (y &gt;&gt; 8) as u8 as f32
+</code></pre>
+</li>
+<li>
+<pre><code>                       };
+</code></pre>
+</li>
+<li>
+<pre><code>                       if m % 3 == 0 {
+</code></pre>
+</li>
+<li>
+<pre><code>                           l.stack[0].tw[m / 3] = (y &gt;&gt; 16) as u8 % 14;
+</code></pre>
+</li>
+<li>
+<pre><code>                       }
+</code></pre>
+</li>
+<li>
+<pre><code>                   }
+</code></pre>
+</li>
+<li>
+<pre><code>               }
+</code></pre>
+</li>
+<li>
+<pre><code>               l.finish_run();
+</code></pre>
+</li>
+<li>
+<pre><code>               if l.rs.part == 0 {
+</code></pre>
+</li>
+<li>
+<pre><code>                   l.job_pos += 1;
+</code></pre>
+</li>
+<li>
+<pre><code>               }
+</code></pre>
+</li>
+<li>
+<pre><code>           }
+</code></pre>
+</li>
+<li>
+<pre><code>           assert!(l.iteration_covered());
+</code></pre>
+</li>
+<li>
+<pre><code>           for ji in 0..n {
+</code></pre>
+</li>
+<li>
+<pre><code>               let j = l.jobs[ji];
+</code></pre>
+</li>
+<li>
+<pre><code>               if iter == 0 {
+</code></pre>
+</li>
+<li>
+<pre><code>                   assert_eq!(runs[ji], 1);
+</code></pre>
+</li>
+<li>
+<pre><code>               } else {
+</code></pre>
+</li>
+<li>
+<pre><code>                   assert_eq!(ran[ji], l.side_moves(ji), &quot;children not run&quot;);
+</code></pre>
+</li>
+<li>
+<pre><code>                   let _ = j;
+</code></pre>
+</li>
+<li>
+<pre><code>               }
+</code></pre>
+</li>
+<li>
+<pre><code>           }
+</code></pre>
+</li>
+<li>
+<pre><code>           l.target += 1;
+</code></pre>
+</li>
+<li>
+<pre><code>       }
+</code></pre>
+</li>
+<li>
+<pre><code>   }
+</code></pre>
+</li>
+<li>}</li>
+<li>#[test]
+fn sort_jobs_matches_stable_sort() {
+let mut rng = crate::cubie::Rng(7);</li>
+</ul>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

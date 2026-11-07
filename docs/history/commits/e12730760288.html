@@ -1,0 +1,34 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Merge opt/no-panics: remove intentional runtime panic paths — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="e12730760288.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="merge-opt-no-panics-remove-intentional-runtime-panic-paths">Merge opt/no-panics: remove intentional runtime panic paths</h1>
+<p>Commit <code>e127307602882155fa0c0bce5da173b6ac6614f6</code> · 2026-11-06T01:54:37+00:00</p>
+<p>This commit is reachable from the released main history. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: Historical ancestor; no current branch tip</p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>Merge opt/no-panics: remove intentional runtime panic paths</p>
+<p>Adapt shared-memory tests to the fallible memory and checksum APIs. Join
+every scoped worker before returning an error, including when more than
+one worker fails. Reject unrepresentable benchmark durations without a
+panic. Worker-failure regression tests run on unwind-capable targets.</p>
+<p>Validation: full check.sh passed (native, scalar, installed cross targets,
+WASM/wasmtime, Bun single/threaded modules, NEON under qemu); the no-panic
+scanner passed. Deterministic h8 nodes/lookups and stream/share solution
+lengths match the measured 229b99f binaries.</p>
+<p>Stream throughput on h8, 40 lanes, interleaved pairs (solves/s):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>pair</th><th align="right">1T measured</th><th align="right">1T candidate</th><th align="right">48T measured</th><th align="right">48T candidate</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td align="right">4.133</td><td align="right">4.067</td><td align="right">151.400</td><td align="right">149.267</td></tr>
+<tr><td>2</td><td align="right">4.133</td><td align="right">4.050</td><td align="right">152.467</td><td align="right">150.300</td></tr>
+<tr><td>3</td><td align="right">4.167</td><td align="right">4.150</td><td align="right">149.500</td><td align="right">149.967</td></tr>
+<tr><td>4</td><td align="right">3.983</td><td align="right">3.900</td><td align="right">151.833</td><td align="right">150.100</td></tr>
+<tr><td>5</td><td align="right">3.933</td><td align="right">3.883</td><td align="right">155.367</td><td align="right">158.867</td></tr>
+<tr><td>6</td><td align="right">3.883</td><td align="right">3.833</td><td align="right">-</td><td align="right">-</td></tr>
+<tr><td>7</td><td align="right">3.833</td><td align="right">3.817</td><td align="right">-</td><td align="right">-</td></tr>
+<tr><td>8</td><td align="right">3.883</td><td align="right">3.833</td><td align="right">-</td><td align="right">-</td></tr>
+</tbody>
+</table></div>
+<p>Paired median throughput change: 1T -1.29%; 48T -1.14%.
+The stream regression is being addressed in a separately measured layout
+follow-up. No speedup is claimed for this correctness and robustness work.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

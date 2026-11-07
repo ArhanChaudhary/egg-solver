@@ -1,0 +1,16 @@
+status 0
+run c48rsbatchopt10 48 random_state 200 1g pfnative 2
+pagemode hugetlb arena 32212254720 only c48rs-opt10,c48rs-opt10-nat,c48rs-opt10-pf,c48rs-opt10-pfn,c48rs-opt10,c48rs-opt10-nat,c48rs-opt10-pf,c48rs-opt10-pfn-pgo
+start 2026-11-06 22:21:54
+wall_s 244.26
+cpu_s 171.47 3.61
+maxrss_kb 100052
+gate_wait_s 0
+ext_cores 0.0
+pages 30518976 110272 107352 0 30408704 1382574 c48rs-opt10-pfn
+free_1g_pages 58 58
+memfree_gib_at_start 11.6
+thpwarm_pct -
+table /data2/competitors/cube48opt10/h48prun31h1.dat 31130910720
+thp always [madvise] never defrag always defer defer+madvise [madvise] never
+par 0 slot -

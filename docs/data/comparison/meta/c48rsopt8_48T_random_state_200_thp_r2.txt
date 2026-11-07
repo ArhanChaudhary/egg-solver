@@ -1,0 +1,16 @@
+status 0
+run c48rsopt8 48 random_state 200 thp shipped 2
+pagemode thp arena 0 only -
+start 2026-11-05 22:09:16
+wall_s 67.36
+cpu_s 252.46 5.85
+maxrss_kb 7632012
+gate_wait_s 0
+ext_cores 0.0
+pages 7627760 7627760 7624908 7600128 0 597390 c48rs-opt8
+free_1g_pages 58 58
+memfree_gib_at_start 15.0
+thpwarm_pct 100.0
+table /mnt/egg/super/xcr/cube48opt-rust/opt8/h48prun31h8.dat 7782727680
+thp always [madvise] never defrag always defer defer+madvise [madvise] never
+par 0 slot -

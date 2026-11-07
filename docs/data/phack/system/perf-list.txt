@@ -1,0 +1,2304 @@
+  mem-loads OR cpu/mem-loads/                        [Kernel PMU event]
+        cpu/event=0x0b,umask=0x10,ldlat=3/
+  cstate_core/c3-residency/                          [Kernel PMU event]
+        cstate_core/event=0x01/
+  cstate_core/c6-residency/                          [Kernel PMU event]
+        cstate_core/event=0x02/
+  cstate_pkg/c3-residency/                           [Kernel PMU event]
+        cstate_pkg/event=0x01/
+  cstate_pkg/c6-residency/                           [Kernel PMU event]
+        cstate_pkg/event=0x02/
+  cstate_pkg/c7-residency/                           [Kernel PMU event]
+        cstate_pkg/event=0x03/
+  msr/aperf/                                         [Kernel PMU event]
+        msr/event=0x01/
+  msr/cpu_thermal_margin/                            [Kernel PMU event]
+        msr/event=0x07/
+  msr/mperf/                                         [Kernel PMU event]
+        msr/event=0x02/
+  msr/smi/                                           [Kernel PMU event]
+        msr/event=0x04/
+  msr/tsc/                                           [Kernel PMU event]
+        msr/event=0x00/
+  uncore/clockticks/                                 [Kernel PMU event]
+        uncore/event=0xff,umask=0x00/
+  uncore/qhl_request_ioh_reads/                      [Kernel PMU event]
+        uncore/event=0x20,umask=0x01/
+  uncore/qhl_request_ioh_writes/                     [Kernel PMU event]
+        uncore/event=0x20,umask=0x02/
+  uncore/qhl_request_local_reads/                    [Kernel PMU event]
+        uncore/event=0x20,umask=0x10/
+  uncore/qhl_request_local_writes/                   [Kernel PMU event]
+        uncore/event=0x20,umask=0x20/
+  uncore/qhl_request_remote_reads/                   [Kernel PMU event]
+        uncore/event=0x20,umask=0x04/
+  uncore/qhl_request_remote_writes/                  [Kernel PMU event]
+        uncore/event=0x20,umask=0x08/
+  uncore/qmc_normal_reads_any/                       [Kernel PMU event]
+        uncore/event=0x2c,umask=0x0f/
+  uncore/qmc_writes_full_any/                        [Kernel PMU event]
+        uncore/event=0x2f,umask=0x0f/
+
+cache:
+  cache_lock_cycles.l1d
+       [Cycles L1D locked. Unit: cpu]
+        cpu/event=0x63,period=2000000,umask=2/
+  cache_lock_cycles.l1d_l2
+       [Cycles L1D and L2 locked. Unit: cpu]
+        cpu/event=0x63,period=2000000,umask=1/
+  l1d.m_evict
+       [L1D cache lines replaced in M state. Unit: cpu]
+        cpu/event=0x51,period=2000000,umask=4/
+  l1d.m_repl
+       [L1D cache lines allocated in the M state. Unit: cpu]
+        cpu/event=0x51,period=2000000,umask=2/
+  l1d.m_snoop_evict
+       [L1D snoop eviction of cache lines in M state. Unit: cpu]
+        cpu/event=0x51,period=2000000,umask=8/
+  l1d.repl
+       [L1 data cache lines allocated. Unit: cpu]
+        cpu/event=0x51,period=2000000,umask=1/
+  l1d_cache_prefetch_lock_fb_hit
+       [L1D prefetch load lock accepted in fill buffer. Unit: cpu]
+        cpu/event=0x52,period=2000000,umask=1/
+  l1d_prefetch.miss
+       [L1D hardware prefetch misses. Unit: cpu]
+        cpu/event=0x4e,period=200000,umask=2/
+  l1d_prefetch.requests
+       [L1D hardware prefetch requests. Unit: cpu]
+        cpu/event=0x4e,period=200000,umask=1/
+  l1d_prefetch.triggers
+       [L1D hardware prefetch requests triggered. Unit: cpu]
+        cpu/event=0x4e,period=200000,umask=4/
+  l1d_wb_l2.e_state
+       [L1 writebacks to L2 in E state. Unit: cpu]
+        cpu/event=0x28,period=100000,umask=4/
+  l1d_wb_l2.i_state
+       [L1 writebacks to L2 in I state (misses). Unit: cpu]
+        cpu/event=0x28,period=100000,umask=1/
+  l1d_wb_l2.m_state
+       [L1 writebacks to L2 in M state. Unit: cpu]
+        cpu/event=0x28,period=100000,umask=8/
+  l1d_wb_l2.mesi
+       [All L1 writebacks to L2. Unit: cpu]
+        cpu/event=0x28,period=100000,umask=0xf/
+  l1d_wb_l2.s_state
+       [L1 writebacks to L2 in S state. Unit: cpu]
+        cpu/event=0x28,period=100000,umask=2/
+  l1i.cycles_stalled
+       [L1I instruction fetch stall cycles. Unit: cpu]
+        cpu/event=0x80,period=2000000,umask=4/
+  l1i.hits
+       [L1I instruction fetch hits. Unit: cpu]
+        cpu/event=0x80,period=2000000,umask=1/
+  l1i.misses
+       [L1I instruction fetch misses. Unit: cpu]
+        cpu/event=0x80,period=2000000,umask=2/
+  l1i.reads
+       [L1I Instruction fetches. Unit: cpu]
+        cpu/event=0x80,period=2000000,umask=3/
+  l2_data_rqsts.any
+       [All L2 data requests. Unit: cpu]
+        cpu/event=0x26,period=200000,umask=0xff/
+  l2_data_rqsts.demand.e_state
+       [L2 data demand loads in E state. Unit: cpu]
+        cpu/event=0x26,period=200000,umask=4/
+  l2_data_rqsts.demand.i_state
+       [L2 data demand loads in I state (misses). Unit: cpu]
+        cpu/event=0x26,period=200000,umask=1/
+  l2_data_rqsts.demand.m_state
+       [L2 data demand loads in M state. Unit: cpu]
+        cpu/event=0x26,period=200000,umask=8/
+  l2_data_rqsts.demand.mesi
+       [L2 data demand requests. Unit: cpu]
+        cpu/event=0x26,period=200000,umask=0xf/
+  l2_data_rqsts.demand.s_state
+       [L2 data demand loads in S state. Unit: cpu]
+        cpu/event=0x26,period=200000,umask=2/
+  l2_data_rqsts.prefetch.e_state
+       [L2 data prefetches in E state. Unit: cpu]
+        cpu/event=0x26,period=200000,umask=0x40/
+  l2_data_rqsts.prefetch.i_state
+       [L2 data prefetches in the I state (misses). Unit: cpu]
+        cpu/event=0x26,period=200000,umask=0x10/
+  l2_data_rqsts.prefetch.m_state
+       [L2 data prefetches in M state. Unit: cpu]
+        cpu/event=0x26,period=200000,umask=0x80/
+  l2_data_rqsts.prefetch.mesi
+       [All L2 data prefetches. Unit: cpu]
+        cpu/event=0x26,period=200000,umask=0xf0/
+  l2_data_rqsts.prefetch.s_state
+       [L2 data prefetches in the S state. Unit: cpu]
+        cpu/event=0x26,period=200000,umask=0x20/
+  l2_lines_in.any
+       [L2 lines allocated. Unit: cpu]
+        cpu/event=0xf1,period=100000,umask=7/
+  l2_lines_in.e_state
+       [L2 lines allocated in the E state. Unit: cpu]
+        cpu/event=0xf1,period=100000,umask=4/
+  l2_lines_in.s_state
+       [L2 lines allocated in the S state. Unit: cpu]
+        cpu/event=0xf1,period=100000,umask=2/
+  l2_lines_out.any
+       [L2 lines evicted. Unit: cpu]
+        cpu/event=0xf2,period=100000,umask=0xf/
+  l2_lines_out.demand_clean
+       [L2 lines evicted by a demand request. Unit: cpu]
+        cpu/event=0xf2,period=100000,umask=1/
+  l2_lines_out.demand_dirty
+       [L2 modified lines evicted by a demand request. Unit: cpu]
+        cpu/event=0xf2,period=100000,umask=2/
+  l2_lines_out.prefetch_clean
+       [L2 lines evicted by a prefetch request. Unit: cpu]
+        cpu/event=0xf2,period=100000,umask=4/
+  l2_lines_out.prefetch_dirty
+       [L2 modified lines evicted by a prefetch request. Unit: cpu]
+        cpu/event=0xf2,period=100000,umask=8/
+  l2_rqsts.ifetch_hit
+       [L2 instruction fetch hits. Unit: cpu]
+        cpu/event=0x24,period=200000,umask=0x10/
+  l2_rqsts.ifetch_miss
+       [L2 instruction fetch misses. Unit: cpu]
+        cpu/event=0x24,period=200000,umask=0x20/
+  l2_rqsts.ifetches
+       [L2 instruction fetches. Unit: cpu]
+        cpu/event=0x24,period=200000,umask=0x30/
+  l2_rqsts.ld_hit
+       [L2 load hits. Unit: cpu]
+        cpu/event=0x24,period=200000,umask=1/
+  l2_rqsts.ld_miss
+       [L2 load misses. Unit: cpu]
+        cpu/event=0x24,period=200000,umask=2/
+  l2_rqsts.loads
+       [L2 requests. Unit: cpu]
+        cpu/event=0x24,period=200000,umask=3/
+  l2_rqsts.miss
+       [All L2 misses. Unit: cpu]
+        cpu/event=0x24,period=200000,umask=0xaa/
+  l2_rqsts.prefetch_hit
+       [L2 prefetch hits. Unit: cpu]
+        cpu/event=0x24,period=200000,umask=0x40/
+  l2_rqsts.prefetch_miss
+       [L2 prefetch misses. Unit: cpu]
+        cpu/event=0x24,period=200000,umask=0x80/
+  l2_rqsts.prefetches
+       [All L2 prefetches. Unit: cpu]
+        cpu/event=0x24,period=200000,umask=0xc0/
+  l2_rqsts.references
+       [All L2 requests. Unit: cpu]
+        cpu/event=0x24,period=200000,umask=0xff/
+  l2_rqsts.rfo_hit
+       [L2 RFO hits. Unit: cpu]
+        cpu/event=0x24,period=200000,umask=4/
+  l2_rqsts.rfo_miss
+       [L2 RFO misses. Unit: cpu]
+        cpu/event=0x24,period=200000,umask=8/
+  l2_rqsts.rfos
+       [L2 RFO requests. Unit: cpu]
+        cpu/event=0x24,period=200000,umask=0xc/
+  l2_transactions.any
+       [All L2 transactions. Unit: cpu]
+        cpu/event=0xf0,period=200000,umask=0x80/
+  l2_transactions.fill
+       [L2 fill transactions. Unit: cpu]
+        cpu/event=0xf0,period=200000,umask=0x20/
+  l2_transactions.ifetch
+       [L2 instruction fetch transactions. Unit: cpu]
+        cpu/event=0xf0,period=200000,umask=4/
+  l2_transactions.l1d_wb
+       [L1D writeback to L2 transactions. Unit: cpu]
+        cpu/event=0xf0,period=200000,umask=0x10/
+  l2_transactions.load
+       [L2 Load transactions. Unit: cpu]
+        cpu/event=0xf0,period=200000,umask=1/
+  l2_transactions.prefetch
+       [L2 prefetch transactions. Unit: cpu]
+        cpu/event=0xf0,period=200000,umask=8/
+  l2_transactions.rfo
+       [L2 RFO transactions. Unit: cpu]
+        cpu/event=0xf0,period=200000,umask=2/
+  l2_transactions.wb
+       [L2 writeback to LLC transactions. Unit: cpu]
+        cpu/event=0xf0,period=200000,umask=0x40/
+  l2_write.lock.e_state
+       [L2 demand lock RFOs in E state. Unit: cpu]
+        cpu/event=0x27,period=100000,umask=0x40/
+  l2_write.lock.hit
+       [All demand L2 lock RFOs that hit the cache. Unit: cpu]
+        cpu/event=0x27,period=100000,umask=0xe0/
+  l2_write.lock.i_state
+       [L2 demand lock RFOs in I state (misses). Unit: cpu]
+        cpu/event=0x27,period=100000,umask=0x10/
+  l2_write.lock.m_state
+       [L2 demand lock RFOs in M state. Unit: cpu]
+        cpu/event=0x27,period=100000,umask=0x80/
+  l2_write.lock.mesi
+       [All demand L2 lock RFOs. Unit: cpu]
+        cpu/event=0x27,period=100000,umask=0xf0/
+  l2_write.lock.s_state
+       [L2 demand lock RFOs in S state. Unit: cpu]
+        cpu/event=0x27,period=100000,umask=0x20/
+  l2_write.rfo.hit
+       [All L2 demand store RFOs that hit the cache. Unit: cpu]
+        cpu/event=0x27,period=100000,umask=0xe/
+  l2_write.rfo.i_state
+       [L2 demand store RFOs in I state (misses). Unit: cpu]
+        cpu/event=0x27,period=100000,umask=1/
+  l2_write.rfo.m_state
+       [L2 demand store RFOs in M state. Unit: cpu]
+        cpu/event=0x27,period=100000,umask=8/
+  l2_write.rfo.mesi
+       [All L2 demand store RFOs. Unit: cpu]
+        cpu/event=0x27,period=100000,umask=0xf/
+  l2_write.rfo.s_state
+       [L2 demand store RFOs in S state. Unit: cpu]
+        cpu/event=0x27,period=100000,umask=2/
+  longest_lat_cache.miss
+       [Longest latency cache miss. Unit: cpu]
+        cpu/event=0x2e,period=100000,umask=0x41/
+  longest_lat_cache.reference
+       [Longest latency cache reference. Unit: cpu]
+        cpu/event=0x2e,period=200000,umask=0x4f/
+  mem_inst_retired.latency_above_threshold_0
+       [Memory instructions retired above 0 clocks (Precise Event). Unit: cpu]
+        cpu/event=0xb,period=2000000,umask=0x10,ldlat=None/
+  mem_inst_retired.latency_above_threshold_1024
+       [Memory instructions retired above 1024 clocks (Precise Event). Unit:
+        cpu]
+        cpu/event=0xb,period=100,umask=0x10,ldlat=0x400/
+  mem_inst_retired.latency_above_threshold_128
+       [Memory instructions retired above 128 clocks (Precise Event). Unit:
+        cpu]
+        cpu/event=0xb,period=1000,umask=0x10,ldlat=0x80/
+  mem_inst_retired.latency_above_threshold_16
+       [Memory instructions retired above 16 clocks (Precise Event). Unit: cpu]
+        cpu/event=0xb,period=10000,umask=0x10,ldlat=0x10/
+  mem_inst_retired.latency_above_threshold_16384
+       [Memory instructions retired above 16384 clocks (Precise Event). Unit:
+        cpu]
+        cpu/event=0xb,period=5,umask=0x10,ldlat=0x4000/
+  mem_inst_retired.latency_above_threshold_2048
+       [Memory instructions retired above 2048 clocks (Precise Event). Unit:
+        cpu]
+        cpu/event=0xb,period=50,umask=0x10,ldlat=0x800/
+  mem_inst_retired.latency_above_threshold_256
+       [Memory instructions retired above 256 clocks (Precise Event). Unit:
+        cpu]
+        cpu/event=0xb,period=500,umask=0x10,ldlat=0x100/
+  mem_inst_retired.latency_above_threshold_32
+       [Memory instructions retired above 32 clocks (Precise Event). Unit: cpu]
+        cpu/event=0xb,period=5000,umask=0x10,ldlat=0x20/
+  mem_inst_retired.latency_above_threshold_32768
+       [Memory instructions retired above 32768 clocks (Precise Event). Unit:
+        cpu]
+        cpu/event=0xb,period=3,umask=0x10,ldlat=0x8000/
+  mem_inst_retired.latency_above_threshold_4
+       [Memory instructions retired above 4 clocks (Precise Event). Unit: cpu]
+        cpu/event=0xb,period=50000,umask=0x10,ldlat=0x4/
+  mem_inst_retired.latency_above_threshold_4096
+       [Memory instructions retired above 4096 clocks (Precise Event). Unit:
+        cpu]
+        cpu/event=0xb,period=20,umask=0x10,ldlat=0x1000/
+  mem_inst_retired.latency_above_threshold_512
+       [Memory instructions retired above 512 clocks (Precise Event). Unit:
+        cpu]
+        cpu/event=0xb,period=200,umask=0x10,ldlat=0x200/
+  mem_inst_retired.latency_above_threshold_64
+       [Memory instructions retired above 64 clocks (Precise Event). Unit: cpu]
+        cpu/event=0xb,period=2000,umask=0x10,ldlat=0x40/
+  mem_inst_retired.latency_above_threshold_8
+       [Memory instructions retired above 8 clocks (Precise Event). Unit: cpu]
+        cpu/event=0xb,period=20000,umask=0x10,ldlat=0x8/
+  mem_inst_retired.latency_above_threshold_8192
+       [Memory instructions retired above 8192 clocks (Precise Event). Unit:
+        cpu]
+        cpu/event=0xb,period=10,umask=0x10,ldlat=0x2000/
+  mem_inst_retired.loads
+       [Instructions retired which contains a load (Precise Event). Unit: cpu]
+        cpu/event=0xb,period=2000000,umask=1/
+  mem_inst_retired.stores
+       [Instructions retired which contains a store (Precise Event). Unit: cpu]
+        cpu/event=0xb,period=2000000,umask=2/
+  mem_load_retired.hit_lfb
+       [Retired loads that miss L1D and hit an previously allocated LFB
+        (Precise Event). Unit: cpu]
+        cpu/event=0xcb,period=200000,umask=0x40/
+  mem_load_retired.l1d_hit
+       [Retired loads that hit the L1 data cache (Precise Event). Unit: cpu]
+        cpu/event=0xcb,period=2000000,umask=1/
+  mem_load_retired.l2_hit
+       [Retired loads that hit the L2 cache (Precise Event). Unit: cpu]
+        cpu/event=0xcb,period=200000,umask=2/
+  mem_load_retired.llc_miss
+       [Retired loads that miss the LLC cache (Precise Event). Unit: cpu]
+        cpu/event=0xcb,period=10000,umask=0x10/
+  mem_load_retired.llc_unshared_hit
+       [Retired loads that hit valid versions in the LLC cache (Precise
+        Event). Unit: cpu]
+        cpu/event=0xcb,period=40000,umask=4/
+  mem_load_retired.other_core_l2_hit_hitm
+       [Retired loads that hit sibling core's L2 in modified or unmodified
+        states (Precise Event). Unit: cpu]
+        cpu/event=0xcb,period=40000,umask=8/
+  offcore_requests.any
+       [All offcore requests. Unit: cpu]
+        cpu/event=0xb0,period=100000,umask=0x80/
+  offcore_requests.any.read
+       [Offcore read requests. Unit: cpu]
+        cpu/event=0xb0,period=100000,umask=8/
+  offcore_requests.any.rfo
+       [Offcore RFO requests. Unit: cpu]
+        cpu/event=0xb0,period=100000,umask=0x10/
+  offcore_requests.demand.read_code
+       [Offcore demand code read requests. Unit: cpu]
+        cpu/event=0xb0,period=100000,umask=2/
+  offcore_requests.demand.read_data
+       [Offcore demand data read requests. Unit: cpu]
+        cpu/event=0xb0,period=100000,umask=1/
+  offcore_requests.demand.rfo
+       [Offcore demand RFO requests. Unit: cpu]
+        cpu/event=0xb0,period=100000,umask=4/
+  offcore_requests.l1d_writeback
+       [Offcore L1 data cache writebacks. Unit: cpu]
+        cpu/event=0xb0,period=100000,umask=0x40/
+  offcore_requests_outstanding.any.read
+       [Outstanding offcore reads. Unit: cpu]
+        cpu/event=0x60,period=2000000,umask=8/
+  offcore_requests_outstanding.any.read_not_empty
+       [Cycles offcore reads busy. Unit: cpu]
+        cpu/event=0x60,cmask=1,period=2000000,umask=8/
+  offcore_requests_outstanding.demand.read_code
+       [Outstanding offcore demand code reads. Unit: cpu]
+        cpu/event=0x60,period=2000000,umask=2/
+  offcore_requests_outstanding.demand.read_code_not_empty
+       [Cycles offcore demand code read busy. Unit: cpu]
+        cpu/event=0x60,cmask=1,period=2000000,umask=2/
+  offcore_requests_outstanding.demand.read_data
+       [Outstanding offcore demand data reads. Unit: cpu]
+        cpu/event=0x60,period=2000000,umask=1/
+  offcore_requests_outstanding.demand.read_data_not_empty
+       [Cycles offcore demand data read busy. Unit: cpu]
+        cpu/event=0x60,cmask=1,period=2000000,umask=1/
+  offcore_requests_outstanding.demand.rfo
+       [Outstanding offcore demand RFOs. Unit: cpu]
+        cpu/event=0x60,period=2000000,umask=4/
+  offcore_requests_outstanding.demand.rfo_not_empty
+       [Cycles offcore demand RFOs busy. Unit: cpu]
+        cpu/event=0x60,cmask=1,period=2000000,umask=4/
+  offcore_requests_sq_full
+       [Offcore requests blocked due to Super Queue full. Unit: cpu]
+        cpu/event=0xb2,period=100000,umask=1/
+  offcore_response.any_data.all_local_dram_and_remote_cache_hit
+       [REQUEST = ANY_DATA read and RESPONSE = ALL_LOCAL_DRAM AND
+        REMOTE_CACHE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x5011/
+  offcore_response.any_data.any_cache_dram
+       [REQUEST = ANY_DATA read and RESPONSE = ANY_CACHE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x7f11/
+  offcore_response.any_data.any_location
+       [REQUEST = ANY_DATA read and RESPONSE = ANY_LOCATION. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xff11/
+  offcore_response.any_data.io_csr_mmio
+       [REQUEST = ANY_DATA read and RESPONSE = IO_CSR_MMIO. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x8011/
+  offcore_response.any_data.llc_hit_no_other_core
+       [REQUEST = ANY_DATA read and RESPONSE = LLC_HIT_NO_OTHER_CORE. Unit:
+        cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x111/
+  offcore_response.any_data.llc_hit_other_core_hit
+       [REQUEST = ANY_DATA read and RESPONSE = LLC_HIT_OTHER_CORE_HIT. Unit:
+        cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x211/
+  offcore_response.any_data.llc_hit_other_core_hitm
+       [REQUEST = ANY_DATA read and RESPONSE = LLC_HIT_OTHER_CORE_HITM. Unit:
+        cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x411/
+  offcore_response.any_data.local_cache
+       [REQUEST = ANY_DATA read and RESPONSE = LOCAL_CACHE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x711/
+  offcore_response.any_data.local_dram_and_remote_cache_hit
+       [REQUEST = ANY_DATA read and RESPONSE = LOCAL_DRAM AND
+        REMOTE_CACHE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x1011/
+  offcore_response.any_data.remote_cache_hitm
+       [REQUEST = ANY_DATA read and RESPONSE = REMOTE_CACHE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x811/
+  offcore_response.any_ifetch.all_local_dram_and_remote_cache_hit
+       [REQUEST = ANY IFETCH and RESPONSE = ALL_LOCAL_DRAM AND
+        REMOTE_CACHE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x5044/
+  offcore_response.any_ifetch.any_cache_dram
+       [REQUEST = ANY IFETCH and RESPONSE = ANY_CACHE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x7f44/
+  offcore_response.any_ifetch.any_location
+       [REQUEST = ANY IFETCH and RESPONSE = ANY_LOCATION. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xff44/
+  offcore_response.any_ifetch.io_csr_mmio
+       [REQUEST = ANY IFETCH and RESPONSE = IO_CSR_MMIO. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x8044/
+  offcore_response.any_ifetch.llc_hit_no_other_core
+       [REQUEST = ANY IFETCH and RESPONSE = LLC_HIT_NO_OTHER_CORE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x144/
+  offcore_response.any_ifetch.llc_hit_other_core_hit
+       [REQUEST = ANY IFETCH and RESPONSE = LLC_HIT_OTHER_CORE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x244/
+  offcore_response.any_ifetch.llc_hit_other_core_hitm
+       [REQUEST = ANY IFETCH and RESPONSE = LLC_HIT_OTHER_CORE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x444/
+  offcore_response.any_ifetch.local_cache
+       [REQUEST = ANY IFETCH and RESPONSE = LOCAL_CACHE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x744/
+  offcore_response.any_ifetch.local_dram_and_remote_cache_hit
+       [REQUEST = ANY IFETCH and RESPONSE = LOCAL_DRAM AND REMOTE_CACHE_HIT.
+        Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x1044/
+  offcore_response.any_ifetch.remote_cache_hitm
+       [REQUEST = ANY IFETCH and RESPONSE = REMOTE_CACHE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x844/
+  offcore_response.any_request.all_local_dram_and_remote_cache_hit
+       [REQUEST = ANY_REQUEST and RESPONSE = ALL_LOCAL_DRAM AND
+        REMOTE_CACHE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x50ff/
+  offcore_response.any_request.any_cache_dram
+       [REQUEST = ANY_REQUEST and RESPONSE = ANY_CACHE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x7fff/
+  offcore_response.any_request.any_location
+       [REQUEST = ANY_REQUEST and RESPONSE = ANY_LOCATION. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xffff/
+  offcore_response.any_request.io_csr_mmio
+       [REQUEST = ANY_REQUEST and RESPONSE = IO_CSR_MMIO. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x80ff/
+  offcore_response.any_request.llc_hit_no_other_core
+       [REQUEST = ANY_REQUEST and RESPONSE = LLC_HIT_NO_OTHER_CORE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x1ff/
+  offcore_response.any_request.llc_hit_other_core_hit
+       [REQUEST = ANY_REQUEST and RESPONSE = LLC_HIT_OTHER_CORE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x2ff/
+  offcore_response.any_request.llc_hit_other_core_hitm
+       [REQUEST = ANY_REQUEST and RESPONSE = LLC_HIT_OTHER_CORE_HITM. Unit:
+        cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x4ff/
+  offcore_response.any_request.local_cache
+       [REQUEST = ANY_REQUEST and RESPONSE = LOCAL_CACHE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x7ff/
+  offcore_response.any_request.local_dram_and_remote_cache_hit
+       [REQUEST = ANY_REQUEST and RESPONSE = LOCAL_DRAM AND REMOTE_CACHE_HIT.
+        Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x10ff/
+  offcore_response.any_request.remote_cache_hitm
+       [REQUEST = ANY_REQUEST and RESPONSE = REMOTE_CACHE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x8ff/
+  offcore_response.any_rfo.all_local_dram_and_remote_cache_hit
+       [REQUEST = ANY RFO and RESPONSE = ALL_LOCAL_DRAM AND REMOTE_CACHE_HIT.
+        Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x5022/
+  offcore_response.any_rfo.any_cache_dram
+       [REQUEST = ANY RFO and RESPONSE = ANY_CACHE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x7f22/
+  offcore_response.any_rfo.any_location
+       [REQUEST = ANY RFO and RESPONSE = ANY_LOCATION. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xff22/
+  offcore_response.any_rfo.io_csr_mmio
+       [REQUEST = ANY RFO and RESPONSE = IO_CSR_MMIO. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x8022/
+  offcore_response.any_rfo.llc_hit_no_other_core
+       [REQUEST = ANY RFO and RESPONSE = LLC_HIT_NO_OTHER_CORE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x122/
+  offcore_response.any_rfo.llc_hit_other_core_hit
+       [REQUEST = ANY RFO and RESPONSE = LLC_HIT_OTHER_CORE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x222/
+  offcore_response.any_rfo.llc_hit_other_core_hitm
+       [REQUEST = ANY RFO and RESPONSE = LLC_HIT_OTHER_CORE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x422/
+  offcore_response.any_rfo.local_cache
+       [REQUEST = ANY RFO and RESPONSE = LOCAL_CACHE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x722/
+  offcore_response.any_rfo.local_dram_and_remote_cache_hit
+       [REQUEST = ANY RFO and RESPONSE = LOCAL_DRAM AND REMOTE_CACHE_HIT.
+        Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x1022/
+  offcore_response.any_rfo.remote_cache_hitm
+       [REQUEST = ANY RFO and RESPONSE = REMOTE_CACHE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x822/
+  offcore_response.corewb.all_local_dram_and_remote_cache_hit
+       [REQUEST = CORE_WB and RESPONSE = ALL_LOCAL_DRAM AND REMOTE_CACHE_HIT.
+        Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x5008/
+  offcore_response.corewb.any_cache_dram
+       [REQUEST = CORE_WB and RESPONSE = ANY_CACHE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x7f08/
+  offcore_response.corewb.any_location
+       [REQUEST = CORE_WB and RESPONSE = ANY_LOCATION. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xff08/
+  offcore_response.corewb.io_csr_mmio
+       [REQUEST = CORE_WB and RESPONSE = IO_CSR_MMIO. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x8008/
+  offcore_response.corewb.llc_hit_no_other_core
+       [REQUEST = CORE_WB and RESPONSE = LLC_HIT_NO_OTHER_CORE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x108/
+  offcore_response.corewb.llc_hit_other_core_hit
+       [REQUEST = CORE_WB and RESPONSE = LLC_HIT_OTHER_CORE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x208/
+  offcore_response.corewb.llc_hit_other_core_hitm
+       [REQUEST = CORE_WB and RESPONSE = LLC_HIT_OTHER_CORE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x408/
+  offcore_response.corewb.local_cache
+       [REQUEST = CORE_WB and RESPONSE = LOCAL_CACHE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x708/
+  offcore_response.corewb.local_dram_and_remote_cache_hit
+       [REQUEST = CORE_WB and RESPONSE = LOCAL_DRAM AND REMOTE_CACHE_HIT.
+        Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x1008/
+  offcore_response.corewb.remote_cache_hitm
+       [REQUEST = CORE_WB and RESPONSE = REMOTE_CACHE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x808/
+  offcore_response.data_ifetch.all_local_dram_and_remote_cache_hit
+       [REQUEST = DATA_IFETCH and RESPONSE = ALL_LOCAL_DRAM AND
+        REMOTE_CACHE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x5077/
+  offcore_response.data_ifetch.any_cache_dram
+       [REQUEST = DATA_IFETCH and RESPONSE = ANY_CACHE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x7f77/
+  offcore_response.data_ifetch.any_location
+       [REQUEST = DATA_IFETCH and RESPONSE = ANY_LOCATION. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xff77/
+  offcore_response.data_ifetch.io_csr_mmio
+       [REQUEST = DATA_IFETCH and RESPONSE = IO_CSR_MMIO. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x8077/
+  offcore_response.data_ifetch.llc_hit_no_other_core
+       [REQUEST = DATA_IFETCH and RESPONSE = LLC_HIT_NO_OTHER_CORE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x177/
+  offcore_response.data_ifetch.llc_hit_other_core_hit
+       [REQUEST = DATA_IFETCH and RESPONSE = LLC_HIT_OTHER_CORE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x277/
+  offcore_response.data_ifetch.llc_hit_other_core_hitm
+       [REQUEST = DATA_IFETCH and RESPONSE = LLC_HIT_OTHER_CORE_HITM. Unit:
+        cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x477/
+  offcore_response.data_ifetch.local_cache
+       [REQUEST = DATA_IFETCH and RESPONSE = LOCAL_CACHE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x777/
+  offcore_response.data_ifetch.local_dram_and_remote_cache_hit
+       [REQUEST = DATA_IFETCH and RESPONSE = LOCAL_DRAM AND REMOTE_CACHE_HIT.
+        Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x1077/
+  offcore_response.data_ifetch.remote_cache_hitm
+       [REQUEST = DATA_IFETCH and RESPONSE = REMOTE_CACHE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x877/
+  offcore_response.data_in.all_local_dram_and_remote_cache_hit
+       [REQUEST = DATA_IN and RESPONSE = ALL_LOCAL_DRAM AND REMOTE_CACHE_HIT.
+        Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x5033/
+  offcore_response.data_in.any_cache_dram
+       [REQUEST = DATA_IN and RESPONSE = ANY_CACHE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x7f33/
+  offcore_response.data_in.any_location
+       [REQUEST = DATA_IN and RESPONSE = ANY_LOCATION. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xff33/
+  offcore_response.data_in.io_csr_mmio
+       [REQUEST = DATA_IN and RESPONSE = IO_CSR_MMIO. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x8033/
+  offcore_response.data_in.llc_hit_no_other_core
+       [REQUEST = DATA_IN and RESPONSE = LLC_HIT_NO_OTHER_CORE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x133/
+  offcore_response.data_in.llc_hit_other_core_hit
+       [REQUEST = DATA_IN and RESPONSE = LLC_HIT_OTHER_CORE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x233/
+  offcore_response.data_in.llc_hit_other_core_hitm
+       [REQUEST = DATA_IN and RESPONSE = LLC_HIT_OTHER_CORE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x433/
+  offcore_response.data_in.local_cache
+       [REQUEST = DATA_IN and RESPONSE = LOCAL_CACHE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x733/
+  offcore_response.data_in.local_dram_and_remote_cache_hit
+       [REQUEST = DATA_IN and RESPONSE = LOCAL_DRAM AND REMOTE_CACHE_HIT.
+        Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x1033/
+  offcore_response.data_in.remote_cache_hitm
+       [REQUEST = DATA_IN and RESPONSE = REMOTE_CACHE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x833/
+  offcore_response.demand_data.all_local_dram_and_remote_cache_hit
+       [REQUEST = DEMAND_DATA and RESPONSE = ALL_LOCAL_DRAM AND
+        REMOTE_CACHE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x5003/
+  offcore_response.demand_data.any_cache_dram
+       [REQUEST = DEMAND_DATA and RESPONSE = ANY_CACHE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x7f03/
+  offcore_response.demand_data.any_location
+       [REQUEST = DEMAND_DATA and RESPONSE = ANY_LOCATION. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xff03/
+  offcore_response.demand_data.io_csr_mmio
+       [REQUEST = DEMAND_DATA and RESPONSE = IO_CSR_MMIO. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x8003/
+  offcore_response.demand_data.llc_hit_no_other_core
+       [REQUEST = DEMAND_DATA and RESPONSE = LLC_HIT_NO_OTHER_CORE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x103/
+  offcore_response.demand_data.llc_hit_other_core_hit
+       [REQUEST = DEMAND_DATA and RESPONSE = LLC_HIT_OTHER_CORE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x203/
+  offcore_response.demand_data.llc_hit_other_core_hitm
+       [REQUEST = DEMAND_DATA and RESPONSE = LLC_HIT_OTHER_CORE_HITM. Unit:
+        cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x403/
+  offcore_response.demand_data.local_cache
+       [REQUEST = DEMAND_DATA and RESPONSE = LOCAL_CACHE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x703/
+  offcore_response.demand_data.local_dram_and_remote_cache_hit
+       [REQUEST = DEMAND_DATA and RESPONSE = LOCAL_DRAM AND REMOTE_CACHE_HIT.
+        Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x1003/
+  offcore_response.demand_data.remote_cache_hitm
+       [REQUEST = DEMAND_DATA and RESPONSE = REMOTE_CACHE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x803/
+  offcore_response.demand_data_rd.all_local_dram_and_remote_cache_hit
+       [REQUEST = DEMAND_DATA_RD and RESPONSE = ALL_LOCAL_DRAM AND
+        REMOTE_CACHE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x5001/
+  offcore_response.demand_data_rd.any_cache_dram
+       [REQUEST = DEMAND_DATA_RD and RESPONSE = ANY_CACHE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x7f01/
+  offcore_response.demand_data_rd.any_location
+       [REQUEST = DEMAND_DATA_RD and RESPONSE = ANY_LOCATION. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xff01/
+  offcore_response.demand_data_rd.io_csr_mmio
+       [REQUEST = DEMAND_DATA_RD and RESPONSE = IO_CSR_MMIO. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x8001/
+  offcore_response.demand_data_rd.llc_hit_no_other_core
+       [REQUEST = DEMAND_DATA_RD and RESPONSE = LLC_HIT_NO_OTHER_CORE. Unit:
+        cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x101/
+  offcore_response.demand_data_rd.llc_hit_other_core_hit
+       [REQUEST = DEMAND_DATA_RD and RESPONSE = LLC_HIT_OTHER_CORE_HIT. Unit:
+        cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x201/
+  offcore_response.demand_data_rd.llc_hit_other_core_hitm
+       [REQUEST = DEMAND_DATA_RD and RESPONSE = LLC_HIT_OTHER_CORE_HITM. Unit:
+        cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x401/
+  offcore_response.demand_data_rd.local_cache
+       [REQUEST = DEMAND_DATA_RD and RESPONSE = LOCAL_CACHE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x701/
+  offcore_response.demand_data_rd.local_dram_and_remote_cache_hit
+       [REQUEST = DEMAND_DATA_RD and RESPONSE = LOCAL_DRAM AND
+        REMOTE_CACHE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x1001/
+  offcore_response.demand_data_rd.remote_cache_hitm
+       [REQUEST = DEMAND_DATA_RD and RESPONSE = REMOTE_CACHE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x801/
+  offcore_response.demand_ifetch.all_local_dram_and_remote_cache_hit
+       [REQUEST = DEMAND_IFETCH and RESPONSE = ALL_LOCAL_DRAM AND
+        REMOTE_CACHE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x5004/
+  offcore_response.demand_ifetch.any_cache_dram
+       [REQUEST = DEMAND_IFETCH and RESPONSE = ANY_CACHE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x7f04/
+  offcore_response.demand_ifetch.any_location
+       [REQUEST = DEMAND_IFETCH and RESPONSE = ANY_LOCATION. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xff04/
+  offcore_response.demand_ifetch.io_csr_mmio
+       [REQUEST = DEMAND_IFETCH and RESPONSE = IO_CSR_MMIO. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x8004/
+  offcore_response.demand_ifetch.llc_hit_no_other_core
+       [REQUEST = DEMAND_IFETCH and RESPONSE = LLC_HIT_NO_OTHER_CORE. Unit:
+        cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x104/
+  offcore_response.demand_ifetch.llc_hit_other_core_hit
+       [REQUEST = DEMAND_IFETCH and RESPONSE = LLC_HIT_OTHER_CORE_HIT. Unit:
+        cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x204/
+  offcore_response.demand_ifetch.llc_hit_other_core_hitm
+       [REQUEST = DEMAND_IFETCH and RESPONSE = LLC_HIT_OTHER_CORE_HITM. Unit:
+        cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x404/
+  offcore_response.demand_ifetch.local_cache
+       [REQUEST = DEMAND_IFETCH and RESPONSE = LOCAL_CACHE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x704/
+  offcore_response.demand_ifetch.local_dram_and_remote_cache_hit
+       [REQUEST = DEMAND_IFETCH and RESPONSE = LOCAL_DRAM AND
+        REMOTE_CACHE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x1004/
+  offcore_response.demand_ifetch.remote_cache_hitm
+       [REQUEST = DEMAND_IFETCH and RESPONSE = REMOTE_CACHE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x804/
+  offcore_response.demand_rfo.all_local_dram_and_remote_cache_hit
+       [REQUEST = DEMAND_RFO and RESPONSE = ALL_LOCAL_DRAM AND
+        REMOTE_CACHE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x5002/
+  offcore_response.demand_rfo.any_cache_dram
+       [REQUEST = DEMAND_RFO and RESPONSE = ANY_CACHE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x7f02/
+  offcore_response.demand_rfo.any_location
+       [REQUEST = DEMAND_RFO and RESPONSE = ANY_LOCATION. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xff02/
+  offcore_response.demand_rfo.io_csr_mmio
+       [REQUEST = DEMAND_RFO and RESPONSE = IO_CSR_MMIO. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x8002/
+  offcore_response.demand_rfo.llc_hit_no_other_core
+       [REQUEST = DEMAND_RFO and RESPONSE = LLC_HIT_NO_OTHER_CORE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x102/
+  offcore_response.demand_rfo.llc_hit_other_core_hit
+       [REQUEST = DEMAND_RFO and RESPONSE = LLC_HIT_OTHER_CORE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x202/
+  offcore_response.demand_rfo.llc_hit_other_core_hitm
+       [REQUEST = DEMAND_RFO and RESPONSE = LLC_HIT_OTHER_CORE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x402/
+  offcore_response.demand_rfo.local_cache
+       [REQUEST = DEMAND_RFO and RESPONSE = LOCAL_CACHE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x702/
+  offcore_response.demand_rfo.local_dram_and_remote_cache_hit
+       [REQUEST = DEMAND_RFO and RESPONSE = LOCAL_DRAM AND REMOTE_CACHE_HIT.
+        Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x1002/
+  offcore_response.demand_rfo.remote_cache_hitm
+       [REQUEST = DEMAND_RFO and RESPONSE = REMOTE_CACHE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x802/
+  offcore_response.other.all_local_dram_and_remote_cache_hit
+       [REQUEST = OTHER and RESPONSE = ALL_LOCAL_DRAM AND REMOTE_CACHE_HIT.
+        Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x5080/
+  offcore_response.other.any_cache_dram
+       [REQUEST = OTHER and RESPONSE = ANY_CACHE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x7f80/
+  offcore_response.other.any_location
+       [REQUEST = OTHER and RESPONSE = ANY_LOCATION. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xff80/
+  offcore_response.other.io_csr_mmio
+       [REQUEST = OTHER and RESPONSE = IO_CSR_MMIO. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x8080/
+  offcore_response.other.llc_hit_no_other_core
+       [REQUEST = OTHER and RESPONSE = LLC_HIT_NO_OTHER_CORE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x180/
+  offcore_response.other.llc_hit_other_core_hit
+       [REQUEST = OTHER and RESPONSE = LLC_HIT_OTHER_CORE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x280/
+  offcore_response.other.llc_hit_other_core_hitm
+       [REQUEST = OTHER and RESPONSE = LLC_HIT_OTHER_CORE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x480/
+  offcore_response.other.local_cache
+       [REQUEST = OTHER and RESPONSE = LOCAL_CACHE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x780/
+  offcore_response.other.local_dram_and_remote_cache_hit
+       [REQUEST = OTHER and RESPONSE = LOCAL_DRAM AND REMOTE_CACHE_HIT. Unit:
+        cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x1080/
+  offcore_response.other.remote_cache_hitm
+       [REQUEST = OTHER and RESPONSE = REMOTE_CACHE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x880/
+  offcore_response.pf_data.all_local_dram_and_remote_cache_hit
+       [REQUEST = PF_DATA and RESPONSE = ALL_LOCAL_DRAM AND REMOTE_CACHE_HIT.
+        Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x5050/
+  offcore_response.pf_data.any_cache_dram
+       [REQUEST = PF_DATA and RESPONSE = ANY_CACHE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x7f50/
+  offcore_response.pf_data.any_location
+       [REQUEST = PF_DATA and RESPONSE = ANY_LOCATION. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xff50/
+  offcore_response.pf_data.io_csr_mmio
+       [REQUEST = PF_DATA and RESPONSE = IO_CSR_MMIO. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x8050/
+  offcore_response.pf_data.llc_hit_no_other_core
+       [REQUEST = PF_DATA and RESPONSE = LLC_HIT_NO_OTHER_CORE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x150/
+  offcore_response.pf_data.llc_hit_other_core_hit
+       [REQUEST = PF_DATA and RESPONSE = LLC_HIT_OTHER_CORE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x250/
+  offcore_response.pf_data.llc_hit_other_core_hitm
+       [REQUEST = PF_DATA and RESPONSE = LLC_HIT_OTHER_CORE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x450/
+  offcore_response.pf_data.local_cache
+       [REQUEST = PF_DATA and RESPONSE = LOCAL_CACHE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x750/
+  offcore_response.pf_data.local_dram_and_remote_cache_hit
+       [REQUEST = PF_DATA and RESPONSE = LOCAL_DRAM AND REMOTE_CACHE_HIT.
+        Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x1050/
+  offcore_response.pf_data.remote_cache_hitm
+       [REQUEST = PF_DATA and RESPONSE = REMOTE_CACHE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x850/
+  offcore_response.pf_data_rd.all_local_dram_and_remote_cache_hit
+       [REQUEST = PF_DATA_RD and RESPONSE = ALL_LOCAL_DRAM AND
+        REMOTE_CACHE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x5010/
+  offcore_response.pf_data_rd.any_cache_dram
+       [REQUEST = PF_DATA_RD and RESPONSE = ANY_CACHE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x7f10/
+  offcore_response.pf_data_rd.any_location
+       [REQUEST = PF_DATA_RD and RESPONSE = ANY_LOCATION. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xff10/
+  offcore_response.pf_data_rd.io_csr_mmio
+       [REQUEST = PF_DATA_RD and RESPONSE = IO_CSR_MMIO. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x8010/
+  offcore_response.pf_data_rd.llc_hit_no_other_core
+       [REQUEST = PF_DATA_RD and RESPONSE = LLC_HIT_NO_OTHER_CORE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x110/
+  offcore_response.pf_data_rd.llc_hit_other_core_hit
+       [REQUEST = PF_DATA_RD and RESPONSE = LLC_HIT_OTHER_CORE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x210/
+  offcore_response.pf_data_rd.llc_hit_other_core_hitm
+       [REQUEST = PF_DATA_RD and RESPONSE = LLC_HIT_OTHER_CORE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x410/
+  offcore_response.pf_data_rd.local_cache
+       [REQUEST = PF_DATA_RD and RESPONSE = LOCAL_CACHE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x710/
+  offcore_response.pf_data_rd.local_dram_and_remote_cache_hit
+       [REQUEST = PF_DATA_RD and RESPONSE = LOCAL_DRAM AND REMOTE_CACHE_HIT.
+        Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x1010/
+  offcore_response.pf_data_rd.remote_cache_hitm
+       [REQUEST = PF_DATA_RD and RESPONSE = REMOTE_CACHE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x810/
+  offcore_response.pf_ifetch.all_local_dram_and_remote_cache_hit
+       [REQUEST = PF_RFO and RESPONSE = ALL_LOCAL_DRAM AND REMOTE_CACHE_HIT.
+        Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x5040/
+  offcore_response.pf_ifetch.any_cache_dram
+       [REQUEST = PF_RFO and RESPONSE = ANY_CACHE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x7f40/
+  offcore_response.pf_ifetch.any_location
+       [REQUEST = PF_RFO and RESPONSE = ANY_LOCATION. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xff40/
+  offcore_response.pf_ifetch.io_csr_mmio
+       [REQUEST = PF_RFO and RESPONSE = IO_CSR_MMIO. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x8040/
+  offcore_response.pf_ifetch.llc_hit_no_other_core
+       [REQUEST = PF_RFO and RESPONSE = LLC_HIT_NO_OTHER_CORE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x140/
+  offcore_response.pf_ifetch.llc_hit_other_core_hit
+       [REQUEST = PF_RFO and RESPONSE = LLC_HIT_OTHER_CORE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x240/
+  offcore_response.pf_ifetch.llc_hit_other_core_hitm
+       [REQUEST = PF_RFO and RESPONSE = LLC_HIT_OTHER_CORE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x440/
+  offcore_response.pf_ifetch.local_cache
+       [REQUEST = PF_RFO and RESPONSE = LOCAL_CACHE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x740/
+  offcore_response.pf_ifetch.local_dram_and_remote_cache_hit
+       [REQUEST = PF_RFO and RESPONSE = LOCAL_DRAM AND REMOTE_CACHE_HIT. Unit:
+        cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x1040/
+  offcore_response.pf_ifetch.remote_cache_hitm
+       [REQUEST = PF_RFO and RESPONSE = REMOTE_CACHE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x840/
+  offcore_response.pf_rfo.all_local_dram_and_remote_cache_hit
+       [REQUEST = PF_IFETCH and RESPONSE = ALL_LOCAL_DRAM AND
+        REMOTE_CACHE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x5020/
+  offcore_response.pf_rfo.any_cache_dram
+       [REQUEST = PF_IFETCH and RESPONSE = ANY_CACHE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x7f20/
+  offcore_response.pf_rfo.any_location
+       [REQUEST = PF_IFETCH and RESPONSE = ANY_LOCATION. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xff20/
+  offcore_response.pf_rfo.io_csr_mmio
+       [REQUEST = PF_IFETCH and RESPONSE = IO_CSR_MMIO. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x8020/
+  offcore_response.pf_rfo.llc_hit_no_other_core
+       [REQUEST = PF_IFETCH and RESPONSE = LLC_HIT_NO_OTHER_CORE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x120/
+  offcore_response.pf_rfo.llc_hit_other_core_hit
+       [REQUEST = PF_IFETCH and RESPONSE = LLC_HIT_OTHER_CORE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x220/
+  offcore_response.pf_rfo.llc_hit_other_core_hitm
+       [REQUEST = PF_IFETCH and RESPONSE = LLC_HIT_OTHER_CORE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x420/
+  offcore_response.pf_rfo.local_cache
+       [REQUEST = PF_IFETCH and RESPONSE = LOCAL_CACHE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x720/
+  offcore_response.pf_rfo.local_dram_and_remote_cache_hit
+       [REQUEST = PF_IFETCH and RESPONSE = LOCAL_DRAM AND REMOTE_CACHE_HIT.
+        Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x1020/
+  offcore_response.pf_rfo.remote_cache_hitm
+       [REQUEST = PF_IFETCH and RESPONSE = REMOTE_CACHE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x820/
+  offcore_response.prefetch.all_local_dram_and_remote_cache_hit
+       [REQUEST = PREFETCH and RESPONSE = ALL_LOCAL_DRAM AND REMOTE_CACHE_HIT.
+        Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x5070/
+  offcore_response.prefetch.any_cache_dram
+       [REQUEST = PREFETCH and RESPONSE = ANY_CACHE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x7f70/
+  offcore_response.prefetch.any_location
+       [REQUEST = PREFETCH and RESPONSE = ANY_LOCATION. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xff70/
+  offcore_response.prefetch.io_csr_mmio
+       [REQUEST = PREFETCH and RESPONSE = IO_CSR_MMIO. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x8070/
+  offcore_response.prefetch.llc_hit_no_other_core
+       [REQUEST = PREFETCH and RESPONSE = LLC_HIT_NO_OTHER_CORE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x170/
+  offcore_response.prefetch.llc_hit_other_core_hit
+       [REQUEST = PREFETCH and RESPONSE = LLC_HIT_OTHER_CORE_HIT. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x270/
+  offcore_response.prefetch.llc_hit_other_core_hitm
+       [REQUEST = PREFETCH and RESPONSE = LLC_HIT_OTHER_CORE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x470/
+  offcore_response.prefetch.local_cache
+       [REQUEST = PREFETCH and RESPONSE = LOCAL_CACHE. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x770/
+  offcore_response.prefetch.local_dram_and_remote_cache_hit
+       [REQUEST = PREFETCH and RESPONSE = LOCAL_DRAM AND REMOTE_CACHE_HIT.
+        Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x1070/
+  offcore_response.prefetch.remote_cache_hitm
+       [REQUEST = PREFETCH and RESPONSE = REMOTE_CACHE_HITM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x870/
+  sq_misc.lru_hints
+       [Super Queue LRU hints sent to LLC. Unit: cpu]
+        cpu/event=0xf4,period=2000000,umask=4/
+  sq_misc.split_lock
+       [Super Queue lock splits across a cache line. Unit: cpu]
+        cpu/event=0xf4,period=2000000,umask=0x10/
+  store_blocks.at_ret
+       [Loads delayed with at-Retirement block code. Unit: cpu]
+        cpu/event=6,period=200000,umask=4/
+  store_blocks.l1d_block
+       [Cacheable loads delayed with L1D block code. Unit: cpu]
+        cpu/event=6,period=200000,umask=8/
+
+floating point:
+  fp_assist.all
+       [X87 Floating point assists (Precise Event). Unit: cpu]
+        cpu/event=0xf7,period=20000,umask=1/
+  fp_assist.input
+       [X87 Floating point assists for invalid input value (Precise Event).
+        Unit: cpu]
+        cpu/event=0xf7,period=20000,umask=4/
+  fp_assist.output
+       [X87 Floating point assists for invalid output value (Precise Event).
+        Unit: cpu]
+        cpu/event=0xf7,period=20000,umask=2/
+  fp_comp_ops_exe.mmx
+       [MMX Uops. Unit: cpu]
+        cpu/event=0x10,period=2000000,umask=2/
+  fp_comp_ops_exe.sse2_integer
+       [SSE2 integer Uops. Unit: cpu]
+        cpu/event=0x10,period=2000000,umask=8/
+  fp_comp_ops_exe.sse_double_precision
+       [SSE* FP double precision Uops. Unit: cpu]
+        cpu/event=0x10,period=2000000,umask=0x80/
+  fp_comp_ops_exe.sse_fp
+       [SSE and SSE2 FP Uops. Unit: cpu]
+        cpu/event=0x10,period=2000000,umask=4/
+  fp_comp_ops_exe.sse_fp_packed
+       [SSE FP packed Uops. Unit: cpu]
+        cpu/event=0x10,period=2000000,umask=0x10/
+  fp_comp_ops_exe.sse_fp_scalar
+       [SSE FP scalar Uops. Unit: cpu]
+        cpu/event=0x10,period=2000000,umask=0x20/
+  fp_comp_ops_exe.sse_single_precision
+       [SSE* FP single precision Uops. Unit: cpu]
+        cpu/event=0x10,period=2000000,umask=0x40/
+  fp_comp_ops_exe.x87
+       [Computational floating-point operations executed. Unit: cpu]
+        cpu/event=0x10,period=2000000,umask=1/
+  fp_mmx_trans.any
+       [All Floating Point to and from MMX transitions. Unit: cpu]
+        cpu/event=0xcc,period=2000000,umask=3/
+  fp_mmx_trans.to_fp
+       [Transitions from MMX to Floating Point instructions. Unit: cpu]
+        cpu/event=0xcc,period=2000000,umask=1/
+  fp_mmx_trans.to_mmx
+       [Transitions from Floating Point to MMX instructions. Unit: cpu]
+        cpu/event=0xcc,period=2000000,umask=2/
+  simd_int_128.pack
+       [128 bit SIMD integer pack operations. Unit: cpu]
+        cpu/event=0x12,period=200000,umask=4/
+  simd_int_128.packed_arith
+       [128 bit SIMD integer arithmetic operations. Unit: cpu]
+        cpu/event=0x12,period=200000,umask=0x20/
+  simd_int_128.packed_logical
+       [128 bit SIMD integer logical operations. Unit: cpu]
+        cpu/event=0x12,period=200000,umask=0x10/
+  simd_int_128.packed_mpy
+       [128 bit SIMD integer multiply operations. Unit: cpu]
+        cpu/event=0x12,period=200000,umask=1/
+  simd_int_128.packed_shift
+       [128 bit SIMD integer shift operations. Unit: cpu]
+        cpu/event=0x12,period=200000,umask=2/
+  simd_int_128.shuffle_move
+       [128 bit SIMD integer shuffle/move operations. Unit: cpu]
+        cpu/event=0x12,period=200000,umask=0x40/
+  simd_int_128.unpack
+       [128 bit SIMD integer unpack operations. Unit: cpu]
+        cpu/event=0x12,period=200000,umask=8/
+  simd_int_64.pack
+       [SIMD integer 64 bit pack operations. Unit: cpu]
+        cpu/event=0xfd,period=200000,umask=4/
+  simd_int_64.packed_arith
+       [SIMD integer 64 bit arithmetic operations. Unit: cpu]
+        cpu/event=0xfd,period=200000,umask=0x20/
+  simd_int_64.packed_logical
+       [SIMD integer 64 bit logical operations. Unit: cpu]
+        cpu/event=0xfd,period=200000,umask=0x10/
+  simd_int_64.packed_mpy
+       [SIMD integer 64 bit packed multiply operations. Unit: cpu]
+        cpu/event=0xfd,period=200000,umask=1/
+  simd_int_64.packed_shift
+       [SIMD integer 64 bit shift operations. Unit: cpu]
+        cpu/event=0xfd,period=200000,umask=2/
+  simd_int_64.shuffle_move
+       [SIMD integer 64 bit shuffle/move operations. Unit: cpu]
+        cpu/event=0xfd,period=200000,umask=0x40/
+  simd_int_64.unpack
+       [SIMD integer 64 bit unpack operations. Unit: cpu]
+        cpu/event=0xfd,period=200000,umask=8/
+
+frontend:
+  macro_insts.decoded
+       [Instructions decoded. Unit: cpu]
+        cpu/event=0xd0,period=2000000,umask=1/
+  macro_insts.fusions_decoded
+       [Macro-fused instructions decoded. Unit: cpu]
+        cpu/event=0xa6,period=2000000,umask=1/
+  two_uop_insts_decoded
+       [Two Uop instructions decoded. Unit: cpu]
+        cpu/event=0x19,period=2000000,umask=1/
+
+hwmon:
+  temp_core_0 OR temp2
+       [Temperature in unit coretemp named Core 0. crit=96'C,max=80'C
+        crit_alarm=0'C. Unit: hwmon_coretemp]
+        hwmon_coretemp/config=0xa0002/
+  temp_core_1 OR temp3
+       [Temperature in unit coretemp named Core 1. crit=96'C,max=80'C
+        crit_alarm=0'C. Unit: hwmon_coretemp]
+        hwmon_coretemp/config=0xa0003/
+  temp_core_10 OR temp12
+       [Temperature in unit coretemp named Core 10. crit=96'C,max=80'C
+        crit_alarm=0'C. Unit: hwmon_coretemp]
+        hwmon_coretemp/config=0xa000c/
+  temp_core_2 OR temp4
+       [Temperature in unit coretemp named Core 2. crit=96'C,max=80'C
+        crit_alarm=0'C. Unit: hwmon_coretemp]
+        hwmon_coretemp/config=0xa0004/
+  temp_core_8 OR temp10
+       [Temperature in unit coretemp named Core 8. crit=96'C,max=80'C
+        crit_alarm=0'C. Unit: hwmon_coretemp]
+        hwmon_coretemp/config=0xa000a/
+  temp_core_9 OR temp11
+       [Temperature in unit coretemp named Core 9. crit=96'C,max=80'C
+        crit_alarm=0'C. Unit: hwmon_coretemp]
+        hwmon_coretemp/config=0xa000b/
+
+legacy cache:
+  branch-load-misses
+       [Branch prediction unit read misses. Unit: cpu]
+        cpu/legacy-cache-config=0x10005/
+  branch-loads
+       [Branch prediction unit read accesses. Unit: cpu]
+        cpu/legacy-cache-config=5/
+  dtlb-load-misses
+       [Data TLB read misses. Unit: cpu]
+        cpu/legacy-cache-config=0x10003/
+  dtlb-loads
+       [Data TLB read accesses. Unit: cpu]
+        cpu/legacy-cache-config=3/
+  dtlb-store-misses
+       [Data TLB write misses. Unit: cpu]
+        cpu/legacy-cache-config=0x10103/
+  dtlb-stores
+       [Data TLB write accesses. Unit: cpu]
+        cpu/legacy-cache-config=0x103/
+  itlb-load-misses
+       [Instruction TLB read misses. Unit: cpu]
+        cpu/legacy-cache-config=0x10004/
+  itlb-loads
+       [Instruction TLB read accesses. Unit: cpu]
+        cpu/legacy-cache-config=4/
+  l1-dcache-load-misses
+       [Level 1 data cache read misses. Unit: cpu]
+        cpu/legacy-cache-config=0x10000/
+  l1-dcache-loads
+       [Level 1 data cache read accesses. Unit: cpu]
+        cpu/legacy-cache-config=0/
+  l1-dcache-prefetch-misses
+       [Level 1 data cache prefetch misses. Unit: cpu]
+        cpu/legacy-cache-config=0x10200/
+  l1-dcache-prefetches
+       [Level 1 data cache prefetch accesses. Unit: cpu]
+        cpu/legacy-cache-config=0x200/
+  l1-dcache-store-misses
+       [Level 1 data cache write misses. Unit: cpu]
+        cpu/legacy-cache-config=0x10100/
+  l1-dcache-stores
+       [Level 1 data cache write accesses. Unit: cpu]
+        cpu/legacy-cache-config=0x100/
+  l1-icache-load-misses
+       [Level 1 instruction cache read misses. Unit: cpu]
+        cpu/legacy-cache-config=0x10001/
+  l1-icache-loads
+       [Level 1 instruction cache read accesses. Unit: cpu]
+        cpu/legacy-cache-config=1/
+  llc-load-misses
+       [Last level cache read misses. Unit: cpu]
+        cpu/legacy-cache-config=0x10002/
+  llc-loads
+       [Last level cache read accesses. Unit: cpu]
+        cpu/legacy-cache-config=2/
+  llc-prefetch-misses
+       [Last level cache prefetch misses. Unit: cpu]
+        cpu/legacy-cache-config=0x10202/
+  llc-prefetches
+       [Last level cache prefetch accesses. Unit: cpu]
+        cpu/legacy-cache-config=0x202/
+  llc-store-misses
+       [Last level cache write misses. Unit: cpu]
+        cpu/legacy-cache-config=0x10102/
+  llc-stores
+       [Last level cache write accesses. Unit: cpu]
+        cpu/legacy-cache-config=0x102/
+  node-load-misses
+       [Local memory read misses. Unit: cpu]
+        cpu/legacy-cache-config=0x10006/
+  node-loads
+       [Local memory read accesses. Unit: cpu]
+        cpu/legacy-cache-config=6/
+  node-prefetch-misses
+       [Local memory prefetch misses. Unit: cpu]
+        cpu/legacy-cache-config=0x10206/
+  node-prefetches
+       [Local memory prefetch accesses. Unit: cpu]
+        cpu/legacy-cache-config=0x206/
+  node-store-misses
+       [Local memory write misses. Unit: cpu]
+        cpu/legacy-cache-config=0x10106/
+  node-stores
+       [Local memory write accesses. Unit: cpu]
+        cpu/legacy-cache-config=0x106/
+
+legacy hardware:
+  branch-instructions
+       [Retired branch instructions [This event is an alias of branches].
+        Unit: cpu]
+        cpu/event=0xc4/
+  branch-misses
+       [Mispredicted branch instructions. Unit: cpu]
+        cpu/event=0xc5/
+  branches
+       [Retired branch instructions [This event is an alias of
+        branch-instructions]. Unit: cpu]
+        cpu/legacy-hardware-config=4/
+  cache-misses
+       [Cache misses. Usually this indicates Last Level Cache misses; this is
+        intended to be used in conjunction with the
+        PERF_COUNT_HW_CACHE_REFERENCES event to calculate cache miss rates.
+        Unit: cpu]
+        cpu/event=0x2e,umask=0x41/
+  cache-references
+       [Cache accesses. Usually this indicates Last Level Cache accesses but
+        this may vary depending on your CPU. This may include prefetches and
+        coherency messages; again this depends on the design of your CPU.
+        Unit: cpu]
+        cpu/event=0x2e,umask=0x4f/
+  cpu-cycles
+       [Total cycles. Be wary of what happens during CPU frequency scaling
+        [This event is an alias of cycles]. Unit: cpu]
+        cpu/event=0x3c/
+  cycles
+       [Total cycles. Be wary of what happens during CPU frequency scaling
+        [This event is an alias of cpu-cycles]. Unit: cpu]
+        cpu/legacy-hardware-config=0/
+  idle-cycles-backend
+       [Stalled cycles during retirement [This event is an alias of
+        stalled-cycles-backend]. Unit: cpu]
+        cpu/legacy-hardware-config=8/
+  idle-cycles-frontend
+       [Stalled cycles during issue [This event is an alias of
+        stalled-cycles-fronted]. Unit: cpu]
+        cpu/legacy-hardware-config=7/
+  instructions
+       [Retired instructions. Be careful,these can be affected by various
+        issues,most notably hardware interrupt counts. Unit: cpu]
+        cpu/event=0xc0/
+  ref-cycles
+       [Total cycles; not affected by CPU frequency scaling. Unit: cpu]
+        cpu/event=0x00,umask=0x03/
+  stalled-cycles-backend
+       [Stalled cycles during retirement [This event is an alias of
+        idle-cycles-backend]. Unit: cpu]
+        cpu/event=0xb1,umask=0x3f,inv,cmask=0x01/
+  stalled-cycles-frontend
+       [Stalled cycles during issue [This event is an alias of
+        idle-cycles-frontend]. Unit: cpu]
+        cpu/event=0x0e,umask=0x01,inv,cmask=0x01/
+
+memory:
+  misalign_mem_ref.store
+       [Misaligned store references. Unit: cpu]
+        cpu/event=5,period=200000,umask=2/
+  offcore_response.any_data.any_dram_and_remote_fwd
+       [REQUEST = ANY_DATA read and RESPONSE = ANY_DRAM AND REMOTE_FWD. Unit:
+        cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x3011/
+  offcore_response.any_data.any_llc_miss
+       [REQUEST = ANY_DATA read and RESPONSE = ANY_LLC_MISS. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xf811/
+  offcore_response.any_data.other_local_dram
+       [REQUEST = ANY_DATA read and RESPONSE = OTHER_LOCAL_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x4011/
+  offcore_response.any_data.remote_dram
+       [REQUEST = ANY_DATA read and RESPONSE = REMOTE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x2011/
+  offcore_response.any_ifetch.any_dram_and_remote_fwd
+       [REQUEST = ANY IFETCH and RESPONSE = ANY_DRAM AND REMOTE_FWD. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x3044/
+  offcore_response.any_ifetch.any_llc_miss
+       [REQUEST = ANY IFETCH and RESPONSE = ANY_LLC_MISS. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xf844/
+  offcore_response.any_ifetch.other_local_dram
+       [REQUEST = ANY IFETCH and RESPONSE = OTHER_LOCAL_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x4044/
+  offcore_response.any_ifetch.remote_dram
+       [REQUEST = ANY IFETCH and RESPONSE = REMOTE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x2044/
+  offcore_response.any_request.any_dram_and_remote_fwd
+       [REQUEST = ANY_REQUEST and RESPONSE = ANY_DRAM AND REMOTE_FWD. Unit:
+        cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x30ff/
+  offcore_response.any_request.any_llc_miss
+       [REQUEST = ANY_REQUEST and RESPONSE = ANY_LLC_MISS. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xf8ff/
+  offcore_response.any_request.other_local_dram
+       [REQUEST = ANY_REQUEST and RESPONSE = OTHER_LOCAL_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x40ff/
+  offcore_response.any_request.remote_dram
+       [REQUEST = ANY_REQUEST and RESPONSE = REMOTE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x20ff/
+  offcore_response.any_rfo.any_dram_and_remote_fwd
+       [REQUEST = ANY RFO and RESPONSE = ANY_DRAM AND REMOTE_FWD. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x3022/
+  offcore_response.any_rfo.any_llc_miss
+       [REQUEST = ANY RFO and RESPONSE = ANY_LLC_MISS. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xf822/
+  offcore_response.any_rfo.other_local_dram
+       [REQUEST = ANY RFO and RESPONSE = OTHER_LOCAL_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x4022/
+  offcore_response.any_rfo.remote_dram
+       [REQUEST = ANY RFO and RESPONSE = REMOTE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x2022/
+  offcore_response.corewb.any_dram_and_remote_fwd
+       [REQUEST = CORE_WB and RESPONSE = ANY_DRAM AND REMOTE_FWD. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x3008/
+  offcore_response.corewb.any_llc_miss
+       [REQUEST = CORE_WB and RESPONSE = ANY_LLC_MISS. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xf808/
+  offcore_response.corewb.other_local_dram
+       [REQUEST = CORE_WB and RESPONSE = OTHER_LOCAL_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x4008/
+  offcore_response.corewb.remote_dram
+       [REQUEST = CORE_WB and RESPONSE = REMOTE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x2008/
+  offcore_response.data_ifetch.any_dram_and_remote_fwd
+       [REQUEST = DATA_IFETCH and RESPONSE = ANY_DRAM AND REMOTE_FWD. Unit:
+        cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x3077/
+  offcore_response.data_ifetch.any_llc_miss
+       [REQUEST = DATA_IFETCH and RESPONSE = ANY_LLC_MISS. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xf877/
+  offcore_response.data_ifetch.other_local_dram
+       [REQUEST = DATA_IFETCH and RESPONSE = OTHER_LOCAL_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x4077/
+  offcore_response.data_ifetch.remote_dram
+       [REQUEST = DATA_IFETCH and RESPONSE = REMOTE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x2077/
+  offcore_response.data_in.any_dram_and_remote_fwd
+       [REQUEST = DATA_IN and RESPONSE = ANY_DRAM AND REMOTE_FWD. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x3033/
+  offcore_response.data_in.any_llc_miss
+       [REQUEST = DATA_IN and RESPONSE = ANY_LLC_MISS. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xf833/
+  offcore_response.data_in.other_local_dram
+       [REQUEST = DATA_IN and RESPONSE = OTHER_LOCAL_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x4033/
+  offcore_response.data_in.remote_dram
+       [REQUEST = DATA_IN and RESPONSE = REMOTE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x2033/
+  offcore_response.demand_data.any_dram_and_remote_fwd
+       [REQUEST = DEMAND_DATA and RESPONSE = ANY_DRAM AND REMOTE_FWD. Unit:
+        cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x3003/
+  offcore_response.demand_data.any_llc_miss
+       [REQUEST = DEMAND_DATA and RESPONSE = ANY_LLC_MISS. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xf803/
+  offcore_response.demand_data.other_local_dram
+       [REQUEST = DEMAND_DATA and RESPONSE = OTHER_LOCAL_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x4003/
+  offcore_response.demand_data.remote_dram
+       [REQUEST = DEMAND_DATA and RESPONSE = REMOTE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x2003/
+  offcore_response.demand_data_rd.any_dram_and_remote_fwd
+       [REQUEST = DEMAND_DATA_RD and RESPONSE = ANY_DRAM AND REMOTE_FWD. Unit:
+        cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x3001/
+  offcore_response.demand_data_rd.any_llc_miss
+       [REQUEST = DEMAND_DATA_RD and RESPONSE = ANY_LLC_MISS. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xf801/
+  offcore_response.demand_data_rd.other_local_dram
+       [REQUEST = DEMAND_DATA_RD and RESPONSE = OTHER_LOCAL_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x4001/
+  offcore_response.demand_data_rd.remote_dram
+       [REQUEST = DEMAND_DATA_RD and RESPONSE = REMOTE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x2001/
+  offcore_response.demand_ifetch.any_dram_and_remote_fwd
+       [REQUEST = DEMAND_IFETCH and RESPONSE = ANY_DRAM AND REMOTE_FWD. Unit:
+        cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x3004/
+  offcore_response.demand_ifetch.any_llc_miss
+       [REQUEST = DEMAND_IFETCH and RESPONSE = ANY_LLC_MISS. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xf804/
+  offcore_response.demand_ifetch.other_local_dram
+       [REQUEST = DEMAND_IFETCH and RESPONSE = OTHER_LOCAL_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x4004/
+  offcore_response.demand_ifetch.remote_dram
+       [REQUEST = DEMAND_IFETCH and RESPONSE = REMOTE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x2004/
+  offcore_response.demand_rfo.any_dram_and_remote_fwd
+       [REQUEST = DEMAND_RFO and RESPONSE = ANY_DRAM AND REMOTE_FWD. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x3002/
+  offcore_response.demand_rfo.any_llc_miss
+       [REQUEST = DEMAND_RFO and RESPONSE = ANY_LLC_MISS. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xf802/
+  offcore_response.demand_rfo.other_local_dram
+       [REQUEST = DEMAND_RFO and RESPONSE = OTHER_LOCAL_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x4002/
+  offcore_response.demand_rfo.remote_dram
+       [REQUEST = DEMAND_RFO and RESPONSE = REMOTE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x2002/
+  offcore_response.other.any_dram_and_remote_fwd
+       [REQUEST = OTHER and RESPONSE = ANY_DRAM AND REMOTE_FWD. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x3080/
+  offcore_response.other.any_llc_miss
+       [REQUEST = OTHER and RESPONSE = ANY_LLC_MISS. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xf880/
+  offcore_response.other.other_local_dram
+       [REQUEST = OTHER and RESPONSE = OTHER_LOCAL_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x4080/
+  offcore_response.other.remote_dram
+       [REQUEST = OTHER and RESPONSE = REMOTE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x2080/
+  offcore_response.pf_data.any_dram_and_remote_fwd
+       [REQUEST = PF_DATA and RESPONSE = ANY_DRAM AND REMOTE_FWD. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x3050/
+  offcore_response.pf_data.any_llc_miss
+       [REQUEST = PF_DATA and RESPONSE = ANY_LLC_MISS. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xf850/
+  offcore_response.pf_data.other_local_dram
+       [REQUEST = PF_DATA and RESPONSE = OTHER_LOCAL_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x4050/
+  offcore_response.pf_data.remote_dram
+       [REQUEST = PF_DATA and RESPONSE = REMOTE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x2050/
+  offcore_response.pf_data_rd.any_dram_and_remote_fwd
+       [REQUEST = PF_DATA_RD and RESPONSE = ANY_DRAM AND REMOTE_FWD. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x3010/
+  offcore_response.pf_data_rd.any_llc_miss
+       [REQUEST = PF_DATA_RD and RESPONSE = ANY_LLC_MISS. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xf810/
+  offcore_response.pf_data_rd.other_local_dram
+       [REQUEST = PF_DATA_RD and RESPONSE = OTHER_LOCAL_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x4010/
+  offcore_response.pf_data_rd.remote_dram
+       [REQUEST = PF_DATA_RD and RESPONSE = REMOTE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x2010/
+  offcore_response.pf_ifetch.any_dram_and_remote_fwd
+       [REQUEST = PF_RFO and RESPONSE = ANY_DRAM AND REMOTE_FWD. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x3040/
+  offcore_response.pf_ifetch.any_llc_miss
+       [REQUEST = PF_RFO and RESPONSE = ANY_LLC_MISS. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xf840/
+  offcore_response.pf_ifetch.other_local_dram
+       [REQUEST = PF_RFO and RESPONSE = OTHER_LOCAL_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x4040/
+  offcore_response.pf_ifetch.remote_dram
+       [REQUEST = PF_RFO and RESPONSE = REMOTE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x2040/
+  offcore_response.pf_rfo.any_dram_and_remote_fwd
+       [REQUEST = PF_IFETCH and RESPONSE = ANY_DRAM AND REMOTE_FWD. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x3020/
+  offcore_response.pf_rfo.any_llc_miss
+       [REQUEST = PF_IFETCH and RESPONSE = ANY_LLC_MISS. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xf820/
+  offcore_response.pf_rfo.other_local_dram
+       [REQUEST = PF_IFETCH and RESPONSE = OTHER_LOCAL_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x4020/
+  offcore_response.pf_rfo.remote_dram
+       [REQUEST = PF_IFETCH and RESPONSE = REMOTE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x2020/
+  offcore_response.prefetch.any_dram_and_remote_fwd
+       [REQUEST = PREFETCH and RESPONSE = ANY_DRAM AND REMOTE_FWD. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x3070/
+  offcore_response.prefetch.any_llc_miss
+       [REQUEST = PREFETCH and RESPONSE = ANY_LLC_MISS. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0xf870/
+  offcore_response.prefetch.other_local_dram
+       [REQUEST = PREFETCH and RESPONSE = OTHER_LOCAL_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x4070/
+  offcore_response.prefetch.remote_dram
+       [REQUEST = PREFETCH and RESPONSE = REMOTE_DRAM. Unit: cpu]
+        cpu/event=0xb7,period=100000,umask=1,offcore_rsp=0x2070/
+
+other:
+  es_reg_renames
+       [ES segment renames. Unit: cpu]
+        cpu/event=0xd5,period=2000000,umask=1/
+  io_transactions
+       [I/O transactions. Unit: cpu]
+        cpu/event=0x6c,period=2000000,umask=1/
+  load_block.overlap_store
+       [Loads that partially overlap an earlier store. Unit: cpu]
+        cpu/event=3,period=200000,umask=2/
+  load_dispatch.any
+       [All loads dispatched. Unit: cpu]
+        cpu/event=0x13,period=2000000,umask=7/
+  load_dispatch.mob
+       [Loads dispatched from the MOB. Unit: cpu]
+        cpu/event=0x13,period=2000000,umask=4/
+  load_dispatch.rs
+       [Loads dispatched that bypass the MOB. Unit: cpu]
+        cpu/event=0x13,period=2000000,umask=1/
+  load_dispatch.rs_delayed
+       [Loads dispatched from stage 305. Unit: cpu]
+        cpu/event=0x13,period=2000000,umask=2/
+  partial_address_alias
+       [False dependencies due to partial address aliasing. Unit: cpu]
+        cpu/event=7,period=200000,umask=1/
+  sb_drain.any
+       [All Store buffer stall cycles. Unit: cpu]
+        cpu/event=4,period=200000,umask=7/
+  seg_rename_stalls
+       [Segment rename stall cycles. Unit: cpu]
+        cpu/event=0xd4,period=2000000,umask=1/
+  snoop_response.hit
+       [Thread responded HIT to snoop. Unit: cpu]
+        cpu/event=0xb8,period=100000,umask=1/
+  snoop_response.hite
+       [Thread responded HITE to snoop. Unit: cpu]
+        cpu/event=0xb8,period=100000,umask=2/
+  snoop_response.hitm
+       [Thread responded HITM to snoop. Unit: cpu]
+        cpu/event=0xb8,period=100000,umask=4/
+  snoopq_requests.code
+       [Snoop code requests. Unit: cpu]
+        cpu/event=0xb4,period=100000,umask=4/
+  snoopq_requests.data
+       [Snoop data requests. Unit: cpu]
+        cpu/event=0xb4,period=100000,umask=1/
+  snoopq_requests.invalidate
+       [Snoop invalidate requests. Unit: cpu]
+        cpu/event=0xb4,period=100000,umask=2/
+  snoopq_requests_outstanding.code
+       [Outstanding snoop code requests. Unit: cpu]
+        cpu/event=0xb3,period=2000000,umask=4/
+  snoopq_requests_outstanding.code_not_empty
+       [Cycles snoop code requests queued. Unit: cpu]
+        cpu/event=0xb3,cmask=1,period=2000000,umask=4/
+  snoopq_requests_outstanding.data
+       [Outstanding snoop data requests. Unit: cpu]
+        cpu/event=0xb3,period=2000000,umask=1/
+  snoopq_requests_outstanding.data_not_empty
+       [Cycles snoop data requests queued. Unit: cpu]
+        cpu/event=0xb3,cmask=1,period=2000000,umask=1/
+  snoopq_requests_outstanding.invalidate
+       [Outstanding snoop invalidate requests. Unit: cpu]
+        cpu/event=0xb3,period=2000000,umask=2/
+  snoopq_requests_outstanding.invalidate_not_empty
+       [Cycles snoop invalidate requests queued. Unit: cpu]
+        cpu/event=0xb3,cmask=1,period=2000000,umask=2/
+  sq_full_stall_cycles
+       [Super Queue full stall cycles. Unit: cpu]
+        cpu/event=0xf6,period=2000000,umask=1/
+
+pipeline:
+  arith.cycles_div_busy
+       [Cycles the divider is busy. Unit: cpu]
+        cpu/event=0x14,period=2000000,umask=1/
+  arith.div
+       [Divide Operations executed. Unit: cpu]
+        cpu/event=0x14,cmask=1,edge=1,inv=1,period=2000000,umask=1/
+  arith.mul
+       [Multiply operations executed. Unit: cpu]
+        cpu/event=0x14,period=2000000,umask=2/
+  baclear.bad_target
+       [BACLEAR asserted with bad target address. Unit: cpu]
+        cpu/event=0xe6,period=2000000,umask=2/
+  baclear.clear
+       [BACLEAR asserted,regardless of cause. Unit: cpu]
+        cpu/event=0xe6,period=2000000,umask=1/
+  baclear_force_iq
+       [Instruction queue forced BACLEAR. Unit: cpu]
+        cpu/event=0xa7,period=2000000,umask=1/
+  bpu_clears.early
+       [Early Branch Prediciton Unit clears. Unit: cpu]
+        cpu/event=0xe8,period=2000000,umask=1/
+  bpu_clears.late
+       [Late Branch Prediction Unit clears. Unit: cpu]
+        cpu/event=0xe8,period=2000000,umask=2/
+  bpu_missed_call_ret
+       [Branch prediction unit missed call or return. Unit: cpu]
+        cpu/event=0xe5,period=2000000,umask=1/
+  br_inst_decoded
+       [Branch instructions decoded. Unit: cpu]
+        cpu/event=0xe0,period=2000000,umask=1/
+  br_inst_exec.any
+       [Branch instructions executed. Unit: cpu]
+        cpu/event=0x88,period=200000,umask=0x7f/
+  br_inst_exec.cond
+       [Conditional branch instructions executed. Unit: cpu]
+        cpu/event=0x88,period=200000,umask=1/
+  br_inst_exec.direct
+       [Unconditional branches executed. Unit: cpu]
+        cpu/event=0x88,period=200000,umask=2/
+  br_inst_exec.direct_near_call
+       [Unconditional call branches executed. Unit: cpu]
+        cpu/event=0x88,period=20000,umask=0x10/
+  br_inst_exec.indirect_near_call
+       [Indirect call branches executed. Unit: cpu]
+        cpu/event=0x88,period=20000,umask=0x20/
+  br_inst_exec.indirect_non_call
+       [Indirect non call branches executed. Unit: cpu]
+        cpu/event=0x88,period=20000,umask=4/
+  br_inst_exec.near_calls
+       [Call branches executed. Unit: cpu]
+        cpu/event=0x88,period=20000,umask=0x30/
+  br_inst_exec.non_calls
+       [All non call branches executed. Unit: cpu]
+        cpu/event=0x88,period=200000,umask=7/
+  br_inst_exec.return_near
+       [Indirect return branches executed. Unit: cpu]
+        cpu/event=0x88,period=20000,umask=8/
+  br_inst_exec.taken
+       [Taken branches executed. Unit: cpu]
+        cpu/event=0x88,period=200000,umask=0x40/
+  br_inst_retired.all_branches
+       [Retired branch instructions (Precise Event). Unit: cpu]
+        cpu/event=0xc4,period=200000,umask=4/
+  br_inst_retired.conditional
+       [Retired conditional branch instructions (Precise Event). Unit: cpu]
+        cpu/event=0xc4,period=200000,umask=1/
+  br_inst_retired.near_call
+       [Retired near call instructions (Precise Event). Unit: cpu]
+        cpu/event=0xc4,period=20000,umask=2/
+  br_misp_exec.any
+       [Mispredicted branches executed. Unit: cpu]
+        cpu/event=0x89,period=20000,umask=0x7f/
+  br_misp_exec.cond
+       [Mispredicted conditional branches executed. Unit: cpu]
+        cpu/event=0x89,period=20000,umask=1/
+  br_misp_exec.direct
+       [Mispredicted unconditional branches executed. Unit: cpu]
+        cpu/event=0x89,period=20000,umask=2/
+  br_misp_exec.direct_near_call
+       [Mispredicted non call branches executed. Unit: cpu]
+        cpu/event=0x89,period=2000,umask=0x10/
+  br_misp_exec.indirect_near_call
+       [Mispredicted indirect call branches executed. Unit: cpu]
+        cpu/event=0x89,period=2000,umask=0x20/
+  br_misp_exec.indirect_non_call
+       [Mispredicted indirect non call branches executed. Unit: cpu]
+        cpu/event=0x89,period=2000,umask=4/
+  br_misp_exec.near_calls
+       [Mispredicted call branches executed. Unit: cpu]
+        cpu/event=0x89,period=2000,umask=0x30/
+  br_misp_exec.non_calls
+       [Mispredicted non call branches executed. Unit: cpu]
+        cpu/event=0x89,period=20000,umask=7/
+  br_misp_exec.return_near
+       [Mispredicted return branches executed. Unit: cpu]
+        cpu/event=0x89,period=2000,umask=8/
+  br_misp_exec.taken
+       [Mispredicted taken branches executed. Unit: cpu]
+        cpu/event=0x89,period=20000,umask=0x40/
+  br_misp_retired.all_branches
+       [Mispredicted retired branch instructions (Precise Event). Unit: cpu]
+        cpu/event=0xc5,period=20000,umask=4/
+  br_misp_retired.conditional
+       [Mispredicted conditional retired branches (Precise Event). Unit: cpu]
+        cpu/event=0xc5,period=20000,umask=1/
+  br_misp_retired.near_call
+       [Mispredicted near retired calls (Precise Event). Unit: cpu]
+        cpu/event=0xc5,period=2000,umask=2/
+  cpu_clk_unhalted.ref
+       [Reference cycles when thread is not halted (fixed counter). Unit: cpu]
+        cpu/event=0x0,umask=0x03,period=2000003/
+  cpu_clk_unhalted.ref_p
+       [Reference base clock (133 Mhz) cycles when thread is not halted
+        (programmable counter). Unit: cpu]
+        cpu/event=0x3c,period=100000,umask=1/
+  cpu_clk_unhalted.thread
+       [Cycles when thread is not halted (fixed counter). Unit: cpu]
+        cpu/event=0x3c,period=2000003/
+  cpu_clk_unhalted.thread_p
+       [Cycles when thread is not halted (programmable counter). Unit: cpu]
+        cpu/event=0x3c,period=2000000/
+  cpu_clk_unhalted.total_cycles
+       [Total CPU cycles. Unit: cpu]
+        cpu/event=0x3c,cmask=2,inv=1,period=2000000/
+  ild_stall.any
+       [Any Instruction Length Decoder stall cycles. Unit: cpu]
+        cpu/event=0x87,period=2000000,umask=0xf/
+  ild_stall.iq_full
+       [Instruction Queue full stall cycles. Unit: cpu]
+        cpu/event=0x87,period=2000000,umask=4/
+  ild_stall.lcp
+       [Length Change Prefix stall cycles. Unit: cpu]
+        cpu/event=0x87,period=2000000,umask=1/
+  ild_stall.mru
+       [Stall cycles due to BPU MRU bypass. Unit: cpu]
+        cpu/event=0x87,period=2000000,umask=2/
+  ild_stall.regen
+       [Regen stall cycles. Unit: cpu]
+        cpu/event=0x87,period=2000000,umask=8/
+  inst_decoded.dec0
+       [Instructions that must be decoded by decoder 0. Unit: cpu]
+        cpu/event=0x18,period=2000000,umask=1/
+  inst_queue_write_cycles
+       [Cycles instructions are written to the instruction queue. Unit: cpu]
+        cpu/event=0x1e,period=2000000,umask=1/
+  inst_queue_writes
+       [Instructions written to instruction queue. Unit: cpu]
+        cpu/event=0x17,period=2000000,umask=1/
+  inst_retired.any
+       [Instructions retired (fixed counter). Unit: cpu]
+        cpu/event=0xc0,period=2000003/
+  inst_retired.any_p
+       [Instructions retired (Programmable counter and Precise Event) (Precise
+        event). Unit: cpu]
+        cpu/event=0xc0,period=2000003/
+  inst_retired.mmx
+       [Retired MMX instructions (Precise Event). Unit: cpu]
+        cpu/event=0xc0,period=2000000,umask=4/
+  inst_retired.total_cycles
+       [Total cycles (Precise Event). Unit: cpu]
+        cpu/event=0xc0,cmask=16,inv=1,period=2000000,umask=1/
+  inst_retired.total_cycles_ps
+       [Total cycles (Precise Event). Unit: cpu]
+        cpu/event=0xc0,cmask=16,inv=1,period=2000000,umask=1/
+  inst_retired.x87
+       [Retired floating-point operations (Precise Event). Unit: cpu]
+        cpu/event=0xc0,period=2000000,umask=2/
+  load_hit_pre
+       [Load operations conflicting with software prefetches. Unit: cpu]
+        cpu/event=0x4c,period=200000,umask=1/
+  lsd.active
+       [Cycles when uops were delivered by the LSD. Unit: cpu]
+        cpu/event=0xa8,cmask=1,period=2000000,umask=1/
+  lsd.inactive
+       [Cycles no uops were delivered by the LSD. Unit: cpu]
+        cpu/event=0xa8,cmask=1,inv=1,period=2000000,umask=1/
+  lsd_overflow
+       [Loops that can't stream from the instruction queue. Unit: cpu]
+        cpu/event=0x20,period=2000000,umask=1/
+  machine_clears.cycles
+       [Cycles machine clear asserted. Unit: cpu]
+        cpu/event=0xc3,period=20000,umask=1/
+  machine_clears.mem_order
+       [Execution pipeline restart due to Memory ordering conflicts. Unit: cpu]
+        cpu/event=0xc3,period=20000,umask=2/
+  machine_clears.smc
+       [Self-Modifying Code detected. Unit: cpu]
+        cpu/event=0xc3,period=20000,umask=4/
+  rat_stalls.any
+       [All RAT stall cycles. Unit: cpu]
+        cpu/event=0xd2,period=2000000,umask=0xf/
+  rat_stalls.flags
+       [Flag stall cycles. Unit: cpu]
+        cpu/event=0xd2,period=2000000,umask=1/
+  rat_stalls.registers
+       [Partial register stall cycles. Unit: cpu]
+        cpu/event=0xd2,period=2000000,umask=2/
+  rat_stalls.rob_read_port
+       [ROB read port stalls cycles. Unit: cpu]
+        cpu/event=0xd2,period=2000000,umask=4/
+  rat_stalls.scoreboard
+       [Scoreboard stall cycles. Unit: cpu]
+        cpu/event=0xd2,period=2000000,umask=8/
+  resource_stalls.any
+       [Resource related stall cycles. Unit: cpu]
+        cpu/event=0xa2,period=2000000,umask=1/
+  resource_stalls.fpcw
+       [FPU control word write stall cycles. Unit: cpu]
+        cpu/event=0xa2,period=2000000,umask=0x20/
+  resource_stalls.load
+       [Load buffer stall cycles. Unit: cpu]
+        cpu/event=0xa2,period=2000000,umask=2/
+  resource_stalls.mxcsr
+       [MXCSR rename stall cycles. Unit: cpu]
+        cpu/event=0xa2,period=2000000,umask=0x40/
+  resource_stalls.other
+       [Other Resource related stall cycles. Unit: cpu]
+        cpu/event=0xa2,period=2000000,umask=0x80/
+  resource_stalls.rob_full
+       [ROB full stall cycles. Unit: cpu]
+        cpu/event=0xa2,period=2000000,umask=0x10/
+  resource_stalls.rs_full
+       [Reservation Station full stall cycles. Unit: cpu]
+        cpu/event=0xa2,period=2000000,umask=4/
+  resource_stalls.store
+       [Store buffer stall cycles. Unit: cpu]
+        cpu/event=0xa2,period=2000000,umask=8/
+  ssex_uops_retired.packed_double
+       [SIMD Packed-Double Uops retired (Precise Event). Unit: cpu]
+        cpu/event=0xc7,period=200000,umask=4/
+  ssex_uops_retired.packed_single
+       [SIMD Packed-Single Uops retired (Precise Event). Unit: cpu]
+        cpu/event=0xc7,period=200000,umask=1/
+  ssex_uops_retired.scalar_double
+       [SIMD Scalar-Double Uops retired (Precise Event). Unit: cpu]
+        cpu/event=0xc7,period=200000,umask=8/
+  ssex_uops_retired.scalar_single
+       [SIMD Scalar-Single Uops retired (Precise Event). Unit: cpu]
+        cpu/event=0xc7,period=200000,umask=2/
+  ssex_uops_retired.vector_integer
+       [SIMD Vector Integer Uops retired (Precise Event). Unit: cpu]
+        cpu/event=0xc7,period=200000,umask=0x10/
+  uop_unfusion
+       [Uop unfusions due to FP exceptions. Unit: cpu]
+        cpu/event=0xdb,period=2000000,umask=1/
+  uops_decoded.esp_folding
+       [Stack pointer instructions decoded. Unit: cpu]
+        cpu/event=0xd1,period=2000000,umask=4/
+  uops_decoded.esp_sync
+       [Stack pointer sync operations. Unit: cpu]
+        cpu/event=0xd1,period=2000000,umask=8/
+  uops_decoded.ms_cycles_active
+       [Uops decoded by Microcode Sequencer. Unit: cpu]
+        cpu/event=0xd1,cmask=1,period=2000000,umask=2/
+  uops_decoded.stall_cycles
+       [Cycles no Uops are decoded. Unit: cpu]
+        cpu/event=0xd1,cmask=1,inv=1,period=2000000,umask=1/
+  uops_executed.core_active_cycles
+       [Cycles Uops executed on any port (core count). Unit: cpu]
+        cpu/event=0xb1,any=1,cmask=1,period=2000000,umask=0x3f/
+  uops_executed.core_active_cycles_no_port5
+       [Cycles Uops executed on ports 0-4 (core count). Unit: cpu]
+        cpu/event=0xb1,any=1,cmask=1,period=2000000,umask=0x1f/
+  uops_executed.core_stall_count
+       [Uops executed on any port (core count). Unit: cpu]
+        cpu/event=0xb1,any=1,cmask=1,edge=1,inv=1,period=2000000,umask=0x3f/
+  uops_executed.core_stall_count_no_port5
+       [Uops executed on ports 0-4 (core count). Unit: cpu]
+        cpu/event=0xb1,any=1,cmask=1,edge=1,inv=1,period=2000000,umask=0x1f/
+  uops_executed.core_stall_cycles
+       [Cycles no Uops issued on any port (core count). Unit: cpu]
+        cpu/event=0xb1,any=1,cmask=1,inv=1,period=2000000,umask=0x3f/
+  uops_executed.core_stall_cycles_no_port5
+       [Cycles no Uops issued on ports 0-4 (core count). Unit: cpu]
+        cpu/event=0xb1,any=1,cmask=1,inv=1,period=2000000,umask=0x1f/
+  uops_executed.port0
+       [Uops executed on port 0. Unit: cpu]
+        cpu/event=0xb1,period=2000000,umask=1/
+  uops_executed.port015
+       [Uops issued on ports 0,1 or 5. Unit: cpu]
+        cpu/event=0xb1,period=2000000,umask=0x40/
+  uops_executed.port015_stall_cycles
+       [Cycles no Uops issued on ports 0,1 or 5. Unit: cpu]
+        cpu/event=0xb1,cmask=1,inv=1,period=2000000,umask=0x40/
+  uops_executed.port1
+       [Uops executed on port 1. Unit: cpu]
+        cpu/event=0xb1,period=2000000,umask=2/
+  uops_executed.port234_core
+       [Uops issued on ports 2,3 or 4. Unit: cpu]
+        cpu/event=0xb1,any=1,period=2000000,umask=0x80/
+  uops_executed.port2_core
+       [Uops executed on port 2 (core count). Unit: cpu]
+        cpu/event=0xb1,any=1,period=2000000,umask=4/
+  uops_executed.port3_core
+       [Uops executed on port 3 (core count). Unit: cpu]
+        cpu/event=0xb1,any=1,period=2000000,umask=8/
+  uops_executed.port4_core
+       [Uops executed on port 4 (core count). Unit: cpu]
+        cpu/event=0xb1,any=1,period=2000000,umask=0x10/
+  uops_executed.port5
+       [Uops executed on port 5. Unit: cpu]
+        cpu/event=0xb1,period=2000000,umask=0x20/
+  uops_issued.any
+       [Uops issued. Unit: cpu]
+        cpu/event=0xe,period=2000000,umask=1/
+  uops_issued.core_stall_cycles
+       [Cycles no Uops were issued on any thread. Unit: cpu]
+        cpu/event=0xe,any=1,cmask=1,inv=1,period=2000000,umask=1/
+  uops_issued.cycles_all_threads
+       [Cycles Uops were issued on either thread. Unit: cpu]
+        cpu/event=0xe,any=1,cmask=1,period=2000000,umask=1/
+  uops_issued.fused
+       [Fused Uops issued. Unit: cpu]
+        cpu/event=0xe,period=2000000,umask=2/
+  uops_issued.stall_cycles
+       [Cycles no Uops were issued. Unit: cpu]
+        cpu/event=0xe,cmask=1,inv=1,period=2000000,umask=1/
+  uops_retired.active_cycles
+       [Cycles Uops are being retired (Precise event). Unit: cpu]
+        cpu/event=0xc2,cmask=1,period=2000000,umask=1/
+  uops_retired.any
+       [Uops retired (Precise Event). Unit: cpu]
+        cpu/event=0xc2,period=2000000,umask=1/
+  uops_retired.macro_fused
+       [Macro-fused Uops retired (Precise Event). Unit: cpu]
+        cpu/event=0xc2,period=2000000,umask=4/
+  uops_retired.retire_slots
+       [Retirement slots used (Precise Event). Unit: cpu]
+        cpu/event=0xc2,period=2000000,umask=2/
+  uops_retired.stall_cycles
+       [Cycles Uops are not retiring (Precise Event). Unit: cpu]
+        cpu/event=0xc2,cmask=1,inv=1,period=2000000,umask=1/
+  uops_retired.total_cycles
+       [Total cycles using precise uop retired event (Precise Event). Unit:
+        cpu]
+        cpu/event=0xc2,cmask=16,inv=1,period=2000000,umask=1/
+
+software:
+  alignment-faults
+       [Number of kernel handled memory alignment faults. Unit: software]
+        software/config=7/
+  bpf-output
+       [An event used by BPF programs to write to the perf ring buffer. Unit:
+        software]
+        software/config=0xa/
+  cgroup-switches
+       [Number of context switches to a task in a different cgroup. Unit:
+        software]
+        software/config=0xb/
+  context-switches
+       [Number of context switches [This event is an alias of cs]. Unit:
+        software]
+        software/config=3/
+  cpu-clock
+       [Per-CPU high-resolution timer based event. Unit: software]
+        software/config=0/
+  cpu-migrations
+       [Number of times a process has migrated to a new CPU [This event is an
+        alias of migrations]. Unit: software]
+        software/config=4/
+  cs
+       [Number of context switches [This event is an alias of
+        context-switches]. Unit: software]
+        software/config=3/
+  dummy
+       [A placeholder event that doesn't count anything. Unit: software]
+        software/config=9/
+  emulation-faults
+       [Number of kernel handled unimplemented instruction faults handled
+        through emulation. Unit: software]
+        software/config=8/
+  faults
+       [Number of page faults [This event is an alias of page-faults]. Unit:
+        software]
+        software/config=2/
+  major-faults
+       [Number of major page faults. Major faults require I/O to handle. Unit:
+        software]
+        software/config=6/
+  migrations
+       [Number of times a process has migrated to a new CPU [This event is an
+        alias of cpu-migrations]. Unit: software]
+        software/config=4/
+  minor-faults
+       [Number of minor page faults. Minor faults don't require I/O to handle.
+        Unit: software]
+        software/config=5/
+  page-faults
+       [Number of page faults [This event is an alias of faults]. Unit:
+        software]
+        software/config=2/
+  task-clock
+       [Per-task high-resolution timer based event. Unit: software]
+        software/config=1/
+
+tool:
+  core_wide
+       [1 if not SMT,if SMT are events being gathered on all SMT threads 1
+        otherwise 0. Unit: tool]
+        tool/config=0xd/
+  duration_time
+       [Wall clock interval time in nanoseconds. Unit: tool]
+        tool/config=1/
+  has_pmem
+       [1 if persistent memory installed otherwise 0. Unit: tool]
+        tool/config=4/
+  num_cores
+       [Number of cores. A core consists of 1 or more thread,with each thread
+        being associated with a logical Linux CPU. Unit: tool]
+        tool/config=5/
+  num_cpus
+       [Number of logical Linux CPUs. There may be multiple such CPUs on a
+        core. Unit: tool]
+        tool/config=6/
+  num_cpus_online
+       [Number of online logical Linux CPUs. There may be multiple such CPUs
+        on a core. Unit: tool]
+        tool/config=7/
+  num_dies
+       [Number of dies. Each die has 1 or more cores. Unit: tool]
+        tool/config=8/
+  num_packages
+       [Number of packages. Each package has 1 or more die. Unit: tool]
+        tool/config=9/
+  smt_on
+       [1 if simultaneous multithreading (aka hyperthreading) is enable
+        otherwise 0. Unit: tool]
+        tool/config=0xb/
+  system_time
+       [System/kernel time in nanoseconds. Unit: tool]
+        tool/config=3/
+  system_tsc_freq
+       [The amount a Time Stamp Counter (TSC) increases per second. Unit: tool]
+        tool/config=0xc/
+  target_cpu
+       [1 if CPUs being analyzed,0 if threads/processes. Unit: tool]
+        tool/config=0xe/
+  user_time
+       [User (non-kernel) time in nanoseconds. Unit: tool]
+        tool/config=2/
+
+virtual memory:
+  dtlb_load_misses.any
+       [DTLB load misses. Unit: cpu]
+        cpu/event=8,period=200000,umask=1/
+  dtlb_load_misses.large_walk_completed
+       [DTLB load miss large page walks. Unit: cpu]
+        cpu/event=8,period=200000,umask=0x80/
+  dtlb_load_misses.pde_miss
+       [DTLB load miss caused by low part of address. Unit: cpu]
+        cpu/event=8,period=200000,umask=0x20/
+  dtlb_load_misses.stlb_hit
+       [DTLB second level hit. Unit: cpu]
+        cpu/event=8,period=2000000,umask=0x10/
+  dtlb_load_misses.walk_completed
+       [DTLB load miss page walks complete. Unit: cpu]
+        cpu/event=8,period=200000,umask=2/
+  dtlb_load_misses.walk_cycles
+       [DTLB load miss page walk cycles. Unit: cpu]
+        cpu/event=8,period=200000,umask=4/
+  dtlb_misses.any
+       [DTLB misses. Unit: cpu]
+        cpu/event=0x49,period=200000,umask=1/
+  dtlb_misses.large_walk_completed
+       [DTLB miss large page walks. Unit: cpu]
+        cpu/event=0x49,period=200000,umask=0x80/
+  dtlb_misses.pde_miss
+       [DTLB misses caused by low part of address. Unit: cpu]
+        cpu/event=0x49,period=200000,umask=0x20/
+  dtlb_misses.stlb_hit
+       [DTLB first level misses but second level hit. Unit: cpu]
+        cpu/event=0x49,period=200000,umask=0x10/
+  dtlb_misses.walk_completed
+       [DTLB miss page walks. Unit: cpu]
+        cpu/event=0x49,period=200000,umask=2/
+  dtlb_misses.walk_cycles
+       [DTLB miss page walk cycles. Unit: cpu]
+        cpu/event=0x49,period=2000000,umask=4/
+  ept.walk_cycles
+       [Extended Page Table walk cycles. Unit: cpu]
+        cpu/event=0x4f,period=2000000,umask=0x10/
+  itlb_flush
+       [ITLB flushes. Unit: cpu]
+        cpu/event=0xae,period=2000000,umask=1/
+  itlb_miss_retired
+       [Retired instructions that missed the ITLB (Precise Event). Unit: cpu]
+        cpu/event=0xc8,period=200000,umask=0x20/
+  itlb_misses.any
+       [ITLB miss. Unit: cpu]
+        cpu/event=0x85,period=200000,umask=1/
+  itlb_misses.large_walk_completed
+       [ITLB miss large page walks. Unit: cpu]
+        cpu/event=0x85,period=200000,umask=0x80/
+  itlb_misses.walk_completed
+       [ITLB miss page walks. Unit: cpu]
+        cpu/event=0x85,period=200000,umask=2/
+  itlb_misses.walk_cycles
+       [ITLB miss page walk cycles. Unit: cpu]
+        cpu/event=0x85,period=2000000,umask=4/
+  large_itlb.hit
+       [Large ITLB hit. Unit: cpu]
+        cpu/event=0x82,period=200000,umask=1/
+  mem_load_retired.dtlb_miss
+       [Retired loads that miss the DTLB (Precise Event). Unit: cpu]
+        cpu/event=0xcb,period=200000,umask=0x80/
+  mem_store_retired.dtlb_miss
+       [Retired stores that miss the DTLB (Precise Event). Unit: cpu]
+        cpu/event=0xc,period=200000,umask=1/
+  rNNN                                               [Raw event descriptor]
+  cpu/event=0..255,pc,edge,.../modifier              [Raw event descriptor]
+       [(see 'man perf-list' or 'man perf-record' on how to encode it)]
+        cpu/event=0..255,pc,edge,any,offcore_rsp=0..0xffffffffffffffff,
+        ldlat=0..0xffff,inv,umask=0..255,cmask=0..255,
+        config=0..0xffffffffffffffff,config1=0..0xffffffffffffffff,
+        config2=0..0xffffffffffffffff,config3=0..0xffffffffffffffff,
+        config4=0..0xffffffffffffffff,legacy-hardware-config=0..9,
+        legacy-cache-config=0..0xffffff,name=string,period=number,freq=number,
+        branch_type=(u|k|hv|any|...),time,call-graph=(fp|dwarf|lbr),
+        stack-size=number,max-stack=number,nr=number,inherit,no-inherit,
+        overwrite,no-overwrite,percore,aux-output,
+        aux-action=(pause|resume|start-paused),aux-sample-size=number,
+        cpu=number,ratio-to-prev=string/modifier
+  breakpoint//modifier                               [Raw event descriptor]
+        breakpoint//modifier
+  cstate_core/event=0..0xffffffffffffffff/modifier   [Raw event descriptor]
+        cstate_core/event=0..0xffffffffffffffff/modifier
+  cstate_pkg/event=0..0xffffffffffffffff/modifier    [Raw event descriptor]
+        cstate_pkg/event=0..0xffffffffffffffff/modifier
+  hwmon_coretemp//modifier                           [Raw event descriptor]
+        hwmon_coretemp//modifier
+  kprobe/retprobe/modifier                           [Raw event descriptor]
+        kprobe/retprobe/modifier
+  msr/event=0..0xffffffffffffffff/modifier           [Raw event descriptor]
+        msr/event=0..0xffffffffffffffff/modifier
+  software//modifier                                 [Raw event descriptor]
+        software//modifier
+  tool//modifier                                     [Raw event descriptor]
+        tool//modifier
+  tracepoint//modifier                               [Raw event descriptor]
+        tracepoint//modifier
+  uncore/event=0..255,edge,inv,.../modifier          [Raw event descriptor]
+        uncore/event=0..255,edge,inv,umask=0..255,cmask=0..255/modifier
+  uprobe/ref_ctr_offset=0..0xffffffff,retprobe/modifier[Raw event descriptor]
+        uprobe/ref_ctr_offset=0..0xffffffff,retprobe/modifier
+  mem:<addr>[/len][:access]                          [Hardware breakpoint]
+
+Metric Groups:
+
+Default:
+  CPUs_utilized
+       [Average CPU utilization]
+       [(software@cpu\-clock\,name\=cpu\-clock@ if #target_cpu else
+        software@task\-clock\,name\=task\-clock@) / (duration_time * 1e9)]
+  backend_cycles_idle
+       [Backend stalls per cycle]
+       [(stalled\-cycles\-backend / cpu\-cycles if
+        has_event(stalled\-cycles\-backend) else 0)]
+       [backend_cycles_idle > 0.2]
+  branch_frequency
+       [Branches per CPU second]
+       [branches / (software@cpu\-clock\,name\=cpu\-clock@ if #target_cpu else
+        software@task\-clock\,name\=task\-clock@)]
+  branch_miss_rate
+       [Branch miss rate]
+       [branch\-misses / branches]
+       [branch_miss_rate > 0.05]
+  cs_per_second
+       [Context switches per CPU second]
+       [software@context\-switches\,name\=context\-switches@ * 1e9 /
+        (software@cpu\-clock\,name\=cpu\-clock@ if #target_cpu else
+        software@task\-clock\,name\=task\-clock@)]
+  cycles_frequency
+       [Cycles per CPU second]
+       [cpu\-cycles / (software@cpu\-clock\,name\=cpu\-clock@ if #target_cpu
+        else software@task\-clock\,name\=task\-clock@)]
+  frontend_cycles_idle
+       [Frontend stalls per cycle]
+       [(stalled\-cycles\-frontend / cpu\-cycles if
+        has_event(stalled\-cycles\-frontend) else 0)]
+       [frontend_cycles_idle > 0.1]
+  insn_per_cycle
+       [Instructions Per Cycle]
+       [instructions / cpu\-cycles]
+       [insn_per_cycle < 1]
+  migrations_per_second
+       [Process migrations to a new CPU per CPU second]
+       [software@cpu\-migrations\,name\=cpu\-migrations@ * 1e9 /
+        (software@cpu\-clock\,name\=cpu\-clock@ if #target_cpu else
+        software@task\-clock\,name\=task\-clock@)]
+  page_faults_per_second
+       [Page faults per CPU second]
+       [software@page\-faults\,name\=page\-faults@ * 1e9 /
+        (software@cpu\-clock\,name\=cpu\-clock@ if #target_cpu else
+        software@task\-clock\,name\=task\-clock@)]
+  stalled_cycles_per_instruction
+       [Max front or backend stalls per instruction]
+       [(max(stalled\-cycles\-frontend,stalled\-cycles\-backend) /
+        instructions if has_event(stalled\-cycles\-frontend) &
+        has_event(stalled\-cycles\-backend) else (stalled\-cycles\-frontend /
+        instructions if has_event(stalled\-cycles\-frontend) else
+        (stalled\-cycles\-backend / instructions if
+        has_event(stalled\-cycles\-backend) else 0)))]
+
+Default2:
+  l1d_miss_rate
+       [L1D miss rate]
+       [L1\-dcache\-load\-misses / L1\-dcache\-loads]
+       [l1d_miss_rate > 0.05]
+  llc_miss_rate
+       [LLC miss rate]
+       [LLC\-load\-misses / LLC\-loads]
+       [llc_miss_rate > 0.05]
+
+Default3:
+  dtlb_miss_rate
+       [dTLB miss rate]
+       [dTLB\-load\-misses / dTLB\-loads]
+       [dtlb_miss_rate > 0.05]
+  itlb_miss_rate
+       [iTLB miss rate]
+       [iTLB\-load\-misses / iTLB\-loads]
+       [itlb_miss_rate > 0.05]
+  l1i_miss_rate
+       [L1I miss rate]
+       [L1\-icache\-load\-misses / L1\-icache\-loads]
+       [l1i_miss_rate > 0.05]
+
+Default4:
+  l1_prefetch_miss_rate
+       [L1 prefetch miss rate]
+       [L1\-dcache\-prefetch\-misses / L1\-dcache\-prefetches]
+       [l1_prefetch_miss_rate > 0.05]
+
+lpm_br: [breakdown of retired branch instructions]
+  lpm_br_cond_insn_between_branches
+       [The number of instructions divided by the number of conditional
+        branches]
+       [d_ratio(instructions,BR_INST_RETIRED.CONDITIONAL)]
+  lpm_br_cond_mispred
+       [Retired conditional branch instructions mispredicted as a percentage
+        of all conditional branches]
+       [d_ratio(BR_MISP_RETIRED.CONDITIONAL,BR_INST_RETIRED.CONDITIONAL)]
+  lpm_br_cond_retired
+       [Retired conditional branch instructions]
+       [d_ratio(BR_INST_RETIRED.CONDITIONAL,duration_time)]
+  lpm_br_taken_insn_between_branches
+       [The number of instructions divided by the number of taken branches]
+       [d_ratio(instructions,BR_INST_RETIRED.ALL_BRANCHES)]
+  lpm_br_taken_retired
+       [The number of taken branches that were retired per second]
+       [d_ratio(BR_INST_RETIRED.ALL_BRANCHES,duration_time)]
+  lpm_br_total_insn_between_branches
+       [The number of instructions divided by the number of branches]
+       [d_ratio(instructions,BR_INST_RETIRED.ALL_BRANCHES)]
+  lpm_br_total_mispred
+       [The number of branch instructions retired,of any type,that were not
+        correctly predicted as a percentage of all branch instrucions]
+       [d_ratio(BR_MISP_RETIRED.ALL_BRANCHES,BR_INST_RETIRED.ALL_BRANCHES)]
+  lpm_br_total_retired
+       [The number of branch instructions retired per second]
+       [d_ratio(BR_INST_RETIRED.ALL_BRANCHES,duration_time)]
+
+lpm_br_cond:
+  lpm_br_cond_insn_between_branches
+       [The number of instructions divided by the number of conditional
+        branches]
+       [d_ratio(instructions,BR_INST_RETIRED.CONDITIONAL)]
+  lpm_br_cond_mispred
+       [Retired conditional branch instructions mispredicted as a percentage
+        of all conditional branches]
+       [d_ratio(BR_MISP_RETIRED.CONDITIONAL,BR_INST_RETIRED.CONDITIONAL)]
+  lpm_br_cond_retired
+       [Retired conditional branch instructions]
+       [d_ratio(BR_INST_RETIRED.CONDITIONAL,duration_time)]
+
+lpm_br_taken:
+  lpm_br_taken_insn_between_branches
+       [The number of instructions divided by the number of taken branches]
+       [d_ratio(instructions,BR_INST_RETIRED.ALL_BRANCHES)]
+  lpm_br_taken_retired
+       [The number of taken branches that were retired per second]
+       [d_ratio(BR_INST_RETIRED.ALL_BRANCHES,duration_time)]
+
+lpm_br_total:
+  lpm_br_total_insn_between_branches
+       [The number of instructions divided by the number of branches]
+       [d_ratio(instructions,BR_INST_RETIRED.ALL_BRANCHES)]
+  lpm_br_total_mispred
+       [The number of branch instructions retired,of any type,that were not
+        correctly predicted as a percentage of all branch instrucions]
+       [d_ratio(BR_MISP_RETIRED.ALL_BRANCHES,BR_INST_RETIRED.ALL_BRANCHES)]
+  lpm_br_total_retired
+       [The number of branch instructions retired per second]
+       [d_ratio(BR_INST_RETIRED.ALL_BRANCHES,duration_time)]
+
+lpm_cpu_power: [Running Average Power Limit (RAPL) power consumption estimates]
+  lpm_cpu_power_cores
+       [d_ratio((power@energy\-cores@ if has_event(power@energy\-cores@) else
+        NaN) * 232.83064365386963e-12,duration_time)]
+  lpm_cpu_power_gpu
+       [d_ratio((power@energy\-gpu@ if has_event(power@energy\-gpu@) else NaN)
+        * 232.83064365386963e-12,duration_time)]
+  lpm_cpu_power_pkg
+       [d_ratio((power@energy\-pkg@ if has_event(power@energy\-pkg@) else NaN)
+        * 232.83064365386963e-12,duration_time)]
+  lpm_cpu_power_psys
+       [d_ratio((power@energy\-psys@ if has_event(power@energy\-psys@) else
+        NaN) * 232.83064365386963e-12,duration_time)]
+  lpm_cpu_power_ram
+       [d_ratio((power@energy\-ram@ if has_event(power@energy\-ram@) else NaN)
+        * 232.83064365386963e-12,duration_time)]
+
+lpm_cs: [Number of context switches per second, instructions retired & core cycles between context switches]
+  lpm_cs_cycles
+       [Cycles per context switch]
+       [d_ratio(cycles,context\-switches)]
+  lpm_cs_instr
+       [Instructions per context switch]
+       [d_ratio(instructions,context\-switches)]
+  lpm_cs_rate
+       [Context switches per second]
+       [d_ratio(context\-switches,duration_time)]
+
+lpm_cycles: [cycles breakdown per privilege level (users, kernel, guest)]
+  lpm_cycles_guest
+       [Hypervisor guest cycles as a percentage of all cycles]
+       [d_ratio(cpu\-cycles:G,cpu\-cycles:kHh + cpu\-cycles:G +
+        cpu\-cycles:uH)]
+  lpm_cycles_kernel
+       [Kernel cycles as a percentage of all cycles]
+       [d_ratio(cpu\-cycles:kHh,cpu\-cycles:kHh + cpu\-cycles:G +
+        cpu\-cycles:uH)]
+  lpm_cycles_total
+       [Total number of cycles]
+       [cpu\-cycles:kHh + cpu\-cycles:G + cpu\-cycles:uH]
+  lpm_cycles_user
+       [User cycles as a percentage of all cycles]
+       [d_ratio(cpu\-cycles:uH,cpu\-cycles:kHh + cpu\-cycles:G +
+        cpu\-cycles:uH)]
+
+lpm_idle:
+  lpm_idle
+       [Percentage of total wallclock cycles where CPUs are in low power state
+        (C1 or deeper sleep state)]
+       [d_ratio(max(msr@tsc@ - msr@mperf@,0),msr@tsc@)]
+
+lpm_ilp:
+  lpm_ilp_idle
+       [Lower power cycles as a percentage of all cycles]
+       [d_ratio(msr@tsc@ - msr@mperf@,msr@tsc@)]
+  lpm_ilp_inst_ret_0
+       [Instructions retired in 0 cycles as a percentage of all cycles]
+       [1 - d_ratio(max(INST_RETIRED.ANY_P@cmask\=1@ -
+        INST_RETIRED.ANY_P@cmask\=2@,0),cycles) -
+        d_ratio(max(INST_RETIRED.ANY_P@cmask\=2@ -
+        INST_RETIRED.ANY_P@cmask\=3@,0),cycles) -
+        d_ratio(max(INST_RETIRED.ANY_P@cmask\=3@ -
+        INST_RETIRED.ANY_P@cmask\=4@,0),cycles) -
+        d_ratio(max(INST_RETIRED.ANY_P@cmask\=4@ -
+        INST_RETIRED.ANY_P@cmask\=5@,0),cycles) -
+        d_ratio(INST_RETIRED.ANY_P@cmask\=5@,cycles)]
+  lpm_ilp_inst_ret_1
+       [Instructions retired in 1 cycles as a percentage of all cycles]
+       [d_ratio(max(INST_RETIRED.ANY_P@cmask\=1@ -
+        INST_RETIRED.ANY_P@cmask\=2@,0),cycles)]
+  lpm_ilp_inst_ret_2
+       [Instructions retired in 2 cycles as a percentage of all cycles]
+       [d_ratio(max(INST_RETIRED.ANY_P@cmask\=2@ -
+        INST_RETIRED.ANY_P@cmask\=3@,0),cycles)]
+  lpm_ilp_inst_ret_3
+       [Instructions retired in 3 cycles as a percentage of all cycles]
+       [d_ratio(max(INST_RETIRED.ANY_P@cmask\=3@ -
+        INST_RETIRED.ANY_P@cmask\=4@,0),cycles)]
+  lpm_ilp_inst_ret_4
+       [Instructions retired in 4 cycles as a percentage of all cycles]
+       [d_ratio(max(INST_RETIRED.ANY_P@cmask\=4@ -
+        INST_RETIRED.ANY_P@cmask\=5@,0),cycles)]
+  lpm_ilp_inst_ret_5
+       [Instructions retired in 5 or more cycles as a percentage of all cycles]
+       [d_ratio(INST_RETIRED.ANY_P@cmask\=5@,cycles)]
+
+smi: [System Management Interrupt metrics]
+  smi_cycles
+       [Percentage of cycles spent in System Management Interrupts. Requires
+        /sys/bus/event_source/devices/cpu/freeze_on_smi to be 1]
+       [(((msr@aperf@ - cycles) / msr@aperf@ if msr@smi@ > 0 else 0) if
+        has_event(msr@aperf@) else 0)]
+       [smi_cycles > 0.1]
+  smi_num
+       [Number of SMI interrupts]
+       [(msr@smi@ if has_event(msr@smi@) else 0)]

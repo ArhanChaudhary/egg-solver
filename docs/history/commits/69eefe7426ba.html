@@ -1,0 +1,83 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>lanes: fewer µops per child (lazy child cube, early stores, blsmsk count, move tables, index tweaks) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="69eefe7426ba.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="lanes-fewer-µops-per-child-lazy-child-cube-early-stores-blsmsk-count-move-tables-index-tweaks">lanes: fewer µops per child (lazy child cube, early stores, blsmsk count, move tables, index tweaks)</h1>
+<p>Commit <code>69eefe7426ba1111839a273730172a57c09c49aa</code> · 2026-11-04T06:33:04+00:00</p>
+<p>Historical experiment outside the released main history; do not treat it as an adopted change. This record describes its historical source and measurements. Later fixes, test coverage and performance can differ. See the current comparison and safety reports for the release assessment.</p>
+<p>References: Historical ancestor; no current branch tip</p>
+<h2 id="original-experiment-record">Original experiment record</h2>
+<p>lanes: fewer µops per child (lazy child cube, early stores, blsmsk count, move tables, index tweaks)</p>
+<p>NEUTRAL (not proposed as a whole). Against cb8cb70 (= fc6d9c9's tree). Search
+unchanged (verify.sh: 3295521 / 2785769, 15:1 16:35 17:270 18:662 19:32;
+3607979 / 3053364, 18:100).</p>
+<p>Seven per-visit instruction cuts, each with a clear mechanism, none of
+which moves throughput.</p>
+<ul>
+<li>early: the pending child's k_face, k_po, phase and the node count are
+written before the index computation, so they are not live across it.
+This removes the spill/reload of the local node counter (a child
+pruned by its corner depth reads the fields back, volatile).</li>
+<li>cnt: the reached moves are counted with blsmsk (<code>todo &amp; (live ^ (live - 1))</code>, all of <code>todo</code> if live is 0): one popcount covers the
+skipped X' moves and the generated child. This is fewer instructions
+than the bzhi form, unlike neg/m3-merged-node-count, which added a
+masked count on the pop path.</li>
+<li>kind: face, kind and face mask of a move come from TABS tables (no
+imul/shr/lea/sub).</li>
+<li>kind2: the X-move blend mask is a k-register loaded from a table
+(<code>Cube::select_mask</code>), not sbb + kmovd.</li>
+<li>idx: Tinv's eo is folded into the first xor of edge_parts_sym, which
+becomes a vpternlog with a memory operand: no load of p as a register,
+no z ^ p. sym_edge entries are 128 bytes (q, p, eo), so the entry
+offset stays one masked, scaled index. msplit's pext is 64-bit, with
+a 64-bit vpmovmskb output (no zero extensions).</li>
+<li>lazy: advance computes only the looked-up child cube, as one
+composition of operands selected by the table mask
+(<code>Cube::child_lookup</code>: inv_mv[m] o b for X moves, a o mv[m] else). The
+other cube is computed on the pass and push paths only. This is a new
+angle on neg/m6-lazy-child-cube, whose mask came from m % 3 at the head
+of the index chain.</li>
+</ul>
+<p>Instructions per node (cachegrind, x86-64-v3 build, random:20:2026, 1T):
+main 148.79; early 146.86; early+cnt 144.50; the whole stack 140.25
+(-5.7%; on v3 the k-mask blends fall back to vpblendvb, so the native
+cut is larger). kind alone was +2.0 (face spilled twice), and idx2
+alone 148.07.</p>
+<p>1T (ab1t.sh, paired concurrent runs, solves/s):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>build</th><th>lanes</th><th>main runs</th><th>variant runs</th><th>change</th></tr>
+</thead>
+<tbody>
+<tr><td>kind</td><td>20</td><td>21.650 21.633 21.367 21.383 21.717</td><td>21.650 21.633 21.367 21.567 21.567</td><td>-0.3%</td></tr>
+<tr><td>idx2</td><td>20</td><td>21.333 21.650 21.033 21.500 21.533</td><td>21.383 21.717 21.517 21.500 21.483</td><td>0.0%</td></tr>
+<tr><td>early</td><td>20</td><td>21.483 21.483 20.733 21.217 21.150</td><td>21.483 21.450 20.750 21.067 21.000</td><td>-0.7%</td></tr>
+<tr><td>early+cnt</td><td>20</td><td>21.750 20.983 21.167 21.533 21.533</td><td>21.600 20.983 21.167 21.517 21.533</td><td>-0.1%</td></tr>
+<tr><td>whole stack (lazy)</td><td>20</td><td>21.600 21.700 21.717 21.367 21.350</td><td>21.600 21.700 21.800 21.367 21.733</td><td>+0.5%</td></tr>
+<tr><td>whole stack (lazy)</td><td>28</td><td>24.083 24.033 23.867 23.967 23.833</td><td>23.933 24.083 23.900 23.967 23.933</td><td>-0.1%</td></tr>
+<tr><td>whole stack (lazy)</td><td>24</td><td>23.450 23.117 23.350 19.983 23.317</td><td>23.783 23.533 23.583 20.100 23.200</td><td>+0.9%</td></tr>
+<tr><td>(Medians. Pairs often give the exact same solve count. The same stack</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>built with -C llvm-args=-align-loops=32, against main built the same</td><td></td><td></td><td></td><td></td></tr>
+<tr><td>way: pairs +3.9 +1.0 0.0 +1.3 +1.4% at 24 lanes.)</td><td></td><td></td><td></td><td></td></tr>
+</tbody>
+</table></div>
+<p>48T at 24 lanes (ab48.sh; only the pairs run after the machine was
+cleaned up, outside load 0.1 cores), solves/s:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>pair</th><th>main</th><th>stack</th><th>change</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>996.700</td><td>1007.967</td><td>+1.1%</td></tr>
+<tr><td>2</td><td>1006.467</td><td>1004.233</td><td>-0.2%</td></tr>
+<tr><td>3</td><td>1012.933</td><td>1008.000</td><td>-0.5%</td></tr>
+<tr><td>4</td><td>1013.400</td><td>1021.900</td><td>+0.8%</td></tr>
+<tr><td>5</td><td>1020.100</td><td>1015.400</td><td>-0.5%</td></tr>
+<tr><td>6</td><td>1027.500</td><td>1020.333</td><td>-0.7%</td></tr>
+<tr><td>Median pair: -0.35%, so neutral. The lazy child cube alone (the part</td><td></td><td></td><td></td></tr>
+<tr><td>that carries the 1T gain) is proposed separately as m7-lazy-child.patch.</td><td></td><td></td><td></td></tr>
+</tbody>
+</table></div>
+<p>Why: at 20 lanes the 1T kernel is bound by memory-level parallelism
+(see the lane patch). But at 28 lanes, where more lanes no longer help,
+the stack is still flat. Visit time is set by the mispredicted branches
+and the latency of their inputs, not by µop count: 9 extra cycles on the
+value chain cost 1.7% (diagnostic), while 3 extra instructions off the
+chain cost 1.0% and 8.5 fewer cost nothing.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

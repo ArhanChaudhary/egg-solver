@@ -1,0 +1,102 @@
+{
+  "name": "events-physical-01-r1",
+  "config": {
+    "cpus": [
+      1,
+      3,
+      5,
+      7,
+      9,
+      11,
+      0,
+      2,
+      4,
+      6,
+      8,
+      10
+    ],
+    "threads": 12,
+    "memory_policy": "interleave"
+  },
+  "lanes": 24,
+  "page_request": "thp",
+  "mode": "stream",
+  "aux": "branch-misses:u",
+  "isolated_event": false,
+  "command": [
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/numactl",
+    "--physcpubind=1,3,5,7,9,11,0,2,4,6,8,10",
+    "--interleave=0,1",
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/perf",
+    "stat",
+    "--no-big-num",
+    "-x",
+    ";",
+    "--delay=-1",
+    "--control=fifo:/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/.ctl-events-physical-01-r1,/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/.ack-events-physical-01-r1",
+    "-o",
+    "/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/stat/events-physical-01-r1.csv",
+    "-e",
+    "{cycles:u,instructions:u,branch-misses:u}",
+    "--",
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/bench",
+    "stream",
+    "/home/arhan/tmp/egg-solver-perf-work/tables/h6",
+    "--warmup",
+    "8.0",
+    "--window",
+    "20.0",
+    "--threads",
+    "12",
+    "--lanes",
+    "24",
+    "--seed",
+    "2026",
+    "--load",
+    "copy",
+    "--json"
+  ],
+  "exit_code": 0,
+  "valid": true,
+  "wall_seconds": 34.81260227970779,
+  "counted_window_seconds": 20.00024052,
+  "benchmark": {
+    "type": "stream",
+    "threads": 12,
+    "lanes": 24,
+    "window": 20.0,
+    "share": null,
+    "cubes": 30,
+    "throughput": 1.5,
+    "nodes_per_cube": 4269651.133333334,
+    "lookups_per_cube": 3623033.4,
+    "lengths": {
+      "16": 3,
+      "17": 27
+    }
+  },
+  "counters": [
+    {
+      "event": "cycles:u",
+      "count": 583521693177.0,
+      "unit": "",
+      "counter_runtime_ns": 239952246191.0,
+      "running_percent": 100.0
+    },
+    {
+      "event": "instructions:u",
+      "count": 1025388075428.0,
+      "unit": "",
+      "counter_runtime_ns": 239952246191.0,
+      "running_percent": 100.0
+    },
+    {
+      "event": "branch-misses:u",
+      "count": 1372229905.0,
+      "unit": "",
+      "counter_runtime_ns": 239952246191.0,
+      "running_percent": 100.0
+    }
+  ],
+  "record": false
+}

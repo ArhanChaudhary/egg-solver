@@ -1,0 +1,13 @@
+status 0
+run nxopt31 1 random_state_from25 25 thp
+start 2026-11-04 23:14:10
+wall_s 383.46
+cpu_s 338.49 0.70
+maxrss_kb 2548912
+gate_wait_s 0
+ext_cores 0.2
+pages 2549428 2549428 2545708 2492416 0 3601788 nxopt31
+free_1g_pages 0 12
+table /data/competitors/nxopt/nxopth31b.dat 2603089924
+thp always [madvise] never defrag always defer defer+madvise [madvise] never
+note status was 2: runtest.sh was edited while running (bash read past the edit after the solver had finished); 25/25 cubes solved, Avg valid

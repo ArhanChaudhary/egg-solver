@@ -1,0 +1,86 @@
+    Finished `test` profile [optimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (/data2/build/egg-solver-target/miri-current/miri/x86_64-unknown-linux-gnu/debug/build/egg-solver/2c049e830a763edb/out/egg_solver-2c049e830a763edb)
+warning: Miri does not support optimizations: the opt-level is ignored. The only effect of selecting a Cargo profile that enables optimizations (such as --release) is to apply its remaining settings, such as whether debug assertions and overflow checks are enabled.
+
+cli::preflight::tests::folders: test
+cli::preflight::tests::needs_and_margins: test
+coord::tests::cocsep_x3_is_3_cocsep: test
+coord::tests::edge_key_roundtrip: test
+coord::tests::edge_key_sym_matches: test
+coord::tests::rank_tables: test
+cubie::tests::facelets: test
+cubie::tests::generated_constants_match_model: test
+cubie::tests::move_orders: test
+cubie::tests::moves_match_sticker_model: test
+cubie::tests::parse_and_format: test
+cubie::tests::sexy_move_order_6: test
+cubie::tests::sticker_roundtrip: test
+cubie::tests::symmetry_conjugation_matches_stickers: test
+gen::collapse::tests::min_codes_is_fieldwise_min: test
+lanes::share::tests::first_pass_dropped_entries_are_counted_down: test
+lanes::share::tests::first_pass_reports_no_longer_solution_while_reporting_one: test
+lanes::share::tests::lead_of_matches_scalar_lead: test
+lanes::share::tests::mutex_contention_parks_and_wakes: test
+lanes::share::tests::share_first_pass_reports_the_shortest_solution: test
+lanes::share::tests::share_fresh_cube_solved_by_others_at_once: test
+lanes::share::tests::share_protocol_with_tiny_search: test
+lanes::share::tests::split_runs_cover_each_child_once: test
+lanes::share::tests::staged_sort_matches_sort_jobs: test
+lanes::tests::quantize18_codes_unseen_children: test
+lanes::tests::sort_jobs_matches_stable_sort: test
+lanes::tests::split_runs_cover_each_child_once: test
+parallel::tests::on_threads_joins_all_failed_workers_before_returning_error: test
+parallel::tests::on_threads_runs_each_share_once_in_order: test
+portable_check::coord::cross_check::portable_matches_x86: test
+portable_check::coord::tests::pext_replacements_match: test
+portable_check::tests::portable_cube_matches_cubie: test
+simd::tests::simd_matches_cubie: test
+solver::tests::hot_index_matches_reference_index: test
+symstart::tests::antisymmetric_cube: test
+symstart::tests::move_conjugates_compose: test
+symstart::tests::random_cubes_are_not_filtered: test
+symstart::tests::superflip_jobs: test
+tables::file::tests::checksum_sees_every_byte: test
+tables::file::tests::previous_table_magic_is_accepted: test
+tables::file::tests::trailer_roundtrip: test
+tables::file::tests::trailer_write_keeps_data: test
+tables::shm::tests::keys_and_page_lists: test
+tables::tests::atomic_updates_finish_before_byte_reads: test
+tables::tests::cocsep_classes_and_distribution: test
+tables::tests::opened_table_file_is_read_only: test
+tables::tests::table_from_file_memory_is_checked: test
+tables::tests::table_meta_and_size_are_checked: test
+
+48 tests, 0 benchmarks
+warning: 1 warning emitted
+
+     Running unittests src/bin/bench.rs (/data2/build/egg-solver-target/miri-current/miri/x86_64-unknown-linux-gnu/debug/build/egg-solver/aaea3b8a2853be95/out/bench-aaea3b8a2853be95)
+warning: Miri does not support optimizations: the opt-level is ignored. The only effect of selecting a Cargo profile that enables optimizations (such as --release) is to apply its remaining settings, such as whether debug assertions and overflow checks are enabled.
+
+tests::legacy_forms_become_subcommands: test
+tests::random_sets: test
+tests::seconds_reject_unrepresentable_durations: test
+
+3 tests, 0 benchmarks
+warning: 1 warning emitted
+
+     Running unittests src/main.rs (/data2/build/egg-solver-target/miri-current/miri/x86_64-unknown-linux-gnu/debug/build/egg-solver/04559a7cbc370c2b/out/egg_solver-04559a7cbc370c2b)
+warning: Miri does not support optimizations: the opt-level is ignored. The only effect of selecting a Cargo profile that enables optimizations (such as --release) is to apply its remaining settings, such as whether debug assertions and overflow checks are enabled.
+
+0 tests, 0 benchmarks
+warning: 1 warning emitted
+
+     Running unittests src/bin/gen.rs (/data2/build/egg-solver-target/miri-current/miri/x86_64-unknown-linux-gnu/debug/build/egg-solver/b66abc0be616dc6b/out/gen-b66abc0be616dc6b)
+warning: Miri does not support optimizations: the opt-level is ignored. The only effect of selecting a Cargo profile that enables optimizations (such as --release) is to apply its remaining settings, such as whether debug assertions and overflow checks are enabled.
+
+0 tests, 0 benchmarks
+warning: 1 warning emitted
+
+     Running unittests src/bin/solve.rs (/data2/build/egg-solver-target/miri-current/miri/x86_64-unknown-linux-gnu/debug/build/egg-solver/a2190e9f83d38b80/out/solve-a2190e9f83d38b80)
+warning: Miri does not support optimizations: the opt-level is ignored. The only effect of selecting a Cargo profile that enables optimizations (such as --release) is to apply its remaining settings, such as whether debug assertions and overflow checks are enabled.
+
+tests::random_scrambles: test
+
+1 test, 0 benchmarks
+warning: 1 warning emitted
+

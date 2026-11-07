@@ -1,0 +1,204 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>nxopt technique inventory (agent x-nx) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../../history/index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="x-nxopt-inventory.md">Markdown source</a> · Offline document</p><details><summary>On this page</summary><ul><li><a href="#a-search-loop">A. Search loop</a></li><li><a href="#b-pruning-table-design-and-encoding">B. Pruning table design and encoding</a></li><li><a href="#c-coordinates-cube-moves-symmetry">C. Coordinates, cube moves, symmetry</a></li><li><a href="#d-lookup-scheduling-memory-threads-compiler-i-o">D. Lookup scheduling, memory, threads, compiler, I/O</a></li><li><a href="#e-table-generation-not-on-the-solve-path">E. Table generation (not on the solve path)</a></li><li><a href="#f-brainstorm-ideas-assigned-to-x-nx-p-ideas-txt">F. Brainstorm ideas assigned to x-nx ($P/ideas.txt)</a></li><li><a href="#m-measurements-and-prototypes-x-nx">M. Measurements and prototypes (x-nx)</a></li><li><a href="#notes-why-the-mapping-holds">Notes: why the mapping holds</a></li></ul></details><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="nxopt-technique-inventory-agent-x-nx">nxopt technique inventory (agent x-nx)</h1>
+<p>Sources read in full: <code>~/ref/cube20src/nxopt.w</code> (2062 lines), <code>nxopt.md</code>, <code>makefile-nxopt</code>, <code>README.md</code>,
+<code>TODO.md</code>, <code>cubepos.w</code> (move, inverse, movepc, symmetry, canonical sequences, threading), <code>kocsymm.w</code>,
+<code>phase1prune.w</code>, <code>phase1prune2.w</code> (the last three are the two-phase solver's, but they are in the
+same source set, so their techniques are listed too).</p>
+<p>&quot;Ours&quot; cites main <strong>55e048e</strong> (<code>~/cube-opt</code>); line numbers are of that commit. Every &quot;have it&quot; was
+checked in the code, not assumed. nxopt line numbers are <code>nxopt.w</code> unless another file is named.</p>
+<p>Mapping used below (proved in the inventory notes at the end): nxopt's subgroup contains all U/D
+moves for the UD-axis table; H48's 48-symmetric subgroup H contains exactly the six half turns
+among the 18 moves. In our kernel a node branches on one side (the &quot;moved&quot; side <code>a</code>); the other
+side <code>b</code> is premultiplied by <code>m^-1</code>, so its value depends on the coset <code>H m^-1 b</code>.</p>
+<p>Verdicts: <strong>done</strong> (we have it, or something strictly stronger), <strong>gap</strong> (applies, we lack it),
+<strong>n/a</strong> (does not apply to H48 / our setting), <strong>neg</strong> (tried, measured not to pay).</p>
+<h2 id="a-search-loop">A. Search loop</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>where in nxopt</th><th>what it does</th><th>ours</th><th>applies to H48?</th><th>expected gain</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>A1</td><td>IDA* from the root heuristic</td><td><code>solve</code> 1760-1796</td><td>iterate d from <code>lookup6(root)</code> up</td><td><code>lanes.rs:472</code> (<code>target = max(ln, li, 1)</code>), <code>start_iteration</code> 553</td><td>yes</td><td>-</td><td>done</td></tr>
+<tr><td>A2</td><td>Lookups on normal and inverse position</td><td><code>lookup6</code> 1540-1568 (<code>invert_into</code> 1558)</td><td>3 probes on p, 3 on p^-1</td><td>both sides per child: <code>advance</code> 1062-1090, <code>resolve_other</code> 1116, <code>resolve_moved</code> 1143; inverse kept incrementally (<code>simd.rs:207</code> <code>premove_inv</code>) instead of inverting per node</td><td>yes</td><td>-</td><td>done (stronger: no per-node inversion)</td></tr>
+<tr><td>A3</td><td>3 axis probes per side via remaps m=0,32,16</td><td><code>lookup3</code> 1430-1479, <code>lookup(cp,m)</code> 1373-1399</td><td>the UD-axis table looked up for the UD, FB, LR axes</td><td>-</td><td><strong>no</strong>: H48 is 48-symmetric, all conjugates give the same entry</td><td>0</td><td>n/a</td></tr>
+<tr><td>A4</td><td>(x,x,x) -&gt; x+1</td><td>1476-1477, 1536-1537</td><td>all 3 axes tight: no last move possible, so +1</td><td>-</td><td><strong>no direct analog</strong>: H48 excludes only half turns (6 of 18 last moves) per tight side; the 12 quarter turns are never excluded by one probe</td><td>0</td><td>n/a</td></tr>
+<tr><td>A5</td><td>Tight probe restricts moves (<code>expandm</code>, <code>fmask</code>/<code>rfmask</code>)</td><td>825-828, 1473-1474, 1689-1695</td><td>probe == togo: that axis' moves cannot be the move at that end</td><td><code>child_node</code> 1240-1248, <code>setup_job</code> 889-897, <code>solver.rs:457-461</code> (<code>NO_HALF</code> when the other side's bound is tight)</td><td>yes (half turns only)</td><td>-</td><td>done</td></tr>
+<tr><td>A6</td><td>Restrictions carried to descendants</td><td>not done: children get <code>cs_mask</code> only (1714, 1740) and re-probe</td><td>-</td><td><code>child_node</code> 1242 <code>mm_x = node.mm_o</code> carries the other side's tight mask down while that end is untouched</td><td>yes</td><td>-</td><td>done (stronger than nxopt)</td></tr>
+<tr><td>A7</td><td>Bidirectional search: extend the end with fewer allowed moves</td><td>1693-1701 (<code>dir = popcount(rfmask) - popcount(fmask)</code>)</td><td>per node, branch on the front (movepc) or back (move) end</td><td><code>child_node</code> 1255, <code>make_node</code> 1335, <code>solver.rs:315</code></td><td>yes</td><td>-</td><td>done</td></tr>
+<tr><td>A8</td><td>Tie-break of A7 by probe sums</td><td>1697-1700</td><td>equal counts: extend the end whose fresh probes are higher</td><td><code>neg/a2-side-tiebreak</code> (count*64+bound = exactly this rule)</td><td>yes</td><td>a2: -0.07% nodes (1K); re-measured on main, 20K: -0.02% (M3)</td><td>neg</td></tr>
+<tr><td>A9</td><td>Inherit one probe from the parent (<code>skipat</code>/<code>skipval</code>)</td><td>1710-1711, 1736-1737, <code>lookup3</code> switch</td><td>the probe of the moved axis on the moved end is the parent's</td><td>X2 keeps the other side's value (<code>advance</code> 1065 <code>po = select(half, lo, tw)</code>); X and X' share it (<code>Node::tw</code> 79-87, <code>skip_xprime</code> 1099)</td><td>yes</td><td>-</td><td>done</td></tr>
+<tr><td>A10</td><td><strong>Inheritance along an axis</strong> (nxopt chains <code>skipval</code> through consecutive same-axis moves: U then D keeps the UD probe)</td><td><code>skipat</code> passed through recursive same-axis moves</td><td>value reused across two same-axis moves</td><td>no (<code>child_node</code> starts every node with <code>tw = [0xFF; 6]</code>)</td><td><strong>yes, partly</strong>: for X on even face F and Y on the opposite face, <code>H Y^-1 X^-1 b = H Y^-1 X b</code> (X2 in H, X/Y commute) and <code>H Y^-1 X2 b = H Y^-1 b</code>; so the X' child reuses the X child's face-F+1 value, and the X2 child's face-F+1 value is the node's own</td><td>measured: -2.4% lookups, nodes identical; but -5.6% to -15.6% at 1T in every kernel form (spills double)</td><td><strong>neg</strong> (<code>$P/x-nx/neg-axis-inheritance.patch</code>)</td></tr>
+<tr><td>A11</td><td>Same-face sibling pruning on a child's return value</td><td>1719-1726, 1745-1752 (<code>tt &gt; togo+1</code>)</td><td>a child &gt;= 2 over prunes its face</td><td><code>note_value</code> 1088, pop path 993-1003</td><td>yes</td><td>-</td><td>done</td></tr>
+<tr><td>A12</td><td>Return value of a subtree</td><td>1755-1758 (returns the node's own probe, or 1)</td><td>-</td><td>children's bounds back-propagated (<code>max_dec</code> 1315, pop 998): back-jumps over whole nodes</td><td>yes</td><td>-</td><td>done (stronger)</td></tr>
+<tr><td>A13</td><td>Canonical move sequences (7-state automaton, HTM)</td><td><code>cubepos.w</code> 1813-1960; <code>next_cs</code>/<code>cs_mask</code> 1712, 1738</td><td>no same face twice, opposite faces in fixed order</td><td><code>solver.rs:12-26</code> <code>ALLOWED_AFTER</code></td><td>yes</td><td>-</td><td>done</td></tr>
+<tr><td>A14</td><td>Separate canonical state per end</td><td><code>recur(fprev, rprev)</code> 1667-1668</td><td>each end has its own automaton state</td><td><code>Node::mm_o</code> (other end) + <code>allowed_after[k_face]</code> (moved end) in <code>child_node</code> 1240</td><td>yes</td><td>-</td><td>done</td></tr>
+<tr><td>A15</td><td>Leaves: check identity at togo == 0 after probing at togo == 1</td><td>1669-1682</td><td>probes at the last level too</td><td><code>advance</code> 1020-1029: r == 1 nodes try <code>mm_n &amp; mm_i</code> moves and test <code>is_solved</code>, no lookups</td><td>yes</td><td>-</td><td>done (stronger)</td></tr>
+<tr><td>A16</td><td>No probes where they cannot prune</td><td>- (nxopt always probes)</td><td>-</td><td><code>advance</code> 1020: lookups only for r1 &lt;= base+3 (2-bit codes cannot exceed base+3)</td><td>yes</td><td>-</td><td>done (ours only)</td></tr>
+<tr><td>A17</td><td>Early exit inside a side's probes</td><td><code>lookup3</code> 1436-1441</td><td>stop at the first probe &gt; togo</td><td>per child: other side first, moved side only if it passes (<code>resolve_other</code> 1116)</td><td>yes</td><td>-</td><td>done</td></tr>
+<tr><td>A18</td><td>Prefix jobs (&quot;heads&quot;, 4 moves)</td><td><code>topn</code> 1586-1666, <code>TOPSIZE</code> 1588-1591</td><td>above base+4, split the root into 4-move prefixes</td><td><code>solver.rs:156</code> <code>job_len</code> (1..4 moves above base+3), <code>lanes.rs</code> <code>extend_jobs</code> 478</td><td>yes</td><td>-</td><td>done</td></tr>
+<tr><td>A19</td><td>Order prefixes by last iteration's effort / <code>order_mult[cs]</code></td><td>1597, 1664, <code>order_mult</code> 2021-2042 (stationary count of canonical continuations)</td><td>most promising prefix first in the final iteration</td><td><code>job_weight</code> 100 (47525/58206 = the same 1.2247 ratio of continuations after an even/odd face), <code>sort_jobs</code> 116, c7/c8 per-child ordering (<code>build_first</code> 616, <code>build_rest</code> 671)</td><td>yes</td><td>-</td><td>done (stronger: 8^(16-h) statistic, per-child split)</td></tr>
+<tr><td>A20</td><td>Symmetric start (<code>-s</code>)</td><td><code>calcsymm</code> 1301-1331, 1774-1775</td><td>skip first-move faces whose children are 96-equivalent (symmetry or antisymmetry) to an earlier face's</td><td>no</td><td>yes, only for symmetric/antisymmetric inputs</td><td>0 on random states</td><td>gap, handed to x-h48 (implementing it; nxopt specifics sent via main)</td></tr>
+<tr><td>A21</td><td><code>-l</code> leftover (no U/D first move)</td><td>1783-1785</td><td>coset-search special case</td><td>-</td><td>no (coset solver feature)</td><td>-</td><td>n/a</td></tr>
+<tr><td>A22</td><td><code>-A</code> all solutions, <code>-n/-x</code> depth limits</td><td>2001-2017</td><td>features</td><td>-</td><td>not speed</td><td>-</td><td>n/a</td></tr>
+<tr><td>A23</td><td>QTM parity bound</td><td>1767-1780, <code>parity</code> 1278-1295</td><td>odd/even depth from parity</td><td>-</td><td>no (HTM)</td><td>-</td><td>n/a</td></tr>
+<tr><td>A24</td><td>Solution check</td><td><code>testit</code> 1801-1830</td><td>replay the solution</td><td>bench verifies each solution (<code>bench.rs:54</code>)</td><td>-</td><td>-</td><td>done</td></tr>
+</tbody>
+</table></div>
+<h2 id="b-pruning-table-design-and-encoding">B. Pruning table design and encoding</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>where in nxopt</th><th>what it does</th><th>ours</th><th>applies?</th><th>expected gain</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>B1</td><td>Coset tables of subgroups containing all U/D moves (12 sizes)</td><td><code>nxopt.md</code> Subgroups/Edges; 144-338</td><td>EO1-3 x EP1-4 subgroups, 20 MB..4 TB</td><td>H48 (nissy) h11: 48-sym subgroup containing half turns (<code>coord.rs</code> 1-12)</td><td>different design</td><td>H48 h11 (58 GiB): ~3.06M nodes/cube; nxopt's comparable 62 GB EO3EP2 (avg6 12.72) is weaker per byte (16-fold vs 48-fold reduction)</td><td>done (H48 chosen)</td></tr>
+<tr><td>B2</td><td>2-bit entries relative to a base</td><td>342-582 (BASE per table), lookup 1354</td><td>codes &lt;=base, +1, +2, &gt;=+3</td><td><code>solver.rs:123-138</code> <code>value</code> (base 10)</td><td>yes</td><td>-</td><td>done</td></tr>
+<tr><td>B3</td><td>Base chosen empirically per table (&quot;yes; 10% faster than 10&quot;)</td><td>393</td><td>base tuned by timing</td><td>base 10 inherited from nissy/cube48opt</td><td>yes</td><td>simulated (M2): base 11 +38% nodes (x-h48 exact: +10.2%), base 9 +268%</td><td>done (10 is best)</td></tr>
+<tr><td>B4</td><td>4-bit group minimum interleaved in the same 16 bytes</td><td><code>nxopt.md</code> Edges; 697-700, 1359-1360</td><td>fallback bound for code 0, same cache line</td><td><code>value</code> 123-138 (<code>*p.add(w &amp; !1) &amp; 15</code>), slots 64k/64k+1 reserved (<code>coord.rs:60-78</code>)</td><td>yes</td><td>-</td><td>done</td></tr>
+<tr><td>B5</td><td>495 -&gt; 512 packing to make room for the minimum</td><td><code>epadd</code> 604, test 776</td><td>2 free slots per 64</td><td><code>coord.rs:60-78</code> <code>mk_eslot</code></td><td>yes</td><td>-</td><td>done</td></tr>
+<tr><td>B6</td><td>E-slice occupancy (495) as least significant index part</td><td><code>nxopt.md</code></td><td>cheap packing</td><td>same layout (<code>coord.rs:11-12</code>)</td><td>yes</td><td>-</td><td>done</td></tr>
+<tr><td>B7</td><td>Symmetry reduction (16, UD axis) with approximate canonical form (self-symmetric corner classes stored redundantly)</td><td><code>initmem</code> 701-760, <code>firstlevs</code>/<code>mind</code> 42-49</td><td>9930 corner rows</td><td>48-fold, 3393 cocsep classes, redundant entries for self-symmetric classes (<code>tables.rs</code> <code>Cocsep::generate</code>)</td><td>yes</td><td>-</td><td>done (stronger)</td></tr>
+<tr><td>B8</td><td>Corner-only bound</td><td>via the 4-bit min only</td><td>-</td><td>cocsep depth <code>cd</code> precheck before the big lookup (<code>solver.rs:115-120</code>, <code>lanes.rs:1068</code>) and <code>max(min, cd)</code> for code 0</td><td>yes</td><td>-</td><td>done (ours only)</td></tr>
+<tr><td>B9</td><td>Branchless code-0 fallback (<code>NOBRANCH</code>)</td><td>1355-1358</td><td>mask select</td><td><code>neg/m6-value-branchless</code></td><td>yes</td><td>measured negative</td><td>neg</td></tr>
+<tr><td>B10</td><td>Next-move masks in the entry (phase1prune)</td><td><code>phase1prune.w</code> 252-306, 412-467</td><td>per entry, which moves decrease/keep/increase the distance (4 bits/face), so children need no probe</td><td>-</td><td>in principle (moved side only: <code>H a m</code> is a function of <code>H a</code>; the other side's child coset is not), but 24+ bits/entry = 13x the h11 table</td><td>memory: impossible at h11; a smaller table with masks loses far more pruning than it saves</td><td>n/a (memory)</td></tr>
+<tr><td>B11</td><td>Forced-move chains (phase1prune2)</td><td><code>phase1prune2.w</code> 679-890</td><td>encode unique descent paths in spare bits</td><td>-</td><td>no spare bits in 2-bit entries</td><td>-</td><td>n/a</td></tr>
+<tr><td>B12</td><td>Table file header (magic, metric, base) and size check</td><td><code>writetab</code>/<code>readtab</code> 993-1009, 1185-1219</td><td>-</td><td><code>tables.rs</code> meta files, size and meta validation (r7)</td><td>yes</td><td>-</td><td>done</td></tr>
+<tr><td>B13</td><td>Table checksum (phase1prune <code>datahash</code>)</td><td><code>phase1prune.w</code> 129-145</td><td>integrity</td><td>size/meta validation only; r7's cross-check tools</td><td>marginal</td><td>-</td><td>done enough</td></tr>
+</tbody>
+</table></div>
+<h2 id="c-coordinates-cube-moves-symmetry">C. Coordinates, cube moves, symmetry</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>where in nxopt</th><th>what it does</th><th>ours</th><th>applies?</th><th>gain</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>C1</td><td>Additive per-cubie tables (<code>fastcornercoords</code>, <code>fastedges</code>)</td><td>58-102, 129-338, <code>getedgecoord</code> 583-606</td><td>sum of 8/12 table entries gives all coordinate fields at once</td><td>AVX2 shuffles + movemask + pext (<code>coord.rs</code> <code>cocsep3</code>, <code>edge_parts_sym_raw</code>, <code>index_sym</code>)</td><td>-</td><td>ours fewer µops (m4/m6 rounds)</td><td>done (different, faster)</td></tr>
+<tr><td>C2</td><td>Symmetry composed into the coordinate tables (<code>fastedges[mm[m][m2]]</code>)</td><td>681-692, 1379</td><td>one pass for remap + canonicalizing symmetry</td><td><code>edge_parts_sym_raw</code>: the conjugate's edge classes built with 2 shuffles from <code>sym_edge[t]</code></td><td>yes</td><td>-</td><td>done</td></tr>
+<tr><td>C3</td><td>Move by 24-entry transition table per move, unrolled</td><td><code>cubepos.w</code> 519-540</td><td>branch-free move</td><td>AVX-512/AVX2 <code>apply_move</code> (<code>simd.rs:195</code>)</td><td>yes</td><td>-</td><td>done (SIMD)</td></tr>
+<tr><td>C4</td><td><code>movepc</code>: move as premultiplication on slot-&gt;cubie form</td><td><code>cubepos.w</code> 889-1075</td><td>the &quot;front&quot; end of bidirectional search</td><td><code>premove_inv</code> (<code>simd.rs:207</code>): compose with a table cube</td><td>yes</td><td>-</td><td>done</td></tr>
+<tr><td>C5</td><td>Inverse by scatter</td><td><code>cubepos.w</code> 837-887</td><td>per node (1558)</td><td>only at the root (<code>simd.rs:225</code>); maintained incrementally afterwards</td><td>yes</td><td>-</td><td>done (stronger)</td></tr>
+<tr><td>C6</td><td>canon_into48/96 with early exit</td><td><code>cubepos.w</code> 1709-1811</td><td>symmetry canonicalization</td><td>only needed for A20 (<code>cubie.rs</code> has <code>symmetries</code>/<code>conjugate</code>)</td><td>for A20</td><td>-</td><td>(part of A20)</td></tr>
+<tr><td>C7</td><td>kocsymm move tables / 16-way canon with <code>minbits</code>/<code>minmap</code> fast path</td><td><code>kocsymm.w</code> 128-510</td><td>two-phase coordinates</td><td>cocsep packed entry gives class, symmetry, depth in one 3-byte load</td><td>-</td><td>-</td><td>done (analog)</td></tr>
+</tbody>
+</table></div>
+<h2 id="d-lookup-scheduling-memory-threads-compiler-i-o">D. Lookup scheduling, memory, threads, compiler, I/O</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>where in nxopt</th><th>what it does</th><th>ours</th><th>applies?</th><th>gain</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>D1</td><td>Prefetch a side's probes before resolving them</td><td><code>lookup3_prefetch</code> 1480-1539, <code>lookup_prefetch</code> 1408-1429</td><td>2-3 misses overlapped per node</td><td>24 lanes per thread, one miss in flight each (<code>run_lanes</code> 1408)</td><td>yes</td><td>-</td><td>done (far deeper MLP)</td></tr>
+<tr><td>D2</td><td>Prefetch hint (T0 default; T1 on Windows)</td><td>892-897</td><td>-</td><td>NTA (<code>solver.rs:141-146</code>); T0/T1 measured -1% (<code>neg/m6-prefetch-t0-t1</code>)</td><td>yes</td><td>-</td><td>done</td></tr>
+<tr><td>D3</td><td>Table memory: one malloc per corner row</td><td>749</td><td>-</td><td>one mapping on 1 GiB hugetlbfs pages (<code>tables.rs:234-290</code>)</td><td>-</td><td>TLB</td><td>done (stronger)</td></tr>
+<tr><td>D4</td><td>Threads: one cube per thread, no per-cube parallelism</td><td><code>dowork</code> 1836-1884, 2051-2058</td><td>-</td><td>stream lanes + share mode for latency (<code>lanes/share.rs</code>)</td><td>-</td><td>-</td><td>done (stronger)</td></tr>
+<tr><td>D5</td><td>Worker padding against false sharing</td><td><code>int buf[64]</code> 1885</td><td>-</td><td>lanes are thread-local <code>Vec&lt;Lane&gt;</code>; shared state is one atomic counter</td><td>yes</td><td>-</td><td>done</td></tr>
+<tr><td>D6</td><td>Global mutex for work handout and ordered output</td><td><code>getwork</code> 1929, <code>report</code> 1253-1277</td><td>-</td><td>atomic counter; bench records under a mutex once per cube</td><td>-</td><td>-</td><td>done</td></tr>
+<tr><td>D7</td><td><code>-O3 -march=native</code>, <code>-DHALF</code> compile-time metric</td><td>makefile-nxopt</td><td>-</td><td><code>target-cpu=native</code>, fat LTO, cgu=1 (Cargo.toml); flag sweeps negative (<code>neg/a7-*</code>)</td><td>yes</td><td>-</td><td>done</td></tr>
+<tr><td>D8</td><td>Input: stdin positions (Singmaster or moves) or random walk</td><td><code>parseposition</code> 1887-1921, <code>getwork</code> 1929-1944</td><td>-</td><td><code>solve</code> CLI, <code>bench</code> random/stream/file</td><td>-</td><td>-</td><td>done</td></tr>
+</tbody>
+</table></div>
+<h2 id="e-table-generation-not-on-the-solve-path">E. Table generation (not on the solve path)</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>technique</th><th>where in nxopt</th><th>what it does</th><th>ours</th><th>applies?</th><th>gain</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>E1</td><td>Affine GF(2) EO move tables (<code>emove</code>/<code>emap</code>: base ^ per-bit xor, deduplicated)</td><td>839-891</td><td>move a whole EO row with xors</td><td><code>gen.rs</code> decodes/encodes cubes per entry</td><td>yes</td><td>generation time only</td><td>n/a for solve speed</td></tr>
+<tr><td>E2</td><td>Prefetch ring during generation (PS=16)</td><td>900-992</td><td>MLP in BFS</td><td><code>gen.rs</code> prefetches in <code>backward_chunk</code> (232)</td><td>yes</td><td>gen only</td><td>done</td></tr>
+<tr><td>E3</td><td>mod-3 depth codes during BFS, then rebase to 2-bit codes</td><td>1139-1163</td><td>2 bits per entry during the BFS</td><td><code>gen.rs</code> 2-bit BFS states (unvisited/new/frontier/old) then final codes</td><td>yes</td><td>gen only</td><td>done (analog)</td></tr>
+<tr><td>E4</td><td>Lock-free row parallelism with neighbour locks, shuffled row order</td><td><code>getgenwork</code> 1050-1087, shuffle 1041</td><td>-</td><td>atomics per word (<code>gen.rs</code> <code>mark_new</code>, <code>lower_nibble</code>)</td><td>yes</td><td>gen only</td><td>done (analog)</td></tr>
+<tr><td>E5</td><td>Group minimum maintained in the same pass</td><td>950-954</td><td>-</td><td><code>lower_nibble</code> (<code>gen.rs:49</code>)</td><td>yes</td><td>-</td><td>done</td></tr>
+<tr><td>E6</td><td>TESTTABLE: average probe value statistics</td><td>1837-1864</td><td>table quality metric</td><td>- (node counts used instead)</td><td>diagnostic</td><td>-</td><td>n/a</td></tr>
+</tbody>
+</table></div>
+<h2 id="f-brainstorm-ideas-assigned-to-x-nx-p-ideas-txt">F. Brainstorm ideas assigned to x-nx (<code>$P/ideas.txt</code>)</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>idea</th><th>ours</th><th>measurement</th><th>verdict</th></tr>
+</thead>
+<tbody>
+<tr><td>5.2</td><td>BPMX / pathmax, full early return on both sides</td><td>in-tree: <code>note_value</code> (lanes.rs:1088) on both sides and on the corner depth, learned bounds at pop, <code>lb &gt; r</code> early return (lanes.rs:950)</td><td>job-level pathmax (the only open case): 0 skippable jobs on random:1000:2026 (M4)</td><td>done</td></tr>
+<tr><td>5.4</td><td>Canonical sequences beyond commuting order (DFA)</td><td>commuting order only</td><td>perfect duplicate elimination is capped at 0.48% of nodes, 0.0035% within jobs (M5)</td><td>not applicable (&lt; 1%)</td></tr>
+<tr><td>3.6</td><td>Small exact in-cache table</td><td>cocsep depth precheck</td><td>(class, eo11) projection of h11, 3.5 MB: prunes 0.16% of lookups (M6)</td><td>neg</td></tr>
+<tr><td>B3 / nxopt</td><td>Empirical base</td><td>base 10</td><td>base 11 +38% / 9 +268% nodes (M2)</td><td>done (10)</td></tr>
+</tbody>
+</table></div>
+<h2 id="m-measurements-and-prototypes-x-nx">M. Measurements and prototypes (x-nx)</h2>
+<p>All counts: <code>count.sh</code> (8 threads, deterministic), lengths identical unless noted.</p>
+<p><strong>M1, A10 axis inheritance</strong> (nodes identical by construction; lookups):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>set</th><th>main 55e048e lookups/cube</th><th>axis (v2) lookups/cube</th><th>change</th></tr>
+</thead>
+<tbody>
+<tr><td>random:1000:2026</td><td>2588380</td><td>2526492</td><td>-2.39% (v1 with root relays: -2.72%)</td></tr>
+<tr><td>random:20000:99</td><td>2607693</td><td>2545909</td><td>-2.37%</td></tr>
+</tbody>
+</table></div>
+<p>nodes/cube 3058198 / 3080725 unchanged; 59.6% of inherited values prune. Throughput, 1T paired, 3 pairs:
+v1 -14.7%, v2 -11.7%, v2a -8.4%, v2b -7.5%, consumer only -5.6%, pop relay only -1.8%,
+v3 (known flag in <code>skip</code> bits) -15.6/-15.0%. <code>stream_thread</code> spill references: 157 (main), 189
+(consumer only), 316 (v2), 319 (v3). The ceiling (~2.4% of lookups) is below the cost of every
+form. Negative.</p>
+<p><strong>M2, B3 base</strong> (simulated from the base-10 table on random:1000:2026; x-h48's exact base-11 emulation: +10.2% nodes):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>base</th><th>rule</th><th>nodes/cube</th><th>lookups/cube</th></tr>
+</thead>
+<tbody>
+<tr><td>10 (main)</td><td>-</td><td>3058198</td><td>2588380</td></tr>
+<tr><td>11</td><td>exact 11 -&gt; max(group min, corner depth); &gt;= 14 not representable (pessimistic)</td><td>4233702 (+38%)</td><td>3700617 (+43%)</td></tr>
+<tr><td>9</td><td>13 -&gt; 12; exact 10 stays code 0 (pessimistic)</td><td>11241867 (+268%)</td><td>7451042</td></tr>
+</tbody>
+</table></div>
+<p>The 4-bit group minimum is the true minimum of its 62 entries and does not depend on the base.
+Re-basing only changes which exact values fall into code 0 and get replaced by max(min, cd), which
+for an 11 is usually 9-10. Free encoding idea (only with a regenerated table, tiny gain): effective
+base = max(base, group min), so groups with min &gt;= 11 get exact 11/12/13 and &gt;= 14.</p>
+<p><strong>M3, A8 tie-break by bounds</strong> (nxopt's rule, count*64 + bound): random:20000:99 nodes 3080725 -&gt; 3080063
+(-0.02%), lookups -0.02%. Neutral, as a2 found.</p>
+<p><strong>M4, 5.2 BPMX / pathmax.</strong> In-tree upward BPMX is complete. Every child value on either side, and
+the corner depth too, raises the node bound (<code>note_value</code>: <code>lb = max(lb, v - 1)</code>, the face is dropped
+if v &gt; r). Exhausted children return their learned bound (pop path). The node returns as soon as
+<code>lb &gt; r</code> (top of <code>advance</code>), on both sides. Downward pathmax cannot prune in fixed-threshold IDA*,
+since the parent passed, so <code>parent - 1 &lt;= r - 1</code>. It cannot restrict half turns either: that needs
+the side's own coset value. Job-level pathmax was the only open case, because jobs are extended
+whatever their parents' bounds. Measured with path bound = max over prefixes of (bound - distance):
+0 jobs skippable on random:1000:2026, although 53 per cube drop by &gt;= 2 on the inverse side.</p>
+<p><strong>M5, 5.4 duplicates beyond commuting order</strong> (reference solver, random:200:2026, every generated
+node hashed with its remaining depth; a node is a duplicate if the same position was generated
+before with at least as many moves left):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>depth from root</th><th>nodes</th><th>within the job</th><th>within the iteration (any job)</th></tr>
+</thead>
+<tbody>
+<tr><td>5</td><td>102.6M</td><td>0</td><td>0.21%</td></tr>
+<tr><td>6</td><td>302.7M</td><td>0.000%</td><td>0.42%</td></tr>
+<tr><td>7</td><td>371.5M</td><td>0.000%</td><td>0.55%</td></tr>
+<tr><td>8</td><td>137.6M</td><td>0.003%</td><td>0.62%</td></tr>
+<tr><td>9</td><td>29.1M</td><td>0.043%</td><td>0.57%</td></tr>
+<tr><td>10</td><td>4.3M</td><td>0.114%</td><td>0.53%</td></tr>
+<tr><td>all (957M)</td><td></td><td><strong>0.0035%</strong></td><td><strong>0.48%</strong></td></tr>
+</tbody>
+</table></div>
+<p>Perfect duplicate elimination saves at most 0.48% of nodes, and inside jobs 0.0035%. A DFA cannot
+reach the 1% bar. twsearch's <code>--newcanon</code> is not in <code>~/ref/twsearch</code> (Rust port only:
+<code>canonical_fsm.rs</code> builds the commuting-class FSM, the same as ours).</p>
+<p><strong>M6, 3.6 small in-cache table.</strong> Candidate: the exact projection of h11, min over (msplit, eslot)
+per (cocsep class, eo11), 3393 x 2048 = 6.9M entries (3.5 MB at 4 bits), built from the group
+minima. Values: 8: 28%, 9: 62%, 10: 6.6%, max 11. On random:1000:2026 it would prune 0.16% of the
+h11 lookups before the DRAM access. Lookups happen at r1 = 11 (53%), 12 (30%), 10 (12%), where
+only values &gt;= 11..13 prune, and no cache-sized coset space reaches those distances. Negative.</p>
+<h2 id="notes-why-the-mapping-holds">Notes: why the mapping holds</h2>
+<ul>
+<li>Kernel conventions (<code>simd.rs</code>): a child moves <code>a -&gt; a m</code> and <code>b -&gt; m^-1 b</code>. The other side's value
+only depends on <code>H m^-1 b</code> (H contains the half turns): X2 keeps it, X and X' share it.</li>
+<li>nxopt's <code>skipval</code> chains: a U move then a D move keeps the UD-axis probe on that end because both
+are in nxopt's subgroup. In H48 only half turns are in H, but X (face F) and Y (opposite face)
+commute, so <code>Y^-1 X b = X Y^-1 b = X2 (X^-1 Y^-1 b)</code>: the same coset as <code>Y^-1 X^-1 b</code>. Two-move
+sequences on one axis therefore share the other side's value in 3 classes (quarter-quarter,
+quarter-half = the X child's own, half-quarter = the node's own Y child). Moves on other axes do
+not commute with X2, so nothing else is shared; and the moved side's cosets <code>H a m</code> share nothing.</li>
+<li>A4 has no analog: a tight H48 probe forbids only the 6 half turns at its end; nothing forbids the
+quarter turns without probing the children.</li>
+</ul>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

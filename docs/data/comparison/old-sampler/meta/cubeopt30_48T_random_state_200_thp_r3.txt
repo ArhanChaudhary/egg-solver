@@ -1,0 +1,14 @@
+status 0
+run cubeopt30 48 random_state 200 thp shipped 3
+pagemode none arena 0 only -
+start 2026-11-05 04:55:28
+wall_s 68.42
+cpu_s 1953.33 209.01
+maxrss_kb 2667308
+gate_wait_s 0
+ext_cores 0.2
+pages 2671436 2671436 2667708 2543616 0 764307 cubeopt30
+free_1g_pages 0 0
+memfree_gib_at_start 14.0
+table /data2/competitors/cube48opt/nxprun30.dat 2603089920
+thp always [madvise] never defrag always defer defer+madvise [madvise] never

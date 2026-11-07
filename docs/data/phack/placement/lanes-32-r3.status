@@ -1,0 +1,60 @@
+Name:	ld-linux-x86-64
+Umask:	0022
+State:	S (sleeping)
+Tgid:	3994840
+Ngid:	0
+Pid:	3994840
+PPid:	3994834
+TracerPid:	0
+Uid:	1004	1004	1004	1004
+Gid:	1004	1004	1004	1004
+FDSize:	256
+Groups:	100 1004 
+NStgid:	3994840
+NSpid:	3994840
+NSpgid:	3994834
+NSsid:	3994834
+VmPeak:	 3054304 kB
+VmSize:	 3054136 kB
+VmLck:	       0 kB
+VmPin:	       0 kB
+VmHWM:	 1984952 kB
+VmRSS:	 1984952 kB
+RssAnon:	 1981668 kB
+RssFile:	    3284 kB
+RssShmem:	       0 kB
+VmData:	 2018148 kB
+VmStk:	     136 kB
+VmExe:	     172 kB
+VmLib:	    2840 kB
+VmPTE:	    4056 kB
+VmSwap:	       0 kB
+HugetlbPages:	       0 kB
+CoreDumping:	0
+THP_enabled:	1
+untag_mask:	0xffffffffffffffff
+Threads:	2
+SigQ:	0/127287
+SigPnd:	0000000000000000
+ShdPnd:	0000000000000000
+SigBlk:	0000000008000000
+SigIgn:	0000000000001000
+SigCgt:	0000000100000440
+CapInh:	0000000000000000
+CapPrm:	0000000000000000
+CapEff:	0000000000000000
+CapBnd:	000001ffffffffff
+CapAmb:	0000000000000000
+NoNewPrivs:	0
+Seccomp:	0
+Seccomp_filters:	0
+Speculation_Store_Bypass:	thread vulnerable
+SpeculationIndirectBranch:	conditional enabled
+Cpus_allowed:	000002
+Cpus_allowed_list:	1
+Mems_allowed:	00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000000,00000003
+Mems_allowed_list:	0-1
+voluntary_ctxt_switches:	5
+nonvoluntary_ctxt_switches:	5
+x86_Thread_features:	
+x86_Thread_features_locked:	

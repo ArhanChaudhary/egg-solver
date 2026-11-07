@@ -1,0 +1,182 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>an1: inline gain-comment audit of main 18c4a66 — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../../history/index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="an1-annotation-audit.md">Markdown source</a> · Offline document</p><details><summary>On this page</summary><ul><li><a href="#stream-kernel-index-path-tables-early-history-to-m8">Stream kernel, index path, tables (early history to m8)</a></li><li><a href="#share-mode-batch-and-latency">Share mode (batch and latency)</a></li><li><a href="#generation-laptop-wasm-scripts-cold-paths">Generation, laptop, wasm, scripts, cold paths</a></li><li><a href="#numbers-not-found-and-caveats">Numbers not found, and caveats</a></li><li><a href="#counts">Counts</a></li><li><a href="#checks-comments-only">Checks (comments only)</a></li></ul></details><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="an1-inline-gain-comment-audit-of-main-18c4a66">an1: inline gain-comment audit of main 18c4a66</h1>
+<p>Patch: <code>$P/an1-annotations.patch</code> (one commit, 53fdbf1, on 18c4a66; comments
+only: 9 files, +51/-34 lines).</p>
+<p>Source of every number: the commit and merge messages of <code>git log main</code>
+(first-parent merges and every merge's second-parent commits) and
+<code>git notes</code>; <code>neg/*</code> ignored. No number is new: each one below is quoted
+or computed from a before/after pair in the named commit. Basis labels:
+<strong>48T</strong> / <strong>1T</strong> = <code>bench stream</code> (20 30 48 L / 10 60 1 L), <strong>batch</strong> =
+old <code>bench.sh</code> 1000-cube wall clock, <strong>thr</strong> = steady-state throughput of
+the early benches, <strong>nodes</strong> = nodes/cube (random:1000:2026 unless named),
+<strong>-c 1</strong> / <strong>-c 0</strong> = <code>solve</code> latency / random_state batch at 48T (ms/cube),
+<strong>bench share</strong> = <code>bench random:1000:2026 ... share</code> (solves/s).</p>
+<p>Status: <strong>ok</strong> = an inline comment with the right number and basis was
+already there; <strong>added</strong> = new comment (or a number added to a comment
+that had none); <strong>fixed</strong> = number, basis or wording corrected;
+<strong>skipped</strong> = not annotated, with the reason.</p>
+<p>Counts: see the end.</p>
+<h2 id="stream-kernel-index-path-tables-early-history-to-m8">Stream kernel, index path, tables (early history to m8)</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>change</th><th>commit (merge)</th><th>measured gain, basis</th><th>code site now</th><th>status</th></tr>
+</thead>
+<tbody>
+<tr><td>1</td><td>cube48opt table layout (E-slice innermost, 16-byte groups, group minimum)</td><td>9090310 (046c33f)</td><td>neutral at h11 (48T batch 143.4 -&gt; 144.5); h0 -71% nodes (72.0M -&gt; 21.1M)</td><td>tables.rs, H48 header comment</td><td>ok</td></tr>
+<tr><td>2</td><td>final-iteration job ordering</td><td>9f9a4d3 (7bce67d)</td><td>-36% nodes, +46% 48T batch</td><td>solver.rs module doc</td><td>ok</td></tr>
+<tr><td>3</td><td>sibling-face pruning + back-jumps</td><td>0c48355 (2271355)</td><td>-17.7% nodes, +7.5% thr</td><td>solver.rs <code>search</code> doc; lanes.rs <code>advance</code> back-jump (&quot;see Solver::search&quot;)</td><td>ok</td></tr>
+<tr><td>4</td><td>job-root bounds once per job, batched prefetch</td><td>c52cb63 (31c2878)</td><td>+2.4% thr, +1.8% 48T batch</td><td>solver.rs <code>job_bounds</code></td><td>ok</td></tr>
+<tr><td>5</td><td>lane-interleaved explicit-stack search</td><td>2bb148d (a0681ad)</td><td>+57% 48T (276.9 -&gt; 434.7)</td><td>lanes.rs module doc</td><td>ok</td></tr>
+<tr><td>6</td><td>X/X' share the other-side lookup (twin values)</td><td>0b65adf (d2674d5)</td><td>-29% lookups, +10% 48T</td><td>lanes.rs <code>Node::twin_values</code></td><td>ok</td></tr>
+<tr><td>7</td><td>job statistic 8^(16-h)</td><td>aa43192 (d63535b)</td><td>-2.1% nodes, +2.8% 48T</td><td>lanes.rs <code>STAT_TERMS</code></td><td>ok</td></tr>
+<tr><td>8</td><td>single-pass round-robin scheduler</td><td>5cea944 (59ce145)</td><td>+15.9% 48T (32 lanes 3-phase -&gt; 16 lanes)</td><td>lanes.rs <code>run_lanes</code></td><td>ok</td></tr>
+<tr><td>9</td><td>edge-only symmetry conjugation</td><td>42a7c98 (ae4fc49)</td><td>+5.5% 48T</td><td>coord.rs <code>edge_key_sym</code></td><td>ok</td></tr>
+<tr><td>10</td><td>packed 3-byte cocsep on a huge page + direct index</td><td>f99ebc4 (3957bbc)</td><td>+2.8% 48T (stack of 2)</td><td>tables.rs <code>Cocsep::packed</code>; coord.rs <code>index_sym</code></td><td>ok</td></tr>
+<tr><td>11</td><td>NTA prefetch of table lines</td><td>ebd6c20 (5b0f6ab)</td><td>+2.6% 48T</td><td>solver.rs <code>prefetch</code>, tables.rs <code>prefetch</code>, prefetch.rs <code>read_once</code></td><td>ok</td></tr>
+<tr><td>12</td><td>m1-micro: CO tables x70, asm vpmovmskb, compose without mask, move orient term, cached table pointer</td><td>e9d751e (6d265dd)</td><td>+2.2% 48T (stack of 4)</td><td>coord.rs <code>CO_LOW</code>, <code>edge_parts_sym_raw</code>; simd.rs <code>compose</code>, <code>apply_move_unchecked</code>; solver.rs <code>table_ptr</code></td><td>ok</td></tr>
+<tr><td>13</td><td>m2-jobs: radix sort, X-only inverse lookups in extension, job prefetch</td><td>d708f1c (814ae96)</td><td>+4.3% 48T (stack)</td><td>lanes.rs <code>sort_jobs</code>, <code>extend_jobs</code>, <code>setup_job</code></td><td>ok</td></tr>
+<tr><td>13a</td><td>branchless face weight (m2-jobs) + masked index (m8)</td><td>d708f1c, 33a8042</td><td>part of m2-jobs' +4.3% 48T</td><td>lanes.rs <code>job_weight</code></td><td>added</td></tr>
+<tr><td>14</td><td>no bounds checks in the lane loop</td><td>042f13c (fe58740)</td><td>+1.1% 48T</td><td>lanes.rs <code>advance</code> SAFETY block</td><td>ok</td></tr>
+<tr><td>15</td><td>skip-sibling: eager face pruning, X' skip mask, branch-free child setup</td><td>7a173a1 (b90b706)</td><td>+13.6% 48T (stack of 3)</td><td>lanes.rs module doc, <code>advance</code>; simd.rs <code>select</code></td><td>ok</td></tr>
+<tr><td>16</td><td>m3-hht: pending value before dispatch, select of the twin value, one static for hot tables</td><td>8b2cf71 (70567ff)</td><td>+3.5% 48T (stack of 3)</td><td>lanes.rs <code>pending_value</code>, <code>advance</code>; simd.rs <code>HotTables</code></td><td>ok</td></tr>
+<tr><td>17</td><td>20 lanes</td><td>18ef7f0 (ff2b7a4)</td><td>+2.9% 48T</td><td>superseded by 24 lanes (#22)</td><td>skipped: superseded</td></tr>
+<tr><td>18</td><td>m4-micro: lane-loop, node-roles, rare-check, heur-pair, index-pext, resolve-face, phase-encoding</td><td>35c608c</td><td>+7.7% 48T, +6.4% 1T (note); per patch +1.9 / +0.5 / +1.1 / ~0 / +1.7 / +1.2 / +1.7%</td><td>lanes.rs <code>run_lanes</code>, <code>Node</code>, rare-kind test, <code>STAT_PAIRS</code>, <code>pending_face</code>, <code>Phase</code>; coord.rs <code>corner_fields</code></td><td>ok</td></tr>
+<tr><td>19</td><td>p5: loop state in registers</td><td>431e46a (9caf0e2)</td><td>+2.7% 48T, +1.8% 1T</td><td>lanes.rs <code>advance</code> doc</td><td>ok</td></tr>
+<tr><td>19a</td><td>p5: nodes counted in a local; no Idle phase</td><td>68dfaf6, ee18653</td><td>part of p5's +3.2% 48T, +1.6% 1T</td><td>lanes.rs <code>advance</code>, <code>advance_cold</code></td><td>ok</td></tr>
+<tr><td>19b</td><td>p5: push_advance from registers</td><td>236bf33</td><td>alone within noise; against the stack without it +0.9% 1T, +0.6% 48T</td><td>lanes.rs <code>push_advance</code></td><td>fixed: said &quot;within noise when measured: +0.9% ...&quot;; now says the number is a stack ablation</td></tr>
+<tr><td>20</td><td>m6 nofmax</td><td>ecd311e (cb8cb70)</td><td>+2.6% 48T, +1.0% 1T</td><td>lanes.rs <code>note_value</code> doc</td><td>ok</td></tr>
+<tr><td>20a</td><td>m6 tabs (small tables in HOT_TABLES, face cut as a <code>face_keep</code> select)</td><td>26b4f4c</td><td>+1.4% 1T, -0.1% 48T (whole patch)</td><td>lanes.rs <code>note_value</code> doc</td><td>fixed: the patch's number was given to the select alone, 48T missing</td></tr>
+<tr><td>20b</td><td>m6 index (cached packed pointer, x3 tables, row_mul / eo_mask)</td><td>85e9c79</td><td>+0.7% 1T, -0.4% 48T</td><td>solver.rs <code>row_mul</code>; coord.rs <code>cocsep_x3</code>, <code>index_sym</code></td><td>ok</td></tr>
+<tr><td>20c</td><td>m6 skipcount (exhaustion test on <code>live</code>)</td><td>621b70a</td><td>+1.0..1.3% 1T (48T +0.6% paired check)</td><td>lanes.rs <code>advance</code>, <code>live == 0</code></td><td>added, &quot;since reworked&quot; (m7 replaced its bzhi count)</td></tr>
+<tr><td>20d</td><td>m6 childnode</td><td>d2a3c2e</td><td>+0.3% 1T, &quot;neutral&quot; per merge</td><td>lanes.rs <code>child_node</code></td><td>ok</td></tr>
+<tr><td>20e</td><td>m6 resolve (twin stored only when X passes, signed max, solved test at bound 0)</td><td>82b291e</td><td>+4.6% 48T, +0.9% 1T</td><td>lanes.rs <code>resolve_other</code>, <code>max_child_bound</code>, <code>resolve_moved</code></td><td>ok</td></tr>
+<tr><td>21</td><td>c7: (job, root child) pairs ordered across jobs</td><td>21e3ca9 (26af596)</td><td>-6..-8% nodes, +4.4% 1T, +0.5% 48T (merge)</td><td>lanes.rs <code>start_iteration</code></td><td>ok</td></tr>
+<tr><td>21a</td><td>c7: +1 code step on faces 1, 3, 5</td><td>21e3ca9</td><td>-0.6% nodes</td><td>lanes.rs <code>quantize18</code></td><td>ok</td></tr>
+<tr><td>21b</td><td>c7: tree sum of the child statistics</td><td>21e3ca9</td><td>a sequential sum took 2% of the samples (profile; no A/B)</td><td>lanes.rs <code>sum18</code></td><td>added</td></tr>
+<tr><td>21c</td><td>c7: whole run's ChildOrder written without reading it</td><td>21e3ca9</td><td>reading it took 2-3% of the samples (profile)</td><td>lanes.rs <code>finish_run</code></td><td>added</td></tr>
+<tr><td>21d</td><td>c7: cold <code>next_run</code>, job prefetch in <code>setup_run</code>, normal-side roots</td><td>21e3ca9</td><td>part of c7, not measured separately</td><td>lanes.rs <code>next_run</code>, <code>setup_run</code>, <code>setup_job</code></td><td>ok</td></tr>
+<tr><td>21e</td><td>c7: run state boxed, off the lane's hot lines</td><td>21e3ca9</td><td>part of c7, not measured separately</td><td>lanes.rs <code>Lane::run_state</code></td><td>added (attribution)</td></tr>
+<tr><td>22</td><td>24 lanes per thread</td><td>0b35690</td><td>+3.3% 48T, +9.7% 1T vs 20 (on c7: +2.2%, +6.0%)</td><td>lanes.rs <code>DEFAULT_LANES</code></td><td>ok</td></tr>
+<tr><td>23</td><td>c8: unseen-child code + rest by best code</td><td>abce87c</td><td>-1.0% nodes (each ~-0.5%), +0.6% 48T, 1T within noise</td><td>lanes.rs <code>finish_run</code>, <code>build_rest</code> (doc and inline)</td><td>fixed: commit name and basis added; the doc's &quot;measured 0.5% fewer nodes&quot; reworded</td></tr>
+<tr><td>24</td><td>s8 get_unchecked at the index; <code>resolve_other</code> keeps its hint</td><td>b608890 (c9a1c4d)</td><td>1T layout-averaged neutral; get_unchecked in resolve_other -1.6% share 1T</td><td>lanes.rs <code>resolve_other</code> (the negative is documented)</td><td>ok</td></tr>
+<tr><td>25</td><td>m7 µop stack: lazy child cube, blsmsk count, move tables, early stores, vpternlog fold</td><td>f8a4919</td><td>+1.5% 1T averaged over code offsets (+1.53% median, 12 pairs), 48T even</td><td>lanes.rs <code>advance</code> (5 sites); coord.rs <code>edge_parts_sym_raw</code></td><td>ok</td></tr>
+<tr><td>26</td><td>m8 unsafe pass (unchecked move tables, run and job paths)</td><td>33a8042 (7608a28)</td><td>alone on 857a0c6: +1.5% 1T, +0.4% 48T; with 95cbb11 on def2cd0: +3.2% 1T, +1.3% 48T, -3.3% instructions/node</td><td>lanes.rs <code>advance</code> SAFETY block</td><td>fixed: the two-commit numbers were given as the unsafe pass's; both now, with their bases</td></tr>
+<tr><td>27</td><td>HOT_TABLES aligned to 4 KiB</td><td>a546429</td><td>neutral (+0.2% 1T, +0.4% 48T), layout pin</td><td>simd.rs <code>HotTables</code> (&quot;neutral on its own&quot;)</td><td>ok</td></tr>
+<tr><td>28</td><td>hot-loop placement (pads)</td><td>1c31eca</td><td>not a speedup (pins the layout); share pad 0 by 1T share +1.7 +0.1 +0.0%</td><td>hot.rs module doc, <code>SHARE_PAD</code></td><td>ok</td></tr>
+<tr><td>28a</td><td>stream pad 16 kept by m8's sweep</td><td>95cbb11</td><td>1T vs main, 2 pairs per pad: 0 -0.3 +0.6%, 16 +4.0 +0.5%, 32 -0.1 +1.2%, 48 +2.4 +1.3%</td><td>hot.rs <code>STREAM_PAD</code></td><td>added (SHARE_PAD had its sweep, STREAM_PAD only the 735dd25 one)</td></tr>
+<tr><td>29</td><td>symmetric start</td><td>857a0c6</td><td>timing set 22.8x 1T, 7.9x 48T; stream 8 threads 28.9x, -96.6% nodes; recursive -29% nodes</td><td>symstart.rs module doc; lanes.rs <code>extend_jobs</code>; solver.rs <code>sym_start</code></td><td>ok</td></tr>
+<tr><td>30</td><td>build folder out of the layout</td><td>f2cb1f4</td><td>layout only (+0.9% 1T was placement)</td><td>tables.rs <code>BUILD_DIR</code> (explains why)</td><td>skipped: robustness (measurement)</td></tr>
+<tr><td>31</td><td>bench's mode threads compiled apart</td><td>595e424</td><td>neutral (measurement robustness)</td><td>bench.rs <code>share_thread</code> doc (ok), comment in <code>run</code></td><td>fixed: the comment in <code>run</code> still said &quot;the hot loop is the spawned closure, with run_lanes and Pool::run inlined&quot;</td></tr>
+<tr><td>32</td><td>size asserts</td><td>aee1645</td><td>no code</td><td>lanes.rs size asserts</td><td>skipped: robustness</td></tr>
+</tbody>
+</table></div>
+<h2 id="share-mode-batch-and-latency">Share mode (batch and latency)</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>change</th><th>commit (merge)</th><th>measured gain, basis</th><th>code site now</th><th>status</th></tr>
+</thead>
+<tbody>
+<tr><td>40</td><td>the work-sharing mode (claims, staged builds, splits, donations)</td><td>82ff5c8 (78ce33e)</td><td>48T batch 4.3x, random_state 7.86 -&gt; 1.26 ms (6.3x), one cube 306 -&gt; 3.6 ms</td><td>share.rs module doc, claim word, <code>build_task</code>, <code>split</code>, <code>claim</code></td><td>ok</td></tr>
+<tr><td>40a</td><td>module doc summary of later latency work</td><td>c10, c11, m8</td><td>-c 1 ~2.2 -&gt; ~1.6 ms at 48T (m8 1.609, r8 1.622, g1 1.634 ms on random_state)</td><td>share.rs module doc</td><td>fixed: stopped at l6 (~2.2 ms)</td></tr>
+<tr><td>41</td><td>l6-share-a: staged builds on all threads, no fresh pages, spin RW lock, waiting removal, stats from atomics, infeasible jobs not claimed</td><td>4088803 (fcc8d7b)</td><td>-c 1 -38.8% at 48T (stack)</td><td>share.rs <code>JOBS_CAP</code>, <code>SpinRw</code>, <code>find_open</code>, <code>open_stage</code>, <code>build</code>, <code>copy_stats</code>, <code>finish_build</code>, <code>build_task</code></td><td>ok</td></tr>
+<tr><td>41a</td><td>spin wait yields</td><td>4088803</td><td>a fix, not a gain</td><td>share.rs <code>spin_wait</code></td><td>ok</td></tr>
+<tr><td>42</td><td>l6-share-2: kept cubes, staged builds of few cubes, fixed mailbox slot, claim prefetch, padding</td><td>47b5da2 (36668cc)</td><td>series -5.6% -c 1, +4.0% bench share; screening ablations</td><td>share.rs <code>keep</code>, <code>build</code>, <code>Mailbox</code>, <code>claim</code>, <code>Pad</code></td><td>ok</td></tr>
+<tr><td>42a</td><td>solver as a parameter of the round loop</td><td>1235cdd</td><td>-3.0% -c 0, -2.6% -c 1, +3.8% bench share at 48T; -2.0% -c 0 1T</td><td>share.rs <code>Worker::rounds</code></td><td>ok</td></tr>
+<tr><td>42b</td><td>no early 4-move prefixes</td><td>c5d7705</td><td>-8.0% -c 1</td><td>share.rs <code>build</code></td><td>ok</td></tr>
+<tr><td>43</td><td>job statistic from per-child sums</td><td>21e3ca9</td><td>part of c7</td><td>share.rs <code>end_job</code></td><td>ok</td></tr>
+<tr><td>44</td><td>trace buffered, counters behind bits</td><td>33ca449</td><td>trace cost: counters +35% -c 1, printing at once 2.0 -&gt; 2.9 ms</td><td>share.rs <code>TRACE_*</code> bits, <code>Pool</code>'s trace-lines field</td><td>ok (+35% is the counters' step from <code>CUBE_TRACE=1</code> to 3: 2.053 -&gt; 2.786 ms)</td></tr>
+<tr><td>44a</td><td><code>trace_found</code> cold, out of line</td><td>33ca449</td><td>inlined: untraced 48T -c 1 +3.7%, -c 0 +4.1%, bench share -4.2%</td><td>share.rs <code>trace_found</code></td><td>added</td></tr>
+<tr><td>45</td><td>first pass for the iterations up to 16</td><td>085a9fd</td><td>-7.4% -c 1, -7.1% -c 0, +2.0% bench share; 15/16/17-move -18/-43/-22%</td><td>share.rs <code>build</code></td><td>ok</td></tr>
+<tr><td>46</td><td>TAIL_LANES</td><td>1f4c85a</td><td>-3.6% -c 1</td><td>share.rs <code>split</code></td><td>ok</td></tr>
+<tr><td>47</td><td>drop solved lanes first, refill together</td><td>9e69243</td><td>-5.1% -c 1</td><td>share.rs <code>cancel_done</code></td><td>ok</td></tr>
+<tr><td>48</td><td>first pass without sort</td><td>5cce44d</td><td>-1.9% -c 1; 15/16-move -16/-11%, depth-15/16 -20/-28%</td><td>share.rs <code>first_pass_order</code></td><td>ok</td></tr>
+<tr><td>49</td><td>touched buffers, WARM_BUFFERS</td><td>8926c95</td><td>-8.1% 17-move, -9.6% depth-17 (3 holds), -0.7% random states (7 holds)</td><td>share.rs <code>touched</code></td><td>fixed: hold counts (all were given as 7)</td></tr>
+<tr><td>50</td><td>split iterations (top-1 lead groups)</td><td>def2cd0</td><td>-2.9% -c 1, nodes -6.8%; replay figures for <code>LEAD_FRACTION</code></td><td>share.rs <code>plan_leads</code>, <code>LEAD_FRACTION</code></td><td>ok (the replay's 20% row is from c11's own replay, not in the commit message)</td></tr>
+<tr><td>51</td><td>symmetric start's parallel extension with <code>keep</code></td><td>857a0c6</td><td>-9.9% -c 1 vs serial (7 symmetric positions)</td><td>share.rs <code>build</code></td><td>ok</td></tr>
+<tr><td>52</td><td>m8: rounds by pointer, share pad 16</td><td>95cbb11 (7608a28)</td><td>both m8 commits on def2cd0: share +2.5% 1T, -c 1 -2.1%, -c 0 -2.5%, bench share +2.5%</td><td>share.rs <code>rounds</code>; hot.rs <code>SHARE_PAD</code></td><td>ok</td></tr>
+<tr><td>52a</td><td>m8: unchecked slots, indexes and divisions on the run/job paths</td><td>33a8042</td><td>part of m8 (measured with #52)</td><td>share.rs <code>joined</code></td><td>added (attribution)</td></tr>
+<tr><td>53</td><td>parking_lot Mutex</td><td>bb07598 (4c74267)</td><td>+0.8% bench share 48T, +1.3% 1T share, -c 1 noise</td><td>share.rs Mutex import comment</td><td>ok</td></tr>
+<tr><td>54</td><td>CachePadded for Pad</td><td>2f4fb7a</td><td>same code, neutral</td><td>share.rs <code>Pad</code></td><td>ok</td></tr>
+<tr><td>55</td><td>s9 page pin of solve's share mode</td><td>508cbe5 (ca820b6)</td><td>neutral vs 0d1a0e8 (+0.5 / -1.0%); at the merge -1.35 / -1.2 / -0.5% -c 1 vs 4c74267</td><td>share.rs <code>run_pinned</code>, solve.rs <code>SHARE_LINE</code></td><td>added: the merge's numbers (kept for layout pinning)</td></tr>
+<tr><td>56</td><td>r8 fixes (pass race, release flake, Worker::new frame note)</td><td>9be649d, 1571c47</td><td>robustness; Worker::new frame: -c 1 +8%</td><td>share.rs <code>Pool::run</code> note</td><td>skipped: robustness (frame note was ok)</td></tr>
+<tr><td>57</td><td>l6 hang fix, r7 join fix</td><td>6f033a4, f947454</td><td>robustness</td><td>share.rs <code>refill</code>, <code>fresh</code></td><td>skipped: robustness</td></tr>
+</tbody>
+</table></div>
+<h2 id="generation-laptop-wasm-scripts-cold-paths">Generation, laptop, wasm, scripts, cold paths</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>#</th><th>change</th><th>commit (merge)</th><th>measured gain, basis</th><th>code site now</th><th>status</th></tr>
+</thead>
+<tbody>
+<tr><td>60</td><td>any-k DFS generator; 32-deep prefetched write ring</td><td>673d49e</td><td>feature; ring not measured alone</td><td>gen/dfs.rs <code>Ring</code></td><td>added &quot;(not measured separately)&quot;</td></tr>
+<tr><td>61</td><td>hashbrown set in the DFS generator</td><td>31525f1</td><td>gen 2 8 -26% (8 threads), gen 0 7 --dfs -32%</td><td>gen/dfs.rs <code>Prefix</code></td><td>ok</td></tr>
+<tr><td>62</td><td>40 lanes up to h8, 32 for h9/h10</td><td>fe926ed</td><td>h7 +10% 1T, +10.6% 8T; h8 +8.9% 8T; h6 +4.5% 1T; h11 stays 24 (40: -3.4% 8T)</td><td>tables/file.rs <code>untuned_lanes</code></td><td>fixed: h8 said +8.6% for 26.73 -&gt; 29.10 (+8.9%)</td></tr>
+<tr><td>63</td><td>default base per k</td><td>fe926ed</td><td>h6 base 9: +15-20% vs base 10; h7 tie</td><td>tables.rs <code>default_base</code></td><td>ok</td></tr>
+<tr><td>64</td><td>portable backends, wasm SIMD128</td><td>84a4aa1, 7eaede8</td><td>features; x86 neutral</td><td>-</td><td>skipped: not a speedup</td></tr>
+<tr><td>65</td><td>wasm: a load in place of a prefetch</td><td>7eaede8</td><td>wasmtime +53%, V8 +45% (h6, 1T)</td><td>prefetch.rs <code>read_once</code></td><td>ok</td></tr>
+<tr><td>66</td><td>wasm module: 16 lanes</td><td>876a97e</td><td>8 lanes +62% vs 1 (200.6 -&gt; 123.8 s), no gain beyond</td><td>wasm/src/lib.rs <code>lanes_for</code></td><td>added % (had times only)</td></tr>
+<tr><td>67</td><td>V8 warm-up</td><td>876a97e, ca31e63</td><td>+45% on V8 (187.7 -&gt; 129.5 s); none on Bun</td><td>wasm/cubeopt.mjs <code>warmUp</code></td><td>added % (had times only)</td></tr>
+<tr><td>68</td><td>wasm threads hang fix, Bun port</td><td>2a0574f, ca31e63</td><td>robustness / tooling</td><td>-</td><td>skipped</td></tr>
+<tr><td>69</td><td>PGO build of solve</td><td>66c4f03 (0d1a0e8)</td><td>1T solve -c 1 -2.1% (8/8 pairs), 48T neutral</td><td>scripts/pgo-solve.sh header</td><td>added</td></tr>
+<tr><td>70</td><td>g1 cold-path idioms</td><td>6990603..43fc26b</td><td>allocations only (solve -c 1 25.7 -&gt; 6.5 per cube), timing neutral</td><td>cubie.rs <code>format_moves</code>, lanes.rs <code>reconstruct</code> (allocation counts)</td><td>ok</td></tr>
+<tr><td>71</td><td>u1 CLI crates, solve --fast</td><td>b6d7821, 80620c4</td><td>neutral; feature</td><td>-</td><td>skipped</td></tr>
+<tr><td>72</td><td>early baseline techniques (side choice, quarter turns on tight bounds, inverse by addition chain, hugetlbfs, BFS direction switch)</td><td>ec7e133</td><td>not measured separately</td><td>solver.rs <code>search</code>, simd.rs <code>inverse</code>, tables.rs <code>map_file</code>, gen.rs module doc</td><td>ok (&quot;not measured separately&quot;)</td></tr>
+</tbody>
+</table></div>
+<h2 id="numbers-not-found-and-caveats">Numbers not found, and caveats</h2>
+<ul>
+<li>No change in main lacks a number where one was measured. The ones
+without an A/B say &quot;not measured separately&quot; (first-version techniques,
+c7's bookkeeping, the DFS write ring).</li>
+<li>c7's tree sum and its ChildOrder write-without-read only have profile
+shares (2% and 2-3% of the samples), and the comments say so: they are
+not speedups.</li>
+<li>m1's four, m3's three, skip-sibling's three, m7's five pieces and l6's
+pieces were measured only as stacks, and the comments say &quot;part of&quot;.</li>
+<li>Two existing figures are not literally in the commit messages, but they
+follow from them or come from the agent's own data, so I left them:
+share.rs <code>TRACE_*</code> &quot;+35%&quot; (the counters' step, CUBE_TRACE=1 -&gt; 3, is
++29..36% in 33ca449's table), and the <code>LEAD_FRACTION</code> replay's &quot;20%&quot;
+row (c11's replay output; the commit lists 10/30/50/70%).</li>
+<li>m4's per-patch gains have no thread count in their source (agent A/Bs);
+the comments give them as &quot;part of m4-micro's +7.7% at 48T&quot;, as before.</li>
+</ul>
+<h2 id="counts">Counts</h2>
+<p>Rows: 83. ok 54, added 13, fixed 8, skipped 8 (superseded 1, robustness or
+measurement 5, features 2).</p>
+<h2 id="checks-comments-only">Checks (comments only)</h2>
+<ul>
+<li>
+<p>Every changed line is a comment (<code>git diff -U0</code>: all <code>+</code>/<code>-</code> lines start
+with <code>//</code>, <code>///</code>, <code>//!</code>, <code>#</code> (shell) or <code>*</code> (JS doc)); <code>cargo fmt --check</code>
+passes (crate and wasm/).</p>
+</li>
+<li>
+<p>bench, solve and gen of 18c4a66 and of the patch, both built in
+/data/agents/an1/repo (same folder, so the same <code>BUILD_DIR</code> bytes),
+<code>objcopy --only-section</code> + <code>cmp</code>:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>binary</th><th>.text</th><th>.rodata</th><th>other differences</th></tr>
+</thead>
+<tbody>
+<tr><td>bench</td><td>identical (1004145 B)</td><td>identical (126138 B)</td><td>.debug_line; 67 u32 words of .data.rel.ro (panic-location line numbers, +2/+6/+7)</td></tr>
+<tr><td>solve</td><td>identical (955243 B)</td><td>identical (126194 B)</td><td>the same</td></tr>
+<tr><td>gen</td><td>identical (993814 B)</td><td>identical (114008 B)</td><td>none: the file is byte-identical</td></tr>
+</tbody>
+</table></div>
+</li>
+<li>
+<p><code>check.sh</code> with /data/tools/bin on PATH, under <code>timeout -s KILL 1800</code> and
+locked.sh: exit 0, <code>CHECK OK</code> (x86 tests, wasm32 library tests under
+wasmtime, <code>bun wasm/test.mjs</code> for both modules, scalar and NEON library
+tests).</p>
+</li>
+<li>
+<p>No benchmarks (comments only).</p>
+</li>
+<li>
+<p>Coordination: comment-only edits in lanes.rs and share.rs (xcr's area),
+so they rebase trivially.</p>
+</li>
+</ul>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

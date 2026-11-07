@@ -1,0 +1,172 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>egg-solver PMU results — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../../history/index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="SUMMARY.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="egg-solver-pmu-results">egg-solver PMU results</h1>
+<p>Status: collection complete; mode full.
+Valid runs: 242/242.</p>
+<p>Use counters.csv and runs.json for raw values, running percentages and exact commands.
+stat/<em>.csv are the original perf output. record/</em>.data retain raw sampled profiles;
+report/annotate/sample text, symbol files, source commit and the profiling-only patch are included.
+Event unavailability, insufficient counter scheduling and optional PEBS/LBR failures are retained
+as diagnostics. No failed or unsupported counter is represented as a measured zero.</p>
+<p>Counters use acknowledged enable/disable after table load and warm-up. IPC and MPKI are
+computed within the same counted event group. Completion-based throughput and average node counts
+have in-flight boundary effects; they are not exact hardware cycles-per-node denominators.
+Pages requested are labels for interventions; verify actual THP coverage and NUMA placement in placement/.
+Westmere lacks the current x86 AVX2/BMI2 backend; this bundle uses the portable scalar backend.
+Uncore/offcore local response labels retain Intel definitions, including remote-cache hits where named.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>run family</th><th align="right">repeats</th><th align="right">median solves/s</th><th align="right">min</th><th align="right">max</th></tr>
+</thead>
+<tbody>
+<tr><td>baseline-one</td><td align="right">3</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>baseline-socket</td><td align="right">3</td><td align="right">1.0500</td><td align="right">0.8500</td><td align="right">1.0500</td></tr>
+<tr><td>baseline-physical</td><td align="right">3</td><td align="right">1.5500</td><td align="right">1.5500</td><td align="right">1.6000</td></tr>
+<tr><td>baseline-smt</td><td align="right">3</td><td align="right">1.4000</td><td align="right">1.3000</td><td align="right">1.6000</td></tr>
+<tr><td>events-one-00</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-01</td><td align="right">3</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-02</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-03</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-04</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-05</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-06</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-07</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-08</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-09</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-10</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-11</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-12</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-13</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-14</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-15</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-16</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-17</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-18</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-19</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-20</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-21</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-22</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-23</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-24</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-25</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-26</td><td align="right">3</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-27</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-28</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-29</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-30</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-31</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-32</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-33</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-34</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-35</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-36</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-37</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-38</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-39</td><td align="right">3</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-40</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-41</td><td align="right">3</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-42</td><td align="right">3</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-43</td><td align="right">3</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-44</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-45</td><td align="right">3</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-46</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-47</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-48</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-49</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-50</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-51</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-52</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-53</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-54</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-one-55</td><td align="right">1</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>events-physical-00</td><td align="right">1</td><td align="right">1.6500</td><td align="right">1.6500</td><td align="right">1.6500</td></tr>
+<tr><td>events-physical-01</td><td align="right">3</td><td align="right">1.5000</td><td align="right">1.5000</td><td align="right">1.6000</td></tr>
+<tr><td>events-physical-02</td><td align="right">1</td><td align="right">1.5500</td><td align="right">1.5500</td><td align="right">1.5500</td></tr>
+<tr><td>events-physical-03</td><td align="right">1</td><td align="right">1.8000</td><td align="right">1.8000</td><td align="right">1.8000</td></tr>
+<tr><td>events-physical-04</td><td align="right">1</td><td align="right">1.7500</td><td align="right">1.7500</td><td align="right">1.7500</td></tr>
+<tr><td>events-physical-05</td><td align="right">1</td><td align="right">1.6500</td><td align="right">1.6500</td><td align="right">1.6500</td></tr>
+<tr><td>events-physical-06</td><td align="right">1</td><td align="right">1.5500</td><td align="right">1.5500</td><td align="right">1.5500</td></tr>
+<tr><td>events-physical-07</td><td align="right">1</td><td align="right">1.6000</td><td align="right">1.6000</td><td align="right">1.6000</td></tr>
+<tr><td>events-physical-08</td><td align="right">1</td><td align="right">1.5500</td><td align="right">1.5500</td><td align="right">1.5500</td></tr>
+<tr><td>events-physical-09</td><td align="right">1</td><td align="right">1.6000</td><td align="right">1.6000</td><td align="right">1.6000</td></tr>
+<tr><td>events-physical-10</td><td align="right">1</td><td align="right">1.7000</td><td align="right">1.7000</td><td align="right">1.7000</td></tr>
+<tr><td>events-physical-11</td><td align="right">1</td><td align="right">1.6000</td><td align="right">1.6000</td><td align="right">1.6000</td></tr>
+<tr><td>events-physical-12</td><td align="right">1</td><td align="right">1.5000</td><td align="right">1.5000</td><td align="right">1.5000</td></tr>
+<tr><td>events-physical-13</td><td align="right">1</td><td align="right">1.6500</td><td align="right">1.6500</td><td align="right">1.6500</td></tr>
+<tr><td>events-physical-14</td><td align="right">1</td><td align="right">1.6500</td><td align="right">1.6500</td><td align="right">1.6500</td></tr>
+<tr><td>events-physical-15</td><td align="right">1</td><td align="right">1.7500</td><td align="right">1.7500</td><td align="right">1.7500</td></tr>
+<tr><td>events-physical-16</td><td align="right">1</td><td align="right">1.5000</td><td align="right">1.5000</td><td align="right">1.5000</td></tr>
+<tr><td>events-physical-17</td><td align="right">1</td><td align="right">1.6500</td><td align="right">1.6500</td><td align="right">1.6500</td></tr>
+<tr><td>events-physical-18</td><td align="right">1</td><td align="right">1.5500</td><td align="right">1.5500</td><td align="right">1.5500</td></tr>
+<tr><td>events-physical-19</td><td align="right">1</td><td align="right">1.5500</td><td align="right">1.5500</td><td align="right">1.5500</td></tr>
+<tr><td>events-physical-20</td><td align="right">1</td><td align="right">1.5500</td><td align="right">1.5500</td><td align="right">1.5500</td></tr>
+<tr><td>events-physical-21</td><td align="right">1</td><td align="right">1.6500</td><td align="right">1.6500</td><td align="right">1.6500</td></tr>
+<tr><td>events-physical-22</td><td align="right">1</td><td align="right">1.5500</td><td align="right">1.5500</td><td align="right">1.5500</td></tr>
+<tr><td>events-physical-23</td><td align="right">1</td><td align="right">1.6000</td><td align="right">1.6000</td><td align="right">1.6000</td></tr>
+<tr><td>events-physical-24</td><td align="right">1</td><td align="right">1.6000</td><td align="right">1.6000</td><td align="right">1.6000</td></tr>
+<tr><td>events-physical-25</td><td align="right">1</td><td align="right">1.6000</td><td align="right">1.6000</td><td align="right">1.6000</td></tr>
+<tr><td>events-physical-26</td><td align="right">3</td><td align="right">1.6000</td><td align="right">1.5500</td><td align="right">1.6500</td></tr>
+<tr><td>events-physical-27</td><td align="right">1</td><td align="right">1.6000</td><td align="right">1.6000</td><td align="right">1.6000</td></tr>
+<tr><td>events-physical-28</td><td align="right">1</td><td align="right">1.6500</td><td align="right">1.6500</td><td align="right">1.6500</td></tr>
+<tr><td>events-physical-29</td><td align="right">1</td><td align="right">1.6000</td><td align="right">1.6000</td><td align="right">1.6000</td></tr>
+<tr><td>events-physical-30</td><td align="right">1</td><td align="right">1.7000</td><td align="right">1.7000</td><td align="right">1.7000</td></tr>
+<tr><td>events-physical-31</td><td align="right">1</td><td align="right">1.7000</td><td align="right">1.7000</td><td align="right">1.7000</td></tr>
+<tr><td>events-physical-32</td><td align="right">1</td><td align="right">1.5500</td><td align="right">1.5500</td><td align="right">1.5500</td></tr>
+<tr><td>events-physical-33</td><td align="right">1</td><td align="right">1.5500</td><td align="right">1.5500</td><td align="right">1.5500</td></tr>
+<tr><td>events-physical-34</td><td align="right">1</td><td align="right">1.7500</td><td align="right">1.7500</td><td align="right">1.7500</td></tr>
+<tr><td>events-physical-35</td><td align="right">1</td><td align="right">1.6000</td><td align="right">1.6000</td><td align="right">1.6000</td></tr>
+<tr><td>events-physical-36</td><td align="right">1</td><td align="right">1.4500</td><td align="right">1.4500</td><td align="right">1.4500</td></tr>
+<tr><td>events-physical-37</td><td align="right">1</td><td align="right">1.6000</td><td align="right">1.6000</td><td align="right">1.6000</td></tr>
+<tr><td>events-physical-38</td><td align="right">1</td><td align="right">1.6500</td><td align="right">1.6500</td><td align="right">1.6500</td></tr>
+<tr><td>events-physical-39</td><td align="right">3</td><td align="right">1.5500</td><td align="right">1.5500</td><td align="right">1.6500</td></tr>
+<tr><td>events-physical-40</td><td align="right">1</td><td align="right">1.6500</td><td align="right">1.6500</td><td align="right">1.6500</td></tr>
+<tr><td>events-physical-41</td><td align="right">3</td><td align="right">1.6500</td><td align="right">1.5500</td><td align="right">1.6500</td></tr>
+<tr><td>events-physical-42</td><td align="right">3</td><td align="right">1.5500</td><td align="right">1.5500</td><td align="right">1.7000</td></tr>
+<tr><td>events-physical-43</td><td align="right">3</td><td align="right">1.6000</td><td align="right">1.5000</td><td align="right">1.7000</td></tr>
+<tr><td>events-physical-44</td><td align="right">1</td><td align="right">1.7000</td><td align="right">1.7000</td><td align="right">1.7000</td></tr>
+<tr><td>events-physical-45</td><td align="right">3</td><td align="right">1.6000</td><td align="right">1.6000</td><td align="right">1.6500</td></tr>
+<tr><td>events-physical-46</td><td align="right">1</td><td align="right">1.5000</td><td align="right">1.5000</td><td align="right">1.5000</td></tr>
+<tr><td>events-physical-47</td><td align="right">1</td><td align="right">1.5000</td><td align="right">1.5000</td><td align="right">1.5000</td></tr>
+<tr><td>events-physical-48</td><td align="right">1</td><td align="right">1.7000</td><td align="right">1.7000</td><td align="right">1.7000</td></tr>
+<tr><td>events-physical-49</td><td align="right">1</td><td align="right">1.6000</td><td align="right">1.6000</td><td align="right">1.6000</td></tr>
+<tr><td>events-physical-50</td><td align="right">1</td><td align="right">1.6000</td><td align="right">1.6000</td><td align="right">1.6000</td></tr>
+<tr><td>events-physical-51</td><td align="right">1</td><td align="right">1.5500</td><td align="right">1.5500</td><td align="right">1.5500</td></tr>
+<tr><td>events-physical-52</td><td align="right">1</td><td align="right">1.6000</td><td align="right">1.6000</td><td align="right">1.6000</td></tr>
+<tr><td>events-physical-53</td><td align="right">1</td><td align="right">1.7000</td><td align="right">1.7000</td><td align="right">1.7000</td></tr>
+<tr><td>events-physical-54</td><td align="right">1</td><td align="right">1.5500</td><td align="right">1.5500</td><td align="right">1.5500</td></tr>
+<tr><td>events-physical-55</td><td align="right">1</td><td align="right">1.6500</td><td align="right">1.6500</td><td align="right">1.6500</td></tr>
+<tr><td>lanes-0</td><td align="right">3</td><td align="right">0.0000</td><td align="right">0.0000</td><td align="right">0.0000</td></tr>
+<tr><td>lanes-1</td><td align="right">3</td><td align="right">0.0000</td><td align="right">0.0000</td><td align="right">0.0000</td></tr>
+<tr><td>lanes-2</td><td align="right">3</td><td align="right">0.0500</td><td align="right">0.0500</td><td align="right">0.0500</td></tr>
+<tr><td>lanes-4</td><td align="right">3</td><td align="right">0.0500</td><td align="right">0.0500</td><td align="right">0.0500</td></tr>
+<tr><td>lanes-8</td><td align="right">3</td><td align="right">0.2500</td><td align="right">0.2500</td><td align="right">0.2500</td></tr>
+<tr><td>lanes-12</td><td align="right">3</td><td align="right">0.2500</td><td align="right">0.2500</td><td align="right">0.2500</td></tr>
+<tr><td>lanes-16</td><td align="right">3</td><td align="right">0.2000</td><td align="right">0.2000</td><td align="right">0.2000</td></tr>
+<tr><td>lanes-24</td><td align="right">3</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>lanes-32</td><td align="right">3</td><td align="right">0.1000</td><td align="right">0.1000</td><td align="right">0.1000</td></tr>
+<tr><td>lanes-40</td><td align="right">3</td><td align="right">0.2000</td><td align="right">0.2000</td><td align="right">0.2000</td></tr>
+<tr><td>lanes-48</td><td align="right">3</td><td align="right">0.2000</td><td align="right">0.2000</td><td align="right">0.2000</td></tr>
+<tr><td>lanes-64</td><td align="right">3</td><td align="right">0.2000</td><td align="right">0.2000</td><td align="right">0.2000</td></tr>
+<tr><td>threads-1</td><td align="right">3</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>threads-2</td><td align="right">3</td><td align="right">0.4000</td><td align="right">0.4000</td><td align="right">0.4000</td></tr>
+<tr><td>threads-4</td><td align="right">3</td><td align="right">0.9000</td><td align="right">0.9000</td><td align="right">0.9000</td></tr>
+<tr><td>threads-6</td><td align="right">3</td><td align="right">0.8500</td><td align="right">0.8500</td><td align="right">0.8500</td></tr>
+<tr><td>threads-12</td><td align="right">3</td><td align="right">1.6000</td><td align="right">1.6000</td><td align="right">1.6500</td></tr>
+<tr><td>threads-24</td><td align="right">3</td><td align="right">1.2000</td><td align="right">1.1500</td><td align="right">1.3500</td></tr>
+<tr><td>share-events-01</td><td align="right">1</td><td align="right">0.5500</td><td align="right">0.5500</td><td align="right">0.5500</td></tr>
+<tr><td>share-events-26</td><td align="right">1</td><td align="right">0.5500</td><td align="right">0.5500</td><td align="right">0.5500</td></tr>
+<tr><td>share-events-29</td><td align="right">1</td><td align="right">0.5500</td><td align="right">0.5500</td><td align="right">0.5500</td></tr>
+<tr><td>share-events-44</td><td align="right">1</td><td align="right">0.5500</td><td align="right">0.5500</td><td align="right">0.5500</td></tr>
+<tr><td>share-events-45</td><td align="right">1</td><td align="right">0.5500</td><td align="right">0.5500</td><td align="right">0.5500</td></tr>
+<tr><td>share-events-46</td><td align="right">1</td><td align="right">0.5500</td><td align="right">0.5500</td><td align="right">0.5500</td></tr>
+<tr><td>share-events-47</td><td align="right">1</td><td align="right">0.5500</td><td align="right">0.5500</td><td align="right">0.5500</td></tr>
+<tr><td>share-events-48</td><td align="right">1</td><td align="right">0.5500</td><td align="right">0.5500</td><td align="right">0.5500</td></tr>
+<tr><td>share-events-55</td><td align="right">1</td><td align="right">0.5500</td><td align="right">0.5500</td><td align="right">0.5500</td></tr>
+<tr><td>share1-one</td><td align="right">3</td><td align="right">0.1000</td><td align="right">0.1000</td><td align="right">0.1000</td></tr>
+<tr><td>share1-physical</td><td align="right">3</td><td align="right">0.5500</td><td align="right">0.5500</td><td align="right">0.6000</td></tr>
+<tr><td>share1-smt</td><td align="right">3</td><td align="right">0.6500</td><td align="right">0.6500</td><td align="right">0.6500</td></tr>
+<tr><td>numa-node1</td><td align="right">3</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>numa-node0</td><td align="right">3</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>pages-4k-one</td><td align="right">3</td><td align="right">0.1500</td><td align="right">0.1500</td><td align="right">0.1500</td></tr>
+<tr><td>pages-4k-physical</td><td align="right">3</td><td align="right">1.6000</td><td align="right">1.5000</td><td align="right">1.7000</td></tr>
+</tbody>
+</table></div>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

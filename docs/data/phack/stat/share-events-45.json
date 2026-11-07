@@ -1,0 +1,105 @@
+{
+  "name": "share-events-45",
+  "config": {
+    "cpus": [
+      1,
+      3,
+      5,
+      7,
+      9,
+      11,
+      0,
+      2,
+      4,
+      6,
+      8,
+      10
+    ],
+    "threads": 12,
+    "memory_policy": "interleave"
+  },
+  "lanes": 24,
+  "page_request": "thp",
+  "mode": "share",
+  "aux": "RESOURCE_STALLS.LOAD",
+  "isolated_event": false,
+  "command": [
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/numactl",
+    "--physcpubind=1,3,5,7,9,11,0,2,4,6,8,10",
+    "--interleave=0,1",
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/perf",
+    "stat",
+    "--no-big-num",
+    "-x",
+    ";",
+    "--delay=-1",
+    "--control=fifo:/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/.ctl-share-events-45,/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/.ack-share-events-45",
+    "-o",
+    "/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/stat/share-events-45.csv",
+    "-e",
+    "{cycles:u,instructions:u,cpu/config=0x2a2,name=egp_resource_stalls_load/u}",
+    "--",
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/bench",
+    "stream",
+    "/home/arhan/tmp/egg-solver-perf-work/tables/h6",
+    "--warmup",
+    "8.0",
+    "--window",
+    "20.0",
+    "--threads",
+    "12",
+    "--lanes",
+    "24",
+    "--seed",
+    "2026",
+    "--load",
+    "copy",
+    "--json",
+    "--share=1"
+  ],
+  "exit_code": 0,
+  "valid": true,
+  "wall_seconds": 35.10787058994174,
+  "counted_window_seconds": 20.000244147,
+  "benchmark": {
+    "type": "stream",
+    "threads": 12,
+    "lanes": 24,
+    "window": 20.0,
+    "share": 1,
+    "cubes": 11,
+    "throughput": 0.55,
+    "nodes_per_cube": 154177614.1818182,
+    "lookups_per_cube": 129990636.63636364,
+    "lengths": {
+      "16": 1,
+      "17": 3,
+      "18": 6,
+      "19": 1
+    }
+  },
+  "counters": [
+    {
+      "event": "cycles:u",
+      "count": 585831142550.0,
+      "unit": "",
+      "counter_runtime_ns": 239945896657.0,
+      "running_percent": 100.0
+    },
+    {
+      "event": "instructions:u",
+      "count": 1012254924569.0,
+      "unit": "",
+      "counter_runtime_ns": 239945896657.0,
+      "running_percent": 100.0
+    },
+    {
+      "event": "egp_resource_stalls_load",
+      "count": 2277947893.0,
+      "unit": "",
+      "counter_runtime_ns": 239945896657.0,
+      "running_percent": 100.0
+    }
+  ],
+  "record": false
+}

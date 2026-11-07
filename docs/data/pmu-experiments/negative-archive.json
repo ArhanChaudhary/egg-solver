@@ -1,0 +1,277 @@
+{
+  "status": "COMPLETE",
+  "completed_at": "2026-11-07T20:24:12.440121+00:00",
+  "release_head": "842a5043abfd550313a86a3d9bb5254f4b457540",
+  "historical_base": "93867a4597ab821b4064a0d407d3c89e133c9013",
+  "experiments": [
+    {
+      "variant": "bytes",
+      "branch": "neg/pmu-byte-packed-load",
+      "commit": "1a6f91913e42a0c1df995f70f5bda82bf6d36719",
+      "worktree": "/data/agents/pmu-opt/archive-bytes",
+      "decision": "REJECT_FOR_RELEASE",
+      "original_patch_sha256": "b1c7f56f9583e62a222846f70483214dd532fda9a59268f2d5691661000737dd",
+      "result_comment_only_annotation": true,
+      "median_ratio_1t": 0.9917403411267792,
+      "median_ratio_48t": 0.9971870878888868,
+      "pairs_1t": [
+        {
+          "pad": 0,
+          "repeat": 1,
+          "before": 4.1,
+          "after": 4.117,
+          "ratio": 1.0041463414634146
+        },
+        {
+          "pad": 16,
+          "repeat": 1,
+          "before": 4.167,
+          "after": 4.133,
+          "ratio": 0.9918406527477802
+        },
+        {
+          "pad": 32,
+          "repeat": 1,
+          "before": 4.083,
+          "after": 4.067,
+          "ratio": 0.9960813127602253
+        },
+        {
+          "pad": 48,
+          "repeat": 1,
+          "before": 4.1,
+          "after": 4.033,
+          "ratio": 0.9836585365853661
+        },
+        {
+          "pad": 48,
+          "repeat": 2,
+          "before": 4.083,
+          "after": 4.033,
+          "ratio": 0.9877541023757042
+        },
+        {
+          "pad": 32,
+          "repeat": 2,
+          "before": 4.067,
+          "after": 4.033,
+          "ratio": 0.9916400295057782
+        },
+        {
+          "pad": 16,
+          "repeat": 2,
+          "before": 4.05,
+          "after": 4.05,
+          "ratio": 1.0
+        },
+        {
+          "pad": 0,
+          "repeat": 2,
+          "before": 4.1,
+          "after": 4.067,
+          "ratio": 0.9919512195121952
+        },
+        {
+          "pad": 0,
+          "repeat": 3,
+          "before": 4.067,
+          "after": 4.033,
+          "ratio": 0.9916400295057782
+        },
+        {
+          "pad": 16,
+          "repeat": 3,
+          "before": 4.1,
+          "after": 4.033,
+          "ratio": 0.9836585365853661
+        },
+        {
+          "pad": 32,
+          "repeat": 3,
+          "before": 4.183,
+          "after": 4.15,
+          "ratio": 0.9921109251733207
+        },
+        {
+          "pad": 48,
+          "repeat": 3,
+          "before": 4.067,
+          "after": 4.017,
+          "ratio": 0.9877059257437916
+        }
+      ],
+      "pairs_48t": [
+        {
+          "round": 1,
+          "before": 153.933,
+          "after": 153.5,
+          "ratio": 0.9971870878888868
+        },
+        {
+          "round": 2,
+          "before": 155.233,
+          "after": 152.067,
+          "ratio": 0.9796048520610953
+        },
+        {
+          "round": 3,
+          "before": 154.533,
+          "after": 153.133,
+          "ratio": 0.9909404463771494
+        },
+        {
+          "round": 4,
+          "before": 154.967,
+          "after": 154.8,
+          "ratio": 0.9989223512102576
+        },
+        {
+          "round": 5,
+          "before": 153.267,
+          "after": 153.3,
+          "ratio": 1.0002153105365148
+        }
+      ],
+      "commit_message": "/data/agents/pmu-opt/negative-48t/bytes-commit-message.txt",
+      "full_source_miri": false
+    },
+    {
+      "variant": "outline",
+      "branch": "neg/pmu-outlined-lane-advance",
+      "commit": "fb892a97f7fece9cbf4a9b430a58420f63edd34d",
+      "worktree": "/data/agents/pmu-opt/archive-outline",
+      "decision": "REJECT_FOR_RELEASE",
+      "original_patch_sha256": "dac6092b4b4805ce03e26e3df7fa6bc7ccf5e68a0d7fd1d1067827c37e1f8492",
+      "result_comment_only_annotation": true,
+      "median_ratio_1t": 0.9256427001276946,
+      "median_ratio_48t": 0.8928105084679698,
+      "pairs_1t": [
+        {
+          "pad": 0,
+          "repeat": 1,
+          "before": 4.1,
+          "after": 3.867,
+          "ratio": 0.9431707317073171
+        },
+        {
+          "pad": 16,
+          "repeat": 1,
+          "before": 4.167,
+          "after": 3.867,
+          "ratio": 0.9280057595392369
+        },
+        {
+          "pad": 32,
+          "repeat": 1,
+          "before": 4.083,
+          "after": 3.75,
+          "ratio": 0.9184423218221895
+        },
+        {
+          "pad": 48,
+          "repeat": 1,
+          "before": 4.1,
+          "after": 3.8,
+          "ratio": 0.926829268292683
+        },
+        {
+          "pad": 48,
+          "repeat": 2,
+          "before": 4.083,
+          "after": 3.767,
+          "ratio": 0.9226059270144501
+        },
+        {
+          "pad": 32,
+          "repeat": 2,
+          "before": 4.067,
+          "after": 3.783,
+          "ratio": 0.9301696582247356
+        },
+        {
+          "pad": 16,
+          "repeat": 2,
+          "before": 4.05,
+          "after": 3.85,
+          "ratio": 0.9506172839506174
+        },
+        {
+          "pad": 0,
+          "repeat": 2,
+          "before": 4.1,
+          "after": 3.717,
+          "ratio": 0.9065853658536587
+        },
+        {
+          "pad": 0,
+          "repeat": 3,
+          "before": 4.067,
+          "after": 3.717,
+          "ratio": 0.9139414802065404
+        },
+        {
+          "pad": 16,
+          "repeat": 3,
+          "before": 4.1,
+          "after": 3.8,
+          "ratio": 0.926829268292683
+        },
+        {
+          "pad": 32,
+          "repeat": 3,
+          "before": 4.183,
+          "after": 3.867,
+          "ratio": 0.9244561319627063
+        },
+        {
+          "pad": 48,
+          "repeat": 3,
+          "before": 4.067,
+          "after": 3.733,
+          "ratio": 0.9178755839685272
+        }
+      ],
+      "pairs_48t": [
+        {
+          "round": 1,
+          "before": 153.933,
+          "after": 137.433,
+          "ratio": 0.8928105084679698
+        },
+        {
+          "round": 2,
+          "before": 155.233,
+          "after": 136.533,
+          "ratio": 0.8795359234183452
+        },
+        {
+          "round": 3,
+          "before": 154.533,
+          "after": 138.867,
+          "ratio": 0.8986235949602998
+        },
+        {
+          "round": 4,
+          "before": 154.967,
+          "after": 139.0,
+          "ratio": 0.8969651603244561
+        },
+        {
+          "round": 5,
+          "before": 153.267,
+          "after": 136.7,
+          "ratio": 0.8919075861079031
+        }
+      ],
+      "commit_message": "/data/agents/pmu-opt/negative-48t/outline-commit-message.txt",
+      "full_source_miri": false
+    }
+  ],
+  "evidence": {
+    "/data/agents/pmu-opt/screen-summary.json": "bf67d6248f990b3eed9494a5d6b5fcbee60e399b8ae4e0c9fe5eb4e4b5fa7c32",
+    "/data/agents/pmu-opt/negative-48t/summary.json": "3e4b51a12a67deb074ae91ee637030989f00a5ce27f5ce4f32d0e383f1388937",
+    "/data/agents/pmu-opt/build-validation.json": "91edd3cf9e7429022f85b09a9857240f69aefca79af000bf53120ae36d980491",
+    "/data/agents/pmu-opt/candidate-evidence.json": "d0d99d5c39c8d6a41412b287c46a343845508d5a4269dfa7c5153de4e74a31ed"
+  },
+  "note": "candidate-evidence.json is the preserved pre-measurement build snapshot; this receipt supplies completed performance and archival evidence."
+}

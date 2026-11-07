@@ -1,0 +1,15 @@
+status 0
+run vcube112 48 random_state 200 thp shipped 3
+pagemode thp arena 0 only -
+start 2026-11-05 09:03:57
+wall_s 105.36
+cpu_s 1843.35 3.24
+maxrss_kb 3715156
+gate_wait_s 0
+ext_cores 0.0
+pages 3718136 3718136 3714108 2566144 0 1630170 vc-optimal
+free_1g_pages 0 0
+memfree_gib_at_start 10.1
+thpwarm_pct 100.0
+table /data2/competitors/vcube/nxprune_1_12_09.dat 2603089920
+thp always [madvise] never defrag always defer defer+madvise [madvise] never

@@ -1,0 +1,90 @@
+{
+  "name": "events-one-55-r1",
+  "config": {
+    "cpus": [
+      1
+    ],
+    "threads": 1,
+    "memory_policy": "local"
+  },
+  "lanes": 24,
+  "page_request": "thp",
+  "mode": "stream",
+  "aux": "OFFCORE_RESPONSE.DEMAND_DATA_RD.REMOTE_DRAM",
+  "isolated_event": false,
+  "command": [
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/numactl",
+    "--physcpubind=1",
+    "--membind=1",
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/perf",
+    "stat",
+    "--no-big-num",
+    "-x",
+    ";",
+    "--delay=-1",
+    "--control=fifo:/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/.ctl-events-one-55-r1,/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/.ack-events-one-55-r1",
+    "-o",
+    "/home/arhan/tmp/egg-solver-perf-work/results-phack-20261106T194245Z/stat/events-one-55-r1.csv",
+    "-e",
+    "{cycles:u,instructions:u,cpu/config=0x1b7,name=egp_offcore_response_demand_data_rd_remote_dram,config1=0x2001/u}",
+    "--",
+    "/home/arhan/tmp/egg-solver-perf-work/payload-2bfe3eadf96a/bin/bench",
+    "stream",
+    "/home/arhan/tmp/egg-solver-perf-work/tables/h6",
+    "--warmup",
+    "8.0",
+    "--window",
+    "20.0",
+    "--threads",
+    "1",
+    "--lanes",
+    "24",
+    "--seed",
+    "2026",
+    "--load",
+    "copy",
+    "--json"
+  ],
+  "exit_code": 0,
+  "valid": true,
+  "wall_seconds": 34.276760500855744,
+  "counted_window_seconds": 20.000163441,
+  "benchmark": {
+    "type": "stream",
+    "threads": 1,
+    "lanes": 24,
+    "window": 20.0,
+    "share": null,
+    "cubes": 3,
+    "throughput": 0.15,
+    "nodes_per_cube": 5145132.0,
+    "lookups_per_cube": 4366999.666666667,
+    "lengths": {
+      "17": 3
+    }
+  },
+  "counters": [
+    {
+      "event": "cycles:u",
+      "count": 60662500283.0,
+      "unit": "",
+      "counter_runtime_ns": 19992890908.0,
+      "running_percent": 100.0
+    },
+    {
+      "event": "instructions:u",
+      "count": 106945122173.0,
+      "unit": "",
+      "counter_runtime_ns": 19992890908.0,
+      "running_percent": 100.0
+    },
+    {
+      "event": "egp_offcore_response_demand_data_rd_remote_dram",
+      "count": 16727.0,
+      "unit": "",
+      "counter_runtime_ns": 19992890908.0,
+      "running_percent": 100.0
+    }
+  ],
+  "record": false
+}

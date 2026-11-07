@@ -1,0 +1,760 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>file.rs — source evidence</title><style>body{font:15px system-ui;margin:2rem}pre{font:13px/1.6 monospace;overflow:auto}.line:target{background:#fff0a0}a{color:#42617a;text-decoration:none}</style><h1>file.rs</h1><p>Source evidence snapshot. Original file SHA-256: <code>75432be325c4fd7c9ec2a063a8806af994cd8a659a30052084db0ed9ce11d736</code>. <a href="file.rs">Raw source</a></p><pre><span class="line" id="L1"><a href="#L1">    1</a> //! Table files: where a table&#x27;s `k` and `base` are stored, and how its data</span>
+<span class="line" id="L2"><a href="#L2">    2</a> //! is brought into memory.</span>
+<span class="line" id="L3"><a href="#L3">    3</a> //!</span>
+<span class="line" id="L4"><a href="#L4">    4</a> //! A table file holds the table data at offset 0 (so that it can be mapped</span>
+<span class="line" id="L5"><a href="#L5">    5</a> //! as is), followed by a 4 KiB text trailer in the last 4 KiB of the file:</span>
+<span class="line" id="L6"><a href="#L6">    6</a> //! a magic line, then `key value` lines (`layout`, `k`, `base`, `bytes`, and</span>
+<span class="line" id="L7"><a href="#L7">    7</a> //! the code `distribution` and `checksum` of the data when known), padded</span>
+<span class="line" id="L8"><a href="#L8">    8</a> //! with NUL bytes. Unknown keys are ignored, except that a `layout` other</span>
+<span class="line" id="L9"><a href="#L9">    9</a> //! than `h48` (the index layout of `coord`) is refused: a variant table (say</span>
+<span class="line" id="L10"><a href="#L10">   10</a> //! with a parity bit in place of an eo bit) must not be read as an h48 one. Files on hugetlbfs are whole 1 GiB pages; their trailer sits in the</span>
+<span class="line" id="L11"><a href="#L11">   11</a> //! slack after the data, so tables made before trailers existed can be</span>
+<span class="line" id="L12"><a href="#L12">   12</a> //! stamped in place (`gen stamp`). Tables without a trailer are described by</span>
+<span class="line" id="L13"><a href="#L13">   13</a> //! a `&lt;path&gt;.meta` sidecar (`k base`), or, for the legacy tables on</span>
+<span class="line" id="L14"><a href="#L14">   14</a> //! `/mnt/huge`, by `tables/&lt;name&gt;.hugemeta` in the build folder. A table can</span>
+<span class="line" id="L15"><a href="#L15">   15</a> //! also be loaded into a shared memory segment that outlives the process</span>
+<span class="line" id="L16"><a href="#L16">   16</a> //! (`LoadMode::Shm`, see `tables::shm`).</span>
+<span class="line" id="L17"><a href="#L17">   17</a> </span>
+<span class="line" id="L18"><a href="#L18">   18</a> pub use super::shm::ShmPages;</span>
+<span class="line" id="L19"><a href="#L19">   19</a> use std::io::{Read, Seek, SeekFrom, Write};</span>
+<span class="line" id="L20"><a href="#L20">   20</a> </span>
+<span class="line" id="L21"><a href="#L21">   21</a> /// Size of the trailer at the end of a table file.</span>
+<span class="line" id="L22"><a href="#L22">   22</a> pub const TRAILER_BYTES: u64 = 4096;</span>
+<span class="line" id="L23"><a href="#L23">   23</a> /// `TRAILER_BYTES` as a length.</span>
+<span class="line" id="L24"><a href="#L24">   24</a> const TRAILER_LEN: usize = 4096;</span>
+<span class="line" id="L25"><a href="#L25">   25</a> const _: () = assert!(TRAILER_LEN as u64 == TRAILER_BYTES);</span>
+<span class="line" id="L26"><a href="#L26">   26</a> const MAGIC: &amp;str = &quot;egg-solver h48 table v1\n&quot;;</span>
+<span class="line" id="L27"><a href="#L27">   27</a> const LEGACY_MAGIC: &amp;str = &quot;cubeopt h48 table v1\n&quot;;</span>
+<span class="line" id="L28"><a href="#L28">   28</a> /// The index layout of the tables this code reads and writes.</span>
+<span class="line" id="L29"><a href="#L29">   29</a> pub const LAYOUT: &amp;str = &quot;h48&quot;;</span>
+<span class="line" id="L30"><a href="#L30">   30</a> </span>
+<span class="line" id="L31"><a href="#L31">   31</a> /// Page size of hugetlbfs mounts used for tables (files there are whole pages).</span>
+<span class="line" id="L32"><a href="#L32">   32</a> pub const HUGE_PAGE: u64 = 1 &lt;&lt; 30;</span>
+<span class="line" id="L33"><a href="#L33">   33</a> </span>
+<span class="line" id="L34"><a href="#L34">   34</a> /// Why a table file (or the bytes of one in memory) cannot be read,</span>
+<span class="line" id="L35"><a href="#L35">   35</a> /// written or used. Errors of the file at `path` carry its path.</span>
+<span class="line" id="L36"><a href="#L36">   36</a> #[derive(Debug, thiserror::Error)]</span>
+<span class="line" id="L37"><a href="#L37">   37</a> #[non_exhaustive]</span>
+<span class="line" id="L38"><a href="#L38">   38</a> pub enum TableError {</span>
+<span class="line" id="L39"><a href="#L39">   39</a>     /// Reading or writing the file failed.</span>
+<span class="line" id="L40"><a href="#L40">   40</a>     #[error(&quot;{path}&quot;)]</span>
+<span class="line" id="L41"><a href="#L41">   41</a>     Io {</span>
+<span class="line" id="L42"><a href="#L42">   42</a>         path: String,</span>
+<span class="line" id="L43"><a href="#L43">   43</a>         source: std::io::Error,</span>
+<span class="line" id="L44"><a href="#L44">   44</a>     },</span>
+<span class="line" id="L45"><a href="#L45">   45</a>     /// Neither a trailer nor a meta file gives the table&#x27;s `k` and base.</span>
+<span class="line" id="L46"><a href="#L46">   46</a>     #[error(&quot;{path}: no table trailer, and no meta file {meta_path}&quot;)]</span>
+<span class="line" id="L47"><a href="#L47">   47</a>     NoMeta {</span>
+<span class="line" id="L48"><a href="#L48">   48</a>         path: String,</span>
+<span class="line" id="L49"><a href="#L49">   49</a>         meta_path: String,</span>
+<span class="line" id="L50"><a href="#L50">   50</a>         source: std::io::Error,</span>
+<span class="line" id="L51"><a href="#L51">   51</a>     },</span>
+<span class="line" id="L52"><a href="#L52">   52</a>     /// A meta file that is not `k base`, or with values the search cannot</span>
+<span class="line" id="L53"><a href="#L53">   53</a>     /// use (`k` above 11, a base above 12).</span>
+<span class="line" id="L54"><a href="#L54">   54</a>     #[error(&quot;bad table meta {0:?}&quot;)]</span>
+<span class="line" id="L55"><a href="#L55">   55</a>     BadMeta(String),</span>
+<span class="line" id="L56"><a href="#L56">   56</a>     /// A trailer whose text does not parse.</span>
+<span class="line" id="L57"><a href="#L57">   57</a>     #[error(&quot;table trailer: {0}&quot;)]</span>
+<span class="line" id="L58"><a href="#L58">   58</a>     MalformedTrailer(String),</span>
+<span class="line" id="L59"><a href="#L59">   59</a>     /// A trailer with values the search cannot use, or whose data size is</span>
+<span class="line" id="L60"><a href="#L60">   60</a>     /// not that of its `k`.</span>
+<span class="line" id="L61"><a href="#L61">   61</a>     #[error(&quot;{path}: bad table trailer {trailer:?}&quot;)]</span>
+<span class="line" id="L62"><a href="#L62">   62</a>     BadTrailer { path: String, trailer: Trailer },</span>
+<span class="line" id="L63"><a href="#L63">   63</a>     /// A file whose size does not match the table&#x27;s `k`.</span>
+<span class="line" id="L64"><a href="#L64">   64</a>     #[error(&quot;table file {path}: {bytes} bytes, but h{k} needs {needed}&quot;)]</span>
+<span class="line" id="L65"><a href="#L65">   65</a>     WrongSize {</span>
+<span class="line" id="L66"><a href="#L66">   66</a>         path: String,</span>
+<span class="line" id="L67"><a href="#L67">   67</a>         bytes: u64,</span>
+<span class="line" id="L68"><a href="#L68">   68</a>         k: u32,</span>
+<span class="line" id="L69"><a href="#L69">   69</a>         needed: u64,</span>
+<span class="line" id="L70"><a href="#L70">   70</a>     },</span>
+<span class="line" id="L71"><a href="#L71">   71</a>     /// A table larger than the address space (h7 and up on wasm32).</span>
+<span class="line" id="L72"><a href="#L72">   72</a>     #[error(&quot;h{0} is larger than the address space&quot;)]</span>
+<span class="line" id="L73"><a href="#L73">   73</a>     TooLarge(u32),</span>
+<span class="line" id="L74"><a href="#L74">   74</a>     /// `write_trailer`: no room after the data.</span>
+<span class="line" id="L75"><a href="#L75">   75</a>     #[error(&quot;{path}: {bytes} bytes, no room for a trailer after {data_bytes} bytes of data&quot;)]</span>
+<span class="line" id="L76"><a href="#L76">   76</a>     NoRoom {</span>
+<span class="line" id="L77"><a href="#L77">   77</a>         path: String,</span>
+<span class="line" id="L78"><a href="#L78">   78</a>         bytes: u64,</span>
+<span class="line" id="L79"><a href="#L79">   79</a>         data_bytes: u64,</span>
+<span class="line" id="L80"><a href="#L80">   80</a>     },</span>
+<span class="line" id="L81"><a href="#L81">   81</a>     /// `write_trailer`: the trailer does not read back as written.</span>
+<span class="line" id="L82"><a href="#L82">   82</a>     #[error(&quot;{path}: trailer reads back as {read:?}, wrote {wrote:?}&quot;)]</span>
+<span class="line" id="L83"><a href="#L83">   83</a>     ReadBack {</span>
+<span class="line" id="L84"><a href="#L84">   84</a>         path: String,</span>
+<span class="line" id="L85"><a href="#L85">   85</a>         read: Option&lt;Box&lt;Trailer&gt;&gt;,</span>
+<span class="line" id="L86"><a href="#L86">   86</a>         wrote: Box&lt;Trailer&gt;,</span>
+<span class="line" id="L87"><a href="#L87">   87</a>     },</span>
+<span class="line" id="L88"><a href="#L88">   88</a>     /// Table bytes in memory (`H48Table::from_file_memory`) shorter than a</span>
+<span class="line" id="L89"><a href="#L89">   89</a>     /// trailer.</span>
+<span class="line" id="L90"><a href="#L90">   90</a>     #[error(&quot;{0} bytes: not a table file&quot;)]</span>
+<span class="line" id="L91"><a href="#L91">   91</a>     NotATableFile(u64),</span>
+<span class="line" id="L92"><a href="#L92">   92</a>     /// Table bytes in memory without a trailer at the end.</span>
+<span class="line" id="L93"><a href="#L93">   93</a>     #[error(&quot;no table trailer at the end&quot;)]</span>
+<span class="line" id="L94"><a href="#L94">   94</a>     NoTrailer,</span>
+<span class="line" id="L95"><a href="#L95">   95</a>     /// Table bytes in memory with an unusable trailer (as `BadTrailer`).</span>
+<span class="line" id="L96"><a href="#L96">   96</a>     #[error(&quot;bad table trailer {0:?}&quot;)]</span>
+<span class="line" id="L97"><a href="#L97">   97</a>     UnusableTrailer(Trailer),</span>
+<span class="line" id="L98"><a href="#L98">   98</a>     /// Table bytes in memory of another size than their trailer&#x27;s `k`</span>
+<span class="line" id="L99"><a href="#L99">   99</a>     /// needs.</span>
+<span class="line" id="L100"><a href="#L100">  100</a>     #[error(&quot;{bytes} bytes, but h{k} needs {needed} and a trailer&quot;)]</span>
+<span class="line" id="L101"><a href="#L101">  101</a>     WrongMemorySize { bytes: u64, k: u32, needed: u64 },</span>
+<span class="line" id="L102"><a href="#L102">  102</a>     /// The data&#x27;s checksum is not the trailer&#x27;s.</span>
+<span class="line" id="L103"><a href="#L103">  103</a>     #[error(&quot;checksum {got:016x}, the trailer says {want:016x}: the data is damaged&quot;)]</span>
+<span class="line" id="L104"><a href="#L104">  104</a>     Checksum { got: u64, want: u64 },</span>
+<span class="line" id="L105"><a href="#L105">  105</a>     /// `LoadMode::Shm` off Linux.</span>
+<span class="line" id="L106"><a href="#L106">  106</a>     #[error(&quot;shared memory segments (--load shm) are only supported on Linux&quot;)]</span>
+<span class="line" id="L107"><a href="#L107">  107</a>     ShmUnsupported,</span>
+<span class="line" id="L108"><a href="#L108">  108</a>     /// `LoadMode::Shm` of a table without a checksum, which could not be told</span>
+<span class="line" id="L109"><a href="#L109">  109</a>     /// from another table in a segment.</span>
+<span class="line" id="L110"><a href="#L110">  110</a>     #[error(</span>
+<span class="line" id="L111"><a href="#L111">  111</a>         &quot;{path}: its trailer has no checksum, which a shared memory segment needs to tell \</span>
+<span class="line" id="L112"><a href="#L112">  112</a>          this table from another (`gen stamp` adds one)&quot;</span>
+<span class="line" id="L113"><a href="#L113">  113</a>     )]</span>
+<span class="line" id="L114"><a href="#L114">  114</a>     ShmNoChecksum { path: String },</span>
+<span class="line" id="L115"><a href="#L115">  115</a>     /// The segment under the table&#x27;s key holds another table (say an older</span>
+<span class="line" id="L116"><a href="#L116">  116</a>     /// one of the same k and base): never used.</span>
+<span class="line" id="L117"><a href="#L117">  117</a>     #[error(</span>
+<span class="line" id="L118"><a href="#L118">  118</a>         &quot;shared memory segment {key:#010x} holds {held}, not the table of {path} ({wanted}); \</span>
+<span class="line" id="L119"><a href="#L119">  119</a>          remove it ({hint}) and load again&quot;</span>
+<span class="line" id="L120"><a href="#L120">  120</a>     )]</span>
+<span class="line" id="L121"><a href="#L121">  121</a>     ShmOtherTable {</span>
+<span class="line" id="L122"><a href="#L122">  122</a>         key: u32,</span>
+<span class="line" id="L123"><a href="#L123">  123</a>         path: String,</span>
+<span class="line" id="L124"><a href="#L124">  124</a>         held: String,</span>
+<span class="line" id="L125"><a href="#L125">  125</a>         wanted: String,</span>
+<span class="line" id="L126"><a href="#L126">  126</a>         hint: String,</span>
+<span class="line" id="L127"><a href="#L127">  127</a>     },</span>
+<span class="line" id="L128"><a href="#L128">  128</a>     /// Another process is loading the segment (try again later).</span>
+<span class="line" id="L129"><a href="#L129">  129</a>     #[error(&quot;shared memory segment {key:#010x} is being loaded by process {pid}&quot;)]</span>
+<span class="line" id="L130"><a href="#L130">  130</a>     ShmLoading { key: u32, pid: i32 },</span>
+<span class="line" id="L131"><a href="#L131">  131</a>     /// The segment cannot be made or used; the message says why and how to</span>
+<span class="line" id="L132"><a href="#L132">  132</a>     /// fix it (memory, kernel limits, an interrupted load).</span>
+<span class="line" id="L133"><a href="#L133">  133</a>     #[error(&quot;shared memory segment {key:#010x}: {message}&quot;)]</span>
+<span class="line" id="L134"><a href="#L134">  134</a>     Shm { key: u32, message: String },</span>
+<span class="line" id="L135"><a href="#L135">  135</a>     /// A shared memory call failed.</span>
+<span class="line" id="L136"><a href="#L136">  136</a>     #[error(&quot;shared memory segment {key:#010x}: {call}&quot;)]</span>
+<span class="line" id="L137"><a href="#L137">  137</a>     ShmCall {</span>
+<span class="line" id="L138"><a href="#L138">  138</a>         key: u32,</span>
+<span class="line" id="L139"><a href="#L139">  139</a>         call: &amp;&#x27;static str,</span>
+<span class="line" id="L140"><a href="#L140">  140</a>         source: std::io::Error,</span>
+<span class="line" id="L141"><a href="#L141">  141</a>     },</span>
+<span class="line" id="L142"><a href="#L142">  142</a>     /// Table memory cannot be allocated (or mapped).</span>
+<span class="line" id="L143"><a href="#L143">  143</a>     #[error(&quot;cannot allocate {bytes} bytes of table memory&quot;)]</span>
+<span class="line" id="L144"><a href="#L144">  144</a>     Alloc {</span>
+<span class="line" id="L145"><a href="#L145">  145</a>         bytes: usize,</span>
+<span class="line" id="L146"><a href="#L146">  146</a>         source: std::io::Error,</span>
+<span class="line" id="L147"><a href="#L147">  147</a>     },</span>
+<span class="line" id="L148"><a href="#L148">  148</a>     /// Memory larger than a slice can be on this target (2 GiB on 32-bit</span>
+<span class="line" id="L149"><a href="#L149">  149</a>     /// targets).</span>
+<span class="line" id="L150"><a href="#L150">  150</a>     #[error(&quot;{0} bytes: larger than a slice can be on this target&quot;)]</span>
+<span class="line" id="L151"><a href="#L151">  151</a>     TooLargeForSlice(usize),</span>
+<span class="line" id="L152"><a href="#L152">  152</a>     /// A worker thread panicked (only where panics unwind, as in tests).</span>
+<span class="line" id="L153"><a href="#L153">  153</a>     #[error(transparent)]</span>
+<span class="line" id="L154"><a href="#L154">  154</a>     Worker(#[from] crate::parallel::WorkerPanicked),</span>
+<span class="line" id="L155"><a href="#L155">  155</a>     /// An environment variable set to a value it cannot have.</span>
+<span class="line" id="L156"><a href="#L156">  156</a>     #[error(&quot;{var}={value:?}: expected {expected}&quot;)]</span>
+<span class="line" id="L157"><a href="#L157">  157</a>     BadEnv {</span>
+<span class="line" id="L158"><a href="#L158">  158</a>         var: &amp;&#x27;static str,</span>
+<span class="line" id="L159"><a href="#L159">  159</a>         value: String,</span>
+<span class="line" id="L160"><a href="#L160">  160</a>         expected: &amp;&#x27;static str,</span>
+<span class="line" id="L161"><a href="#L161">  161</a>     },</span>
+<span class="line" id="L162"><a href="#L162">  162</a>     /// The cocsep table does not come out as it must (a bug in the cube</span>
+<span class="line" id="L163"><a href="#L163">  163</a>     /// model).</span>
+<span class="line" id="L164"><a href="#L164">  164</a>     #[error(&quot;cocsep table: {what} {found}, expected {expected} (a bug in the cube model)&quot;)]</span>
+<span class="line" id="L165"><a href="#L165">  165</a>     CocsepModel {</span>
+<span class="line" id="L166"><a href="#L166">  166</a>         what: &amp;&#x27;static str,</span>
+<span class="line" id="L167"><a href="#L167">  167</a>         found: usize,</span>
+<span class="line" id="L168"><a href="#L168">  168</a>         expected: usize,</span>
+<span class="line" id="L169"><a href="#L169">  169</a>     },</span>
+<span class="line" id="L170"><a href="#L170">  170</a>     /// Table generation asked for something out of range.</span>
+<span class="line" id="L171"><a href="#L171">  171</a>     #[error(&quot;table generation: {0}&quot;)]</span>
+<span class="line" id="L172"><a href="#L172">  172</a>     Generate(String),</span>
+<span class="line" id="L173"><a href="#L173">  173</a> }</span>
+<span class="line" id="L174"><a href="#L174">  174</a> </span>
+<span class="line" id="L175"><a href="#L175">  175</a> /// `TableError::Io` of the file at `path`.</span>
+<span class="line" id="L176"><a href="#L176">  176</a> pub(crate) fn io_error(path: &amp;str) -&gt; impl FnOnce(std::io::Error) -&gt; TableError + &#x27;_ {</span>
+<span class="line" id="L177"><a href="#L177">  177</a>     move |source| TableError::Io {</span>
+<span class="line" id="L178"><a href="#L178">  178</a>         path: path.to_string(),</span>
+<span class="line" id="L179"><a href="#L179">  179</a>         source,</span>
+<span class="line" id="L180"><a href="#L180">  180</a>     }</span>
+<span class="line" id="L181"><a href="#L181">  181</a> }</span>
+<span class="line" id="L182"><a href="#L182">  182</a> </span>
+<span class="line" id="L183"><a href="#L183">  183</a> /// What a table&#x27;s trailer says about it.</span>
+<span class="line" id="L184"><a href="#L184">  184</a> #[derive(Clone, Copy, Debug, PartialEq, Eq)]</span>
+<span class="line" id="L185"><a href="#L185">  185</a> pub struct Trailer {</span>
+<span class="line" id="L186"><a href="#L186">  186</a>     pub k: u32,</span>
+<span class="line" id="L187"><a href="#L187">  187</a>     pub base: u8,</span>
+<span class="line" id="L188"><a href="#L188">  188</a>     /// Bytes of table data at the start of the file.</span>
+<span class="line" id="L189"><a href="#L189">  189</a>     pub data_bytes: u64,</span>
+<span class="line" id="L190"><a href="#L190">  190</a>     /// Number of real entries with each 2-bit code, if recorded.</span>
+<span class="line" id="L191"><a href="#L191">  191</a>     pub distribution: Option&lt;[u64; 4]&gt;,</span>
+<span class="line" id="L192"><a href="#L192">  192</a>     /// `checksum` of the data, if recorded.</span>
+<span class="line" id="L193"><a href="#L193">  193</a>     pub checksum: Option&lt;u64&gt;,</span>
+<span class="line" id="L194"><a href="#L194">  194</a> }</span>
+<span class="line" id="L195"><a href="#L195">  195</a> </span>
+<span class="line" id="L196"><a href="#L196">  196</a> impl Trailer {</span>
+<span class="line" id="L197"><a href="#L197">  197</a>     /// The trailer as stored: text lines padded with NUL bytes (the text is</span>
+<span class="line" id="L198"><a href="#L198">  198</a>     /// far shorter than the trailer).</span>
+<span class="line" id="L199"><a href="#L199">  199</a>     #[must_use]</span>
+<span class="line" id="L200"><a href="#L200">  200</a>     pub fn to_bytes(&amp;self) -&gt; Vec&lt;u8&gt; {</span>
+<span class="line" id="L201"><a href="#L201">  201</a>         use std::fmt::Write as _;</span>
+<span class="line" id="L202"><a href="#L202">  202</a>         let mut text = String::with_capacity(TRAILER_LEN);</span>
+<span class="line" id="L203"><a href="#L203">  203</a>         text.push_str(MAGIC);</span>
+<span class="line" id="L204"><a href="#L204">  204</a>         let _ = writeln!(text, &quot;layout {LAYOUT}&quot;);</span>
+<span class="line" id="L205"><a href="#L205">  205</a>         let _ = writeln!(text, &quot;k {}&quot;, self.k);</span>
+<span class="line" id="L206"><a href="#L206">  206</a>         let _ = writeln!(text, &quot;base {}&quot;, self.base);</span>
+<span class="line" id="L207"><a href="#L207">  207</a>         let _ = writeln!(text, &quot;bytes {}&quot;, self.data_bytes);</span>
+<span class="line" id="L208"><a href="#L208">  208</a>         if let Some(d) = self.distribution {</span>
+<span class="line" id="L209"><a href="#L209">  209</a>             let _ = writeln!(text, &quot;distribution {} {} {} {}&quot;, d[0], d[1], d[2], d[3]);</span>
+<span class="line" id="L210"><a href="#L210">  210</a>         }</span>
+<span class="line" id="L211"><a href="#L211">  211</a>         if let Some(c) = self.checksum {</span>
+<span class="line" id="L212"><a href="#L212">  212</a>             let _ = writeln!(text, &quot;checksum {c:016x}&quot;);</span>
+<span class="line" id="L213"><a href="#L213">  213</a>         }</span>
+<span class="line" id="L214"><a href="#L214">  214</a>         let mut bytes = text.into_bytes();</span>
+<span class="line" id="L215"><a href="#L215">  215</a>         bytes.resize(TRAILER_LEN, 0);</span>
+<span class="line" id="L216"><a href="#L216">  216</a>         bytes</span>
+<span class="line" id="L217"><a href="#L217">  217</a>     }</span>
+<span class="line" id="L218"><a href="#L218">  218</a> </span>
+<span class="line" id="L219"><a href="#L219">  219</a>     /// Parse a trailer. Returns `Ok(None)` if `bytes` does not start with the</span>
+<span class="line" id="L220"><a href="#L220">  220</a>     /// magic line (a file without a trailer).</span>
+<span class="line" id="L221"><a href="#L221">  221</a>     ///</span>
+<span class="line" id="L222"><a href="#L222">  222</a>     /// # Errors</span>
+<span class="line" id="L223"><a href="#L223">  223</a>     /// `MalformedTrailer` if the magic line is there but the rest is</span>
+<span class="line" id="L224"><a href="#L224">  224</a>     /// malformed.</span>
+<span class="line" id="L225"><a href="#L225">  225</a>     pub fn parse(bytes: &amp;[u8]) -&gt; Result&lt;Option&lt;Trailer&gt;, TableError&gt; {</span>
+<span class="line" id="L226"><a href="#L226">  226</a>         let Some(rest) = bytes</span>
+<span class="line" id="L227"><a href="#L227">  227</a>             .strip_prefix(MAGIC.as_bytes())</span>
+<span class="line" id="L228"><a href="#L228">  228</a>             .or_else(|| bytes.strip_prefix(LEGACY_MAGIC.as_bytes()))</span>
+<span class="line" id="L229"><a href="#L229">  229</a>         else {</span>
+<span class="line" id="L230"><a href="#L230">  230</a>             return Ok(None);</span>
+<span class="line" id="L231"><a href="#L231">  231</a>         };</span>
+<span class="line" id="L232"><a href="#L232">  232</a>         let end = rest.iter().position(|&amp;b| b == 0).unwrap_or(rest.len());</span>
+<span class="line" id="L233"><a href="#L233">  233</a>         let invalid = |what: &amp;str| TableError::MalformedTrailer(what.to_string());</span>
+<span class="line" id="L234"><a href="#L234">  234</a>         let text = std::str::from_utf8(&amp;rest[..end]).map_err(|_| invalid(&quot;not text&quot;))?;</span>
+<span class="line" id="L235"><a href="#L235">  235</a>         let (mut k, mut base, mut data_bytes) = (None, None, None);</span>
+<span class="line" id="L236"><a href="#L236">  236</a>         let (mut distribution, mut checksum) = (None, None);</span>
+<span class="line" id="L237"><a href="#L237">  237</a>         for line in text.lines() {</span>
+<span class="line" id="L238"><a href="#L238">  238</a>             let mut words = line.split_whitespace();</span>
+<span class="line" id="L239"><a href="#L239">  239</a>             let key = words.next().unwrap_or(&quot;&quot;);</span>
+<span class="line" id="L240"><a href="#L240">  240</a>             let values: Vec&lt;&amp;str&gt; = words.collect();</span>
+<span class="line" id="L241"><a href="#L241">  241</a>             let number = |i: usize| -&gt; Result&lt;u64, TableError&gt; {</span>
+<span class="line" id="L242"><a href="#L242">  242</a>                 values</span>
+<span class="line" id="L243"><a href="#L243">  243</a>                     .get(i)</span>
+<span class="line" id="L244"><a href="#L244">  244</a>                     .and_then(|v| v.parse().ok())</span>
+<span class="line" id="L245"><a href="#L245">  245</a>                     .ok_or_else(|| invalid(line))</span>
+<span class="line" id="L246"><a href="#L246">  246</a>             };</span>
+<span class="line" id="L247"><a href="#L247">  247</a>             match key {</span>
+<span class="line" id="L248"><a href="#L248">  248</a>                 &quot;layout&quot; if values != [LAYOUT] =&gt; {</span>
+<span class="line" id="L249"><a href="#L249">  249</a>                     return Err(invalid(&amp;format!(&quot;unsupported layout {values:?}&quot;)));</span>
+<span class="line" id="L250"><a href="#L250">  250</a>                 }</span>
+<span class="line" id="L251"><a href="#L251">  251</a>                 &quot;k&quot; =&gt; k = Some(number(0)?),</span>
+<span class="line" id="L252"><a href="#L252">  252</a>                 &quot;base&quot; =&gt; base = Some(number(0)?),</span>
+<span class="line" id="L253"><a href="#L253">  253</a>                 &quot;bytes&quot; =&gt; data_bytes = Some(number(0)?),</span>
+<span class="line" id="L254"><a href="#L254">  254</a>                 &quot;distribution&quot; =&gt; {</span>
+<span class="line" id="L255"><a href="#L255">  255</a>                     distribution = Some([number(0)?, number(1)?, number(2)?, number(3)?]);</span>
+<span class="line" id="L256"><a href="#L256">  256</a>                 }</span>
+<span class="line" id="L257"><a href="#L257">  257</a>                 &quot;checksum&quot; =&gt; {</span>
+<span class="line" id="L258"><a href="#L258">  258</a>                     let v = values.first().ok_or_else(|| invalid(line))?;</span>
+<span class="line" id="L259"><a href="#L259">  259</a>                     checksum = Some(u64::from_str_radix(v, 16).map_err(|_| invalid(line))?);</span>
+<span class="line" id="L260"><a href="#L260">  260</a>                 }</span>
+<span class="line" id="L261"><a href="#L261">  261</a>                 // Unknown keys are allowed (later versions may add some).</span>
+<span class="line" id="L262"><a href="#L262">  262</a>                 _ =&gt; {}</span>
+<span class="line" id="L263"><a href="#L263">  263</a>             }</span>
+<span class="line" id="L264"><a href="#L264">  264</a>         }</span>
+<span class="line" id="L265"><a href="#L265">  265</a>         let (Some(k), Some(base), Some(data_bytes)) = (k, base, data_bytes) else {</span>
+<span class="line" id="L266"><a href="#L266">  266</a>             return Err(invalid(&quot;k, base or bytes missing&quot;));</span>
+<span class="line" id="L267"><a href="#L267">  267</a>         };</span>
+<span class="line" id="L268"><a href="#L268">  268</a>         let k = u32::try_from(k).map_err(|_| invalid(&quot;k&quot;))?;</span>
+<span class="line" id="L269"><a href="#L269">  269</a>         let base = u8::try_from(base).map_err(|_| invalid(&quot;base&quot;))?;</span>
+<span class="line" id="L270"><a href="#L270">  270</a>         Ok(Some(Trailer {</span>
+<span class="line" id="L271"><a href="#L271">  271</a>             k,</span>
+<span class="line" id="L272"><a href="#L272">  272</a>             base,</span>
+<span class="line" id="L273"><a href="#L273">  273</a>             data_bytes,</span>
+<span class="line" id="L274"><a href="#L274">  274</a>             distribution,</span>
+<span class="line" id="L275"><a href="#L275">  275</a>             checksum,</span>
+<span class="line" id="L276"><a href="#L276">  276</a>         }))</span>
+<span class="line" id="L277"><a href="#L277">  277</a>     }</span>
+<span class="line" id="L278"><a href="#L278">  278</a> }</span>
+<span class="line" id="L279"><a href="#L279">  279</a> </span>
+<span class="line" id="L280"><a href="#L280">  280</a> /// Whether `path` is on a hugetlbfs mount (whose files are whole huge pages</span>
+<span class="line" id="L281"><a href="#L281">  281</a> /// and can only be written through a mapping).</span>
+<span class="line" id="L282"><a href="#L282">  282</a> #[must_use]</span>
+<span class="line" id="L283"><a href="#L283">  283</a> pub fn is_hugetlbfs(path: &amp;str) -&gt; bool {</span>
+<span class="line" id="L284"><a href="#L284">  284</a>     #[cfg(target_os = &quot;linux&quot;)]</span>
+<span class="line" id="L285"><a href="#L285">  285</a>     {</span>
+<span class="line" id="L286"><a href="#L286">  286</a>         // The statfs magic of hugetlbfs.</span>
+<span class="line" id="L287"><a href="#L287">  287</a>         const HUGETLBFS_MAGIC: i64 = 0x9584_58f6;</span>
+<span class="line" id="L288"><a href="#L288">  288</a>         let Ok(c_path) = std::ffi::CString::new(path) else {</span>
+<span class="line" id="L289"><a href="#L289">  289</a>             return false;</span>
+<span class="line" id="L290"><a href="#L290">  290</a>         };</span>
+<span class="line" id="L291"><a href="#L291">  291</a>         // A missing file: judge by its folder (the file may be about to be</span>
+<span class="line" id="L292"><a href="#L292">  292</a>         // created there).</span>
+<span class="line" id="L293"><a href="#L293">  293</a>         let dir = std::path::Path::new(path)</span>
+<span class="line" id="L294"><a href="#L294">  294</a>             .parent()</span>
+<span class="line" id="L295"><a href="#L295">  295</a>             .and_then(|p| std::ffi::CString::new(p.as_os_str().as_encoded_bytes()).ok());</span>
+<span class="line" id="L296"><a href="#L296">  296</a>         for p in [Some(c_path), dir].into_iter().flatten() {</span>
+<span class="line" id="L297"><a href="#L297">  297</a>             // SAFETY: `p` is a NUL-terminated path, `st` a valid out-pointer.</span>
+<span class="line" id="L298"><a href="#L298">  298</a>             unsafe {</span>
+<span class="line" id="L299"><a href="#L299">  299</a>                 let mut st: libc::statfs = std::mem::zeroed();</span>
+<span class="line" id="L300"><a href="#L300">  300</a>                 if libc::statfs(p.as_ptr(), &amp;raw mut st) == 0 {</span>
+<span class="line" id="L301"><a href="#L301">  301</a>                     #[allow(clippy::unnecessary_cast, reason = &quot;f_type&#x27;s type varies by target&quot;)]</span>
+<span class="line" id="L302"><a href="#L302">  302</a>                     return st.f_type as i64 == HUGETLBFS_MAGIC;</span>
+<span class="line" id="L303"><a href="#L303">  303</a>                 }</span>
+<span class="line" id="L304"><a href="#L304">  304</a>             }</span>
+<span class="line" id="L305"><a href="#L305">  305</a>         }</span>
+<span class="line" id="L306"><a href="#L306">  306</a>         false</span>
+<span class="line" id="L307"><a href="#L307">  307</a>     }</span>
+<span class="line" id="L308"><a href="#L308">  308</a>     #[cfg(not(target_os = &quot;linux&quot;))]</span>
+<span class="line" id="L309"><a href="#L309">  309</a>     {</span>
+<span class="line" id="L310"><a href="#L310">  310</a>         let _ = path;</span>
+<span class="line" id="L311"><a href="#L311">  311</a>         false</span>
+<span class="line" id="L312"><a href="#L312">  312</a>     }</span>
+<span class="line" id="L313"><a href="#L313">  313</a> }</span>
+<span class="line" id="L314"><a href="#L314">  314</a> </span>
+<span class="line" id="L315"><a href="#L315">  315</a> /// File size of a new table of `data_bytes` with its trailer.</span>
+<span class="line" id="L316"><a href="#L316">  316</a> #[must_use]</span>
+<span class="line" id="L317"><a href="#L317">  317</a> pub fn file_bytes(data_bytes: u64, hugetlbfs: bool) -&gt; u64 {</span>
+<span class="line" id="L318"><a href="#L318">  318</a>     let len = data_bytes + TRAILER_BYTES;</span>
+<span class="line" id="L319"><a href="#L319">  319</a>     if hugetlbfs {</span>
+<span class="line" id="L320"><a href="#L320">  320</a>         len.div_ceil(HUGE_PAGE) * HUGE_PAGE</span>
+<span class="line" id="L321"><a href="#L321">  321</a>     } else {</span>
+<span class="line" id="L322"><a href="#L322">  322</a>         len</span>
+<span class="line" id="L323"><a href="#L323">  323</a>     }</span>
+<span class="line" id="L324"><a href="#L324">  324</a> }</span>
+<span class="line" id="L325"><a href="#L325">  325</a> </span>
+<span class="line" id="L326"><a href="#L326">  326</a> /// Read the trailer of a table file, if it has one.</span>
+<span class="line" id="L327"><a href="#L327">  327</a> ///</span>
+<span class="line" id="L328"><a href="#L328">  328</a> /// # Errors</span>
+<span class="line" id="L329"><a href="#L329">  329</a> /// If the file cannot be read, or has a malformed trailer.</span>
+<span class="line" id="L330"><a href="#L330">  330</a> pub fn read_trailer(path: &amp;str) -&gt; Result&lt;Option&lt;Trailer&gt;, TableError&gt; {</span>
+<span class="line" id="L331"><a href="#L331">  331</a>     let read = || -&gt; std::io::Result&lt;Option&lt;Vec&lt;u8&gt;&gt;&gt; {</span>
+<span class="line" id="L332"><a href="#L332">  332</a>         let f = std::fs::File::open(path)?;</span>
+<span class="line" id="L333"><a href="#L333">  333</a>         let len = f.metadata()?.len();</span>
+<span class="line" id="L334"><a href="#L334">  334</a>         if len &lt; TRAILER_BYTES {</span>
+<span class="line" id="L335"><a href="#L335">  335</a>             return Ok(None);</span>
+<span class="line" id="L336"><a href="#L336">  336</a>         }</span>
+<span class="line" id="L337"><a href="#L337">  337</a>         let mut buf = vec![0u8; TRAILER_LEN];</span>
+<span class="line" id="L338"><a href="#L338">  338</a>         (&amp;f).seek(SeekFrom::Start(len - TRAILER_BYTES))?;</span>
+<span class="line" id="L339"><a href="#L339">  339</a>         (&amp;f).read_exact(&amp;mut buf)?;</span>
+<span class="line" id="L340"><a href="#L340">  340</a>         Ok(Some(buf))</span>
+<span class="line" id="L341"><a href="#L341">  341</a>     };</span>
+<span class="line" id="L342"><a href="#L342">  342</a>     match read().map_err(io_error(path))? {</span>
+<span class="line" id="L343"><a href="#L343">  343</a>         Some(buf) =&gt; Trailer::parse(&amp;buf),</span>
+<span class="line" id="L344"><a href="#L344">  344</a>         None =&gt; Ok(None),</span>
+<span class="line" id="L345"><a href="#L345">  345</a>     }</span>
+<span class="line" id="L346"><a href="#L346">  346</a> }</span>
+<span class="line" id="L347"><a href="#L347">  347</a> </span>
+<span class="line" id="L348"><a href="#L348">  348</a> /// Write `trailer` into the last 4 KiB of an existing table file, then read</span>
+<span class="line" id="L349"><a href="#L349">  349</a> /// it back.</span>
+<span class="line" id="L350"><a href="#L350">  350</a> ///</span>
+<span class="line" id="L351"><a href="#L351">  351</a> /// # Errors</span>
+<span class="line" id="L352"><a href="#L352">  352</a> /// If the file is too small to hold the data and a trailer after it (the</span>
+<span class="line" id="L353"><a href="#L353">  353</a> /// data region is never written), or on any I/O error, or if the trailer</span>
+<span class="line" id="L354"><a href="#L354">  354</a> /// does not read back as written.</span>
+<span class="line" id="L355"><a href="#L355">  355</a> pub fn write_trailer(path: &amp;str, trailer: &amp;Trailer) -&gt; Result&lt;(), TableError&gt; {</span>
+<span class="line" id="L356"><a href="#L356">  356</a>     let f = std::fs::OpenOptions::new()</span>
+<span class="line" id="L357"><a href="#L357">  357</a>         .read(true)</span>
+<span class="line" id="L358"><a href="#L358">  358</a>         .write(true)</span>
+<span class="line" id="L359"><a href="#L359">  359</a>         .open(path)</span>
+<span class="line" id="L360"><a href="#L360">  360</a>         .map_err(io_error(path))?;</span>
+<span class="line" id="L361"><a href="#L361">  361</a>     let len = f.metadata().map_err(io_error(path))?.len();</span>
+<span class="line" id="L362"><a href="#L362">  362</a>     if len &lt; trailer.data_bytes + TRAILER_BYTES {</span>
+<span class="line" id="L363"><a href="#L363">  363</a>         return Err(TableError::NoRoom {</span>
+<span class="line" id="L364"><a href="#L364">  364</a>             path: path.to_string(),</span>
+<span class="line" id="L365"><a href="#L365">  365</a>             bytes: len,</span>
+<span class="line" id="L366"><a href="#L366">  366</a>             data_bytes: trailer.data_bytes,</span>
+<span class="line" id="L367"><a href="#L367">  367</a>         });</span>
+<span class="line" id="L368"><a href="#L368">  368</a>     }</span>
+<span class="line" id="L369"><a href="#L369">  369</a>     let offset = len - TRAILER_BYTES;</span>
+<span class="line" id="L370"><a href="#L370">  370</a>     let bytes = trailer.to_bytes();</span>
+<span class="line" id="L371"><a href="#L371">  371</a>     #[cfg(target_os = &quot;linux&quot;)]</span>
+<span class="line" id="L372"><a href="#L372">  372</a>     if is_hugetlbfs(path) {</span>
+<span class="line" id="L373"><a href="#L373">  373</a>         // hugetlbfs has no write(): map the last page and copy the trailer in.</span>
+<span class="line" id="L374"><a href="#L374">  374</a>         let page = HUGE_PAGE.min(len);</span>
+<span class="line" id="L375"><a href="#L375">  375</a>         let page_start = len - page;</span>
+<span class="line" id="L376"><a href="#L376">  376</a>         // (A page is at most 1 GiB, and the offset within it smaller: they</span>
+<span class="line" id="L377"><a href="#L377">  377</a>         // fit in `usize` on any target.)</span>
+<span class="line" id="L378"><a href="#L378">  378</a>         let as_usize = |x: u64| usize::try_from(x).map_err(std::io::Error::other);</span>
+<span class="line" id="L379"><a href="#L379">  379</a>         let as_offset = |x: u64| libc::off_t::try_from(x).map_err(std::io::Error::other);</span>
+<span class="line" id="L380"><a href="#L380">  380</a>         let (page_len, in_page, file_offset) = (|| {</span>
+<span class="line" id="L381"><a href="#L381">  381</a>             Ok::&lt;_, std::io::Error&gt;((</span>
+<span class="line" id="L382"><a href="#L382">  382</a>                 as_usize(page)?,</span>
+<span class="line" id="L383"><a href="#L383">  383</a>                 as_usize(offset - page_start)?,</span>
+<span class="line" id="L384"><a href="#L384">  384</a>                 as_offset(page_start)?,</span>
+<span class="line" id="L385"><a href="#L385">  385</a>             ))</span>
+<span class="line" id="L386"><a href="#L386">  386</a>         })()</span>
+<span class="line" id="L387"><a href="#L387">  387</a>         .map_err(io_error(path))?;</span>
+<span class="line" id="L388"><a href="#L388">  388</a>         // SAFETY: a fresh shared mapping of the file&#x27;s last page; only the</span>
+<span class="line" id="L389"><a href="#L389">  389</a>         // trailer bytes (past the data, checked above) are written.</span>
+<span class="line" id="L390"><a href="#L390">  390</a>         unsafe {</span>
+<span class="line" id="L391"><a href="#L391">  391</a>             use std::os::unix::io::AsRawFd;</span>
+<span class="line" id="L392"><a href="#L392">  392</a>             let p = libc::mmap(</span>
+<span class="line" id="L393"><a href="#L393">  393</a>                 std::ptr::null_mut(),</span>
+<span class="line" id="L394"><a href="#L394">  394</a>                 page_len,</span>
+<span class="line" id="L395"><a href="#L395">  395</a>                 libc::PROT_READ | libc::PROT_WRITE,</span>
+<span class="line" id="L396"><a href="#L396">  396</a>                 libc::MAP_SHARED,</span>
+<span class="line" id="L397"><a href="#L397">  397</a>                 f.as_raw_fd(),</span>
+<span class="line" id="L398"><a href="#L398">  398</a>                 file_offset,</span>
+<span class="line" id="L399"><a href="#L399">  399</a>             );</span>
+<span class="line" id="L400"><a href="#L400">  400</a>             if p == libc::MAP_FAILED {</span>
+<span class="line" id="L401"><a href="#L401">  401</a>                 return Err(io_error(path)(std::io::Error::last_os_error()));</span>
+<span class="line" id="L402"><a href="#L402">  402</a>             }</span>
+<span class="line" id="L403"><a href="#L403">  403</a>             let dst = p.cast::&lt;u8&gt;().add(in_page);</span>
+<span class="line" id="L404"><a href="#L404">  404</a>             std::ptr::copy_nonoverlapping(bytes.as_ptr(), dst, bytes.len());</span>
+<span class="line" id="L405"><a href="#L405">  405</a>             libc::munmap(p, page_len);</span>
+<span class="line" id="L406"><a href="#L406">  406</a>         }</span>
+<span class="line" id="L407"><a href="#L407">  407</a>         return read_back(path, trailer);</span>
+<span class="line" id="L408"><a href="#L408">  408</a>     }</span>
+<span class="line" id="L409"><a href="#L409">  409</a>     let write = || -&gt; std::io::Result&lt;()&gt; {</span>
+<span class="line" id="L410"><a href="#L410">  410</a>         (&amp;f).seek(SeekFrom::Start(offset))?;</span>
+<span class="line" id="L411"><a href="#L411">  411</a>         (&amp;f).write_all(&amp;bytes)?;</span>
+<span class="line" id="L412"><a href="#L412">  412</a>         f.sync_data()</span>
+<span class="line" id="L413"><a href="#L413">  413</a>     };</span>
+<span class="line" id="L414"><a href="#L414">  414</a>     write().map_err(io_error(path))?;</span>
+<span class="line" id="L415"><a href="#L415">  415</a>     read_back(path, trailer)</span>
+<span class="line" id="L416"><a href="#L416">  416</a> }</span>
+<span class="line" id="L417"><a href="#L417">  417</a> </span>
+<span class="line" id="L418"><a href="#L418">  418</a> /// Check that the trailer of `path` reads back as `trailer`.</span>
+<span class="line" id="L419"><a href="#L419">  419</a> fn read_back(path: &amp;str, trailer: &amp;Trailer) -&gt; Result&lt;(), TableError&gt; {</span>
+<span class="line" id="L420"><a href="#L420">  420</a>     match read_trailer(path)? {</span>
+<span class="line" id="L421"><a href="#L421">  421</a>         Some(t) if t == *trailer =&gt; Ok(()),</span>
+<span class="line" id="L422"><a href="#L422">  422</a>         read =&gt; Err(TableError::ReadBack {</span>
+<span class="line" id="L423"><a href="#L423">  423</a>             path: path.to_string(),</span>
+<span class="line" id="L424"><a href="#L424">  424</a>             read: read.map(Box::new),</span>
+<span class="line" id="L425"><a href="#L425">  425</a>             wrote: Box::new(*trailer),</span>
+<span class="line" id="L426"><a href="#L426">  426</a>         }),</span>
+<span class="line" id="L427"><a href="#L427">  427</a>     }</span>
+<span class="line" id="L428"><a href="#L428">  428</a> }</span>
+<span class="line" id="L429"><a href="#L429">  429</a> </span>
+<span class="line" id="L430"><a href="#L430">  430</a> /// Bytes per chunk of `checksum`.</span>
+<span class="line" id="L431"><a href="#L431">  431</a> pub const CHECKSUM_CHUNK: usize = 1 &lt;&lt; 20;</span>
+<span class="line" id="L432"><a href="#L432">  432</a> </span>
+<span class="line" id="L433"><a href="#L433">  433</a> fn mix(h: u64, x: u64) -&gt; u64 {</span>
+<span class="line" id="L434"><a href="#L434">  434</a>     (h ^ x).wrapping_mul(0x9E37_79B9_7F4A_7C15).rotate_left(29)</span>
+<span class="line" id="L435"><a href="#L435">  435</a> }</span>
+<span class="line" id="L436"><a href="#L436">  436</a> </span>
+<span class="line" id="L437"><a href="#L437">  437</a> /// Hash of each `CHECKSUM_CHUNK` bytes of `data` (the last chunk may be</span>
+<span class="line" id="L438"><a href="#L438">  438</a> /// shorter), in parallel.</span>
+<span class="line" id="L439"><a href="#L439">  439</a> ///</span>
+<span class="line" id="L440"><a href="#L440">  440</a> /// # Errors</span>
+<span class="line" id="L441"><a href="#L441">  441</a> /// If a worker thread panicked.</span>
+<span class="line" id="L442"><a href="#L442">  442</a> pub fn chunk_hashes(</span>
+<span class="line" id="L443"><a href="#L443">  443</a>     data: &amp;[u8],</span>
+<span class="line" id="L444"><a href="#L444">  444</a>     threads: usize,</span>
+<span class="line" id="L445"><a href="#L445">  445</a> ) -&gt; Result&lt;Vec&lt;u64&gt;, crate::parallel::WorkerPanicked&gt; {</span>
+<span class="line" id="L446"><a href="#L446">  446</a>     fn chunk_hash(chunk: &amp;[u8]) -&gt; u64 {</span>
+<span class="line" id="L447"><a href="#L447">  447</a>         // Four independent lanes (no single dependency chain), then folded.</span>
+<span class="line" id="L448"><a href="#L448">  448</a>         let mut lanes = [1u64, 2, 3, 4];</span>
+<span class="line" id="L449"><a href="#L449">  449</a>         let (words, rest) = chunk.as_chunks::&lt;32&gt;();</span>
+<span class="line" id="L450"><a href="#L450">  450</a>         for w in words {</span>
+<span class="line" id="L451"><a href="#L451">  451</a>             for (lane, x) in lanes.iter_mut().zip(w.as_chunks::&lt;8&gt;().0) {</span>
+<span class="line" id="L452"><a href="#L452">  452</a>                 *lane = mix(*lane, u64::from_le_bytes(*x));</span>
+<span class="line" id="L453"><a href="#L453">  453</a>             }</span>
+<span class="line" id="L454"><a href="#L454">  454</a>         }</span>
+<span class="line" id="L455"><a href="#L455">  455</a>         let mut h = lanes.iter().fold(chunk.len() as u64, |h, &amp;l| mix(h, l));</span>
+<span class="line" id="L456"><a href="#L456">  456</a>         for &amp;b in rest {</span>
+<span class="line" id="L457"><a href="#L457">  457</a>             h = mix(h, u64::from(b));</span>
+<span class="line" id="L458"><a href="#L458">  458</a>         }</span>
+<span class="line" id="L459"><a href="#L459">  459</a>         h</span>
+<span class="line" id="L460"><a href="#L460">  460</a>     }</span>
+<span class="line" id="L461"><a href="#L461">  461</a>     let n = data.len().div_ceil(CHECKSUM_CHUNK);</span>
+<span class="line" id="L462"><a href="#L462">  462</a>     let threads = threads.clamp(1, n.max(1));</span>
+<span class="line" id="L463"><a href="#L463">  463</a>     let per = n.div_ceil(threads);</span>
+<span class="line" id="L464"><a href="#L464">  464</a>     Ok(crate::parallel::on_threads(threads, |t| {</span>
+<span class="line" id="L465"><a href="#L465">  465</a>         data.chunks(CHECKSUM_CHUNK)</span>
+<span class="line" id="L466"><a href="#L466">  466</a>             .skip(t * per)</span>
+<span class="line" id="L467"><a href="#L467">  467</a>             .take(per)</span>
+<span class="line" id="L468"><a href="#L468">  468</a>             .map(chunk_hash)</span>
+<span class="line" id="L469"><a href="#L469">  469</a>             .collect::&lt;Vec&lt;u64&gt;&gt;()</span>
+<span class="line" id="L470"><a href="#L470">  470</a>     })?</span>
+<span class="line" id="L471"><a href="#L471">  471</a>     .concat())</span>
+<span class="line" id="L472"><a href="#L472">  472</a> }</span>
+<span class="line" id="L473"><a href="#L473">  473</a> </span>
+<span class="line" id="L474"><a href="#L474">  474</a> /// The checksum of `len` bytes of data from its `chunk_hashes` (so that a</span>
+<span class="line" id="L475"><a href="#L475">  475</a> /// table generated in parts aligned to chunks needs no second pass).</span>
+<span class="line" id="L476"><a href="#L476">  476</a> #[must_use]</span>
+<span class="line" id="L477"><a href="#L477">  477</a> pub fn combine_hashes(len: u64, hashes: &amp;[u64]) -&gt; u64 {</span>
+<span class="line" id="L478"><a href="#L478">  478</a>     hashes.iter().fold(len, |h, &amp;x| mix(h, x))</span>
+<span class="line" id="L479"><a href="#L479">  479</a> }</span>
+<span class="line" id="L480"><a href="#L480">  480</a> </span>
+<span class="line" id="L481"><a href="#L481">  481</a> /// Checksum of table data: a hash of each 1 MiB chunk (in parallel), then of</span>
+<span class="line" id="L482"><a href="#L482">  482</a> /// the chunk hashes in order. Detects corruption (bit flips, truncation),</span>
+<span class="line" id="L483"><a href="#L483">  483</a> /// not tampering.</span>
+<span class="line" id="L484"><a href="#L484">  484</a> ///</span>
+<span class="line" id="L485"><a href="#L485">  485</a> /// # Errors</span>
+<span class="line" id="L486"><a href="#L486">  486</a> /// If a worker thread panicked.</span>
+<span class="line" id="L487"><a href="#L487">  487</a> pub fn checksum(data: &amp;[u8], threads: usize) -&gt; Result&lt;u64, crate::parallel::WorkerPanicked&gt; {</span>
+<span class="line" id="L488"><a href="#L488">  488</a>     Ok(combine_hashes(</span>
+<span class="line" id="L489"><a href="#L489">  489</a>         data.len() as u64,</span>
+<span class="line" id="L490"><a href="#L490">  490</a>         &amp;chunk_hashes(data, threads)?,</span>
+<span class="line" id="L491"><a href="#L491">  491</a>     ))</span>
+<span class="line" id="L492"><a href="#L492">  492</a> }</span>
+<span class="line" id="L493"><a href="#L493">  493</a> </span>
+<span class="line" id="L494"><a href="#L494">  494</a> /// How `H48Table::open` brings a table file into memory.</span>
+<span class="line" id="L495"><a href="#L495">  495</a> #[derive(Clone, Copy, Debug, PartialEq, Eq)]</span>
+<span class="line" id="L496"><a href="#L496">  496</a> pub enum LoadMode {</span>
+<span class="line" id="L497"><a href="#L497">  497</a>     /// The table&#x27;s shared memory segment if there is one that holds it</span>
+<span class="line" id="L498"><a href="#L498">  498</a>     /// (`Shm`, Linux); else `Map` for files on hugetlbfs or `/dev/shm`</span>
+<span class="line" id="L499"><a href="#L499">  499</a>     /// (already in memory) and on other unix systems; `Copy` for other files</span>
+<span class="line" id="L500"><a href="#L500">  500</a>     /// on Linux (anonymous memory gets transparent huge pages reliably, the</span>
+<span class="line" id="L501"><a href="#L501">  501</a>     /// page cache may not) and where there are no file mappings (WASI,</span>
+<span class="line" id="L502"><a href="#L502">  502</a>     /// Windows).</span>
+<span class="line" id="L503"><a href="#L503">  503</a>     Auto,</span>
+<span class="line" id="L504"><a href="#L504">  504</a>     /// Map the file read-only (shared with other processes using it).</span>
+<span class="line" id="L505"><a href="#L505">  505</a>     Map,</span>
+<span class="line" id="L506"><a href="#L506">  506</a>     /// Copy the file into anonymous memory (transparent huge pages where</span>
+<span class="line" id="L507"><a href="#L507">  507</a>     /// available), then drop it from the page cache.</span>
+<span class="line" id="L508"><a href="#L508">  508</a>     Copy,</span>
+<span class="line" id="L509"><a href="#L509">  509</a>     /// Attach the table&#x27;s shared memory segment, made from the file first if</span>
+<span class="line" id="L510"><a href="#L510">  510</a>     /// there is none (Linux; see `tables::shm`). `Auto` also uses a segment</span>
+<span class="line" id="L511"><a href="#L511">  511</a>     /// that is there, if it holds this file&#x27;s table.</span>
+<span class="line" id="L512"><a href="#L512">  512</a>     Shm,</span>
+<span class="line" id="L513"><a href="#L513">  513</a> }</span>
+<span class="line" id="L514"><a href="#L514">  514</a> </span>
+<span class="line" id="L515"><a href="#L515">  515</a> /// Options of `H48Table::open_with`.</span>
+<span class="line" id="L516"><a href="#L516">  516</a> #[derive(Clone, Copy, Debug)]</span>
+<span class="line" id="L517"><a href="#L517">  517</a> pub struct LoadOptions {</span>
+<span class="line" id="L518"><a href="#L518">  518</a>     pub mode: LoadMode,</span>
+<span class="line" id="L519"><a href="#L519">  519</a>     /// With `Map`: fault the whole table in at open (a sequential read), not</span>
+<span class="line" id="L520"><a href="#L520">  520</a>     /// on first use (random reads, slow until the table is cached). With</span>
+<span class="line" id="L521"><a href="#L521">  521</a>     /// `Shm`: map all of the segment&#x27;s pages at attach.</span>
+<span class="line" id="L522"><a href="#L522">  522</a>     pub prefault: bool,</span>
+<span class="line" id="L523"><a href="#L523">  523</a>     /// With `Shm`: the page sizes a new segment may get.</span>
+<span class="line" id="L524"><a href="#L524">  524</a>     pub shm_pages: ShmPages,</span>
+<span class="line" id="L525"><a href="#L525">  525</a>     /// The segment&#x27;s key [default: `shm::key` of the table&#x27;s k and base].</span>
+<span class="line" id="L526"><a href="#L526">  526</a>     pub shm_key: Option&lt;u32&gt;,</span>
+<span class="line" id="L527"><a href="#L527">  527</a> }</span>
+<span class="line" id="L528"><a href="#L528">  528</a> </span>
+<span class="line" id="L529"><a href="#L529">  529</a> impl Default for LoadOptions {</span>
+<span class="line" id="L530"><a href="#L530">  530</a>     fn default() -&gt; LoadOptions {</span>
+<span class="line" id="L531"><a href="#L531">  531</a>         LoadOptions {</span>
+<span class="line" id="L532"><a href="#L532">  532</a>             mode: LoadMode::Auto,</span>
+<span class="line" id="L533"><a href="#L533">  533</a>             prefault: true,</span>
+<span class="line" id="L534"><a href="#L534">  534</a>             shm_pages: ShmPages::ALL,</span>
+<span class="line" id="L535"><a href="#L535">  535</a>             shm_key: None,</span>
+<span class="line" id="L536"><a href="#L536">  536</a>         }</span>
+<span class="line" id="L537"><a href="#L537">  537</a>     }</span>
+<span class="line" id="L538"><a href="#L538">  538</a> }</span>
+<span class="line" id="L539"><a href="#L539">  539</a> </span>
+<span class="line" id="L540"><a href="#L540">  540</a> impl LoadOptions {</span>
+<span class="line" id="L541"><a href="#L541">  541</a>     /// Options from the environment: `EGG_SOLVER_LOAD` = `auto` | `map` |</span>
+<span class="line" id="L542"><a href="#L542">  542</a>     /// `copy` | `shm`, `EGG_SOLVER_PREFAULT` = `1` | `0`, `EGG_SOLVER_SHM_PAGES`</span>
+<span class="line" id="L543"><a href="#L543">  543</a>     /// (`ShmPages::parse`) and `EGG_SOLVER_SHM_KEY` (`shm::parse_key`).</span>
+<span class="line" id="L544"><a href="#L544">  544</a>     ///</span>
+<span class="line" id="L545"><a href="#L545">  545</a>     /// # Errors</span>
+<span class="line" id="L546"><a href="#L546">  546</a>     /// If a variable is set to another value.</span>
+<span class="line" id="L547"><a href="#L547">  547</a>     pub fn from_env() -&gt; Result&lt;LoadOptions, TableError&gt; {</span>
+<span class="line" id="L548"><a href="#L548">  548</a>         let mut o = LoadOptions::default();</span>
+<span class="line" id="L549"><a href="#L549">  549</a>         let bad = |var, value: String, expected| TableError::BadEnv {</span>
+<span class="line" id="L550"><a href="#L550">  550</a>             var,</span>
+<span class="line" id="L551"><a href="#L551">  551</a>             value,</span>
+<span class="line" id="L552"><a href="#L552">  552</a>             expected,</span>
+<span class="line" id="L553"><a href="#L553">  553</a>         };</span>
+<span class="line" id="L554"><a href="#L554">  554</a>         if let Ok(v) = crate::env::var(&quot;EGG_SOLVER_LOAD&quot;) {</span>
+<span class="line" id="L555"><a href="#L555">  555</a>             o.mode = match v.as_str() {</span>
+<span class="line" id="L556"><a href="#L556">  556</a>                 &quot;auto&quot; | &quot;&quot; =&gt; LoadMode::Auto,</span>
+<span class="line" id="L557"><a href="#L557">  557</a>                 &quot;map&quot; =&gt; LoadMode::Map,</span>
+<span class="line" id="L558"><a href="#L558">  558</a>                 &quot;copy&quot; =&gt; LoadMode::Copy,</span>
+<span class="line" id="L559"><a href="#L559">  559</a>                 &quot;shm&quot; =&gt; LoadMode::Shm,</span>
+<span class="line" id="L560"><a href="#L560">  560</a>                 _ =&gt; return Err(bad(&quot;EGG_SOLVER_LOAD&quot;, v, &quot;auto, map, copy or shm&quot;)),</span>
+<span class="line" id="L561"><a href="#L561">  561</a>             };</span>
+<span class="line" id="L562"><a href="#L562">  562</a>         }</span>
+<span class="line" id="L563"><a href="#L563">  563</a>         if let Ok(v) = crate::env::var(&quot;EGG_SOLVER_SHM_PAGES&quot;) {</span>
+<span class="line" id="L564"><a href="#L564">  564</a>             o.shm_pages = match ShmPages::parse(&amp;v) {</span>
+<span class="line" id="L565"><a href="#L565">  565</a>                 Some(pages) =&gt; pages,</span>
+<span class="line" id="L566"><a href="#L566">  566</a>                 None =&gt; return Err(bad(&quot;EGG_SOLVER_SHM_PAGES&quot;, v, &quot;e.g. 1g,2m,4k&quot;)),</span>
+<span class="line" id="L567"><a href="#L567">  567</a>             };</span>
+<span class="line" id="L568"><a href="#L568">  568</a>         }</span>
+<span class="line" id="L569"><a href="#L569">  569</a>         if let Ok(v) = crate::env::var(&quot;EGG_SOLVER_SHM_KEY&quot;) {</span>
+<span class="line" id="L570"><a href="#L570">  570</a>             o.shm_key = match super::shm::parse_key(&amp;v) {</span>
+<span class="line" id="L571"><a href="#L571">  571</a>                 Some(key) =&gt; Some(key),</span>
+<span class="line" id="L572"><a href="#L572">  572</a>                 None =&gt; return Err(bad(&quot;EGG_SOLVER_SHM_KEY&quot;, v, &quot;e.g. 0x636f0709&quot;)),</span>
+<span class="line" id="L573"><a href="#L573">  573</a>             };</span>
+<span class="line" id="L574"><a href="#L574">  574</a>         }</span>
+<span class="line" id="L575"><a href="#L575">  575</a>         if let Ok(v) = crate::env::var(&quot;EGG_SOLVER_PREFAULT&quot;) {</span>
+<span class="line" id="L576"><a href="#L576">  576</a>             o.prefault = match v.as_str() {</span>
+<span class="line" id="L577"><a href="#L577">  577</a>                 &quot;1&quot; | &quot;&quot; =&gt; true,</span>
+<span class="line" id="L578"><a href="#L578">  578</a>                 &quot;0&quot; =&gt; false,</span>
+<span class="line" id="L579"><a href="#L579">  579</a>                 _ =&gt; return Err(bad(&quot;EGG_SOLVER_PREFAULT&quot;, v, &quot;0 or 1&quot;)),</span>
+<span class="line" id="L580"><a href="#L580">  580</a>             };</span>
+<span class="line" id="L581"><a href="#L581">  581</a>         }</span>
+<span class="line" id="L582"><a href="#L582">  582</a>         Ok(o)</span>
+<span class="line" id="L583"><a href="#L583">  583</a>     }</span>
+<span class="line" id="L584"><a href="#L584">  584</a> </span>
+<span class="line" id="L585"><a href="#L585">  585</a>     /// The mode used for the file at `path` (resolves `Auto`, unless a</span>
+<span class="line" id="L586"><a href="#L586">  586</a>     /// segment of the table is there: see `H48Table::open_reporting`).</span>
+<span class="line" id="L587"><a href="#L587">  587</a>     #[must_use]</span>
+<span class="line" id="L588"><a href="#L588">  588</a>     pub fn mode_for(&amp;self, path: &amp;str) -&gt; LoadMode {</span>
+<span class="line" id="L589"><a href="#L589">  589</a>         match self.mode {</span>
+<span class="line" id="L590"><a href="#L590">  590</a>             LoadMode::Auto =&gt; {</span>
+<span class="line" id="L591"><a href="#L591">  591</a>                 let in_memory = path.starts_with(&quot;/dev/shm&quot;) || is_hugetlbfs(path);</span>
+<span class="line" id="L592"><a href="#L592">  592</a>                 if cfg!(unix) &amp;&amp; (!cfg!(target_os = &quot;linux&quot;) || in_memory) {</span>
+<span class="line" id="L593"><a href="#L593">  593</a>                     LoadMode::Map</span>
+<span class="line" id="L594"><a href="#L594">  594</a>                 } else {</span>
+<span class="line" id="L595"><a href="#L595">  595</a>                     LoadMode::Copy</span>
+<span class="line" id="L596"><a href="#L596">  596</a>                 }</span>
+<span class="line" id="L597"><a href="#L597">  597</a>             }</span>
+<span class="line" id="L598"><a href="#L598">  598</a>             m =&gt; m,</span>
+<span class="line" id="L599"><a href="#L599">  599</a>         }</span>
+<span class="line" id="L600"><a href="#L600">  600</a>     }</span>
+<span class="line" id="L601"><a href="#L601">  601</a> }</span>
+<span class="line" id="L602"><a href="#L602">  602</a> </span>
+<span class="line" id="L603"><a href="#L603">  603</a> /// Where `bench tune` saves a table&#x27;s best lane counts.</span>
+<span class="line" id="L604"><a href="#L604">  604</a> fn tune_path(table: &amp;str) -&gt; String {</span>
+<span class="line" id="L605"><a href="#L605">  605</a>     format!(&quot;{table}.tune&quot;)</span>
+<span class="line" id="L606"><a href="#L606">  606</a> }</span>
+<span class="line" id="L607"><a href="#L607">  607</a> </span>
+<span class="line" id="L608"><a href="#L608">  608</a> /// Save the best lane count per thread count (`threads lanes` lines).</span>
+<span class="line" id="L609"><a href="#L609">  609</a> ///</span>
+<span class="line" id="L610"><a href="#L610">  610</a> /// # Errors</span>
+<span class="line" id="L611"><a href="#L611">  611</a> /// If the file cannot be written (e.g. the table&#x27;s folder is read-only).</span>
+<span class="line" id="L612"><a href="#L612">  612</a> pub fn save_tuned_lanes(table: &amp;str, best: &amp;[(usize, usize)]) -&gt; std::io::Result&lt;String&gt; {</span>
+<span class="line" id="L613"><a href="#L613">  613</a>     use std::fmt::Write as _;</span>
+<span class="line" id="L614"><a href="#L614">  614</a>     let mut text = String::new();</span>
+<span class="line" id="L615"><a href="#L615">  615</a>     for (threads, lanes) in best {</span>
+<span class="line" id="L616"><a href="#L616">  616</a>         let _ = writeln!(text, &quot;{threads} {lanes}&quot;);</span>
+<span class="line" id="L617"><a href="#L617">  617</a>     }</span>
+<span class="line" id="L618"><a href="#L618">  618</a>     let path = tune_path(table);</span>
+<span class="line" id="L619"><a href="#L619">  619</a>     std::fs::write(&amp;path, text)?;</span>
+<span class="line" id="L620"><a href="#L620">  620</a>     Ok(path)</span>
+<span class="line" id="L621"><a href="#L621">  621</a> }</span>
+<span class="line" id="L622"><a href="#L622">  622</a> </span>
+<span class="line" id="L623"><a href="#L623">  623</a> /// Lanes per thread for a table of `k`, when not tuned (`bench tune`).</span>
+<span class="line" id="L624"><a href="#L624">  624</a> /// Smaller tables gain from more lanes (measured, solves/s, 24 -&gt; 40 lanes):</span>
+<span class="line" id="L625"><a href="#L625">  625</a> /// h7 +10% at 1T (2.017 -&gt; 2.217) and at 8 threads (15.43 -&gt; 17.07), also</span>
+<span class="line" id="L626"><a href="#L626">  626</a> /// on 1 GiB pages (2.017 -&gt; 2.283 at 1T: not a TLB effect); h8 equal at 1T,</span>
+<span class="line" id="L627"><a href="#L627">  627</a> /// +8.9% at 8 threads (26.73 -&gt; 29.10); h6 equal (+4.5% at 1T, -1 to -5%</span>
+<span class="line" id="L628"><a href="#L628">  628</a> /// at 8 threads). h11 keeps `lanes::DEFAULT_LANES`, 24 (tuned at 1 and 48</span>
+<span class="line" id="L629"><a href="#L629">  629</a> /// threads; 40 is 3.4% slower at 8 threads, 197.9 -&gt; 191.2). h9 and h10</span>
+<span class="line" id="L630"><a href="#L630">  630</a> /// (no RAM for them here) get 32, in between.</span>
+<span class="line" id="L631"><a href="#L631">  631</a> #[must_use]</span>
+<span class="line" id="L632"><a href="#L632">  632</a> pub fn untuned_lanes(k: u32) -&gt; usize {</span>
+<span class="line" id="L633"><a href="#L633">  633</a>     match k {</span>
+<span class="line" id="L634"><a href="#L634">  634</a>         0..=8 =&gt; 40,</span>
+<span class="line" id="L635"><a href="#L635">  635</a>         9 | 10 =&gt; 32,</span>
+<span class="line" id="L636"><a href="#L636">  636</a>         _ =&gt; crate::lanes::DEFAULT_LANES,</span>
+<span class="line" id="L637"><a href="#L637">  637</a>     }</span>
+<span class="line" id="L638"><a href="#L638">  638</a> }</span>
+<span class="line" id="L639"><a href="#L639">  639</a> </span>
+<span class="line" id="L640"><a href="#L640">  640</a> /// The default lanes per thread for `threads` threads on the table at</span>
+<span class="line" id="L641"><a href="#L641">  641</a> /// `path`: from `&lt;path&gt;.tune` (`bench tune`; the entry of the nearest</span>
+<span class="line" id="L642"><a href="#L642">  642</a> /// thread count), else `untuned_lanes(k)`.</span>
+<span class="line" id="L643"><a href="#L643">  643</a> pub fn default_lanes(path: &amp;str, k: u32) -&gt; impl Fn(usize) -&gt; usize {</span>
+<span class="line" id="L644"><a href="#L644">  644</a>     let tuned: Vec&lt;(usize, usize)&gt; = std::fs::read_to_string(tune_path(path))</span>
+<span class="line" id="L645"><a href="#L645">  645</a>         .unwrap_or_default()</span>
+<span class="line" id="L646"><a href="#L646">  646</a>         .lines()</span>
+<span class="line" id="L647"><a href="#L647">  647</a>         .filter_map(|l| {</span>
+<span class="line" id="L648"><a href="#L648">  648</a>             let mut w = l.split_whitespace().map(|x| x.parse::&lt;usize&gt;().ok());</span>
+<span class="line" id="L649"><a href="#L649">  649</a>             Some((w.next()??, w.next()??))</span>
+<span class="line" id="L650"><a href="#L650">  650</a>         })</span>
+<span class="line" id="L651"><a href="#L651">  651</a>         .filter(|&amp;(threads, lanes)| threads &gt; 0 &amp;&amp; lanes &gt; 0)</span>
+<span class="line" id="L652"><a href="#L652">  652</a>         .collect();</span>
+<span class="line" id="L653"><a href="#L653">  653</a>     move |threads| {</span>
+<span class="line" id="L654"><a href="#L654">  654</a>         tuned</span>
+<span class="line" id="L655"><a href="#L655">  655</a>             .iter()</span>
+<span class="line" id="L656"><a href="#L656">  656</a>             .min_by_key(|&amp;&amp;(t, _)| t.abs_diff(threads))</span>
+<span class="line" id="L657"><a href="#L657">  657</a>             .map_or(untuned_lanes(k), |&amp;(_, lanes)| lanes)</span>
+<span class="line" id="L658"><a href="#L658">  658</a>     }</span>
+<span class="line" id="L659"><a href="#L659">  659</a> }</span>
+<span class="line" id="L660"><a href="#L660">  660</a> </span>
+<span class="line" id="L661"><a href="#L661">  661</a> #[cfg(test)]</span>
+<span class="line" id="L662"><a href="#L662">  662</a> mod tests {</span>
+<span class="line" id="L663"><a href="#L663">  663</a>     #[test]</span>
+<span class="line" id="L664"><a href="#L664">  664</a>     fn previous_table_magic_is_accepted() {</span>
+<span class="line" id="L665"><a href="#L665">  665</a>         let trailer = super::Trailer {</span>
+<span class="line" id="L666"><a href="#L666">  666</a>             k: 0,</span>
+<span class="line" id="L667"><a href="#L667">  667</a>             base: 8,</span>
+<span class="line" id="L668"><a href="#L668">  668</a>             data_bytes: crate::tables::h48_bytes(0),</span>
+<span class="line" id="L669"><a href="#L669">  669</a>             distribution: None,</span>
+<span class="line" id="L670"><a href="#L670">  670</a>             checksum: Some(123),</span>
+<span class="line" id="L671"><a href="#L671">  671</a>         };</span>
+<span class="line" id="L672"><a href="#L672">  672</a>         let modern = trailer.to_bytes();</span>
+<span class="line" id="L673"><a href="#L673">  673</a>         let mut previous = super::LEGACY_MAGIC.as_bytes().to_vec();</span>
+<span class="line" id="L674"><a href="#L674">  674</a>         previous.extend_from_slice(modern.strip_prefix(super::MAGIC.as_bytes()).unwrap());</span>
+<span class="line" id="L675"><a href="#L675">  675</a>         previous.resize(super::TRAILER_LEN, 0);</span>
+<span class="line" id="L676"><a href="#L676">  676</a>         assert_eq!(super::Trailer::parse(&amp;previous).unwrap(), Some(trailer));</span>
+<span class="line" id="L677"><a href="#L677">  677</a>         assert_eq!(super::Trailer::parse(&amp;modern).unwrap(), Some(trailer));</span>
+<span class="line" id="L678"><a href="#L678">  678</a>     }</span>
+<span class="line" id="L679"><a href="#L679">  679</a> </span>
+<span class="line" id="L680"><a href="#L680">  680</a>     use super::*;</span>
+<span class="line" id="L681"><a href="#L681">  681</a> </span>
+<span class="line" id="L682"><a href="#L682">  682</a>     #[test]</span>
+<span class="line" id="L683"><a href="#L683">  683</a>     fn trailer_roundtrip() {</span>
+<span class="line" id="L684"><a href="#L684">  684</a>         let t = Trailer {</span>
+<span class="line" id="L685"><a href="#L685">  685</a>             k: 7,</span>
+<span class="line" id="L686"><a href="#L686">  686</a>             base: 9,</span>
+<span class="line" id="L687"><a href="#L687">  687</a>             data_bytes: 3_891_363_840,</span>
+<span class="line" id="L688"><a href="#L688">  688</a>             distribution: Some([88_529_771, 897_323_586, 6_126_261_227, 7_936_519_016]),</span>
+<span class="line" id="L689"><a href="#L689">  689</a>             checksum: Some(0x0123_4567_89ab_cdef),</span>
+<span class="line" id="L690"><a href="#L690">  690</a>         };</span>
+<span class="line" id="L691"><a href="#L691">  691</a>         let bytes = t.to_bytes();</span>
+<span class="line" id="L692"><a href="#L692">  692</a>         assert_eq!(bytes.len() as u64, TRAILER_BYTES);</span>
+<span class="line" id="L693"><a href="#L693">  693</a>         assert_eq!(Trailer::parse(&amp;bytes).unwrap(), Some(t));</span>
+<span class="line" id="L694"><a href="#L694">  694</a>         let bare = Trailer {</span>
+<span class="line" id="L695"><a href="#L695">  695</a>             distribution: None,</span>
+<span class="line" id="L696"><a href="#L696">  696</a>             checksum: None,</span>
+<span class="line" id="L697"><a href="#L697">  697</a>             ..t</span>
+<span class="line" id="L698"><a href="#L698">  698</a>         };</span>
+<span class="line" id="L699"><a href="#L699">  699</a>         assert_eq!(Trailer::parse(&amp;bare.to_bytes()).unwrap(), Some(bare));</span>
+<span class="line" id="L700"><a href="#L700">  700</a>         // No magic: no trailer. Magic but garbage: an error.</span>
+<span class="line" id="L701"><a href="#L701">  701</a>         assert_eq!(Trailer::parse(&amp;[0u8; 64]).unwrap(), None);</span>
+<span class="line" id="L702"><a href="#L702">  702</a>         assert!(Trailer::parse(format!(&quot;{MAGIC}k 7\n&quot;).as_bytes()).is_err());</span>
+<span class="line" id="L703"><a href="#L703">  703</a>         assert!(Trailer::parse(format!(&quot;{MAGIC}k x\nbase 9\nbytes 1\n&quot;).as_bytes()).is_err());</span>
+<span class="line" id="L704"><a href="#L704">  704</a>         // Another index layout is refused, unknown keys are not.</span>
+<span class="line" id="L705"><a href="#L705">  705</a>         let other = format!(&quot;{MAGIC}layout h48-parity\nk 7\nbase 9\nbytes 1\n&quot;);</span>
+<span class="line" id="L706"><a href="#L706">  706</a>         assert!(Trailer::parse(other.as_bytes()).is_err());</span>
+<span class="line" id="L707"><a href="#L707">  707</a>         let extra = format!(&quot;{MAGIC}k 7\nbase 9\nbytes 1\nmade-by gen 2\n&quot;);</span>
+<span class="line" id="L708"><a href="#L708">  708</a>         assert_eq!(</span>
+<span class="line" id="L709"><a href="#L709">  709</a>             Trailer::parse(extra.as_bytes()).unwrap().map(|t| t.k),</span>
+<span class="line" id="L710"><a href="#L710">  710</a>             Some(7)</span>
+<span class="line" id="L711"><a href="#L711">  711</a>         );</span>
+<span class="line" id="L712"><a href="#L712">  712</a>     }</span>
+<span class="line" id="L713"><a href="#L713">  713</a> </span>
+<span class="line" id="L714"><a href="#L714">  714</a>     #[test]</span>
+<span class="line" id="L715"><a href="#L715">  715</a>     #[cfg_attr(miri, ignore = &quot;files&quot;)]</span>
+<span class="line" id="L716"><a href="#L716">  716</a>     fn trailer_write_keeps_data() {</span>
+<span class="line" id="L717"><a href="#L717">  717</a>         let path = crate::tables::scratch_path(&quot;trailer&quot;)</span>
+<span class="line" id="L718"><a href="#L718">  718</a>             .to_string_lossy()</span>
+<span class="line" id="L719"><a href="#L719">  719</a>             .into_owned();</span>
+<span class="line" id="L720"><a href="#L720">  720</a>         let data: Vec&lt;u8&gt; = (0..10_000u32).map(|i| (i % 251) as u8).collect();</span>
+<span class="line" id="L721"><a href="#L721">  721</a>         let t = Trailer {</span>
+<span class="line" id="L722"><a href="#L722">  722</a>             k: 0,</span>
+<span class="line" id="L723"><a href="#L723">  723</a>             base: 7,</span>
+<span class="line" id="L724"><a href="#L724">  724</a>             data_bytes: data.len() as u64,</span>
+<span class="line" id="L725"><a href="#L725">  725</a>             distribution: None,</span>
+<span class="line" id="L726"><a href="#L726">  726</a>             checksum: Some(checksum(&amp;data, 3).unwrap()),</span>
+<span class="line" id="L727"><a href="#L727">  727</a>         };</span>
+<span class="line" id="L728"><a href="#L728">  728</a>         // Too small for data plus trailer: refused, file untouched.</span>
+<span class="line" id="L729"><a href="#L729">  729</a>         std::fs::write(&amp;path, &amp;data).unwrap();</span>
+<span class="line" id="L730"><a href="#L730">  730</a>         assert!(write_trailer(&amp;path, &amp;t).is_err());</span>
+<span class="line" id="L731"><a href="#L731">  731</a>         assert_eq!(std::fs::read(&amp;path).unwrap(), data);</span>
+<span class="line" id="L732"><a href="#L732">  732</a>         let mut with_room = data.clone();</span>
+<span class="line" id="L733"><a href="#L733">  733</a>         with_room.resize(data.len() + usize::try_from(TRAILER_BYTES).unwrap(), 0xAA);</span>
+<span class="line" id="L734"><a href="#L734">  734</a>         std::fs::write(&amp;path, &amp;with_room).unwrap();</span>
+<span class="line" id="L735"><a href="#L735">  735</a>         write_trailer(&amp;path, &amp;t).unwrap();</span>
+<span class="line" id="L736"><a href="#L736">  736</a>         assert_eq!(read_trailer(&amp;path).unwrap(), Some(t));</span>
+<span class="line" id="L737"><a href="#L737">  737</a>         assert_eq!(&amp;std::fs::read(&amp;path).unwrap()[..data.len()], &amp;data[..]);</span>
+<span class="line" id="L738"><a href="#L738">  738</a>         std::fs::remove_file(&amp;path).unwrap();</span>
+<span class="line" id="L739"><a href="#L739">  739</a>     }</span>
+<span class="line" id="L740"><a href="#L740">  740</a> </span>
+<span class="line" id="L741"><a href="#L741">  741</a>     #[test]</span>
+<span class="line" id="L742"><a href="#L742">  742</a>     fn checksum_sees_every_byte() {</span>
+<span class="line" id="L743"><a href="#L743">  743</a>         let mut data = vec![0u8; 3 &lt;&lt; 20 | 0x4D];</span>
+<span class="line" id="L744"><a href="#L744">  744</a>         let c0 = checksum(&amp;data, 4).unwrap();</span>
+<span class="line" id="L745"><a href="#L745">  745</a>         assert_eq!(</span>
+<span class="line" id="L746"><a href="#L746">  746</a>             c0,</span>
+<span class="line" id="L747"><a href="#L747">  747</a>             checksum(&amp;data, 1).unwrap(),</span>
+<span class="line" id="L748"><a href="#L748">  748</a>             &quot;independent of the thread count&quot;</span>
+<span class="line" id="L749"><a href="#L749">  749</a>         );</span>
+<span class="line" id="L750"><a href="#L750">  750</a>         let (a, b) = data.split_at(2 * CHECKSUM_CHUNK);</span>
+<span class="line" id="L751"><a href="#L751">  751</a>         let parts = [chunk_hashes(a, 2).unwrap(), chunk_hashes(b, 3).unwrap()].concat();</span>
+<span class="line" id="L752"><a href="#L752">  752</a>         assert_eq!(combine_hashes(data.len() as u64, &amp;parts), c0, &quot;from parts&quot;);</span>
+<span class="line" id="L753"><a href="#L753">  753</a>         for pos in [0, 5, 1 &lt;&lt; 20, (3 &lt;&lt; 20) + 76] {</span>
+<span class="line" id="L754"><a href="#L754">  754</a>             data[pos] ^= 1;</span>
+<span class="line" id="L755"><a href="#L755">  755</a>             assert_ne!(checksum(&amp;data, 4).unwrap(), c0, &quot;flip at {pos}&quot;);</span>
+<span class="line" id="L756"><a href="#L756">  756</a>             data[pos] ^= 1;</span>
+<span class="line" id="L757"><a href="#L757">  757</a>         }</span>
+<span class="line" id="L758"><a href="#L758">  758</a>         assert_ne!(checksum(&amp;data[1..], 4).unwrap(), c0);</span>
+<span class="line" id="L759"><a href="#L759">  759</a>     }</span>
+<span class="line" id="L760"><a href="#L760">  760</a> }</span></pre></html>
