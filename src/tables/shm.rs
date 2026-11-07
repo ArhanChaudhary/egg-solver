@@ -33,6 +33,26 @@
 use super::file::{self, LoadOptions, TableError};
 use super::Memory;
 
+/// Copy a trailer only after its one-time publication. The caller provides
+/// live storage whose first byte is atomic; the writer publishes once with
+/// Release and never changes the payload afterwards. `out` is disjoint.
+#[cfg(any(test, all(target_os = "linux", not(miri))))]
+unsafe fn copy_published_trailer(start: *mut u8, out: &mut [u8]) {
+    use std::sync::atomic::{AtomicU8, Ordering};
+    let Some((first, rest)) = out.split_first_mut() else {
+        return;
+    };
+    // SAFETY: the first byte is atomic throughout publication and reading.
+    *first = unsafe { AtomicU8::from_ptr(start) }.load(Ordering::Acquire);
+    if *first != 0 {
+        // SAFETY: Acquire observed publication; the initialized payload is
+        // now immutable. A zero marker must never permit this read.
+        unsafe {
+            std::ptr::copy_nonoverlapping(start.add(1), rest.as_mut_ptr(), rest.len());
+        }
+    }
+}
+
 /// The first two bytes of every key: legacy ASCII "co" (retained for compatibility).
 pub const KEY_PREFIX: u32 = 0x636f_0000;
 
@@ -176,7 +196,11 @@ pub(crate) fn open(
 /// holding this table): `LoadMode::Auto` and `Shm` attach it, so a load
 /// needs no memory.
 #[must_use]
-pub fn loaded(path: &str, options: &LoadOptions) -> bool {
+/// # Safety
+/// Any segment inspected must follow this module's publication protocol:
+/// its trailer is written once, before the Release marker, and immutable
+/// thereafter for the duration of this call.
+pub unsafe fn loaded(path: &str, options: &LoadOptions) -> bool {
     linux::loaded(path, options)
 }
 
@@ -194,7 +218,10 @@ pub fn new_segment_page(path: &str, options: &LoadOptions) -> Option<u64> {
 ///
 /// # Errors
 /// If it cannot be removed (it belongs to another user), or off Linux.
-pub fn remove(key: u32) -> Result<Option<Removed>, TableError> {
+/// # Safety
+/// Any segment inspected must follow the publication and immutability
+/// contract of [`loaded`] until this call returns.
+pub unsafe fn remove(key: u32) -> Result<Option<Removed>, TableError> {
     linux::remove(key)
 }
 
@@ -358,11 +385,20 @@ mod linux {
         /// before: `shm_nattch` does not count this attachment).
         fn new(id: i32, read_only: bool) -> io::Result<Attachment> {
             let ds = stat(id)?;
+            // Checked before last_page can do in-bounds pointer arithmetic.
+            isize::try_from(ds.shm_segsz).map_err(io::Error::other)?;
             let flags = if read_only { libc::SHM_RDONLY } else { 0 };
             // SAFETY: the kernel picks the address.
             let ptr = unsafe { libc::shmat(id, std::ptr::null(), flags) };
             if ptr.addr() == usize::MAX {
                 return Err(io::Error::last_os_error());
+            }
+            if ptr.is_null() {
+                // SAFETY: detach the attachment just returned by shmat.
+                unsafe {
+                    libc::shmdt(ptr);
+                }
+                return Err(io::Error::other("shared memory returned a null address"));
             }
             Ok(Attachment {
                 ptr: ptr.cast(),
@@ -384,8 +420,7 @@ mod linux {
             // sees it sees the rest, and the data.
             unsafe {
                 let start = self.ptr.add(offset);
-                bytes[0] = AtomicU8::from_ptr(start).load(Ordering::Acquire);
-                std::ptr::copy_nonoverlapping(start.add(1), bytes.as_mut_ptr().add(1), page - 1);
+                super::copy_published_trailer(start, &mut bytes);
             }
             Some(bytes)
         }
@@ -395,6 +430,7 @@ mod linux {
         /// are whole pages).
         fn into_memory(self) -> io::Result<Memory> {
             let len = usize::try_from(self.bytes()).map_err(io::Error::other)?;
+            isize::try_from(len).map_err(io::Error::other)?;
             let memory = Memory { ptr: self.ptr, len };
             std::mem::forget(self);
             Ok(memory)
@@ -957,7 +993,7 @@ mod segment_tests {
             assert!(n < 64);
             let key = 0x4000_0000 | std::process::id() << 6 | n;
             // (A segment left by a crashed earlier process of this id.)
-            let _ = remove(key);
+            let _ = unsafe { remove(key) };
             TestKey(key)
         }
 
@@ -973,7 +1009,7 @@ mod segment_tests {
 
     impl Drop for TestKey {
         fn drop(&mut self) {
-            let _ = remove(self.0);
+            let _ = unsafe { remove(self.0) };
         }
     }
 
@@ -1011,7 +1047,7 @@ mod segment_tests {
             &self,
             options: &LoadOptions,
         ) -> Result<(H48Table, crate::tables::LoadReport), TableError> {
-            H48Table::open_reporting(&self.path, options)
+            unsafe { H48Table::open_reporting(&self.path, options) }
         }
     }
 
@@ -1080,14 +1116,14 @@ mod segment_tests {
         }
         drop(first);
         assert_eq!(attached(segment.id), 0, "dropping the table detaches");
-        let removed = remove(key.0).unwrap().unwrap();
+        let removed = unsafe { remove(key.0) }.unwrap().unwrap();
         assert_eq!(removed.id, segment.id);
         assert!(
             removed.held.starts_with("h0 base 8, checksum"),
             "{}",
             removed.held
         );
-        assert!(remove(key.0).unwrap().is_none());
+        assert!(unsafe { remove(key.0) }.unwrap().is_none());
         let (_, report) = table.open(&key.options(LoadMode::Auto, "4k")).unwrap();
         assert_eq!(report.segment, None);
         assert!(report.notes.is_empty(), "{:?}", report.notes);
@@ -1145,7 +1181,7 @@ mod segment_tests {
             "{:?}",
             report.notes
         );
-        assert!(remove(key.0).unwrap().is_some());
+        assert!(unsafe { remove(key.0) }.unwrap().is_some());
         assert!(stat(id).is_err());
         // Made by a child process that exits without loading it.
         // SAFETY: the child only makes the segment and exits (no allocation,
@@ -1200,7 +1236,7 @@ mod segment_tests {
             checksum: None,
             ..no_checksum.trailer
         };
-        file::write_trailer(&no_checksum.path, &trailer).unwrap();
+        unsafe { file::write_trailer(&no_checksum.path, &trailer) }.unwrap();
         let error = no_checksum
             .open(&key.options(LoadMode::Shm, "4k"))
             .err()
@@ -1268,5 +1304,49 @@ mod segment_tests {
         );
         assert_eq!(header.source, "/mnt/huge/h7?x");
         assert!(parse_header(&[0u8; 4096]).unwrap().is_none());
+    }
+}
+
+#[cfg(test)]
+mod publication_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU8, Ordering};
+
+    #[test]
+    fn safe_api_trailer_publication_orders_payload_reads() {
+        for _ in 0..8 {
+            let memory = Memory::anonymous(64).unwrap();
+            std::thread::scope(|scope| {
+                let write = || {
+                    // SAFETY: this is the only writer, before publication;
+                    // readers leave the payload untouched until Acquire.
+                    unsafe {
+                        memory.ptr().add(1).write_bytes(0x5a, 63);
+                        AtomicU8::from_ptr(memory.ptr()).store(b'e', Ordering::Release);
+                    }
+                };
+                if std::thread::Builder::new()
+                    .spawn_scoped(scope, write)
+                    .is_err()
+                {
+                    write();
+                }
+                let mut snapshot = [0; 64];
+                // SAFETY: the producer above follows the publication protocol.
+                unsafe {
+                    copy_published_trailer(memory.ptr(), &mut snapshot);
+                }
+                assert!(
+                    snapshot == [0; 64] || (snapshot[0] == b'e' && snapshot[1..] == [0x5a; 63])
+                );
+            });
+            let mut snapshot = [0; 64];
+            // SAFETY: the writer has joined, and no other writes can occur.
+            unsafe {
+                copy_published_trailer(memory.ptr(), &mut snapshot);
+            }
+            assert_eq!(snapshot[0], b'e');
+            assert_eq!(snapshot[1..], [0x5a; 63]);
+        }
     }
 }

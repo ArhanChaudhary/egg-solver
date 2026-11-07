@@ -707,15 +707,16 @@ fn run_command(command: &Command, json: bool) -> anyhow::Result<()> {
     let path = &table_args.table;
     let corners = Cocsep::generate()?;
     let load_start = Instant::now();
-    let table = table_args.load.open(path)?;
+    // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
+    let table = unsafe { table_args.load.open(path) }?;
     eprintln!(
         "table h{} base {} loaded in {:.1}s",
-        table.meta.k,
-        table.meta.base,
+        table.meta().k,
+        table.meta().base,
         load_start.elapsed().as_secs_f64()
     );
     let solver = Solver::new(&corners, &table);
-    let lanes = |run: &RunArgs| cli::lanes(run.lanes, path, table.meta.k, run.threads);
+    let lanes = |run: &RunArgs| cli::lanes(run.lanes, path, table.meta().k, run.threads);
     match command {
         Command::Tune(args) => tune(&solver, path, args.window, json),
         Command::Stream(args) => stream(&solver, args, lanes(&args.run), json),

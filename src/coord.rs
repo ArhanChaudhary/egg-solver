@@ -324,17 +324,20 @@ pub fn edge_key(cube: Cube) -> u64 {
 /// conjugation: +5.5% at 48T when added, edge-conj.)
 #[must_use]
 #[inline(always)]
-pub fn edge_key_sym(cube: Cube, sym: usize) -> u64 {
-    let (msplit, eo11, eslot) = edge_parts_sym(cube, sym);
-    (msplit << 20) | (eo11 << 9) | eslot
+pub fn edge_key_sym(cube: Cube, sym: usize) -> Option<u64> {
+    let (msplit, eo11, eslot) = edge_parts_sym(cube, sym)?;
+    Some((msplit << 20) | (eo11 << 9) | eslot)
 }
 
 /// (msplit, eo11, eslot) of `cube` conjugated by `sym` (see `edge_key_sym`).
 #[must_use]
 #[inline(always)]
-pub fn edge_parts_sym(cube: Cube, sym: usize) -> (u64, u64, u64) {
+pub fn edge_parts_sym(cube: Cube, sym: usize) -> Option<(u64, u64, u64)> {
+    if sym >= 48 {
+        return None;
+    }
     let (msplit, eo_bits, eslot) = edge_parts_sym_raw(cube, sym);
-    (msplit, u64::from(eo_bits >> 17), eslot)
+    Some((msplit, u64::from(eo_bits >> 17), eslot))
 }
 
 /// `edge_parts_sym` with the eo part unshifted: the eo of edges 0..11 in
@@ -401,7 +404,7 @@ fn edge_parts_sym_raw(cube: Cube, sym: usize) -> (u64, u32, u64) {
 /// multiply and pext: part of m6-micro's index patch.)
 #[must_use]
 #[inline(always)]
-pub fn index_sym(cube: Cube, sym: usize, class: usize, row_mul: u64, eo_mask: u32) -> u64 {
+pub(crate) fn index_sym(cube: Cube, sym: usize, class: usize, row_mul: u64, eo_mask: u32) -> u64 {
     let (msplit, eo_bits, eslot) = edge_parts_sym_raw(cube, sym);
     let row = class as u64 * N_MSPLIT as u64 + msplit;
     #[cfg(backend = "x86")]
@@ -452,7 +455,16 @@ pub fn split_index(index: u64, k: u32) -> (usize, u64) {
 /// A cube with the corners of `corners` and the edges of an h11 edge key:
 /// some cube of that coordinate.
 #[must_use]
-pub fn cube_from_edge_key(corners: Cube, edge_key: u64) -> Cube {
+pub fn cube_from_edge_key(corners: Cube, edge_key: u64) -> Option<Cube> {
+    let eslot = (edge_key & 0x1FF) as usize;
+    if edge_key >> 20 >= N_MSPLIT as u64 || SLOT_EMASK[eslot] == 0 {
+        return None;
+    }
+    Some(cube_from_edge_key_internal(corners, edge_key))
+}
+
+/// Internal inverse for an existing coordinate (a real slot, msplit < 70).
+pub(crate) fn cube_from_edge_key_internal(corners: Cube, edge_key: u64) -> Cube {
     let eslot = (edge_key & 0x1FF) as usize;
     let eo11 = ((edge_key >> 9) & 0x7FF) as u32;
     let msplit = (edge_key >> 20) as usize;
@@ -481,7 +493,7 @@ pub fn cube_from_edge_key(corners: Cube, edge_key: u64) -> Cube {
     }
     bytes[8..16].fill(0);
     bytes[28..32].fill(0);
-    Cube::from_bytes(bytes)
+    Cube::from_bytes_internal(bytes)
 }
 
 #[cfg(test)]
@@ -517,11 +529,11 @@ mod tests {
             let c = Cube::from_cubie(&CubieCube::random(&mut rng));
             for t in 0..48 {
                 let ek = edge_key(c.transform_edges(t));
-                assert_eq!(edge_key_sym(c, t), ek);
+                assert_eq!(edge_key_sym(c, t), Some(ek));
                 for k in 0..=11 {
                     let x = ((1234 * N_MSPLIT as u64) << 20) + ek;
                     assert_eq!(
-                        index_from_parts(1234, edge_parts_sym(c, t), k),
+                        index_from_parts(1234, edge_parts_sym(c, t).unwrap(), k),
                         reduce_key(x, k)
                     );
                 }
@@ -544,7 +556,7 @@ mod tests {
         for _ in 0..1000 {
             let c = Cube::from_cubie(&CubieCube::random(&mut rng));
             let ek = edge_key(c);
-            let d = cube_from_edge_key(c, ek);
+            let d = cube_from_edge_key(c, ek).unwrap();
             assert_eq!(edge_key(d), ek);
             assert!(ek < (N_MSPLIT << 20) as u64);
             for k in [0, 11] {

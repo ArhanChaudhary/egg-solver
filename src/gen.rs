@@ -19,7 +19,7 @@ pub mod collapse;
 pub mod dfs;
 pub mod progress;
 
-use crate::coord::{cocsep, cube_from_edge_key, h11_key, reduce_key, split_index};
+use crate::coord::{cocsep, cube_from_edge_key_internal, h11_key, reduce_key, split_index};
 use crate::cubie::Move;
 use crate::simd::Cube;
 use crate::tables::{
@@ -46,7 +46,7 @@ pub struct Generator<'a> {
 #[inline(always)]
 fn decode_index(corners: &Cocsep, k: u32, index: u64) -> Cube {
     let (class, edge_key) = split_index(index, k);
-    cube_from_edge_key(corners.representatives[class], edge_key)
+    cube_from_edge_key_internal(corners.representatives[class], edge_key)
 }
 
 /// The 2-bit code of an entry.
@@ -144,6 +144,9 @@ impl Generator<'_> {
                 "BFS only on true coordinates (h0, h11), not h{}",
                 self.k
             )));
+        }
+        if self.base > 12 || self.derived.iter().any(|(meta, _)| meta.base > 12) {
+            return Err(TableError::Generate("table base is above 12".into()));
         }
         let n_words = table_words(self.k)?;
         // SAFETY: the caller grants writable memory without byte aliases.

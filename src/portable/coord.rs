@@ -158,7 +158,7 @@ mod tests {
             let corners = rng.next_u64();
             let mut bytes = [0u8; 32];
             bytes[..8].copy_from_slice(&corners.to_le_bytes());
-            let (co_fields, tetrads) = corner_fields(Cube::from_bytes(bytes));
+            let (co_fields, tetrads) = corner_fields(Cube::from_bytes_internal(bytes));
             assert_eq!(co_fields, pext_reference(corners, 0x0060_6060_6060_6060));
             assert_eq!(tetrads, pext_reference(corners, 0x0404_0404_0404_0404));
         }
@@ -193,7 +193,7 @@ mod cross_check {
             let (msplit, eo_bits, eslot) = edge_parts_sym_raw(p, sym);
             assert_eq!(
                 (msplit, u64::from(eo_bits >> 17), eslot),
-                crate::coord::edge_parts_sym(x, sym)
+                crate::coord::edge_parts_sym(x, sym).unwrap()
             );
             for k in [0, 1, 7, 10, 11] {
                 let eo_mask = u32::MAX.unbounded_shr(32 - k) << (28 - k);

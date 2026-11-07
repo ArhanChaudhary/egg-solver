@@ -33,75 +33,95 @@ struct Counts {
     codes: [AtomicU64; 4],
 }
 
+fn report(what: &str, index: u64, detail: &str) {
+    eprintln!("VIOLATION {what}: index {index} {detail}");
+}
+
+fn random_index(rows: u64, rng: &mut Rng) -> u64 {
+    // Slots 0 and 1 of each group hold metadata; slot 511 is unused.
+    let slot = loop {
+        let value = rng.below(N_SLOTS as u64);
+        if value % 64 >= 2 && value != 511 {
+            break value;
+        }
+    };
+    rng.below(rows) * N_SLOTS as u64 + slot
+}
+
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     let samples: u64 = args[2].parse().unwrap();
     let seed: u64 = args[3].parse().unwrap();
     let threads: u64 = args.get(4).map_or(8, |x| x.parse().unwrap());
     let corners = Cocsep::generate().unwrap();
-    let table = H48Table::open(&args[1]).expect("open table");
-    let k = table.meta.k;
+    // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
+    let table = unsafe { H48Table::open(&args[1]) }.expect("open table");
+    let k = table.meta().k;
     assert!(
         k == 0 || k == 11,
         "only tables of true coordinates (h0, h11)"
     );
     let rows = h48_rows(k);
     let counts = Counts::default();
-    let report = |what: &str, index: u64, detail: String| {
-        eprintln!("VIOLATION {what}: index {index} {detail}");
-    };
     std::thread::scope(|s| {
         for t in 0..threads {
             let (corners, table, counts, report) = (&corners, &table, &counts, &report);
             s.spawn(move || {
                 let mut rng = Rng(seed ^ (t << 40));
                 for _ in 0..samples / threads {
-                    // A random real entry: slots 0, 1 of each group of 64 hold
-                    // the group minimum, slot 511 is unused.
-                    let slot = loop {
-                        let x = rng.below(N_SLOTS as u64);
-                        if x % 64 >= 2 && x != 511 {
-                            break x;
-                        }
-                    };
-                    let index = rng.below(rows) * N_SLOTS as u64 + slot;
+                    let index = random_index(rows, &mut rng);
                     let (class, edge_key) = split_index(index, k);
-                    let cube = cube_from_edge_key(corners.representatives[class], edge_key);
-                    let code = table.get(index).0;
+                    let (Some(cube), Some((code, _))) = (
+                        cube_from_edge_key(corners.representatives()[class], edge_key),
+                        table.get(index),
+                    ) else {
+                        counts.index_mismatch.fetch_add(1, Relaxed);
+                        report("index", index, "invalid coordinate");
+                        continue;
+                    };
                     counts.samples.fetch_add(1, Relaxed);
                     counts.codes[usize::from(code)].fetch_add(1, Relaxed);
                     if corners.index(cube, k) != index {
                         counts.index_mismatch.fetch_add(1, Relaxed);
-                        report("index", index, format!("{cube:?}"));
+                        report("index", index, &format!("{cube:?}"));
                     }
                     // Self-symmetric variants of the entry (the same coset seen
                     // through a symmetry fixing the class representative).
-                    let mut sym = corners.self_symmetries[class] & !1;
+                    let mut sym = corners.self_symmetries()[class] & !1;
                     while sym != 0 {
                         let s = sym.trailing_zeros() as usize;
                         sym ^= sym.isolate_lowest_one();
                         let variant = cube.transform(s);
-                        let entry = corners.entries[egg_solver::coord::cocsep(variant)];
+                        let entry = corners.entries()[egg_solver::coord::cocsep(variant)];
                         debug_assert_eq!(entry_class(entry), class);
                         let variant_index = corners.index(variant, k);
-                        if table.get(variant_index).0 != code {
+                        if table
+                            .get(variant_index)
+                            .is_none_or(|(value, _)| value != code)
+                        {
                             counts.variant_mismatch.fetch_add(1, Relaxed);
                             report(
                                 "variant",
                                 index,
-                                format!("sym {s} ttrep {}", entry_sym_to_rep(entry)),
+                                &format!("sym {s} ttrep {}", entry_sym_to_rep(entry)),
                             );
                         }
                     }
                     let mut has_lower = false;
                     for m in Move::ALL {
-                        let neighbor_code = table.get(corners.index(cube.apply_move(m), k)).0;
+                        let Some((neighbor_code, _)) =
+                            table.get(corners.index(cube.apply_move(m), k))
+                        else {
+                            counts.index_mismatch.fetch_add(1, Relaxed);
+                            report("neighbor", index, "invalid coordinate");
+                            continue;
+                        };
                         if neighbor_code + 1 < code {
                             counts.too_low_neighbor.fetch_add(1, Relaxed);
                             report(
                                 "too low neighbor",
                                 index,
-                                format!("code {code} move {} code {neighbor_code}", m.index()),
+                                &format!("code {code} move {} code {neighbor_code}", m.index()),
                             );
                         }
                         if neighbor_code > code + 1 && code < 3 {
@@ -109,14 +129,14 @@ fn main() {
                             report(
                                 "too high neighbor",
                                 index,
-                                format!("code {code} move {} code {neighbor_code}", m.index()),
+                                &format!("code {code} move {} code {neighbor_code}", m.index()),
                             );
                         }
                         has_lower |= neighbor_code + 1 == code;
                     }
                     if (code == 1 || code == 2) && !has_lower {
                         counts.no_lower_neighbor.fetch_add(1, Relaxed);
-                        report("no lower neighbor", index, format!("code {code}"));
+                        report("no lower neighbor", index, &format!("code {code}"));
                     }
                 }
             });
