@@ -31,6 +31,8 @@ Requires Rust and Cargo. The release build targets the CPU it is built on.
 cargo build --release --locked
 mkdir -p tables
 target/release/gen 0 auto tables/h0
+# Optionally tune the lanes per thread for your machine
+target/release/bench tables/h0 tune
 printf '%s\n' "R U R' U' F2" | target/release/solve --table tables/h0
 ```
 
