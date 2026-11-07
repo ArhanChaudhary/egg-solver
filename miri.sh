@@ -41,19 +41,53 @@ run() { # <miri flags> <test filters...>
     shift
     MIRIFLAGS="$flags" cargo +"$toolchain" miri test --lib -- "$@" --test-threads=1
 }
+# Run independent heavy test families concurrently, preserving every status.
+# The datasets and checks are unchanged; this avoids a single group adding
+# several long interpreted tests before another group can finish.
+parallel_group() { # <group number> <family>
+    local group=$1 family=$2
+    local -a children=() shards=()
+    local shard=0 group_failed=0
+    shard_run() {
+        shard=$((shard + 1))
+        local path="$logs/$group-$shard.log"
+        shards+=("$path")
+        run "$strict" "$@" > "$path" 2>&1 & children+=("$!")
+    }
+    if [ "$family" = coordinates ]; then
+        shard_run simd:: coord:: solver:: tables:: \
+            --skip portable_check::coord::cross_check::portable_matches_x86 \
+            --skip portable_check::coord::tests::pext_replacements_match \
+            --skip tables::file::tests::checksum_sees_every_byte
+        shard_run portable_check::coord::cross_check::portable_matches_x86
+        shard_run portable_check::coord::tests::pext_replacements_match
+        shard_run tables::file::tests::checksum_sees_every_byte
+    else
+        shard_run --skip cubie::tests --skip simd:: --skip coord:: --skip solver:: --skip tables:: \
+            --skip lanes::tests:: --skip lanes::share::tests::staged \
+            --skip lanes::share::tests::share_ --skip lanes::share::tests::first_pass_ \
+            --skip lanes::share::tests::split_runs_cover_each_child_once --skip symstart::
+        shard_run lanes::share::tests::split_runs_cover_each_child_once
+        shard_run symstart:: --skip symstart::tests::superflip_jobs
+        shard_run symstart::tests::superflip_jobs
+    fi
+    for child in "${children[@]}"; do
+        if ! wait "$child"; then group_failed=1; fi
+    done
+    cat "${shards[@]}"
+    [ "$group_failed" -eq 0 ]
+}
 pids=()
 run "$strict" cubie::tests::symmetry > "$logs/1.log" 2>&1 & pids+=("$!")
 run "$strict" cubie::tests --skip cubie::tests::symmetry > "$logs/2.log" 2>&1 & pids+=("$!")
-run "$strict" simd:: coord:: solver:: tables:: > "$logs/3.log" 2>&1 & pids+=("$!")
+parallel_group 3 coordinates > "$logs/3.log" 2>&1 & pids+=("$!")
 run "$strict" lanes::tests:: > "$logs/4.log" 2>&1 & pids+=("$!")
 run "$strict" lanes::share::tests::staged > "$logs/5.log" 2>&1 & pids+=("$!")
 run "$strict -Zmiri-many-seeds=$seeds" lanes::share::tests::share_ > "$logs/6.log" 2>&1 & pids+=("$!")
 run "$strict" lanes::share::tests::first_pass_ > "$logs/7.log" 2>&1 & pids+=("$!")
 # Catch every remaining module/test, including newly added tests. The
 # catalogue/coverage comparison below also catches accidentally empty groups.
-run "$strict" --skip cubie::tests --skip simd:: --skip coord:: --skip solver:: --skip tables:: \
-    --skip lanes::tests:: --skip lanes::share::tests::staged \
-    --skip lanes::share::tests::share_ --skip lanes::share::tests::first_pass_ > "$logs/8.log" 2>&1 & pids+=("$!")
+parallel_group 8 remaining > "$logs/8.log" 2>&1 & pids+=("$!")
 MIRIFLAGS="$strict" cargo +"$toolchain" miri test --bins -- --test-threads=1 > "$logs/9.log" 2>&1 & pids+=("$!")
 failed=0
 for miri_pid in "${pids[@]}"; do
