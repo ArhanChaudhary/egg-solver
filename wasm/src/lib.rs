@@ -117,7 +117,9 @@ fn with_state(f: impl FnOnce(&mut State) -> Result<String, String>) -> i32 {
 /// A string argument.
 ///
 /// # Safety
-/// `ptr` points to `len` readable bytes (or `len` is 0).
+/// If `len` is nonzero, `ptr` addresses one live allocation containing at
+/// least `len <= isize::MAX` bytes, immutable for the returned borrow. Zero
+/// length permits a null pointer.
 unsafe fn text_argument<'a>(ptr: *const u8, len: usize) -> Result<&'a str, String> {
     if len == 0 {
         return Ok("");
@@ -253,9 +255,9 @@ pub extern "C" fn egg_solver_table_load(verify: u32) -> i32 {
 fn table_json(table: &H48Table) -> String {
     format!(
         r#"{{"k":{},"base":{},"bytes":{}}}"#,
-        table.meta.k,
-        table.meta.base,
-        h48_bytes(table.meta.k)
+        table.meta().k,
+        table.meta().base,
+        h48_bytes(table.meta().k)
     )
 }
 
@@ -265,11 +267,10 @@ fn table_json(table: &H48Table) -> String {
 #[unsafe(no_mangle)]
 pub extern "C" fn egg_solver_generate(k: u32, base: u32, threads: u32) -> i32 {
     with_state(|state| {
-        // (h7 fits in wasm32's 4 GiB, but not with the generator's own
-        // memory: make it with the native `gen` and load the file.)
+        // h7 exceeds the isize::MAX limit for one table allocation on wasm32.
         if k > 6 {
             return Err(format!(
-                "h{k} is too big to generate here (h0..h6): use the native gen and load its file"
+                "h{k} exceeds the wasm32 table limit (h0..h6): use the native solver"
             ));
         }
         let base = match base {
@@ -301,7 +302,8 @@ pub extern "C" fn egg_solver_generate(k: u32, base: u32, threads: u32) -> i32 {
 /// "lookups":..,"seconds":..}`.
 ///
 /// # Safety
-/// `text` points to `len` readable bytes.
+/// If `len` is nonzero, `text` points into one live allocation containing
+/// `len <= isize::MAX` bytes, immutable until this call returns.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn egg_solver_solve(
     text: *const u8,
@@ -346,7 +348,8 @@ pub unsafe extern "C" fn egg_solver_solve(
 /// a JSON array of the results (as `egg_solver_solve`) in input order.
 ///
 /// # Safety
-/// `text` points to `len` readable bytes.
+/// If `len` is nonzero, `text` points into one live allocation containing
+/// `len <= isize::MAX` bytes, immutable until this call returns.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn egg_solver_solve_batch(
     text: *const u8,

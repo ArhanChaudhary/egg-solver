@@ -192,7 +192,8 @@ fn open_source(path: &str) -> anyhow::Result<H48Table> {
         ..LoadOptions::default()
     };
     log::info!("{path}: mapped (prefault: {})", options.prefault);
-    H48Table::open_with(path, &options).with_context(|| format!("cannot open {path}"))
+    // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
+    unsafe { H48Table::open_with(path, &options) }.with_context(|| format!("cannot open {path}"))
 }
 
 /// Peak resident memory of this process, in GiB (0 where unknown: WASI).
@@ -367,19 +368,22 @@ fn generate(args: &GenerateArgs) -> anyhow::Result<ExitCode> {
             },
             derived.len()
         );
-        let (table, ds) = egg_solver::generate(
-            &corners,
-            k,
-            base,
-            in_place.then_some(out.as_str()),
-            &derived,
-            threads,
-        )?;
+        // SAFETY: Output files are exclusively owned during generation and retained unchanged while mapped.
+        let (table, ds) = unsafe {
+            egg_solver::generate(
+                &corners,
+                k,
+                base,
+                in_place.then_some(out.as_str()),
+                &derived,
+                threads,
+            )
+        }?;
         for d in &ds {
             progress::line(format_args!(
                 "h{} base {} distribution {:?}",
-                d.meta.k,
-                d.meta.base,
+                d.meta().k,
+                d.meta().base,
                 d.distribution()?
             ));
         }
@@ -387,7 +391,7 @@ fn generate(args: &GenerateArgs) -> anyhow::Result<ExitCode> {
             file::read_trailer(out)?.context("no trailer written")?
         } else {
             let trailer = table.trailer(threads)?;
-            write_table(out, table.memory.bytes()?, &trailer)?;
+            write_table(out, table.memory().bytes()?, &trailer)?;
             trailer
         }
     } else {
@@ -440,7 +444,8 @@ fn generate_dfs(
         let len = usize::try_from((range.end - range.start) * ROW_BYTES)?;
         let mem = Memory::anonymous(len)?;
         let part = dfs::Part {
-            words: mem.words()?,
+            // SAFETY: our writable part, with byte access only after generation.
+            words: unsafe { mem.words()? },
             first_slot: range.start * 512,
             end_slot: range.end * 512,
         };
@@ -470,7 +475,8 @@ fn generate_dfs(
         distribution: Some(dist),
         checksum: Some(file::combine_hashes(data_bytes, &hashes)),
     };
-    file::write_trailer(out, &trailer)?;
+    // SAFETY: output storage is exclusively owned; no trailer view is live.
+    unsafe { file::write_trailer(out, &trailer) }?;
     Ok(trailer)
 }
 
@@ -553,7 +559,8 @@ fn write_table(path: &str, data: &[u8], trailer: &Trailer) -> anyhow::Result<()>
     let f = create_table_file(path, trailer.data_bytes)?;
     write_at(&f, path, data, 0)?;
     drop(f);
-    file::write_trailer(path, trailer)?;
+    // SAFETY: output storage is exclusively owned; no trailer view is live.
+    unsafe { file::write_trailer(path, trailer) }?;
     Ok(())
 }
 
@@ -587,15 +594,14 @@ fn stamp(path: &str, k: u32, base: u8) -> anyhow::Result<ExitCode> {
         anyhow::bail!("{path} already has a trailer: {t:?}");
     }
     let progress = spinner(format!("stamping {path}"));
-    let data = Memory::map_read_only(path, usize::try_from(data_bytes)?, true)
+    // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
+    let data = unsafe { Memory::map_read_only(path, usize::try_from(data_bytes)?, true) }
         .with_context(|| format!("cannot map {path}"))?;
-    let table = H48Table {
-        memory: data,
-        meta: H48Meta { k, base },
-    };
+    let table = H48Table::from_memory(data, H48Meta { k, base })?;
     let trailer = table.trailer(egg_solver::thread_count())?;
     drop(table);
-    file::write_trailer(path, &trailer)?;
+    // SAFETY: output storage is exclusively owned; no trailer view is live.
+    unsafe { file::write_trailer(path, &trailer) }?;
     drop_cache(path);
     if let Some(progress) = progress {
         progress.finish_and_clear();
@@ -738,15 +744,15 @@ fn derive(source: &str, k: u32, out: &str, force: bool) -> anyhow::Result<ExitCo
         )?;
     }
     let src = open_source(source)?;
-    if k > src.meta.k {
-        let source_k = src.meta.k;
+    if k > src.meta().k {
+        let source_k = src.meta().k;
         return Err(BadInput(format!("{source} is h{source_k}: no h{k} from it")).into());
     }
     let t = Instant::now();
     let progress = spinner(format!("deriving h{k} from {source}"));
     let table = collapse::derive(&src, k, egg_solver::thread_count())?;
     let trailer = table.trailer(egg_solver::thread_count())?;
-    write_table(out, table.memory.bytes()?, &trailer)?;
+    write_table(out, table.memory().bytes()?, &trailer)?;
     drop(src);
     drop_cache(source);
     if let Some(progress) = progress {
@@ -763,10 +769,10 @@ fn derive(source: &str, k: u32, out: &str, force: bool) -> anyhow::Result<ExitCo
 
 fn compare(a: &str, b: &str) -> anyhow::Result<ExitCode> {
     let (ta, tb) = (open_source(a)?, open_source(b)?);
-    if ta.meta.base != tb.meta.base || ta.meta.k > tb.meta.k {
+    if ta.meta().base != tb.meta().base || ta.meta().k > tb.meta().k {
         return Err(BadInput(format!(
             "{a} is h{} base {}, {b} h{} base {}: compare needs the same base, {b}'s k at least {a}'s",
-            ta.meta.k, ta.meta.base, tb.meta.k, tb.meta.base
+            ta.meta().k, ta.meta().base, tb.meta().k, tb.meta().base
         ))
         .into());
     }
@@ -777,7 +783,10 @@ fn compare(a: &str, b: &str) -> anyhow::Result<ExitCode> {
     }
     println!(
         "{a} (h{} base {}) vs {b} (h{} base {}): {d:?}",
-        ta.meta.k, ta.meta.base, tb.meta.k, tb.meta.base
+        ta.meta().k,
+        ta.meta().base,
+        tb.meta().k,
+        tb.meta().base
     );
     drop((ta, tb));
     drop_cache(a);

@@ -36,14 +36,14 @@ struct Reference<'a> {
 impl Reference<'_> {
     /// Table lower bound of one cube.
     fn table_bound(&self, cube: Cube) -> u8 {
-        let corner_bound = entry_depth(self.corners.entries[cocsep(cube)]);
-        let index = self.corners.index(cube, self.table.meta.k);
-        assert!(index < h48_slots(self.table.meta.k));
-        let (code, group_min) = self.table.get(index);
+        let corner_bound = entry_depth(self.corners.entries()[cocsep(cube)]);
+        let index = self.corners.index(cube, self.table.meta().k);
+        assert!(index < h48_slots(self.table.meta().k));
+        let (code, group_min) = self.table.get(index).unwrap_or((0, 0));
         if code == 0 {
             group_min.max(corner_bound)
         } else {
-            self.table.meta.base + code
+            self.table.meta().base + code
         }
     }
 
@@ -198,7 +198,8 @@ fn main() {
     let threads: usize = args.get(4).map_or(8, |x| x.parse().unwrap());
     let lanes: usize = args.get(5).map_or(20, |x| x.parse().unwrap());
     let corners = Cocsep::generate().unwrap();
-    let table = H48Table::open(&args[1]).expect("open table");
+    // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
+    let table = unsafe { H48Table::open(&args[1]) }.expect("open table");
     let solver = Solver::new(&corners, &table);
     let reference = Reference {
         corners: &corners,

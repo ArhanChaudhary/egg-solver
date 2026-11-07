@@ -273,9 +273,11 @@ fn main() -> ExitCode {
     }
     args.verbosity.init_logging();
     let result = if let Some(path) = &args.shm_load {
-        args.load.shm_load(path)
+        // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
+        unsafe { args.load.shm_load(path) }
     } else if let Some(path) = &args.shm_remove {
-        args.load.shm_remove(path)
+        // SAFETY: the table segment follows the documented storage contract.
+        unsafe { args.load.shm_remove(path) }
     } else if args.fast {
         run_fast(&args)
     } else {
@@ -311,9 +313,10 @@ fn run(args: &Args) -> anyhow::Result<ExitCode> {
         .context("no table")?;
     let cubes = read_scrambles(args.count.unwrap_or(usize::MAX))?;
     let corners = Cocsep::generate()?;
-    let table = args.load.open(path)?;
+    // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
+    let table = unsafe { args.load.open(path) }?;
     let threads = args.threads;
-    let lanes = cli::lanes(args.lanes, path, table.meta.k, threads);
+    let lanes = cli::lanes(args.lanes, path, table.meta().k, threads);
     let concurrency = args.concurrency;
     log::info!(
         "{} cubes, at most {concurrency} at once (0: all)",
@@ -507,8 +510,9 @@ fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
         println!("scramble {scramble}");
     }
     let corners = Cocsep::generate()?;
-    let table = args.load.open(&path)?;
-    let lanes = cli::lanes(args.lanes, &path, table.meta.k, threads);
+    // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
+    let table = unsafe { args.load.open(&path) }?;
+    let lanes = cli::lanes(args.lanes, &path, table.meta().k, threads);
     let solver = Solver::new(&corners, &table);
     let get = |i: usize| cubes.get(i).copied();
     // (The scramble, after the warm-up cube if any.)

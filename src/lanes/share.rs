@@ -796,6 +796,8 @@ impl<'a> Pool<'a> {
         max_active: usize,
         nthreads: usize,
     ) -> Pool<'a> {
+        // claim_range doubles this value in u32 arithmetic.
+        let nthreads = nthreads.clamp(1, (u32::MAX / 2) as usize);
         Pool {
             cubes,
             max_active: max_active.max(1),
@@ -1292,7 +1294,7 @@ fn build(
         }
         inner.b = pool.take_bufs();
         inner.b.stats_from_atomics = from_atomics;
-        start_sort(pool, inner, ctx);
+        start_sort(pool, ctx);
         return true;
     }
     if inner.sort_by_bounds {
@@ -1684,8 +1686,11 @@ fn open_stage(pool: &Pool, ctx: &Arc<CubeCtx>, stage: usize, tasks: usize) {
 /// `sort_jobs`: by `!job_key << 32 | index`. Keys are counted per chunk by
 /// their top bits (`ST_KEYS`), scattered to their buckets (`ST_SCATTER`),
 /// and runs of buckets are sorted and gathered (`ST_BUCKETS`).
-fn start_sort(pool: &Pool, inner: &mut Inner, ctx: &Arc<CubeCtx>) {
-    let chunks = sort_setup(inner);
+fn start_sort(pool: &Pool, ctx: &Arc<CubeCtx>) {
+    // SAFETY: the previous stage has ended. Do not take `inner` as a
+    // reference argument: its function-entry borrow would remain protected
+    // while another worker can claim the stage published below.
+    let chunks = sort_setup(unsafe { &mut *ctx.inner.get() });
     open_stage(pool, ctx, ST_KEYS, chunks);
 }
 
@@ -2147,7 +2152,7 @@ fn build_task(
                     stats_from_bounds(&mut inner.jobs);
                 }
                 if inner.jobs.len() >= SORT_MIN {
-                    start_sort(pool, inner, ctx);
+                    start_sort(pool, ctx);
                 } else {
                     inner.feasible = sort_serial(&mut inner.jobs, &mut inner.b, inner.target);
                     finish_build(pool, ctx);
@@ -2189,10 +2194,17 @@ fn finish_build(pool: &Pool, ctx: &Arc<CubeCtx>) {
     ctx.outstanding.store(claimed, Relaxed);
     ctx.rarely_written.claims_ran_out_ns.store(0, Relaxed);
     inner.published = Instant::now();
-    ctx.claim.store(claimed << 32, Release);
-    pool.publish(ctx);
+    // All reads of Inner, including tracing, must finish before publication:
+    // another worker can finish these jobs and immediately rebuild it.
     if pool.trace {
         trace_build(pool, ctx, inner, sorted);
+    }
+    ctx.claim.store(claimed << 32, Release);
+    pool.publish(ctx);
+    #[cfg(test)]
+    if pool.pause_after_publish {
+        // Exercise a worker taking over immediately after publication.
+        std::thread::sleep(std::time::Duration::from_millis(2));
     }
 }
 
@@ -3870,6 +3882,37 @@ mod tests {
         }
     }
 
+    /// Tracing must finish reading the old builder state before another
+    /// worker can finish its jobs and rebuild the next iteration.
+    #[test]
+    fn share_trace_publication_with_immediate_workers() {
+        let corners = Cocsep::truncated(4);
+        let table = H48Table::zeroed(0, 2);
+        let solver = Solver::new(&corners, &table);
+        let cubes = [
+            CubieCube::SOLVED
+                .apply_moves(&[0, 6, 12, 3, 9, 15])
+                .unwrap(),
+            CubieCube::SOLVED
+                .apply_moves(&[6, 0, 12, 9, 3, 15, 1])
+                .unwrap(),
+        ];
+        let optimal: Vec<_> = cubes
+            .iter()
+            .map(|c| solver.solve(c).0.unwrap().len())
+            .collect();
+        let (solutions, _) = solve_with_pool_counted(&solver, &cubes, (3, 2, 1), |pool| {
+            pool.trace = true;
+            pool.trace_bits = TRACE_TASKS | TRACE_COUNTERS;
+            pool.first_pass_span = 0;
+            pool.pause_after_publish = true;
+        });
+        for ((cube, solution), length) in cubes.iter().zip(&solutions).zip(optimal) {
+            assert_eq!(cube.apply_moves(solution), Some(CubieCube::SOLVED));
+            assert_eq!(solution.len(), length);
+        }
+    }
+
     /// Work sharing over a tiny search (claims, builds, splits, donations,
     /// cube hand-over): every cube reported once, as short as `Solver::solve`.
     #[test]
@@ -4025,6 +4068,45 @@ mod tests {
         }
     }
 
+    /// Keep the mutex contended long enough to exercise native park/wake FFI.
+    #[test]
+    fn mutex_contention_parks_and_wakes() {
+        let value = Mutex::new(0);
+        let entered = AtomicBool::new(false);
+        let held = value.lock();
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                entered.store(true, Release);
+                *value.lock() += 1;
+            });
+            while !entered.load(Acquire) {
+                std::thread::yield_now();
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+            drop(held);
+        });
+        assert_eq!(*value.lock(), 1);
+    }
+
+    /// Run a stage's disjoint tasks concurrently, joining before its barrier.
+    /// Reverse atomic claims also vary the task order from the serial builder.
+    fn run_sort_stage(inner: &Inner, stage: usize, tasks: usize) {
+        let remaining = AtomicUsize::new(tasks);
+        std::thread::scope(|scope| {
+            for _ in 0..tasks.min(3) {
+                scope.spawn(|| {
+                    while let Ok(task) =
+                        remaining.try_update(Relaxed, Relaxed, |n| n.checked_sub(1))
+                    {
+                        // SAFETY: each task is claimed once, its output ranges
+                        // are disjoint, and every worker joins before the barrier.
+                        unsafe { sort_task(inner, stage, task - 1) };
+                    }
+                });
+            }
+        });
+    }
+
     /// A split iteration's staged sort: each job's root children run once,
     /// in its first-part run (a lead of the cube above the threshold: its
     /// group) or its rest run; the first-part runs by decreasing lead
@@ -4075,10 +4157,7 @@ mod tests {
         let mut tasks = sort_setup(&mut inner);
         let mut stage = ST_KEYS;
         loop {
-            for task in (0..tasks).rev() {
-                // SAFETY: one task at a time.
-                unsafe { sort_task(&inner, stage, task) };
-            }
+            run_sort_stage(&inner, stage, tasks);
             match sort_stage_done(&mut inner, stage) {
                 Some((next_stage, next_tasks)) => (stage, tasks) = (next_stage, next_tasks),
                 None => break,
@@ -4356,10 +4435,7 @@ mod tests {
             let mut tasks = sort_setup(&mut inner);
             let mut stage = ST_KEYS;
             loop {
-                for task in (0..tasks).rev() {
-                    // SAFETY: one task at a time.
-                    unsafe { sort_task(&inner, stage, task) };
-                }
+                run_sort_stage(&inner, stage, tasks);
                 match sort_stage_done(&mut inner, stage) {
                     Some((next_stage, next_tasks)) => (stage, tasks) = (next_stage, next_tasks),
                     None => break,

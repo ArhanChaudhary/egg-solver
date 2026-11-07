@@ -11,7 +11,7 @@
 //! back into range.
 
 use crate::cubie::{CubieCube, Move};
-#[cfg(target_feature = "avx512bw")]
+#[cfg(all(target_feature = "avx512bw", target_feature = "avx512vl"))]
 use std::arch::x86_64::_mm256_mask_blend_epi8;
 use std::arch::x86_64::{
     __m256i, _mm256_add_epi8, _mm256_and_si256, _mm256_andnot_si256, _mm256_blendv_epi8,
@@ -194,7 +194,7 @@ pub static HOT_TABLES: HotTables = HotTables {
 /// A cube state in one AVX2 register (layout: see the module docs).
 #[derive(Clone, Copy)]
 #[repr(transparent)]
-pub struct Cube(pub __m256i);
+pub struct Cube(pub(crate) __m256i);
 
 /// Load 32 aligned bytes.
 #[inline(always)]
@@ -247,9 +247,21 @@ impl Cube {
         Cube(load(&bytes))
     }
 
-    /// The cube with these 32 bytes (in the layout above).
+    /// Parse the byte layout, rejecting duplicate pieces and invalid orientations.
+    /// Unused bytes are ignored. This does not require physical reachability.
     #[must_use]
-    pub fn from_bytes(bytes: [u8; 32]) -> Cube {
+    pub fn from_bytes(mut bytes: [u8; 32]) -> Option<Cube> {
+        if !crate::cubie::valid_cube_bytes(&bytes) {
+            return None;
+        }
+        bytes[8..16].fill(0);
+        bytes[28..32].fill(0);
+        Some(Self::from_bytes_internal(bytes))
+    }
+
+    /// Internal coordinate construction and raw-byte backend tests only.
+    #[must_use]
+    pub(crate) fn from_bytes_internal(bytes: [u8; 32]) -> Cube {
         Cube(load(&Aligned32(bytes)))
     }
 
@@ -446,13 +458,13 @@ impl Cube {
     /// blend's mask register as is (no mask computation).
     #[must_use]
     #[inline(always)]
-    pub fn select_mask(mask: u32, if_set: Cube, if_clear: Cube) -> Cube {
-        #[cfg(target_feature = "avx512bw")]
-        // SAFETY: AVX-512BW is enabled (cfg).
+    pub(crate) fn select_mask(mask: u32, if_set: Cube, if_clear: Cube) -> Cube {
+        #[cfg(all(target_feature = "avx512bw", target_feature = "avx512vl"))]
+        // SAFETY: AVX-512BW and AVX-512VL are enabled (cfg).
         unsafe {
             Cube(_mm256_mask_blend_epi8(mask, if_clear.0, if_set.0))
         }
-        #[cfg(not(target_feature = "avx512bw"))]
+        #[cfg(not(all(target_feature = "avx512bw", target_feature = "avx512vl")))]
         Cube::select(mask != 0, if_set, if_clear)
     }
 
@@ -463,7 +475,7 @@ impl Cube {
     /// select (`apply_move` is `compose` with the move's shuffle).
     ///
     /// # Safety
-    /// `mv < 18`.
+    /// `mv < 18`, and `x_move_mask` is either zero or `u32::MAX`.
     #[must_use]
     #[inline(always)]
     pub unsafe fn child_lookup(moved: Cube, other: Cube, mv: usize, x_move_mask: u32) -> Cube {

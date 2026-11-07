@@ -35,6 +35,11 @@
     )
 )]
 
+// Packed coordinates and on-disk word encoding use little-endian layout.
+// Do not let unsupported targets reinterpret bytes as unchecked indices.
+#[cfg(target_endian = "big")]
+compile_error!("egg-solver currently requires a little-endian target");
+
 #[cfg(feature = "cli")]
 pub mod cli;
 pub mod coord;
@@ -72,7 +77,11 @@ use tables::{h48_bytes, h48_rows, Cocsep, H48Meta, H48Table, Memory, TableError}
 /// # Errors
 /// If `k` is not 0 or 11, a derived `k` is above `k`, memory cannot be
 /// allocated, or a table file cannot be created or written.
-pub fn generate(
+/// # Safety
+/// Output files must not be accessed through other handles or mappings during
+/// generation, or changed or truncated while any returned table uses them.
+/// Calls with no output files use private anonymous memory and are unrestricted.
+pub unsafe fn generate(
     corners: &Cocsep,
     k: u32,
     base: u8,
@@ -85,6 +94,9 @@ pub fn generate(
             "BFS only on true coordinates (h0, h11), not h{k}"
         )));
     }
+    if base > 12 || derived.iter().any(|(dk, db, _)| *dk > k || *db > 12) {
+        return Err(TableError::Generate("invalid generation metadata".into()));
+    }
     let allocate = |k: u32, path: Option<&str>| -> Result<Memory, TableError> {
         let len = h48_bytes(k);
         let too_large = |_| TableError::TooLarge(k);
@@ -93,7 +105,9 @@ pub fn generate(
                 // (Room for the trailer after the data.)
                 let file_len = tables::file::file_bytes(len, tables::file::is_hugetlbfs(path));
                 let file_len = usize::try_from(file_len).map_err(too_large)?;
-                Memory::map_file(path, file_len, true).map_err(tables::file::io_error(path))
+                // SAFETY: the caller grants exclusive access to output files.
+                unsafe { Memory::map_file(path, file_len, true) }
+                    .map_err(tables::file::io_error(path))
             }
             None => Memory::anonymous(usize::try_from(len).map_err(too_large)?),
         }
@@ -105,7 +119,9 @@ pub fn generate(
         .collect::<Result<_, _>>()?;
     let derived_words = derived_memory
         .iter()
-        .map(Memory::words)
+        // SAFETY: fresh writable mappings, shared only through atomic words
+        // until generation has joined every worker.
+        .map(|memory| unsafe { memory.words() })
         .collect::<Result<Vec<_>, _>>()?;
     let generator = gen::Generator {
         corners,
@@ -126,13 +142,15 @@ pub fn generate(
             })
             .collect(),
     };
-    let _counts = generator.run(&memory)?;
+    // SAFETY: fresh writable memory, not exposed to readers before this ends.
+    let _counts = unsafe { generator.run(&memory)? };
     let table = H48Table {
         memory,
         meta: H48Meta { k, base },
     };
     if let Some(path) = out {
-        tables::file::write_trailer(path, &table.trailer(threads)?)?;
+        // SAFETY: output storage is exclusively owned; no trailer view is live.
+        unsafe { tables::file::write_trailer(path, &table.trailer(threads)?) }?;
     }
     let derived_tables = derived
         .iter()
@@ -146,7 +164,8 @@ pub fn generate(
                 },
             };
             if let Some(path) = path {
-                tables::file::write_trailer(path, &table.trailer(threads)?)?;
+                // SAFETY: output storage is exclusively owned; no trailer view is live.
+                unsafe { tables::file::write_trailer(path, &table.trailer(threads)?) }?;
             }
             Ok(table)
         })
@@ -168,7 +187,8 @@ pub fn generate_table(
     verbose: bool,
 ) -> Result<H48Table, TableError> {
     if k == 0 || k == 11 {
-        return Ok(generate(corners, k, base, None, &[], threads)?.0);
+        // SAFETY: no output files; all memory is privately owned.
+        return Ok(unsafe { generate(corners, k, base, None, &[], threads) }?.0);
     }
     let settings = gen::dfs::Settings {
         k,
@@ -182,7 +202,8 @@ pub fn generate_table(
     let memory = Memory::anonymous(len)?;
     let rows = 0..h48_rows(k);
     let part = gen::dfs::Part {
-        words: memory.words()?,
+        // SAFETY: our fresh writable mapping, read only after generation ends.
+        words: unsafe { memory.words()? },
         first_slot: 0,
         end_slot: rows.end * coord::N_SLOTS as u64,
     };
@@ -197,4 +218,73 @@ pub fn generate_table(
 #[must_use]
 pub fn thread_count() -> usize {
     std::thread::available_parallelism().map_or(1, std::num::NonZero::get)
+}
+
+#[cfg(test)]
+mod safe_api_tests {
+    use super::*;
+    use simd::Cube;
+
+    #[test]
+    fn safe_api_rejects_invalid_cubes_and_coordinates() {
+        assert!(Cube::from_bytes([4; 32]).is_none());
+        assert!(Cube::from_bytes([255; 32]).is_none());
+        let solved = Cube::solved();
+        for sym in [48, usize::MAX] {
+            assert!(coord::edge_parts_sym(solved, sym).is_none());
+            assert!(coord::edge_key_sym(solved, sym).is_none());
+        }
+        for key in [0, 1, 511, 70 << 20, u64::MAX] {
+            assert!(coord::cube_from_edge_key(solved, key).is_none());
+        }
+        let original = solved.to_bytes();
+        for position in (0..8).chain(16..28) {
+            let mut bytes = original;
+            bytes[position] = 255;
+            assert!(Cube::from_bytes(bytes).is_none());
+        }
+        let mut bytes = original;
+        bytes[8..16].fill(255);
+        bytes[28..32].fill(255);
+        assert_eq!(Cube::from_bytes(bytes).unwrap().to_bytes(), original);
+        let mut rng = cubie::Rng(2026);
+        for _ in 0..64 {
+            let cube = Cube::from_cubie(&cubie::CubieCube::random(&mut rng));
+            assert_eq!(
+                Cube::from_bytes(cube.to_bytes()).unwrap().to_cubie(),
+                cube.to_cubie()
+            );
+            let key = coord::edge_key(cube);
+            let restored = coord::cube_from_edge_key(cube, key).unwrap();
+            assert_eq!(coord::edge_key(restored), key);
+            assert_eq!(
+                coord::edge_key_sym(cube, 47),
+                Some(coord::edge_key(cube.transform_edges(47)))
+            );
+        }
+    }
+
+    #[test]
+    fn safe_api_checks_table_memory_and_metadata() {
+        assert!(Memory::anonymous(usize::MAX).is_err());
+        for meta in [
+            H48Meta { k: 12, base: 2 },
+            H48Meta { k: 0, base: 13 },
+            H48Meta { k: 0, base: 2 },
+        ] {
+            assert!(H48Table::from_memory(Memory::anonymous(4096).unwrap(), meta).is_err());
+        }
+        // An intentionally undersized internal fixture also exercises get's
+        // allocation check. External code cannot construct this table.
+        let table = H48Table {
+            memory: Memory::anonymous(4096).unwrap(),
+            meta: H48Meta { k: 0, base: 2 },
+        };
+        assert_eq!(table.get(0), Some((0, 0)));
+        assert_eq!(table.get(16383), Some((0, 0)));
+        for index in [16384, tables::h48_slots(0), u64::MAX] {
+            assert_eq!(table.get(index), None);
+            table.prefetch(index);
+        }
+    }
 }

@@ -14,7 +14,7 @@
 
 use crate::cubie::{CubieCube, Move};
 
-pub mod coord;
+pub(crate) mod coord;
 
 #[cfg(backend = "neon")]
 mod v16_neon;
@@ -347,8 +347,8 @@ pub static HOT_TABLES: HotTables = HotTables {
 /// (bytes 0..12); the other bytes are unspecified, as in `simd.rs`.
 #[derive(Clone, Copy)]
 pub struct Cube {
-    pub corners: V16,
-    pub edges: V16,
+    pub(crate) corners: V16,
+    pub(crate) edges: V16,
 }
 
 /// Bytes `0..n` of a half set to `value`, the others 0.
@@ -405,9 +405,21 @@ impl Cube {
         SOLVED_BYTES.load()
     }
 
-    /// A cube from its 32 bytes (`to_bytes` layout).
+    /// Parse the byte layout, rejecting duplicate pieces and invalid orientations.
+    /// Unused bytes are ignored. This does not require physical reachability.
     #[must_use]
-    pub fn from_bytes(bytes: [u8; 32]) -> Cube {
+    pub fn from_bytes(mut bytes: [u8; 32]) -> Option<Cube> {
+        if !crate::cubie::valid_cube_bytes(&bytes) {
+            return None;
+        }
+        bytes[8..16].fill(0);
+        bytes[28..32].fill(0);
+        Some(Self::from_bytes_internal(bytes))
+    }
+
+    /// Internal coordinate construction and raw-byte backend tests only.
+    #[must_use]
+    pub(crate) fn from_bytes_internal(bytes: [u8; 32]) -> Cube {
         halves(&Aligned32(bytes)).load()
     }
 
@@ -420,7 +432,7 @@ impl Cube {
         for (i, byte) in bytes[16..28].iter_mut().enumerate() {
             *byte = cube.edge_perm[i] | (cube.edge_orient[i] << 4);
         }
-        Cube::from_bytes(bytes)
+        Cube::from_bytes_internal(bytes)
     }
 
     /// The 32 bytes, the unspecified ones zeroed.
@@ -634,7 +646,7 @@ impl Cube {
     /// mask of every byte (no compare).
     #[inline(always)]
     #[must_use]
-    pub fn select_mask(mask: u32, if_set: Cube, if_clear: Cube) -> Cube {
+    pub(crate) fn select_mask(mask: u32, if_set: Cube, if_clear: Cube) -> Cube {
         #[expect(clippy::cast_possible_truncation, reason = "all ones or all zeros")]
         let byte_mask = mask as u8;
         Cube {
@@ -649,7 +661,7 @@ impl Cube {
     /// 0). One composition of selected operands, as in `simd.rs`.
     ///
     /// # Safety
-    /// `mv < 18`.
+    /// `mv < 18`, and `x_move_mask` is either zero or `u32::MAX`.
     #[inline(always)]
     #[must_use]
     pub unsafe fn child_lookup(moved: Cube, other: Cube, mv: usize, x_move_mask: u32) -> Cube {

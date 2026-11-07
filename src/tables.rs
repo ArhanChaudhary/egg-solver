@@ -26,17 +26,23 @@ use std::sync::atomic::{AtomicU64, Ordering};
 /// The cocsep table: per cocsep coordinate, its symmetry class, the
 /// symmetry that maps it to the class representative ("sym to rep") and its
 /// depth (distance to solved).
+///
+/// ```compile_fail,E0616
+/// fn corrupt(table: &mut egg_solver::tables::Cocsep) {
+///     table.entries = Vec::new().into_boxed_slice();
+/// }
+/// ```
 pub struct Cocsep {
     /// `entries[cocsep] = class << 16 | sym_to_rep << 8 | depth` (see
     /// `entry_*`).
-    pub entries: Box<[u32]>,
+    pub(crate) entries: Box<[u32]>,
     /// Representative cube (corners only meaningful) per class.
-    pub representatives: Box<[Cube]>,
+    pub(crate) representatives: Box<[Cube]>,
     /// Bitmask of the symmetries fixing the representative's cocsep, per
     /// class.
-    pub self_symmetries: Box<[u64]>,
+    pub(crate) self_symmetries: Box<[u64]>,
     /// Depth distribution of the 153090 cocsep coordinates.
-    pub distribution: Box<[u64]>,
+    pub(crate) distribution: Box<[u64]>,
     /// Hot-path copy of `entries` packed into 3 bytes per entry (25% less
     /// L2 footprint): `class << 10 | sym_to_rep << 4 | depth` (+1 pad byte),
     /// on a transparent huge page (one TLB entry instead of ~113). (+2.8% at
@@ -88,6 +94,30 @@ pub fn entry_depth(entry: u32) -> u8 {
 }
 
 impl Cocsep {
+    /// Entries in coordinate order; callers cannot invalidate their indices.
+    #[must_use]
+    pub fn entries(&self) -> &[u32] {
+        &self.entries
+    }
+
+    /// Representative cube of each symmetry class.
+    #[must_use]
+    pub fn representatives(&self) -> &[Cube] {
+        &self.representatives
+    }
+
+    /// Symmetries fixing each representative.
+    #[must_use]
+    pub fn self_symmetries(&self) -> &[u64] {
+        &self.self_symmetries
+    }
+
+    /// Number of coordinates at each depth.
+    #[must_use]
+    pub fn distribution(&self) -> &[u64] {
+        &self.distribution
+    }
+
     /// Build the table: a breadth-first search (BFS) over the cocsep
     /// coordinate, then the symmetry classes.
     ///
@@ -249,7 +279,7 @@ impl Cocsep {
     /// unaligned load of 3 bytes and the next entry's first byte.
     #[must_use]
     #[inline(always)]
-    pub fn packed(&self, i: usize) -> u32 {
+    pub(crate) fn packed(&self, i: usize) -> u32 {
         debug_assert!(i < N_COCSEP);
         unsafe { self.packed.ptr().add(3 * i).cast::<u32>().read_unaligned() }
     }
@@ -301,6 +331,9 @@ impl Memory {
     /// If `mmap` fails.
     #[cfg(unix)]
     pub fn anonymous(len: usize) -> Result<Memory, TableError> {
+        if isize::try_from(len).is_err() {
+            return Err(TableError::TooLargeForSlice(len));
+        }
         // (Miri supports only these flags, and no `madvise`.)
         #[cfg(not(miri))]
         let flags = libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_NORESERVE;
@@ -319,6 +352,13 @@ impl Memory {
                 return Err(TableError::Alloc {
                     bytes: len,
                     source: std::io::Error::last_os_error(),
+                });
+            }
+            if p.is_null() {
+                libc::munmap(p, len);
+                return Err(TableError::Alloc {
+                    bytes: len,
+                    source: std::io::Error::other("mapping returned a null address"),
                 });
             }
             #[cfg(all(not(miri), target_os = "linux"))]
@@ -346,6 +386,7 @@ impl Memory {
     #[cfg(all(not(unix), not(target_arch = "wasm32")))]
     #[must_use]
     pub fn try_anonymous(len: usize) -> Option<Memory> {
+        isize::try_from(len).ok()?;
         // SAFETY: a non-zero size; freed with the same layout in `drop`.
         let ptr = unsafe { std::alloc::alloc_zeroed(Memory::layout(len)?) };
         (!ptr.is_null()).then_some(Memory { ptr, len })
@@ -354,11 +395,12 @@ impl Memory {
     /// Zeroed page-aligned memory from wasi-libc (`posix_memalign`), or
     /// `None` if there is not enough. The threads build's memory is all there
     /// from the start and never grows (see `wasm/build.rs`), and C's
-    /// allocator, unlike Rust's, hands out more than `isize::MAX` (h7 is 3.6
-    /// GiB).
+    /// allocator supplies page alignment. Requests above `isize::MAX` are
+    /// rejected because the solver uses in-bounds pointer arithmetic.
     #[cfg(all(target_arch = "wasm32", wasm_threads))]
     #[must_use]
     pub fn try_anonymous(len: usize) -> Option<Memory> {
+        isize::try_from(len).ok()?;
         let mut ptr = std::ptr::null_mut();
         // SAFETY: an out-pointer; the block is freed in `drop`.
         if unsafe { libc::posix_memalign(&raw mut ptr, 4096, len.max(1)) } != 0 {
@@ -372,12 +414,13 @@ impl Memory {
 
     /// Zeroed whole pages of wasm32 linear memory (`memory.grow`), or `None`
     /// if the engine has no more (at most 4 GiB in all). Not from the
-    /// allocator: it cannot hand out more than `isize::MAX` (2 GiB) at
-    /// once, and h7 is 3.6 GiB.
+    /// allocator: pages can be reused without growing the allocator's heap.
+    /// A single block must still fit in `isize::MAX` (under 2 GiB on wasm32).
     #[cfg(all(not(unix), target_arch = "wasm32", not(wasm_threads)))]
     #[must_use]
     pub fn try_anonymous(len: usize) -> Option<Memory> {
         const PAGE: usize = 1 << 16;
+        isize::try_from(len).ok()?;
         let pages_len = len.max(1).checked_next_multiple_of(PAGE)?;
         let mut spare = SPARE_PAGES
             .lock()
@@ -419,7 +462,12 @@ impl Memory {
     /// # Errors
     /// If the file cannot be opened, sized or mapped, or is shorter than
     /// `len`.
-    pub fn map_file(path: &str, len: usize, create: bool) -> std::io::Result<Memory> {
+    /// # Safety
+    /// The file must not be truncated while mapped. Other handles or mappings
+    /// must not access bytes concurrently with a write, or write bytes covered
+    /// by an immutable view. Writes must obey `words`' aliasing contract.
+    /// These requirements also apply to other processes.
+    pub unsafe fn map_file(path: &str, len: usize, create: bool) -> std::io::Result<Memory> {
         Memory::map(path, len, create, true)
     }
 
@@ -429,7 +477,10 @@ impl Memory {
     ///
     /// # Errors
     /// As `map_file`.
-    pub fn map_read_only(path: &str, len: usize, prefault: bool) -> std::io::Result<Memory> {
+    /// # Safety
+    /// The file must remain unchanged and untruncated until this mapping is
+    /// dropped, including writes through other handles or by other processes.
+    pub unsafe fn map_read_only(path: &str, len: usize, prefault: bool) -> std::io::Result<Memory> {
         Memory::map(path, len, false, prefault)
     }
 
@@ -444,6 +495,7 @@ impl Memory {
     #[cfg(unix)]
     fn map(path: &str, len: usize, create: bool, prefault: bool) -> std::io::Result<Memory> {
         use std::os::unix::io::AsRawFd;
+        isize::try_from(len).map_err(std::io::Error::other)?;
         // (Opened tables are mapped read-only: a stray write faults instead
         // of corrupting the shared table file for every process.)
         let file = std::fs::OpenOptions::new()
@@ -464,6 +516,7 @@ impl Memory {
             file.set_len(rounded as u64)?;
         }
         let file_len = usize::try_from(file.metadata()?.len()).map_err(std::io::Error::other)?;
+        isize::try_from(file_len).map_err(std::io::Error::other)?;
         if file_len < len {
             return Err(std::io::Error::other(format!(
                 "table file {path} too small: {file_len} < {len}"
@@ -499,6 +552,13 @@ impl Memory {
         };
         if p == libc::MAP_FAILED {
             return Err(std::io::Error::last_os_error());
+        }
+        if p.is_null() {
+            // SAFETY: this is the mapping just returned by mmap.
+            unsafe {
+                libc::munmap(p, file_len);
+            }
+            return Err(std::io::Error::other("mapping returned a null address"));
         }
         let memory = Memory {
             ptr: p.cast::<u8>(),
@@ -562,11 +622,24 @@ impl Memory {
     }
     /// The memory as 64-bit words, for the table generator's atomic updates.
     ///
+    /// # Safety
+    /// Before mutating a word, the caller must ensure the mapping is writable
+    /// and that no non-atomic access or immutable byte reference overlaps the
+    /// mutation. A view used only for loads may coexist with other readers.
+    ///
+    /// ```compile_fail,E0133
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let memory = egg_solver::tables::Memory::anonymous(8)?;
+    /// let _words = memory.words()?; // Requires an explicit unsafe contract.
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Errors
     /// If the memory is larger than a slice can be (`isize::MAX` bytes: 2
     /// GiB on 32-bit targets).
     #[expect(clippy::cast_ptr_alignment, reason = "mappings are page aligned")]
-    pub fn words(&self) -> Result<&[AtomicU64], TableError> {
+    pub unsafe fn words(&self) -> Result<&[AtomicU64], TableError> {
         self.check_slice_len()?;
         // SAFETY: our memory, of at most `isize::MAX` bytes, page aligned.
         Ok(unsafe { std::slice::from_raw_parts(self.ptr.cast::<AtomicU64>(), self.len / 8) })
@@ -716,35 +789,98 @@ pub struct H48Meta {
 
 /// An H48 table: 2-bit codes, 0 = "at most `base`" (then the group minimum
 /// and the corner depth give a bound), 1..=3 = `base + code` (3: at least).
+///
+/// ```compile_fail,E0616
+/// fn corrupt(table: &mut egg_solver::tables::H48Table) {
+///     table.meta.k = 32;
+/// }
+/// ```
 pub struct H48Table {
-    pub memory: Memory,
-    pub meta: H48Meta,
+    pub(crate) memory: Memory,
+    pub(crate) meta: H48Meta,
 }
 
 impl H48Table {
+    /// Load a private copy; later file changes cannot alter the table's memory.
+    ///
+    /// # Errors
+    /// Invalid metadata, allocation failure, or a file read error.
+    pub fn open_copy(path: &str) -> Result<H48Table, TableError> {
+        let options = file::LoadOptions {
+            mode: file::LoadMode::Copy,
+            ..file::LoadOptions::default()
+        };
+        // SAFETY: Copy never maps files or attaches shared segments.
+        unsafe { Self::open_with(path, &options) }
+    }
+
+    /// Table metadata, validated when the table is constructed.
+    #[must_use]
+    pub fn meta(&self) -> H48Meta {
+        self.meta
+    }
+
+    /// Read-only access to the backing allocation.
+    #[must_use]
+    pub fn memory(&self) -> &Memory {
+        &self.memory
+    }
+
+    /// Adopt initialized table codes after checking metadata and allocation size.
+    /// This checks memory safety, not whether the codes are correct lower bounds.
+    ///
+    /// # Errors
+    /// Invalid metadata or insufficient memory for the declared table.
+    pub fn from_memory(memory: Memory, meta: H48Meta) -> Result<Self, TableError> {
+        if meta.k > 11 || meta.base > 12 {
+            return Err(TableError::BadMeta(format!("{} {}", meta.k, meta.base)));
+        }
+        let needed = h48_bytes(meta.k);
+        if (memory.len() as u64) < needed {
+            return Err(TableError::WrongSize {
+                path: "<memory>".into(),
+                bytes: memory.len() as u64,
+                k: meta.k,
+                needed,
+            });
+        }
+        Ok(Self { memory, meta })
+    }
+
     #[must_use]
     #[inline(always)]
     pub fn ptr(&self) -> *const u8 {
         self.memory.ptr()
     }
 
-    /// Returns (2-bit code, group minimum).
+    /// Returns (2-bit code, group minimum), or `None` outside the table.
     #[must_use]
     #[inline(always)]
     #[expect(clippy::cast_ptr_alignment, reason = "tables are page aligned")]
-    pub fn get(&self, index: u64) -> (u8, u8) {
+    pub fn get(&self, index: u64) -> Option<(u8, u8)> {
+        if index >= h48_slots(self.meta.k) {
+            return None;
+        }
+        let w = usize::try_from(index >> 5).ok()?;
+        if w >= self.memory.len() / 8 {
+            return None;
+        }
+        // SAFETY: w and the preceding group word are within this aligned,
+        // initialized allocation, which is immutable while borrowed.
         unsafe {
             let words = self.memory.ptr().cast_const().cast::<u64>();
-            let w = (index >> 5) as usize;
             let word = *words.add(w);
             // (The group's first word holds the minimum in slots 0-1.)
             let group_min = *words.add(w & !1) & 15;
-            (((word >> ((index & 31) * 2)) & 3) as u8, group_min as u8)
+            Some((((word >> ((index & 31) * 2)) & 3) as u8, group_min as u8))
         }
     }
 
     #[inline(always)]
     pub fn prefetch(&self, index: u64) {
+        if index >= h48_slots(self.meta.k) || index >> 2 >= self.memory.len() as u64 {
+            return;
+        }
         // NTA: each line is read once; less L2 pollution (cocsep data).
         // (+2.6% at 48T when added, prefetch-nta.)
         // SAFETY: an entry of the table (indices are below its size).
@@ -759,7 +895,8 @@ impl H48Table {
     /// If the table is larger than its memory or a slice can be, or a
     /// counting thread panicked.
     pub fn distribution(&self) -> Result<[u64; 4], TableError> {
-        let words = self.memory.words()?;
+        // SAFETY: distribution only loads the words; it never mutates them.
+        let words = unsafe { self.memory.words()? };
         let len = usize::try_from(h48_bytes(self.meta.k) / 8)
             .map_err(|_| TableError::TooLarge(self.meta.k))?;
         let words = words.get(..len).ok_or(TableError::TooLarge(self.meta.k))?;
@@ -898,8 +1035,11 @@ impl H48Table {
     ///
     /// # Errors
     /// See `open_with`.
-    pub fn open(path: &str) -> Result<H48Table, TableError> {
-        H48Table::open_with(path, &file::LoadOptions::from_env()?)
+    /// # Safety
+    /// As `open_with`; the environment can select a shared mapping.
+    pub unsafe fn open(path: &str) -> Result<H48Table, TableError> {
+        // SAFETY: the caller supplies the shared-storage contract.
+        unsafe { H48Table::open_with(path, &file::LoadOptions::from_env()?) }
     }
 
     /// Open a table file. Files on hugetlbfs (1 GiB pages) and `/dev/shm`
@@ -910,8 +1050,16 @@ impl H48Table {
     /// # Errors
     /// If the table's meta cannot be read (`read_meta`), the file size does
     /// not match its `k`, or reading, mapping or allocating fails.
-    pub fn open_with(path: &str, options: &file::LoadOptions) -> Result<H48Table, TableError> {
-        H48Table::open_reporting(path, options).map(|(table, _)| table)
+    /// # Safety
+    /// With Map (including Auto selecting Map), nobody may modify or truncate
+    /// the file until the table is dropped. With Shm, nobody may modify the
+    /// published segment while it is attached. Copy has no such requirement.
+    pub unsafe fn open_with(
+        path: &str,
+        options: &file::LoadOptions,
+    ) -> Result<H48Table, TableError> {
+        // SAFETY: the caller supplies the shared-storage contract.
+        unsafe { H48Table::open_reporting(path, options) }.map(|(table, _)| table)
     }
 
     /// `open_with`, and how the table was loaded. With `LoadMode::Shm` the
@@ -923,7 +1071,9 @@ impl H48Table {
     /// As `open_with`; with `Shm`, also if the segment cannot be made or
     /// holds another table, or is being loaded by another process
     /// (`TableError::ShmLoading`: try again).
-    pub fn open_reporting(
+    /// # Safety
+    /// As `open_with`.
+    pub unsafe fn open_reporting(
         path: &str,
         options: &file::LoadOptions,
     ) -> Result<(H48Table, LoadReport), TableError> {
@@ -957,7 +1107,9 @@ impl H48Table {
         }
         let io_error = file::io_error(path);
         if report.mode == file::LoadMode::Map {
-            let memory = Memory::map_read_only(path, len, options.prefault).map_err(io_error)?;
+            // SAFETY: the caller promises an immutable, untruncated file.
+            let memory =
+                unsafe { Memory::map_read_only(path, len, options.prefault) }.map_err(io_error)?;
             return Ok((H48Table { memory, meta }, report));
         }
         let memory = Memory::anonymous(len)?;
@@ -991,8 +1143,7 @@ impl H48Table {
         let trailer_start = file_len
             .checked_sub(file::TRAILER_BYTES)
             .ok_or(TableError::NotATableFile(file_len))?;
-        // (Slices of at most 1 GiB: wasm32 has no slices over 2 GiB, h7 is
-        // 3.6 GiB.)
+        // Use bounded chunks for checksums and trailer reads.
         let piece = |start: u64, len: u64| -> &[u8] {
             // (Offsets within the memory, whose length is a `usize`, are
             // `usize`s too; out of range, the piece is empty.)
@@ -1203,6 +1354,26 @@ mod tests {
     use super::*;
     use crate::cubie::*;
 
+    /// Atomic generator writes finish before any immutable byte view is made.
+    #[test]
+    fn atomic_updates_finish_before_byte_reads() {
+        let memory = Memory::anonymous(16).unwrap();
+        let values = [0x0123_4567_89ab_cdef_u64, 0xfedc_ba98_7654_3210];
+        {
+            // SAFETY: fresh writable memory, exposed only as atomic words
+            // until both scoped workers have finished.
+            let words = unsafe { memory.words().unwrap() };
+            std::thread::scope(|scope| {
+                for (word, value) in words.iter().zip(values) {
+                    scope.spawn(move || word.store(value, Ordering::Relaxed));
+                }
+            });
+        }
+        let bytes = memory.bytes().unwrap();
+        assert_eq!(&bytes[..8], &values[0].to_ne_bytes());
+        assert_eq!(&bytes[8..], &values[1].to_ne_bytes());
+    }
+
     /// Tables open only with a valid meta and a file of the size its `k`
     /// needs (a wrong meta would give wrong, possibly too high, bounds).
     #[test]
@@ -1215,7 +1386,7 @@ mod tests {
         std::fs::write(&path, vec![0u8; usize::try_from(len).unwrap()]).unwrap();
         let open_with = |meta: &str| {
             std::fs::write(meta_path(&path), meta).unwrap();
-            H48Table::open(&path).map(|t| (t.meta.k, t.meta.base))
+            unsafe { H48Table::open(&path) }.map(|t| (t.meta.k, t.meta.base))
         };
         assert_eq!(open_with("0 8\n").unwrap(), (0, 8));
         for bad in ["0 13", "12 8", "0", "0 8 1", "x 8", "0 -1", ""] {
@@ -1278,7 +1449,7 @@ mod tests {
         let len = usize::try_from(h48_bytes(0)).unwrap();
         std::fs::write(&path, vec![0u8; len]).unwrap();
         std::fs::write(meta_path(&path), "0 8\n").unwrap();
-        let table = H48Table::open(&path).unwrap();
+        let table = unsafe { H48Table::open(&path) }.unwrap();
         let start = table.ptr() as usize;
         let maps = std::fs::read_to_string("/proc/self/maps").unwrap();
         let perms = maps

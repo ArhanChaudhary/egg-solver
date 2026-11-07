@@ -352,14 +352,21 @@ pub fn read_trailer(path: &str) -> Result<Option<Trailer>, TableError> {
 /// If the file is too small to hold the data and a trailer after it (the
 /// data region is never written), or on any I/O error, or if the trailer
 /// does not read back as written.
-pub fn write_trailer(path: &str, trailer: &Trailer) -> Result<(), TableError> {
+/// # Safety
+/// Nobody may truncate the file or access its trailer during this call. On
+/// hugetlbfs this function writes through a temporary shared mapping.
+pub unsafe fn write_trailer(path: &str, trailer: &Trailer) -> Result<(), TableError> {
     let f = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
         .open(path)
         .map_err(io_error(path))?;
     let len = f.metadata().map_err(io_error(path))?.len();
-    if len < trailer.data_bytes + TRAILER_BYTES {
+    if trailer
+        .data_bytes
+        .checked_add(TRAILER_BYTES)
+        .is_none_or(|needed| len < needed)
+    {
         return Err(TableError::NoRoom {
             path: path.to_string(),
             bytes: len,
@@ -399,6 +406,12 @@ pub fn write_trailer(path: &str, trailer: &Trailer) -> Result<(), TableError> {
             );
             if p == libc::MAP_FAILED {
                 return Err(io_error(path)(std::io::Error::last_os_error()));
+            }
+            if p.is_null() {
+                libc::munmap(p, page_len);
+                return Err(io_error(path)(std::io::Error::other(
+                    "mapping returned a null address",
+                )));
             }
             let dst = p.cast::<u8>().add(in_page);
             std::ptr::copy_nonoverlapping(bytes.as_ptr(), dst, bytes.len());
@@ -727,12 +740,17 @@ mod tests {
         };
         // Too small for data plus trailer: refused, file untouched.
         std::fs::write(&path, &data).unwrap();
-        assert!(write_trailer(&path, &t).is_err());
+        assert!(unsafe { write_trailer(&path, &t) }.is_err());
+        let overflowing = Trailer {
+            data_bytes: u64::MAX,
+            ..t
+        };
+        assert!(unsafe { write_trailer(&path, &overflowing) }.is_err());
         assert_eq!(std::fs::read(&path).unwrap(), data);
         let mut with_room = data.clone();
         with_room.resize(data.len() + usize::try_from(TRAILER_BYTES).unwrap(), 0xAA);
         std::fs::write(&path, &with_room).unwrap();
-        write_trailer(&path, &t).unwrap();
+        unsafe { write_trailer(&path, &t) }.unwrap();
         assert_eq!(read_trailer(&path).unwrap(), Some(t));
         assert_eq!(&std::fs::read(&path).unwrap()[..data.len()], &data[..]);
         std::fs::remove_file(&path).unwrap();

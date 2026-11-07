@@ -264,7 +264,9 @@ strings or random states, in plain web JavaScript (`demo-worker.mjs`,
 ### Tables
 
 wasm32 has at most 4 GiB of memory, for the table and everything else
-(tens of MB; ~0.2 GB with 8 threads). Small tables can be generated in the module; larger ones are made
+(tens of MB; ~0.2 GB with 8 threads). Each table allocation must also fit below
+Rust's `isize::MAX` limit (2 GiB on wasm32), so h0 through h6 are supported;
+h7 is rejected. Small tables can be generated in the module; larger ones are made
 by the native `gen` (see "Running on a laptop") and loaded from the file.
 Time per random-state cube, one at a time, mean and median of 10 cubes
 (h4: 5), on Zen 5 cores (8 threads: one L3 domain), in V8 (Chrome's engine;
@@ -276,10 +278,9 @@ measured in Node 26) and in Bun (JavaScriptCore, Safari's engine):
 | h4 base 8 | 0.45 GiB | any browser                 | the module: 75 s (8 threads: 13 s) | 21.6 s, 20.7 s |          |                  |                  |
 | h5        | 0.9 GiB  | desktop browsers            | `gen 5 auto`               | 19.4 s, 10.3 s   |                  |                  |                  |
 | h6        | 1.8 GiB  | desktop browsers            | `gen 6 auto`               | 12.6 s, 5.0 s    | 12.2 s, 4.9 s    | 1.6 s, 0.65 s    | 1.6 s, 0.65 s              |
-| h7        | 3.6 GiB  | Bun; Chrome (tested headless) | `gen 7 auto`             | 6.7 s, 2.9 s     | 6.5 s, 2.9 s     | 0.93 s, 0.44 s   | 0.91 s, 0.44 s             |
 
 Loading from a file takes seconds (from a local server into headless
-Chromium: h6 3-13 s, h7 15 s; `verify` adds a checksum pass). The 4 GiB are
+Chromium: h6 3-13 s; `verify` adds a checksum pass). The 4 GiB are
 the engine's limit for wasm32; a browser tab may allow less (mobile ones
 much less). h8 and larger would need memory64 (64-bit WebAssembly memory),
 which this build does not use.
@@ -353,3 +354,20 @@ scalar, wasmtime and V8; h6, 100 depth-17 cubes: the same in Bun).
 Settings use `EGG_SOLVER_*`; the corresponding `CUBEOPT_*` names remain fallback aliases.
 An explicitly set modern name takes precedence. Existing table files and shared-memory
 segments remain readable, and pruning-table data does not need to be regenerated.
+
+### Library memory safety contracts
+
+`Cube::from_bytes`, symmetry-coordinate lookups, and `cube_from_edge_key`
+return `Option` for invalid input. Table and solver internals are exposed
+through read-only accessors. `H48Table::from_memory` checks the metadata
+and allocation size; `get` returns `None` for an invalid index.
+
+`H48Table::open_copy` loads private RAM and is safe. APIs that can map files
+or attach shared segments are unsafe: the backing storage must remain
+unchanged and untruncated while the table exists. This includes changes by
+other processes. The command-line mapped/shared modes require the same
+condition; `--load copy` avoids that dependence after loading. File-backed
+generation requires exclusive access to its output paths.
+
+The current packed-coordinate and table encodings require a little-endian
+target. Big-endian builds are rejected at compile time.

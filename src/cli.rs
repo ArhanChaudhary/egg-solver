@@ -161,17 +161,24 @@ impl LoadArgs {
     /// # Errors
     /// As `H48Table::open_with`, as a `BadInput` (exit status 2, as `solve`
     /// gave before).
-    pub fn open(self, path: &str) -> anyhow::Result<H48Table> {
-        self.open_reported(path).map(|(table, _)| table)
+    /// # Safety
+    /// Shared table storage must remain unchanged as required by `H48Table::open_with`.
+    pub unsafe fn open(self, path: &str) -> anyhow::Result<H48Table> {
+        // SAFETY: inherited from this method's shared-storage contract.
+        unsafe { self.open_reported(path) }.map(|(table, _)| table)
     }
 
     /// `open`, and how the table was loaded.
     ///
     /// # Errors
     /// As `open`.
-    pub fn open_reported(self, path: &str) -> anyhow::Result<(H48Table, LoadReport)> {
-        self.preflight(path)?;
-        self.open_logged(path).map_err(|error| {
+    /// # Safety
+    /// Shared table storage must remain unchanged as required by `H48Table::open_with`.
+    pub unsafe fn open_reported(self, path: &str) -> anyhow::Result<(H48Table, LoadReport)> {
+        // SAFETY: the shared-storage contract includes the preflight inspection.
+        unsafe { self.preflight(path) }?;
+        // SAFETY: inherited from this method's shared-storage contract.
+        unsafe { self.open_logged(path) }.map_err(|error| {
             // (Most messages name the file already.)
             let what = if error.to_string().contains(path) {
                 "cannot open table".to_string()
@@ -188,7 +195,7 @@ impl LoadArgs {
     /// KiB pages are left for. Nothing is needed when `auto` or `--shm`
     /// attaches the table's segment, or for a segment on huge pages (pool
     /// pages, which `tables::shm` checks itself).
-    fn preflight(self, path: &str) -> anyhow::Result<()> {
+    unsafe fn preflight(self, path: &str) -> anyhow::Result<()> {
         let options = self.options();
         let mode = options.mode_for(path);
         if !matches!(mode, LoadMode::Copy | LoadMode::Shm) {
@@ -198,7 +205,10 @@ impl LoadArgs {
         let Ok(meta) = crate::tables::read_meta(path) else {
             return Ok(());
         };
-        if matches!(options.mode, LoadMode::Auto | LoadMode::Shm) && shm::loaded(path, &options) {
+        // SAFETY: inherited from the loading API's shared-storage contract.
+        if matches!(options.mode, LoadMode::Auto | LoadMode::Shm)
+            && unsafe { shm::loaded(path, &options) }
+        {
             return Ok(());
         }
         if mode == LoadMode::Copy {
@@ -222,7 +232,7 @@ impl LoadArgs {
     }
 
     /// `open_reported`, with the table's own error.
-    fn open_logged(self, path: &str) -> Result<(H48Table, LoadReport), TableError> {
+    unsafe fn open_logged(self, path: &str) -> Result<(H48Table, LoadReport), TableError> {
         let options = self.options();
         let mode = options.mode_for(path);
         log::info!(
@@ -241,7 +251,8 @@ impl LoadArgs {
         let start = Instant::now();
         let mut waiting = false;
         let (table, report) = loop {
-            match H48Table::open_reporting(path, &options) {
+            // SAFETY: inherited from this method's shared-storage contract.
+            match unsafe { H48Table::open_reporting(path, &options) } {
                 // (Another process is filling the segment: wait for it.)
                 Err(TableError::ShmLoading { key, pid }) => {
                     if !waiting {
@@ -285,10 +296,13 @@ impl LoadArgs {
     ///
     /// # Errors
     /// As `open` with `--load shm`.
-    pub fn shm_load(self, path: &str) -> anyhow::Result<ExitCode> {
+    /// # Safety
+    /// Shared table storage must remain unchanged as required by `H48Table::open_with`.
+    pub unsafe fn shm_load(self, path: &str) -> anyhow::Result<ExitCode> {
         let args = LoadArgs { shm: true, ..self };
         let start = Instant::now();
-        let (table, report) = args.open_reported(path)?;
+        // SAFETY: inherited from this method's shared-storage contract.
+        let (table, report) = unsafe { args.open_reported(path) }?;
         let seconds = start.elapsed().as_secs_f64();
         let segment = report
             .segment
@@ -319,7 +333,10 @@ impl LoadArgs {
     /// # Errors
     /// If the table's k and base cannot be read, or the segment cannot be
     /// removed (another user's).
-    pub fn shm_remove(self, path: &str) -> anyhow::Result<ExitCode> {
+    ///
+    /// # Safety
+    /// The segment must follow [`shm::remove`]'s publication contract.
+    pub unsafe fn shm_remove(self, path: &str) -> anyhow::Result<ExitCode> {
         let key = if let Some(key) = self.shm_key {
             key
         } else {
@@ -328,7 +345,8 @@ impl LoadArgs {
             })?;
             shm::key(meta.k, meta.base)
         };
-        match shm::remove(key)? {
+        // SAFETY: required by this method.
+        match unsafe { shm::remove(key) }? {
             Some(removed) => {
                 let still = match removed.attached {
                     0 => String::new(),

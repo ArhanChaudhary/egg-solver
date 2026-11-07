@@ -58,9 +58,15 @@ pub(crate) const ALLOWED_AFTER_CONST: [u32; 6] = allowed_after_table();
 pub static ALLOWED_AFTER: [u32; 6] = ALLOWED_AFTER_CONST;
 
 /// The tables of a search, and the hot path's lookups.
+///
+/// ```compile_fail,E0616
+/// fn replace<'a>(solver: &mut egg_solver::solver::Solver<'a>, table: &'a egg_solver::tables::H48Table) {
+///     solver.table = table;
+/// }
+/// ```
 pub struct Solver<'a> {
-    pub corners: &'a Cocsep,
-    pub table: &'a H48Table,
+    pub(crate) corners: &'a Cocsep,
+    pub(crate) table: &'a H48Table,
     /// `table.ptr()`, cached (saves a dependent load per prefetch/lookup;
     /// with `value` and `prefetch`, part of m1-micro's +2.2% at 48T).
     table_ptr: *const u8,
@@ -153,6 +159,18 @@ const UNKNOWN: u8 = 0xFF;
 const FOUND: u8 = 0xFE;
 
 impl<'a> Solver<'a> {
+    /// Corner table borrowed for the lifetime of the cached pointer.
+    #[must_use]
+    pub fn corners(&self) -> &'a Cocsep {
+        self.corners
+    }
+
+    /// Pruning table borrowed for the lifetime of the cached pointer.
+    #[must_use]
+    pub fn table(&self) -> &'a H48Table {
+        self.table
+    }
+
     #[must_use]
     pub fn new(corners: &'a Cocsep, table: &'a H48Table) -> Solver<'a> {
         let k = table.meta.k;

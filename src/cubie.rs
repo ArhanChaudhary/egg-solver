@@ -88,6 +88,28 @@ pub struct CubieCube {
     pub(crate) edge_orient: [u8; 12],
 }
 
+/// Structural validity of the SIMD byte layout. Reachability is separate:
+/// coordinate generation also uses cubes with mismatched permutation parity.
+pub(crate) fn valid_cube_bytes(bytes: &[u8; 32]) -> bool {
+    let mut corners = 0u16;
+    let mut edges = 0u16;
+    for &byte in &bytes[..8] {
+        let piece = byte & 31;
+        if piece >= 8 || byte >> 5 >= 3 {
+            return false;
+        }
+        corners |= 1 << piece;
+    }
+    for &byte in &bytes[16..28] {
+        let piece = byte & 15;
+        if piece >= 12 || byte >> 4 >= 2 {
+            return false;
+        }
+        edges |= 1 << piece;
+    }
+    corners == 0xFF && edges == 0xFFF
+}
+
 impl CubieCube {
     pub const SOLVED: CubieCube = CubieCube {
         corner_perm: [0, 1, 2, 3, 4, 5, 6, 7],

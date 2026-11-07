@@ -24,7 +24,7 @@ fn corners() -> &'static Cocsep {
 fn h0() -> &'static H48Table {
     static TABLE: OnceLock<H48Table> = OnceLock::new();
     TABLE.get_or_init(|| {
-        egg_solver::generate(corners(), 0, 8, None, &[], egg_solver::thread_count())
+        unsafe { egg_solver::generate(corners(), 0, 8, None, &[], egg_solver::thread_count()) }
             .unwrap()
             .0
     })
@@ -93,7 +93,8 @@ fn h0_table_matches_brute_force() {
     let corners = corners();
     let base = 3u8;
     let (table, _) =
-        egg_solver::generate(corners, 0, base, None, &[], egg_solver::thread_count()).unwrap();
+        unsafe { egg_solver::generate(corners, 0, base, None, &[], egg_solver::thread_count()) }
+            .unwrap();
     // The distance of each table entry: the least over the cubes it covers.
     let mut best: HashMap<u64, u8> = HashMap::new();
     for &(cube, distance) in ball(5).values() {
@@ -101,7 +102,7 @@ fn h0_table_matches_brute_force() {
         let entry = best.entry(index).or_insert(distance);
         *entry = (*entry).min(distance);
         // admissible
-        let (code, group_min) = table.get(index);
+        let (code, group_min) = table.get(index).unwrap();
         let value = if code == 0 { group_min } else { base + code };
         assert!(
             value <= distance,
@@ -110,7 +111,7 @@ fn h0_table_matches_brute_force() {
     }
     let mut want = [0u64; 3];
     for (&index, &distance) in &best {
-        let (code, _) = table.get(index);
+        let (code, _) = table.get(index).unwrap();
         let expect = distance.saturating_sub(base).min(3);
         assert_eq!(code, expect, "index {index} depth {distance}");
         if distance <= base + 2 {
@@ -138,7 +139,7 @@ fn reference_length(cube: &CubieCube, corners: &Cocsep) -> usize {
         if depth == 0 {
             return cube.is_solved();
         }
-        if entry_depth(corners.entries[cocsep(cube)]) > depth {
+        if entry_depth(corners.entries()[cocsep(cube)]) > depth {
             return false;
         }
         for mv in Move::ALL {
@@ -206,9 +207,12 @@ fn table_value_is_symmetry_invariant() {
     let mut rng = Rng(99);
     for _ in 0..500 {
         let cube = Cube::from_cubie(&CubieCube::random(&mut rng));
-        let code = table.get(corners.index(cube, 0)).0;
+        let code = table.get(corners.index(cube, 0)).unwrap().0;
         for sym in 0..48 {
-            assert_eq!(table.get(corners.index(cube.transform(sym), 0)).0, code);
+            assert_eq!(
+                table.get(corners.index(cube.transform(sym), 0)).unwrap().0,
+                code
+            );
         }
     }
 }
@@ -521,7 +525,8 @@ fn dfs_table_in_parts(k: u32, prefix_depth: u8, parts: u64) -> H48Table {
             Memory::anonymous(usize::try_from((range.end - range.start) * ROW_BYTES).unwrap())
                 .unwrap();
         let part = egg_solver::gen::dfs::Part {
-            words: part_mem.words().unwrap(),
+            // SAFETY: fresh writable memory, copied only after workers finish.
+            words: unsafe { part_mem.words().unwrap() },
             first_slot: range.start * N_SLOTS as u64,
             end_slot: range.end * N_SLOTS as u64,
         };
@@ -536,10 +541,7 @@ fn dfs_table_in_parts(k: u32, prefix_depth: u8, parts: u64) -> H48Table {
             );
         }
     }
-    H48Table {
-        memory,
-        meta: H48Meta { k, base: 3 },
-    }
+    H48Table::from_memory(memory, H48Meta { k, base: 3 }).unwrap()
 }
 
 fn dfs_table(k: u32, prefix_depth: u8) -> H48Table {
@@ -554,13 +556,13 @@ fn dfs_generator_matches_bfs_and_brute_force() {
     let cs = corners();
     let base = 3u8;
     let len = usize::try_from(h48_bytes(0)).unwrap();
-    let bfs = egg_solver::generate(cs, 0, base, None, &[], egg_solver::thread_count())
+    let bfs = unsafe { egg_solver::generate(cs, 0, base, None, &[], egg_solver::thread_count()) }
         .unwrap()
         .0;
     for prefix_depth in [1, 2, 5] {
         let t = dfs_table(0, prefix_depth);
         assert!(
-            t.memory.bytes().unwrap()[..len] == bfs.memory.bytes().unwrap()[..len],
+            t.memory().bytes().unwrap()[..len] == bfs.memory().bytes().unwrap()[..len],
             "h0 with prefix depth {prefix_depth}"
         );
     }
@@ -575,7 +577,7 @@ fn dfs_generator_matches_bfs_and_brute_force() {
     }
     let mut group_min: HashMap<u64, u8> = HashMap::new();
     for (&idx, &d) in &best {
-        let (code, _) = t.get(idx);
+        let (code, _) = t.get(idx).unwrap();
         assert_eq!(code, d.saturating_sub(base).min(3), "idx {idx} depth {d}");
         let g = group_min.entry(idx >> 6).or_insert(d);
         *g = (*g).min(d);
@@ -587,7 +589,7 @@ fn dfs_generator_matches_bfs_and_brute_force() {
         "no entry too low"
     );
     for (&g, &d) in &group_min {
-        assert_eq!(t.get(g << 6 | 2).1, d, "group {g}");
+        assert_eq!(t.get(g << 6 | 2).unwrap().1, d, "group {g}");
     }
     // Collapse: h3 -> h2, h3 -> h0.
     let t3 = dfs_table(3, 2);
@@ -596,7 +598,7 @@ fn dfs_generator_matches_bfs_and_brute_force() {
     for parts in [3, 7] {
         let t = dfs_table_in_parts(3, 2, parts);
         assert!(
-            t.memory.bytes().unwrap()[..n3] == t3.memory.bytes().unwrap()[..n3],
+            t.memory().bytes().unwrap()[..n3] == t3.memory().bytes().unwrap()[..n3],
             "h3 in {parts} parts"
         );
     }
@@ -605,7 +607,7 @@ fn dfs_generator_matches_bfs_and_brute_force() {
         let derived = egg_solver::gen::collapse::derive(&t3, want, threads).unwrap();
         let n = usize::try_from(h48_bytes(want)).unwrap();
         assert!(
-            derived.memory.bytes().unwrap()[..n] == small.memory.bytes().unwrap()[..n],
+            derived.memory().bytes().unwrap()[..n] == small.memory().bytes().unwrap()[..n],
             "h3 -> h{want}"
         );
         let diff = egg_solver::gen::collapse::compare(small, &t3, threads).unwrap();

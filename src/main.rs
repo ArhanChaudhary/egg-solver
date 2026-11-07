@@ -57,7 +57,8 @@ fn main() -> ExitCode {
 fn run(args: &Args) -> anyhow::Result<ExitCode> {
     let path = args.table.as_deref().context("no table")?;
     let corners = Cocsep::generate()?;
-    let table = args.load.open(path)?;
+    // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
+    let table = unsafe { args.load.open(path) }?;
     let solver = Solver::new(&corners, &table);
     for line in std::io::stdin().lock().lines() {
         let line = line.context("cannot read stdin")?;
