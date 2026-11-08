@@ -57,9 +57,9 @@ arguments or stdin. Empty input is an error. `--warmup SCRAMBLE` is optional.
 `--load map` or shared memory, keep the backing storage unchanged while
 running. See `solve --help` and the [user guide](docs/reference/USER_GUIDE.md).
 
-## Measured comparison
+## Historical measured comparison
 
-Recorded speedup over each competitor; higher is better. AMD EPYC 9V45,
+Recorded speedup over each competitor in the earlier matrix; higher is better. AMD EPYC 9V45,
 1 GiB pages, matched solve modes. GB below are decimal table sizes.
 
 | Competitor | egg table | GB: competitor / egg | Mode | 1 thread | 48 threads |
@@ -73,7 +73,8 @@ Recorded speedup over each competitor; higher is better. AMD EPYC 9V45,
 
 These measurements used egg-solver `229b99f`. Later build differences,
 samples, variation and limitations are in the [full comparison](docs/comparisons/README.md).
-Larger nxopt configurations have not been benchmarked here.
+The newer [500-state nissy throughput study](docs/comparisons/NISSY_THROUGHPUT.md) and
+[62.474 GB nxopt study](docs/comparisons/NXOPT32.md) have separate configurations and timing definitions.
 
 ## Browser and documentation
 

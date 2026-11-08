@@ -1,86 +1,77 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Threads, lanes, empty slots, and available search parallelism — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../index.html">Home</a><a href="../guide/OVERVIEW.html">Learn</a><a href="../comparisons/index.html">Compare</a><a href="index.html">Performance</a><a href="../safety/index.html">Safety</a><a href="../history/index.html">History</a><a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="PARALLELISM.md">Markdown source</a> · Offline document</p><details><summary>On this page</summary><ul><li><a href="#what-the-numbers-refer-to">What the numbers refer to</a></li><li><a href="#chen-shuang-s-empty-slot-counter">Chen Shuang's empty-slot counter</a></li><li><a href="#finite-batches-expose-a-different-limit">Finite batches expose a different limit</a></li><li><a href="#how-much-of-one-search-can-be-parallelized">How much of one search can be parallelized?</a></li><li><a href="#production-cli-lane-screen">Production CLI lane screen</a></li><li><a href="#measured-single-cube-scaling">Measured single-cube scaling</a></li><li><a href="#benchmark-scope">Benchmark scope</a></li></ul></details><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="threads-lanes-empty-slots-and-available-search-parallelism">Threads, lanes, empty slots, and available search parallelism</h1>
-<p>2026-11-08. Counter interpretation, the h6–h10 finite-batch matrix, and the single-cube scaling measurements are complete. Both final solution sets pass cross-implementation replay.</p>
-<h2 id="what-the-numbers-refer-to">What the numbers refer to</h2>
-<div class="table-wrap"><table>
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Workers, lanes and search parallelism — egg-solver</title><style>
+:root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
+header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
+header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
+header a { color:#d9f0ff; }
+header a[aria-current] { color:white; text-decoration-thickness:3px; }
+main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+h1 { margin-top:0; font-size:2rem; line-height:1.25; }
+h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
+h3 { margin-top:1.5rem; }
+a { color:var(--accent); overflow-wrap:anywhere; }
+p,li { max-width:90ch; }
+code { background:#eff3f6; border-radius:3px; padding:.1em .25em; overflow-wrap:anywhere; font-size:.9em; }
+pre { max-width:100%; padding:1rem; background:#eef3f6; overflow:auto; line-height:1.45; }
+pre code { background:none; padding:0; overflow-wrap:normal; }
+.table-wrap { max-width:100%; overflow:auto; margin:1rem 0 1.5rem; border:1px solid var(--line); }
+.table-wrap.long-table { max-height:70vh; }
+table { width:100%; border-collapse:collapse; font-size:.9rem; font-variant-numeric:tabular-nums; }
+th,td { padding:.55rem .65rem; border:1px solid var(--line); vertical-align:top; overflow-wrap:normal; }
+th { background:#eaf1f6; text-align:left; position:sticky; top:0; z-index:1; }
+tr:nth-child(even) { background:#f8fafb; }
+caption,.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+details { border:1px solid var(--line); padding:.6rem 1rem; border-radius:5px; margin:1rem 0; }
+summary { cursor:pointer; font-weight:600; }
+.table-tools { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:.6rem; background:#f4f7f9; }
+.table-tools input { font:inherit; border:1px solid #afc0ce; border-radius:4px; padding:.3rem .5rem; width:min(100%,22rem); min-width:0; }
+.note,.source-link,footer { color:var(--muted); font-size:.85rem; }
+.source-link { margin-top:2rem; }
+.archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
+footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
+svg { max-width:100%; height:auto; }
+:target { scroll-margin-top:1rem; }
+.skip-link { position:absolute; left:-10000px; }
+.skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
+@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+</style></head>
+<body>
+<a class="skip-link" href="#docs-content">Skip to content</a>
+<header><strong>egg-solver</strong><nav aria-label="Documentation"><a href="../index.html">Home</a>
+<a href="../guide/OVERVIEW.html">Learn</a>
+<a href="../comparisons/index.html">Benchmarks</a>
+<a href="index.html">Performance</a>
+<a href="../safety/index.html">Safety</a>
+<a href="../history/index.html">History</a>
+<a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<main id="docs-content"><h1 id="workers-lanes-and-search-parallelism">Workers, lanes and search parallelism</h1>
+<p><a href="index.html">Performance studies</a> · <a href="../comparisons/NISSY_THROUGHPUT.html">Batch throughput</a> · <a href="../guide/HOW_IT_WORKS.html">How the search works</a></p>
+<p>Measured <strong>November 8, 2026</strong>, on the <strong>48-core EPYC VM</strong>. Forty-eight is the machine's worker budget, not a limit on search lanes. Explicit lane counts through 128 were tested; <strong>24 lanes per worker won every h6–h10 finite-batch screen</strong>.</p>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#what-is-being-parallelized">What is being parallelized?</a></li><li><a href="#production-cli-lane-screen">Production CLI lane screen</a></li><li><a href="#parallelism-within-one-cube">Parallelism within one cube</a></li><li><a href="#cubeopt-s-occupied-and-empty-slots">Cubeopt's occupied and empty slots</a></li><li><a href="#research-caller-versus-shipped-cli">Research caller versus shipped CLI</a></li></ul></details>
+<h2 id="what-is-being-parallelized">What is being parallelized?</h2>
+<div class="table-wrap" role="region" aria-label="What is being parallelized?" tabindex="0"><table id="docs-table-1"><caption>What is being parallelized?</caption>
 <thead>
 <tr><th>Quantity</th><th>Meaning</th></tr>
 </thead>
 <tbody>
-<tr><td>48 CPU workers</td><td>This VM exposes 48 CPU cores. This is a hardware allocation, not a software-lane limit.</td></tr>
-<tr><td>24 / 32 / 40 default lanes</td><td>Egg's default interleaved search contexts per worker: h11 uses 24; h9/h10 use 32; h0–h8 use 40.</td></tr>
-<tr><td>48 in <code>bench tune</code></td><td>The largest candidate in the current built-in tuning list. It is a search-grid choice, not a limit in the search algorithm. Explicit <code>-l</code> accepts larger values.</td></tr>
-<tr><td>8 contexts in the supplied cube48opt10</td><td>Its query and assignment functions loop over eight software-pipeline slots per worker. This is independent of its CPU thread count.</td></tr>
-<tr><td>Data SIMD</td><td>Vector operations on a cube's pieces. These are distinct from both software contexts and OS threads.</td></tr>
+<tr><td>CPU worker</td><td>Operating-system thread executing search code</td></tr>
+<tr><td>Software lane</td><td>An interleaved search context within a worker, helping overlap table accesses</td></tr>
+<tr><td>SIMD operation</td><td>Vector computation on cube data; distinct from workers and lanes</td></tr>
+<tr><td>Prefix job</td><td>A subtree that workers can claim and split independently</td></tr>
 </tbody>
 </table></div>
-<p>More software lanes provide more independent table loads to overlap. They also require state storage and bookkeeping. Filling more slots does not guarantee higher throughput. The new experiment explicitly tested 64, 96 and 128 lanes as well as smaller values.</p>
-<h2 id="chen-shuang-s-empty-slot-counter">Chen Shuang's empty-slot counter</h2>
-<p>The supplied Linux binary prints <code>N/E node(s)</code>, where <strong>N is occupied query-slot visits and E is empty query-slot visits</strong>. In <code>step1_query</code>, addresses <code>0x5594–0x55af</code> increment the counter at statistics offset zero for a null current-node pointer and the counter at offset eight for a non-null pointer. The formatting code prints offset eight first and offset zero second. The loop terminates after eight slots.</p>
-<p>Thus, for this format:</p>
-<p><code>slot occupancy = N / (N + E)</code>.</p>
-<p>E is the number of empty positions, not a second total-node count. A future binary's print format must be checked before reusing this interpretation.</p>
-<p>A separate controlled probe of the checksum-pinned current web Opt4 query function confirms the counter semantics. It uses the original generated table and valid one-move cubes. Negative budgets stop each assigned context after its first query; inactive slots are marked complete. Only exports are added to an in-memory module copy; function code and pruning data are unchanged.</p>
-<div class="table-wrap"><table>
-<thead>
-<tr><th align="right">Assigned contexts</th><th align="right">Counter at offset 8: occupied</th><th align="right">Counter at offset 0: empty</th><th align="right">Total slots</th></tr>
-</thead>
-<tbody>
-<tr><td align="right">0</td><td align="right">0</td><td align="right">8</td><td align="right">8</td></tr>
-<tr><td align="right">1</td><td align="right">1</td><td align="right">7</td><td align="right">8</td></tr>
-<tr><td align="right">4</td><td align="right">4</td><td align="right">4</td><td align="right">8</td></tr>
-<tr><td align="right">8</td><td align="right">8</td><td align="right">0</td><td align="right">8</td></tr>
-</tbody>
-</table></div>
-<p>Raw evidence: <code>cubeopt-slot-probe.json</code>, <code>cubeopt-counter-disassembly.txt</code>, and <code>src/probe-cubeopt-slots.mjs</code> in <code>../data/nissy-throughput-20261108/</code>.</p>
-<p>The previous real runs give:</p>
-<div class="table-wrap"><table>
-<thead>
-<tr><th>Run</th><th align="right">Occupied slot visits</th><th align="right">Empty slot visits</th><th align="right">Weighted query-slot occupancy</th></tr>
-</thead>
-<tbody>
-<tr><td>Supplied native h10, 48 threads, all 500 states</td><td align="right">3,350,197,488</td><td align="right">58,856,861</td><td align="right">98.2735%</td></tr>
-<tr><td>Current web Opt4, 14 threads, first 100 completed states</td><td align="right">42,957,800,426</td><td align="right">730,518</td><td align="right">99.9983%</td></tr>
-</tbody>
-</table></div>
-<p>These use different tables and runtimes; the table is not a speed comparison. Counting empty positions in the native h10 total changes the occupied count by only about 1.76%. It does not turn its 6.70M occupied visits/cube into the reported Mac figure of 4.88M.</p>
-<p>This occupancy is conditional on calls to the query pipeline. It does not include time spent building jobs, synchronizing, waiting for another phase, or not calling the query function. Occupied slots can also stall on memory. It is therefore a proxy for how densely a hypothetical parallel query step is populated, <strong>not measured GPU utilization or a GPU speedup prediction</strong>.</p>
-<h2 id="finite-batches-expose-a-different-limit">Finite batches expose a different limit</h2>
-<p>An independent-cube lane needs its own input cube. With 500 inputs, 48 workers and 40 lanes per worker allocate 1,920 software slots, but at most 500 can initially hold separate cubes: a 26.0% ceiling before any complete. With 128 lanes per worker that ceiling is 8.1%. As cubes finish, a few hard cubes may remain on a few workers.</p>
-<p>Egg's independent-lane loop compacts active lanes, so it does not necessarily execute full-cost empty visits. Nevertheless, unused CPU workers cannot help a hard cube owned by another independent lane. Memory-latency hiding also shrinks when a worker has very few active contexts.</p>
-<p>Work sharing changes the unit of scheduling to subtrees. A single input cube can supply multiple independent jobs, so a 500-cube batch can fill many more software contexts than it has cubes.</p>
-<p>The initial <strong>research-probe</strong> h6, all-500-state runs show this distinction. They use ordinary <code>Pool::run</code>, not the shipped CLI's fixed-placement <code>run_pinned</code> path. The CLI was substantially faster and ranked lanes differently; these probe timings must not be quoted as current CLI performance:</p>
-<div class="table-wrap"><table>
-<thead>
-<tr><th>Mode</th><th align="right">CPU threads</th><th align="right">Lanes/thread</th><th align="right">Batch wall</th><th align="right">Mean nodes/cube</th><th align="right">Process CPU seconds / batch wall</th></tr>
-</thead>
-<tbody>
-<tr><td>Independent cubes</td><td align="right">48</td><td align="right">8</td><td align="right">216.826 s</td><td align="right">89,711,408</td><td align="right">17.00 cores</td></tr>
-<tr><td>Independent cubes</td><td align="right">48</td><td align="right">16</td><td align="right">236.493 s</td><td align="right">89,711,408</td><td align="right">14.39 cores</td></tr>
-<tr><td>Independent cubes</td><td align="right">48</td><td align="right">40</td><td align="right">342.684 s</td><td align="right">89,711,408</td><td align="right">Retained in raw resource record</td></tr>
-<tr><td>Shared subtrees</td><td align="right">48</td><td align="right">8</td><td align="right">67.279 s</td><td align="right">103,273,616</td><td align="right">47.95 cores</td></tr>
-<tr><td>Shared subtrees</td><td align="right">48</td><td align="right">40</td><td align="right">70.092 s</td><td align="right">104,245,213</td><td align="right">47.93 cores</td></tr>
-<tr><td>Shared subtrees</td><td align="right">48</td><td align="right">64</td><td align="right">71.392 s</td><td align="right">104,066,798</td><td align="right">47.95 cores</td></tr>
-</tbody>
-</table></div>
-<p>These are one process per tuning configuration. Process CPU includes initialization and spinning; dividing it by the separately measured batch wall is an approximation of scheduled core use, not a count of useful cores. Every row's 500 solutions replayed correctly and matched the known optimal lengths. The pruning tables were resident on one-GiB pages; loading is excluded from batch wall.</p>
-<p>Within this research-probe binary, shared scheduling finished about 3.22× faster than the eight-lane independent batch despite doing about 15% more counted search work. This is an end-to-end observation of those harness paths, not an isolated estimate of scheduling gain in the production CLI. Allocating 64 lanes instead of eight does not help this h6 case. This is evidence for scheduling and load balance, not an assertion that eight lanes is best for every table or workload.</p>
-<p>The shared-mode <code>Pool::counters</code> statistic is the mean post-round active-lane count. Dividing it by configured lanes describes occupancy during counted rounds. It excludes maintenance/build/wait time and can differ slightly from an exact count of lane calls when a round ends jobs. It must not be presented as wall-time GPU occupancy.</p>
-<h2 id="how-much-of-one-search-can-be-parallelized">How much of one search can be parallelized?</h2>
-<p>The fixed-width software pipeline is not the limit of the tree. Prefix subtrees can be searched independently within an IDA* target depth. Nissy reserves space for 43,254 canonical four-move starting tasks before pruning; the number actually useful depends on the state and depth. Egg similarly builds and splits prefix jobs, and can donate remaining work.</p>
-<p>The restrictions are elsewhere:</p>
-<ul>
-<li>A shortest-solution proof must finish all required shallower work. A found deeper solution cannot simply skip that proof.</li>
-<li>Pruning makes subtrees very uneven. The final few surviving branches can limit useful width.</li>
-<li>Job creation, sorting, distribution and synchronization have costs.</li>
-<li>The programs stop after an optimal solution is established; more workers may perform extra work before the stop reaches them.</li>
-<li>Memory bandwidth, dependency latency and the worker's state footprint can limit throughput even with occupied contexts.</li>
-</ul>
-<p>A whole batch and one cube therefore need separate measurements. The matrix records the fastest observed complete-batch configuration, and separate one-cube-at-a-time scaling runs at 1–48 CPU threads. Measured speedup, efficiency and changed node counts are below. Neither high slot occupancy nor this 48-core VM establishes the maximum useful GPU width.</p>
+<p>A worker visits lanes in sequence while their memory accesses overlap. Increasing lanes does not add CPU cores. A shared search can generate many jobs from one cube, so it is not limited to one independent input per lane.</p>
+<p>The default lane counts are 40 for h0–h8, 32 for h9/h10 and 24 for h11. The built-in tuner currently stops its candidate list at 48; <code>-l</code> accepts larger values. Those defaults and candidates are heuristics, not tree-width limits. They were not changed from a single host's new batch screen.</p>
 <h2 id="production-cli-lane-screen">Production CLI lane screen</h2>
-<p>These are actual complete-batch walls for all 500 states, one process per tuning configuration, 48 CPU workers. The shared-work CLI is used throughout this table. It fixes worker-state and stack-frame placement; <code>run_pinned</code> does not mean CPU-affinity pinning. The ordinary research-probe path above is excluded from production configuration selection.</p>
-<div class="table-wrap"><table>
+<p>Every cell is <strong>complete-batch wall seconds for 500 states</strong>, at <strong>48 workers</strong> and concurrency zero. <strong>Lower is faster.</strong> Each tuning cell is one process, not a repeated confidence estimate. All tables use resident 1 GiB pages.</p>
+<div class="table-wrap" role="region" aria-label="Production CLI lane screen" tabindex="0"><table id="docs-table-2"><caption>Production CLI lane screen</caption>
 <thead>
-<tr><th align="right">Lanes/worker</th><th align="right">h6 seconds</th><th align="right">h7 seconds</th><th align="right">h8 seconds</th><th align="right">h9 seconds</th><th align="right">h10 seconds</th></tr>
+<tr><th align="right">Lanes per worker</th><th align="right">h6 (s)</th><th align="right">h7 (s)</th><th align="right">h8 (s)</th><th align="right">h9 (s)</th><th align="right">h10 (s)</th></tr>
 </thead>
 <tbody>
 <tr><td align="right">8</td><td align="right">23.6840</td><td align="right">12.1135</td><td align="right">5.6396</td><td align="right">2.7792</td><td align="right">1.4491</td></tr>
@@ -94,30 +85,95 @@
 <tr><td align="right">128</td><td align="right">16.6385</td><td align="right">8.1849</td><td align="right">3.9488</td><td align="right">1.9705</td><td align="right">1.0363</td></tr>
 </tbody>
 </table></div>
-<p>Twenty-four lanes won each screen. Neither a 48-lane limit nor larger defaults are justified by these measurements: 64–128 lanes are supported but slower on this batch. The existing built-in tune grid still ends at 48; explicit larger values remain usable. Other hardware and workload sizes need their own tuning.</p>
-<p>The probe/CLI timing gap is also a useful warning: an algorithmically similar research caller is not interchangeable with the shipped program. Fixed placement and different generated code are possible contributors; this VM has no PMU evidence that isolates their contributions. We do not attribute the entire difference to one mechanism.</p>
-<h2 id="measured-single-cube-scaling">Measured single-cube scaling</h2>
-<p>This study solves one input at a time (<code>-c 1</code>) with the production CLI. It uses three declared states (indices 0, 8 and 10, optimal lengths 18, 16 and 19), repeated ten times in the same order: 30 solves, three distinct states. The 24-lane count is fixed across worker counts; it was selected by the throughput screen, not retuned for every scaling row. Each row is one process, so small differences are exploratory rather than repeated confidence intervals.</p>
-<div class="table-wrap"><table>
+<p>The declared grid did not test 12 or 20 lanes. More than 48 lanes was supported but slower here. This does not determine the best lane count for every CPU or workload. <a href="../comparisons/NISSY_THROUGHPUT.html">The throughput report</a> gives the three final repeated batches at the selected setting.</p>
+<h2 id="parallelism-within-one-cube">Parallelism within one cube</h2>
+<p>These runs use the <strong>production CLI</strong>, concurrency one and a fixed 24 lanes per worker. They solve indices 0, 8 and 10 (optimal lengths 18, 16 and 19) ten times in the same order: <strong>30 solves of three distinct states</strong>. Each row is one process. This is a small scaling sample, not the complete 500-state benchmark or a confidence interval.</p>
+<p>Speedup is the one-worker batch time divided by the row's batch time. Efficiency is speedup divided by worker count. “Extra nodes” is the change in counted work relative to one worker. Time/cube is the 30-solve wall time divided by 30; lower is faster.</p>
+<h3 id="h6">h6</h3>
+<div class="table-wrap" role="region" aria-label="h6" tabindex="0"><table id="docs-table-3"><caption>h6</caption>
 <thead>
-<tr><th align="right">CPU workers</th><th align="right">h6 ms/cube</th><th align="right">h6 speedup</th><th align="right">h6 efficiency</th><th align="right">h10 ms/cube</th><th align="right">h10 speedup</th><th align="right">h10 efficiency</th></tr>
+<tr><th align="right">Workers</th><th align="right">Time/cube (ms)</th><th align="right">Speedup</th><th align="right">Efficiency</th><th align="right">Extra nodes</th></tr>
 </thead>
 <tbody>
-<tr><td align="right">1</td><td align="right">2547.695</td><td align="right">1.00×</td><td align="right">100.0%</td><td align="right">164.672</td><td align="right">1.00×</td><td align="right">100.0%</td></tr>
-<tr><td align="right">2</td><td align="right">1282.842</td><td align="right">1.99×</td><td align="right">99.3%</td><td align="right">83.805</td><td align="right">1.96×</td><td align="right">98.2%</td></tr>
-<tr><td align="right">4</td><td align="right">647.304</td><td align="right">3.94×</td><td align="right">98.4%</td><td align="right">42.276</td><td align="right">3.90×</td><td align="right">97.4%</td></tr>
-<tr><td align="right">8</td><td align="right">328.917</td><td align="right">7.75×</td><td align="right">96.8%</td><td align="right">21.537</td><td align="right">7.65×</td><td align="right">95.6%</td></tr>
-<tr><td align="right">16</td><td align="right">172.266</td><td align="right">14.79×</td><td align="right">92.4%</td><td align="right">11.146</td><td align="right">14.77×</td><td align="right">92.3%</td></tr>
-<tr><td align="right">24</td><td align="right">120.665</td><td align="right">21.11×</td><td align="right">88.0%</td><td align="right">7.707</td><td align="right">21.37×</td><td align="right">89.0%</td></tr>
-<tr><td align="right">32</td><td align="right">98.366</td><td align="right">25.90×</td><td align="right">80.9%</td><td align="right">6.544</td><td align="right">25.16×</td><td align="right">78.6%</td></tr>
-<tr><td align="right">48</td><td align="right">76.554</td><td align="right">33.28×</td><td align="right">69.3%</td><td align="right">5.423</td><td align="right">30.37×</td><td align="right">63.3%</td></tr>
+<tr><td align="right">1</td><td align="right">2547.695</td><td align="right">1.00×</td><td align="right">100.0%</td><td align="right">+0.0%</td></tr>
+<tr><td align="right">2</td><td align="right">1282.842</td><td align="right">1.99×</td><td align="right">99.3%</td><td align="right">+0.7%</td></tr>
+<tr><td align="right">4</td><td align="right">647.304</td><td align="right">3.94×</td><td align="right">98.4%</td><td align="right">+0.2%</td></tr>
+<tr><td align="right">8</td><td align="right">328.917</td><td align="right">7.75×</td><td align="right">96.8%</td><td align="right">+2.1%</td></tr>
+<tr><td align="right">16</td><td align="right">172.266</td><td align="right">14.79×</td><td align="right">92.4%</td><td align="right">+5.7%</td></tr>
+<tr><td align="right">24</td><td align="right">120.665</td><td align="right">21.11×</td><td align="right">88.0%</td><td align="right">+9.2%</td></tr>
+<tr><td align="right">32</td><td align="right">98.366</td><td align="right">25.90×</td><td align="right">80.9%</td><td align="right">+12.2%</td></tr>
+<tr><td align="right">48</td><td align="right">76.554</td><td align="right">33.28×</td><td align="right">69.3%</td><td align="right">+19.2%</td></tr>
 </tbody>
 </table></div>
-<p>At 48 workers, the measured speedup was <strong>33.28× for h6</strong> and <strong>30.37× for h10</strong>: 69.3% and 63.3% efficiency against the one-worker configuration. The searches counted 19.2% and 6.7% more nodes respectively than at one worker. This extra work, imbalance and coordination mean the figures cannot identify a universal parallel fraction by an Amdahl fit.</p>
-<p>This establishes useful parallelism within one cube through 48 CPU workers on these states. Twenty-four lanes × 48 workers configures 1,152 interleaved contexts; it is not a claim that all are continuously occupied or executed simultaneously. Both implementations can generate tens of thousands of prefix jobs, and split work further. Their usefulness depends on pruning, target depth, the remaining tail and scheduling cost. This CPU study neither measures a GPU nor determines its maximum useful width.</p>
-<p>The nissy allocation screen makes the batch issue concrete too: h6's pilot took 60.624 s at 48 × 1 versus 21.796 s at 6 × 8. The latter finished the all-500 confirmation in 102.621 s and won the complete allocation screen. Allocating all cores to independent inputs is not always the best way to finish a finite batch.</p>
-<p>Raw single-cube outputs are indexed by <code>*-single30-parallelism</code> in <a href="../data/nissy-throughput-20261108/run-index.csv">the run index</a>; <a href="../data/nissy-throughput-20261108/analysis.json">analysis JSON</a> retains every speedup and node ratio. Final h6–h10 throughput and all 30 raw final outputs are in <a href="../comparisons/NISSY_THROUGHPUT.html">the nissy comparison</a>.</p>
-<h2 id="benchmark-scope">Benchmark scope</h2>
-<p>The research probe uses the existing public Rust lane and pool APIs. Every primary egg throughput screen, final batch, and single-cube scaling measurement uses the shipped <code>egg-solve</code> CLI. Research-probe timings are excluded from production configuration selection. Nissy is driven through its public C API with one shared, read-only, one-GiB-page table and independently scheduled cube processes. Its build and worker/thread allocation are selected explicitly. Both final rows use measured complete-batch wall time per cube, not summed per-cube latency divided by a nominal worker count.</p>
-<p>The source and raw records are retained under <code>../data/nissy-throughput-20261108/</code>. No hardware PMU counters are available on this VM; this study uses wall clocks, process CPU accounting, and software search counters.</p>
-</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>
+<h3 id="h10">h10</h3>
+<div class="table-wrap" role="region" aria-label="h10" tabindex="0"><table id="docs-table-4"><caption>h10</caption>
+<thead>
+<tr><th align="right">Workers</th><th align="right">Time/cube (ms)</th><th align="right">Speedup</th><th align="right">Efficiency</th><th align="right">Extra nodes</th></tr>
+</thead>
+<tbody>
+<tr><td align="right">1</td><td align="right">164.672</td><td align="right">1.00×</td><td align="right">100.0%</td><td align="right">+0.0%</td></tr>
+<tr><td align="right">2</td><td align="right">83.805</td><td align="right">1.96×</td><td align="right">98.2%</td><td align="right">-0.0%</td></tr>
+<tr><td align="right">4</td><td align="right">42.276</td><td align="right">3.90×</td><td align="right">97.4%</td><td align="right">+0.3%</td></tr>
+<tr><td align="right">8</td><td align="right">21.537</td><td align="right">7.65×</td><td align="right">95.6%</td><td align="right">+0.8%</td></tr>
+<tr><td align="right">16</td><td align="right">11.146</td><td align="right">14.77×</td><td align="right">92.3%</td><td align="right">+2.0%</td></tr>
+<tr><td align="right">24</td><td align="right">7.707</td><td align="right">21.37×</td><td align="right">89.0%</td><td align="right">+3.1%</td></tr>
+<tr><td align="right">32</td><td align="right">6.544</td><td align="right">25.16×</td><td align="right">78.6%</td><td align="right">+4.3%</td></tr>
+<tr><td align="right">48</td><td align="right">5.423</td><td align="right">30.37×</td><td align="right">63.3%</td><td align="right">+6.7%</td></tr>
+</tbody>
+</table></div>
+<p>At 48 workers the measured speedups are <strong>33.28× (h6)</strong> and <strong>30.37× (h10)</strong>. Additional speculative work, imbalance and coordination limit scaling. Because node counts change too, these figures do not identify a universal parallel fraction with an Amdahl fit.</p>
+<p>Twenty-four lanes × 48 workers configures 1,152 contexts; it does not establish that all are continuously active. Both implementations can prepare tens of thousands of canonical prefix jobs (43,254 before pruning) and split work further. Useful width depends on pruning, target depth, the remaining tail and scheduling cost. This CPU experiment does not measure a GPU's useful width.</p>
+<p><a href="../data/nissy-throughput-20261108/analysis.json">Analysis JSON</a> retains every speedup and node ratio. Raw scaling files are indexed as <code>*-single30-parallelism</code> in <a href="../data/nissy-throughput-20261108/run-index.csv">the run index</a>.</p>
+<h2 id="cubeopt-s-occupied-and-empty-slots">Cubeopt's occupied and empty slots</h2>
+<p>The supplied Linux cube48opt10 has <strong>eight software query slots per worker</strong>. Its printed <code>N/E node(s)</code> counters are <strong>occupied / empty slot visits</strong>, not occupied / total. Query-slot occupancy is:</p>
+<pre><code class="language-text">occupied / (occupied + empty)
+</code></pre>
+<p>A controlled probe of the pinned original web Opt4 query function confirmed the interpretation:</p>
+<div class="table-wrap" role="region" aria-label="Cubeopt's occupied and empty slots" tabindex="0"><table id="docs-table-5"><caption>Cubeopt's occupied and empty slots</caption>
+<thead>
+<tr><th align="right">Assigned slots</th><th align="right">Occupied visits</th><th align="right">Empty visits</th></tr>
+</thead>
+<tbody>
+<tr><td align="right">0</td><td align="right">0</td><td align="right">8</td></tr>
+<tr><td align="right">1</td><td align="right">1</td><td align="right">7</td></tr>
+<tr><td align="right">4</td><td align="right">4</td><td align="right">4</td></tr>
+<tr><td align="right">8</td><td align="right">8</td><td align="right">0</td></tr>
+</tbody>
+</table></div>
+<p>The earlier native h10 all-500 run had <strong>98.2735%</strong> weighted query-slot occupancy. The separate web Opt4 first-100-completions sample had <strong>99.9983%</strong>. Their tables, runtimes and samples differ; these percentages are not a speed comparison.</p>
+<p>Occupied slots can still wait on memory. The counter excludes job construction, synchronization, idle phases and any time the query function is not running. It is not measured wall-time GPU utilization. Including empty visits changes the native occupied count by only about 1.76%; it does not explain the reported Mac node-count difference.</p>
+<p><a href="../data/nissy-throughput-20261108/cubeopt-slot-probe.json">Counter probe</a>, <a href="../data/nissy-throughput-20261108/cubeopt-counter-disassembly.txt">native disassembly</a> and <a href="../data/nissy-throughput-20261108/cubeopt-occupancy.json">aggregated occupancy</a> retain the evidence.</p>
+<h2 id="research-caller-versus-shipped-cli">Research caller versus shipped CLI</h2>
+<p>The exploratory Rust probe used ordinary <code>Pool::run</code>; the shipped CLI uses <code>run_pinned</code>, which fixes worker/stack placement. <strong>Pinned here does not mean CPU affinity.</strong> Their timings and lane rankings differed substantially, so probe times were excluded from production configuration selection.</p>
+<p>The <a href="PARALLELISM_20261108.html">dated research notes</a> preserve those measurements and counter qualifications. Fixed placement and generated-code differences may contribute, but the VM has no PMU counters to isolate their effects. The ordinary pool's post-round active-lane statistic is also not an exact query-slot or wall-time utilization counter.</p>
+<p>Independent-cube scheduling has a finite-input limit: 500 cubes cannot initially fill 48 × 40 independent lanes. Shared-subtree scheduling allows workers to help a remaining hard cube. This explains the scheduling distinction; it does not turn the research probe's timing ratio into a production-CLI optimization claim.</p>
+
+<p class="source-link"><a href="PARALLELISM.md">Markdown source</a></p></main>
+<footer><a href="../PROVENANCE.html">Sources and evidence scope</a></footer>
+<script>
+for (const wrapper of document.querySelectorAll('.table-wrap')) {
+  const table=wrapper.querySelector('table');
+  const rows=[...table.tBodies].flatMap(body=>[...body.rows]);
+  if(rows.length>50) wrapper.classList.add('long-table');
+  if(rows.length<=12) continue;
+  const tools=document.createElement('div'); tools.className='table-tools';
+  const label=document.createElement('label'); label.textContent='Filter this table';
+  const input=document.createElement('input'); input.type='search'; input.id=table.id+'-filter';
+  label.htmlFor=input.id; input.setAttribute('aria-controls',table.id);
+  const count=document.createElement('span'); count.className='note'; count.setAttribute('aria-live','polite');
+  count.textContent=rows.length+' rows';
+  input.addEventListener('input',()=>{
+    const query=input.value.trim().toLowerCase(); let shown=0;
+    for(const row of rows){row.hidden=!!query&&!row.textContent.toLowerCase().includes(query);if(!row.hidden)shown++;}
+    count.textContent=shown+' of '+rows.length+' rows';
+  });
+  tools.append(label,input,count); wrapper.before(tools);
+}
+function revealTarget(){
+  let id;try{id=decodeURIComponent(location.hash.slice(1));}catch{return;}
+  const target=document.getElementById(id);if(!target)return;
+  for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+}
+revealTarget(); window.addEventListener('hashchange',revealTarget);
+</script>
+</body></html>

@@ -22,8 +22,10 @@
 | SMT | Multiple logical CPU threads sharing a physical core's resources |
 | PGO | Profile-guided optimization: compiler decisions informed by a training workload |
 | LTO / BOLT | Link-time optimization / a tool for optimizing machine code after linking |
+| IPC | Counted instructions divided by counted cycles for the stated event group |
+| Ginst/s | Billions of counted instructions per second |
 | PMU | Hardware performance-monitoring counters, such as cycles, instructions and cache events |
 | Paired A/B run | A baseline and candidate measured under matched conditions, with their ratio recorded |
 | Miri | An interpreter used to detect undefined behavior in tested Rust executions; finite runs are not a universal proof |
 
-The [full report](../comparisons/RESULTS.md) defines its exact timing formulas and sampling rules. Use those definitions when interpreting a table.
+[Benchmark methods](../comparisons/METHODS.md) defines the timing formulas and historical notation. Each study states its own inputs, sources and sampling rules.

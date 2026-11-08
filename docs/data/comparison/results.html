@@ -1,7 +1,60 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>egg-solver vs nxopt, vcube, nissy-core H48, cubeopt30, cube48opt10 and cube48opt-rust — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../../history/index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="results.md">Markdown source</a> · Offline document</p><details><summary>On this page</summary><ul><li><a href="#final-source-validation">Final source validation</a></li><li><a href="#fresh-miri-validation">Fresh Miri validation</a></li><li><a href="#latency-one-cube-at-a-time-on-all-threads-egg-solver-solve-c-1-vs-nissy-h48-cubeopt30-cube48opt10">Latency: one cube at a time on all threads (egg-solver solve -c 1 vs nissy H48, cubeopt30, cube48opt10)</a></li><li><a href="#throughput-many-cubes-in-flight-egg-solver-solve-c-0-bench-stream-vs-nxopt-t-vcube-w-which-solve-one-cube-per-thread">Throughput: many cubes in flight (egg-solver solve -c 0 / bench stream vs nxopt -t, vcube -w, which solve one cube per thread)</a></li><li><a href="#headline-same-page-type-same-semantics-same-size-group">Headline (same page type, same semantics, same size group)</a></li><li><a href="#cube-solver-test-wiki-metrics-this-machine">cube_solver_test wiki metrics (this machine)</a></li><li><a href="#distance-20-positions-cube20-org">Distance-20 positions (cube20.org)</a></li><li><a href="#build-screening-shipped-flags-vs-o3-march-native-and-vs-pgo">Build screening (shipped flags vs -O3 -march=native and vs PGO)</a></li><li><a href="#solution-lengths-optimality-cross-check">Solution lengths (optimality cross-check)</a></li><li><a href="#rejected-runs-page-placement-outside-load-or-interference-validation">Rejected runs (page placement, outside load, or interference validation)</a></li><li><a href="#harness-correction-2026-11-05">Harness correction (2026-11-05)</a></li><li><a href="#fairness">Fairness</a></li><li><a href="#cube48opt10-s-table-vs-egg-solver-h10">cube48opt10's table vs egg-solver h10</a></li><li><a href="#bugs-and-issues-found-in-other-solvers-for-the-final-report-the-user-will-report-them-upstream">Bugs and issues found in other solvers (for the final report; the user will report them upstream)</a></li><li><a href="#phack-hardware-counter-analysis">phack hardware-counter analysis</a></li><li><a href="#runs">Runs</a></li><li><a href="#tables">Tables</a></li><li><a href="#memory-and-hugepage-steps">Memory and hugepage steps</a></li></ul></details><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="egg-solver-vs-nxopt-vcube-nissy-core-h48-cubeopt30-cube48opt10-and-cube48opt-rust">egg-solver vs nxopt, vcube, nissy-core H48, cubeopt30, cube48opt10 and cube48opt-rust</h1>
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>egg-solver vs nxopt, vcube, nissy-core H48, cubeopt30, cube48opt10 and cube48opt-rust — egg-solver</title><style>
+:root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
+header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
+header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
+header a { color:#d9f0ff; }
+header a[aria-current] { color:white; text-decoration-thickness:3px; }
+main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+h1 { margin-top:0; font-size:2rem; line-height:1.25; }
+h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
+h3 { margin-top:1.5rem; }
+a { color:var(--accent); overflow-wrap:anywhere; }
+p,li { max-width:90ch; }
+code { background:#eff3f6; border-radius:3px; padding:.1em .25em; overflow-wrap:anywhere; font-size:.9em; }
+pre { max-width:100%; padding:1rem; background:#eef3f6; overflow:auto; line-height:1.45; }
+pre code { background:none; padding:0; overflow-wrap:normal; }
+.table-wrap { max-width:100%; overflow:auto; margin:1rem 0 1.5rem; border:1px solid var(--line); }
+.table-wrap.long-table { max-height:70vh; }
+table { width:100%; border-collapse:collapse; font-size:.9rem; font-variant-numeric:tabular-nums; }
+th,td { padding:.55rem .65rem; border:1px solid var(--line); vertical-align:top; overflow-wrap:normal; }
+th { background:#eaf1f6; text-align:left; position:sticky; top:0; z-index:1; }
+tr:nth-child(even) { background:#f8fafb; }
+caption,.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+details { border:1px solid var(--line); padding:.6rem 1rem; border-radius:5px; margin:1rem 0; }
+summary { cursor:pointer; font-weight:600; }
+.table-tools { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:.6rem; background:#f4f7f9; }
+.table-tools input { font:inherit; border:1px solid #afc0ce; border-radius:4px; padding:.3rem .5rem; width:min(100%,22rem); min-width:0; }
+.note,.source-link,footer { color:var(--muted); font-size:.85rem; }
+.source-link { margin-top:2rem; }
+.archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
+footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
+svg { max-width:100%; height:auto; }
+:target { scroll-margin-top:1rem; }
+.skip-link { position:absolute; left:-10000px; }
+.skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
+@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+</style></head>
+<body>
+<a class="skip-link" href="#docs-content">Skip to content</a>
+<header><strong>egg-solver</strong><nav aria-label="Documentation"><a href="../../index.html">Home</a>
+<a href="../../guide/OVERVIEW.html">Learn</a>
+<a href="../../comparisons/index.html">Benchmarks</a>
+<a href="../../performance/index.html">Performance</a>
+<a href="../../safety/index.html">Safety</a>
+<a href="../../history/index.html">History</a>
+<a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<main id="docs-content"><h1 id="egg-solver-vs-nxopt-vcube-nissy-core-h48-cubeopt30-cube48opt10-and-cube48opt-rust">egg-solver vs nxopt, vcube, nissy-core H48, cubeopt30, cube48opt10 and cube48opt-rust</h1>
+<p class="archive-note">Recorded evidence. Commands, paths and status messages describe the measurement environment and date. <a href="../../index.html">Documentation home</a>.</p>
 <p>egg-solver: 229b99f Merge opt/u1-cli: clap, anyhow, thiserror, log/env_logger, --json, indicatif, clap_complete, criterion (user request). Machine: AMD EPYC 9V45, 48 cores (Zen 5), 94 GiB; THP enabled=madvise, defrag=madvise. Harness: cube_solver_test runtest.sh (extended), driven by final-compare.sh.</p>
 <p>Cells: seconds per cube (sec/solv); at 48T the median over repeats [min-max, repeats]; at 1T (one run of 50 cubes, or two 25-cube chunks) ± the 95% interval of the mean over the cubes (this is the cube-to-cube spread; every solver gets the same cubes, see 'per cube' in the headline). 1G = 1 GiB hugetlb pages, THP = 2 MiB transparent huge pages: every solver is measured on both, and a speedup is only stated between equal page types, equal semantics and the same size group. 'size' is the table size relative to the egg-solver table it is compared with. GB·s = table GB x sec/solv at 48T. nodes/cube is each solver's own count (not comparable across solvers).</p>
 <p>No-panic integration: in first-party sources (dependencies excluded), the same source scanner found 127 forbidden explicit calls at <code>0b5b5a6</code> and zero at <code>935cb7f</code> (including shipped backends, binaries and build scripts; tests and compile-time contexts excluded). The full backend checks enforce the policy. <a href="no-panic-inventory.html">Source inventory and remaining implicit-check diagnostics</a>.</p>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#final-source-validation">Final source validation</a></li><li><a href="#fresh-miri-validation">Fresh Miri validation</a></li><li><a href="#latency-one-cube-at-a-time-on-all-threads-egg-solver-solve-c-1-vs-nissy-h48-cubeopt30-cube48opt10">Latency: one cube at a time on all threads (egg-solver solve -c 1 vs nissy H48, cubeopt30, cube48opt10)</a></li><li><a href="#throughput-many-cubes-in-flight-egg-solver-solve-c-0-bench-stream-vs-nxopt-t-vcube-w-which-solve-one-cube-per-thread">Throughput: many cubes in flight (egg-solver solve -c 0 / bench stream vs nxopt -t, vcube -w, which solve one cube per thread)</a></li><li><a href="#headline-same-page-type-same-semantics-same-size-group">Headline (same page type, same semantics, same size group)</a></li><li><a href="#cube-solver-test-wiki-metrics-this-machine">cube_solver_test wiki metrics (this machine)</a></li><li><a href="#distance-20-positions-cube20-org">Distance-20 positions (cube20.org)</a></li><li><a href="#build-screening-shipped-flags-vs-o3-march-native-and-vs-pgo">Build screening (shipped flags vs -O3 -march=native and vs PGO)</a></li><li><a href="#solution-lengths-optimality-cross-check">Solution lengths (optimality cross-check)</a></li><li><a href="#rejected-runs-page-placement-outside-load-or-interference-validation">Rejected runs (page placement, outside load, or interference validation)</a></li><li><a href="#harness-correction-2026-11-05">Harness correction (2026-11-05)</a></li><li><a href="#fairness">Fairness</a></li><li><a href="#cube48opt10-s-table-vs-egg-solver-h10">cube48opt10's table vs egg-solver h10</a></li><li><a href="#bugs-and-issues-found-in-other-solvers-for-the-final-report-the-user-will-report-them-upstream">Bugs and issues found in other solvers (for the final report; the user will report them upstream)</a></li><li><a href="#phack-hardware-counter-analysis">phack hardware-counter analysis</a></li><li><a href="#runs">Runs</a></li><li><a href="#tables">Tables</a></li><li><a href="#memory-and-hugepage-steps">Memory and hugepage steps</a></li></ul></details>
 <h2 id="final-source-validation">Final source validation</h2>
 <p>The comparison tables measure commit <code>229b99f</code>. The later final source <code>842a5043abfd</code> adds
 preflight, shared-memory support, the no-panic integration, the measured stream follow-up
@@ -10,7 +63,7 @@ Its performance was checked separately against the immutable comparison binaries
 (1 GiB pages, 40 lanes; stream warmup/window 10/60 seconds at 1T and 20/30 at 48T).
 The timing tables below retain their original measured provenance. Search node/lookup
 counts and solution-length histograms match exactly on the verification datasets.</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Final source validation" tabindex="0"><table id="docs-table-1"><caption>Final source validation</caption>
 <thead>
 <tr><th>check</th><th align="right">paired runs</th><th align="right">final / measured</th><th align="right">change</th></tr>
 </thead>
@@ -31,7 +84,7 @@ Existing environment names remain fallback aliases and legacy tables remain read
 <p>Final renamed main: <code>842a5043abfd550313a86a3d9bb5254f4b457540</code> in <code>~/egg-solver</code>. Full native/scalar/ARM/WASM checks, legacy h8/h11 search identity and hot-code comparisons passed. The temporary old repository-path alias has been removed.</p>
 <h2 id="fresh-miri-validation">Fresh Miri validation</h2>
 <p>The x86 AVX2/BMI2 and portable solver paths passed Miri with symbolic-alignment checks and four virtual CPUs. Each path also passed all catalogued shared-search tests under scheduling seeds 0 through 15. The staged-sort tests execute disjoint tasks concurrently with up to three workers and join before every stage barrier. A contention test also exercises the mutex park/wake path.</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Fresh Miri validation" tabindex="0"><table id="docs-table-2"><caption>Fresh Miri validation</caption>
 <thead>
 <tr><th>Path</th><th align="right">Catalogued unit tests</th><th align="right">Executed unique tests</th><th align="right">Explicitly ignored</th><th align="right">Shared-search seeds</th></tr>
 </thead>
@@ -55,7 +108,7 @@ Existing environment names remain fallback aliases and legacy tables remain read
 <p>Toolchain: <code>miri 0.1.0 (1c3a650696 2026-11-02)</code>. Source SHA-256: <code>93478bc5c45ba267255574f8cb466f02f006f1c7bf558fb8f9d088ec4307a4c9</code>. Completed: 2026-11-07 14:47:20 UTC. Raw logs and catalogues are retained in <code>/data/agents/codex-resume/miri-current/</code> and <code>miri-portable/</code>. Build, individual-worker and catalogue-coverage failures all fail the runner; failure-injection probes verify those guards.</p>
 <h2 id="latency-one-cube-at-a-time-on-all-threads-egg-solver-solve-c-1-vs-nissy-h48-cubeopt30-cube48opt10">Latency: one cube at a time on all threads (egg-solver solve -c 1 vs nissy H48, cubeopt30, cube48opt10)</h2>
 <h3 id="2-6-3-9-gb-tables-latency">~2.6-3.9 GB tables (latency)</h3>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="~2.6-3.9 GB tables (latency)" tabindex="0"><table id="docs-table-3"><caption>~2.6-3.9 GB tables (latency)</caption>
 <thead>
 <tr><th>solver</th><th>build</th><th align="right">table GB (size)</th><th align="right">1T 1G</th><th align="right">1T THP</th><th align="right">48T 1G</th><th align="right">48T THP</th><th align="right">GB·s 48T 1G / THP</th><th align="right">nodes/cube</th><th>pages measured (1G / THP rows)</th><th>egg-solver faster by (same pages)</th></tr>
 </thead>
@@ -67,7 +120,7 @@ Existing environment names remain fallback aliases and legacy tables remain read
 </tbody>
 </table></div>
 <h3 id="7-6-7-8-gb-tables-latency">~7.6-7.8 GB tables (latency)</h3>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="~7.6-7.8 GB tables (latency)" tabindex="0"><table id="docs-table-4"><caption>~7.6-7.8 GB tables (latency)</caption>
 <thead>
 <tr><th>solver</th><th>build</th><th align="right">table GB (size)</th><th align="right">1T 1G</th><th align="right">1T THP</th><th align="right">48T 1G</th><th align="right">48T THP</th><th align="right">GB·s 48T 1G / THP</th><th align="right">nodes/cube</th><th>pages measured (1G / THP rows)</th><th>egg-solver faster by (same pages)</th></tr>
 </thead>
@@ -78,7 +131,7 @@ Existing environment names remain fallback aliases and legacy tables remain read
 </tbody>
 </table></div>
 <h3 id="large-tables-1-gib-pages-only-latency">large tables (1 GiB pages only) (latency)</h3>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="large tables (1 GiB pages only) (latency)" tabindex="0"><table id="docs-table-5"><caption>large tables (1 GiB pages only) (latency)</caption>
 <thead>
 <tr><th>solver</th><th>build</th><th align="right">table GB (size)</th><th align="right">1T 1G</th><th align="right">1T THP</th><th align="right">48T 1G</th><th align="right">48T THP</th><th align="right">GB·s 48T 1G / THP</th><th align="right">nodes/cube</th><th>pages measured (1G / THP rows)</th><th>egg-solver faster by (same pages)</th></tr>
 </thead>
@@ -95,7 +148,7 @@ Existing environment names remain fallback aliases and legacy tables remain read
 </table></div>
 <h2 id="throughput-many-cubes-in-flight-egg-solver-solve-c-0-bench-stream-vs-nxopt-t-vcube-w-which-solve-one-cube-per-thread">Throughput: many cubes in flight (egg-solver solve -c 0 / bench stream vs nxopt -t, vcube -w, which solve one cube per thread)</h2>
 <h3 id="2-6-3-9-gb-tables-throughput">~2.6-3.9 GB tables (throughput)</h3>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="~2.6-3.9 GB tables (throughput)" tabindex="0"><table id="docs-table-6"><caption>~2.6-3.9 GB tables (throughput)</caption>
 <thead>
 <tr><th>solver</th><th>build</th><th align="right">table GB (size)</th><th align="right">1T 1G</th><th align="right">1T THP</th><th align="right">48T 1G</th><th align="right">48T THP</th><th align="right">GB·s 48T 1G / THP</th><th align="right">nodes/cube</th><th>pages measured (1G / THP rows)</th><th>egg-solver faster by (same pages)</th></tr>
 </thead>
@@ -107,7 +160,7 @@ Existing environment names remain fallback aliases and legacy tables remain read
 </tbody>
 </table></div>
 <h3 id="7-6-7-8-gb-tables-throughput">~7.6-7.8 GB tables (throughput)</h3>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="~7.6-7.8 GB tables (throughput)" tabindex="0"><table id="docs-table-7"><caption>~7.6-7.8 GB tables (throughput)</caption>
 <thead>
 <tr><th>solver</th><th>build</th><th align="right">table GB (size)</th><th align="right">1T 1G</th><th align="right">1T THP</th><th align="right">48T 1G</th><th align="right">48T THP</th><th align="right">GB·s 48T 1G / THP</th><th align="right">nodes/cube</th><th>pages measured (1G / THP rows)</th><th>egg-solver faster by (same pages)</th></tr>
 </thead>
@@ -119,7 +172,7 @@ Existing environment names remain fallback aliases and legacy tables remain read
 </tbody>
 </table></div>
 <h3 id="large-tables-1-gib-pages-only-throughput">large tables (1 GiB pages only) (throughput)</h3>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="large tables (1 GiB pages only) (throughput)" tabindex="0"><table id="docs-table-8"><caption>large tables (1 GiB pages only) (throughput)</caption>
 <thead>
 <tr><th>solver</th><th>build</th><th align="right">table GB (size)</th><th align="right">1T 1G</th><th align="right">1T THP</th><th align="right">48T 1G</th><th align="right">48T THP</th><th align="right">GB·s 48T 1G / THP</th><th align="right">nodes/cube</th><th>pages measured (1G / THP rows)</th><th>egg-solver faster by (same pages)</th></tr>
 </thead>
@@ -134,7 +187,7 @@ Existing environment names remain fallback aliases and legacy tables remain read
 </table></div>
 <h2 id="headline-same-page-type-same-semantics-same-size-group">Headline (same page type, same semantics, same size group)</h2>
 <p>egg-solver uses the default SIMD build, compared against the same competitor rows.</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Headline (same page type, same semantics, same size group)" tabindex="0"><table id="docs-table-9"><caption>Headline (same page type, same semantics, same size group)</caption>
 <thead>
 <tr><th>semantics</th><th>group</th><th>competitor</th><th align="right">size vs egg-solver</th><th>pages</th><th align="right">threads</th><th align="right">egg-solver faster by (sec/solv)</th><th>per cube</th></tr>
 </thead>
@@ -202,7 +255,7 @@ Existing environment names remain fallback aliases and legacy tables remain read
 <h2 id="cube-solver-test-wiki-metrics-this-machine">cube_solver_test wiki metrics (this machine)</h2>
 <p>The wiki's three tables, measured here: first 100 cubes of random_move_15f/16f/17f and of random_state ('inf'; fewer where marked), nodes from 1-thread runs (<code>solve -t 1 -c 1</code> for egg-solver). <strong>Node definitions differ between solvers</strong> (what one node is: a move generated, an evaluation, a lookup...), so node counts and space-node products compare search-plus-table efficiency only roughly; nissy's counts also vary run to run (competitor-bugs.md #7), so its values are means over the runs of each cube.</p>
 <h3 id="space-node-product-table-bytes-x-nodes-visited-in-1e15-bytes-less-is-better">Space-node product (table bytes x nodes visited, in 1e15 bytes; less is better)</h3>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Space-node product (table bytes x nodes visited, in 1e15 bytes; less is better)" tabindex="0"><table id="docs-table-10"><caption>Space-node product (table bytes x nodes visited, in 1e15 bytes; less is better)</caption>
 <thead>
 <tr><th>solver</th><th align="right">table MB</th><th align="right">15f</th><th align="right">16f</th><th align="right">17f</th><th align="right">inf</th></tr>
 </thead>
@@ -230,7 +283,7 @@ Existing environment names remain fallback aliases and legacy tables remain read
 </tbody>
 </table></div>
 <h3 id="number-of-nodes-visited-millions-per-cube-less-is-better">Number of nodes visited (millions per cube; less is better)</h3>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Number of nodes visited (millions per cube; less is better)" tabindex="0"><table id="docs-table-11"><caption>Number of nodes visited (millions per cube; less is better)</caption>
 <thead>
 <tr><th>solver</th><th align="right">15-move</th><th align="right">16-move</th><th align="right">17-move</th><th align="right">inf-move</th></tr>
 </thead>
@@ -260,7 +313,7 @@ Existing environment names remain fallback aliases and legacy tables remain read
 <h3 id="average-time-per-node-random-state-harness-tt-ns-node-sec-solv-nodes-per-cube-of-the-same-run">Average time per node (random_state; harness tt, ns/node = sec/solv / nodes per cube of the same run)</h3>
 <p>1 GiB pages, chosen builds; THP where no 1 GiB row exists (marked). 1T timings: the same first 50 cubes, 48T: 200 cubes, median of 3 repeats. 48T sec/solv is a latency for egg-solver, nissy and cubeopt, a throughput (one cube per thread) for nxopt and vcube, as in the wiki.</p>
 <p>Single-thread results</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Average time per node (random_state; harness tt, ns/node = sec/solv / nodes per cube of the same run)" tabindex="0"><table id="docs-table-12"><caption>Average time per node (random_state; harness tt, ns/node = sec/solv / nodes per cube of the same run)</caption>
 <thead>
 <tr><th>solver</th><th align="right">ns/node</th><th align="right">sec/solv</th><th align="right">GB*sec</th></tr>
 </thead>
@@ -288,7 +341,7 @@ Existing environment names remain fallback aliases and legacy tables remain read
 </tbody>
 </table></div>
 <p>All-thread (48) results</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Average time per node (random_state; harness tt, ns/node = sec/solv / nodes per cube of the same run)" tabindex="0"><table id="docs-table-13"><caption>Average time per node (random_state; harness tt, ns/node = sec/solv / nodes per cube of the same run)</caption>
 <thead>
 <tr><th>solver</th><th align="right">ns/node</th><th align="right">sec/solv</th><th align="right">GB*sec</th></tr>
 </thead>
@@ -316,7 +369,7 @@ Existing environment names remain fallback aliases and legacy tables remain read
 </tbody>
 </table></div>
 <h3 id="reference-the-wiki-s-published-values-intel-core-i7-10750h-6-cores-12-threads-thp-always-not-this-machine">Reference: the wiki's published values (Intel Core i7-10750H, 6 cores / 12 threads, THP always; NOT this machine)</h3>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Reference: the wiki's published values (Intel Core i7-10750H, 6 cores / 12 threads, THP always; NOT this machine)" tabindex="0"><table id="docs-table-14"><caption>Reference: the wiki's published values (Intel Core i7-10750H, 6 cores / 12 threads, THP always; NOT this machine)</caption>
 <thead>
 <tr><th>solver</th><th align="right">table MB</th><th>space-node 15f / 16f / 17f / inf</th><th>nodes (M) 15 / 16 / 17 / inf</th></tr>
 </thead>
@@ -336,7 +389,7 @@ Existing environment names remain fallback aliases and legacy tables remain read
 </tbody>
 </table></div>
 <p>Time per node on the wiki's machine (ns/node, sec/solv, GB*sec):</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Reference: the wiki's published values (Intel Core i7-10750H, 6 cores / 12 threads, THP always; NOT this machine)" tabindex="0"><table id="docs-table-15"><caption>Reference: the wiki's published values (Intel Core i7-10750H, 6 cores / 12 threads, THP always; NOT this machine)</caption>
 <thead>
 <tr><th>solver</th><th>1 thread</th><th>12 threads</th></tr>
 </thead>
@@ -356,7 +409,7 @@ Existing environment names remain fallback aliases and legacy tables remain read
 </tbody>
 </table></div>
 <h3 id="node-counts-vs-the-wiki-same-datasets-first-100-cubes-nodes-do-not-depend-on-the-machine">Node counts vs the wiki (same datasets, first 100 cubes; nodes do not depend on the machine)</h3>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Node counts vs the wiki (same datasets, first 100 cubes; nodes do not depend on the machine)" tabindex="0"><table id="docs-table-16"><caption>Node counts vs the wiki (same datasets, first 100 cubes; nodes do not depend on the machine)</caption>
 <thead>
 <tr><th>solver</th><th>15-move here / wiki</th><th>16-move</th><th>17-move</th><th>inf-move</th></tr>
 </thead>
@@ -379,7 +432,7 @@ Existing environment names remain fallback aliases and legacy tables remain read
 <p>Length check: all 3904 solutions returned have length 20.</p>
 <p>nissy h48h11 (its generator is slightly inadmissible, competitor-bugs.md #1): 20 moves on every cube here, so the inadmissible entries did not cost optimality on these positions.</p>
 <h3 id="2-6-3-9-gb-tables-distance-20">~2.6-3.9 GB tables (distance 20)</h3>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="~2.6-3.9 GB tables (distance 20)" tabindex="0"><table id="docs-table-17"><caption>~2.6-3.9 GB tables (distance 20)</caption>
 <thead>
 <tr><th>solver</th><th>semantics</th><th align="right">table GB</th><th align="right">48T 1G (100 cubes)</th><th align="right">1T 1G (10 cubes)</th><th align="right">1T 1G (100 cubes)</th><th align="right">nodes/cube</th><th>egg-solver faster by (same semantics)</th></tr>
 </thead>
@@ -395,7 +448,7 @@ Existing environment names remain fallback aliases and legacy tables remain read
 </tbody>
 </table></div>
 <h3 id="7-6-7-8-gb-tables-distance-20">~7.6-7.8 GB tables (distance 20)</h3>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="~7.6-7.8 GB tables (distance 20)" tabindex="0"><table id="docs-table-18"><caption>~7.6-7.8 GB tables (distance 20)</caption>
 <thead>
 <tr><th>solver</th><th>semantics</th><th align="right">table GB</th><th align="right">48T 1G (100 cubes)</th><th align="right">1T 1G (10 cubes)</th><th align="right">1T 1G (100 cubes)</th><th align="right">nodes/cube</th><th>egg-solver faster by (same semantics)</th></tr>
 </thead>
@@ -410,7 +463,7 @@ Existing environment names remain fallback aliases and legacy tables remain read
 </tbody>
 </table></div>
 <h3 id="large-tables-1-gib-pages-only-distance-20">large tables (1 GiB pages only) (distance 20)</h3>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="large tables (1 GiB pages only) (distance 20)" tabindex="0"><table id="docs-table-19"><caption>large tables (1 GiB pages only) (distance 20)</caption>
 <thead>
 <tr><th>solver</th><th>semantics</th><th align="right">table GB</th><th align="right">48T 1G (100 cubes)</th><th align="right">1T 1G (10 cubes)</th><th align="right">1T 1G (100 cubes)</th><th align="right">nodes/cube</th><th>egg-solver faster by (same semantics)</th></tr>
 </thead>
@@ -432,7 +485,7 @@ Existing environment names remain fallback aliases and legacy tables remain read
 </table></div>
 <h2 id="build-screening-shipped-flags-vs-o3-march-native-and-vs-pgo">Build screening (shipped flags vs -O3 -march=native and vs PGO)</h2>
 <p>Frozen selection: nxopt pgo, vcube shipped, h48 shipped, cube48opt-rust Opt7 pfpgo, cube48opt-rust Opt8 native, cube48opt-rust Opt10 pfnative (an alternative build replaces the shipped one only when its runs are &gt; 1% faster). nxopt's makefile already uses -O3 -march=native. cubeopt30/cube48opt10 are prebuilt closed-source binaries: they cannot be rebuilt or profile-tuned.</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Build screening (shipped flags vs -O3 -march=native and vs PGO)" tabindex="0"><table id="docs-table-20"><caption>Build screening (shipped flags vs -O3 -march=native and vs PGO)</caption>
 <thead>
 <tr><th>run</th><th align="right">shipped</th><th align="right">alternative</th><th align="right">vs shipped</th></tr>
 </thead>
@@ -484,7 +537,7 @@ Existing environment names remain fallback aliases and legacy tables remain read
 </table></div>
 <h2 id="solution-lengths-optimality-cross-check">Solution lengths (optimality cross-check)</h2>
 <p>Competitors among themselves: 612 cubes, 0 with different lengths. egg-solver: 613 cubes.</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Solution lengths (optimality cross-check)" tabindex="0"><table id="docs-table-21"><caption>Solution lengths (optimality cross-check)</caption>
 <thead>
 <tr><th>run</th><th align="right">cubes vs egg-solver</th><th align="right">equal</th><th align="right">different</th></tr>
 </thead>
@@ -1034,7 +1087,7 @@ exit 1
 <h2 id="bugs-and-issues-found-in-other-solvers-for-the-final-report-the-user-will-report-them-upstream">Bugs and issues found in other solvers (for the final report; the user will report them upstream)</h2>
 <p>Source commits read: nissy-core 1f7e8e9 (2026-09-17), vcube 9f5bc2c (2024-04-18), cube20src/nxopt f430921 (2025-07-18), cube_solver_test b9cca71 (2026-02-01); cubeopt30/cube48opt10 = the prebuilt binaries in ~/ (no source).</p>
 <p>Each entry: project, file:line at the commit we read, what is wrong, a repro or proof, impact, and a suggested fix.</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Bugs and issues found in other solvers (for the final report; the user will report them upstream)" tabindex="0"><table id="docs-table-22"><caption>Bugs and issues found in other solvers (for the final report; the user will report them upstream)</caption>
 <thead>
 <tr><th>#</th><th>project</th><th>severity</th><th>summary</th></tr>
 </thead>
@@ -1120,7 +1173,7 @@ exit 1
 </ul>
 </li>
 </ul>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="f1: exact locations for #2-#6, and new findings #7-#10 (f1, 2026-11-04)" tabindex="0"><table id="docs-table-23"><caption>f1: exact locations for #2-#6, and new findings #7-#10 (f1, 2026-11-04)</caption>
 <thead>
 <tr><th>#</th><th>project</th><th>severity</th><th>summary</th></tr>
 </thead>
@@ -1204,7 +1257,7 @@ exit 1
 <li>No bug. It looks like a one-off cost right after generation (THP compaction / first touch).</li>
 </ul>
 <h3 id="shm1-vcube-shared-memory-found-while-porting-shm-2026-11-05">shm1: vcube shared memory (found while porting <code>--shm</code>, 2026-11-05)</h3>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="shm1: vcube shared memory (found while porting --shm, 2026-11-05)" tabindex="0"><table id="docs-table-24"><caption>shm1: vcube shared memory (found while porting --shm, 2026-11-05)</caption>
 <thead>
 <tr><th>#</th><th>project</th><th>severity</th><th>summary</th></tr>
 </thead>
@@ -1280,7 +1333,7 @@ annotated instruction's percentage is not its exclusive cost. Both recovered
 annotations concentrate on the same hot regions, with integer/vector unpacking,
 stack traffic and loop control visible. This locates work; it does not prove an
 optimization or its gain.</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Cycle profile and counter evidence" tabindex="0"><table id="docs-table-25"><caption>Cycle profile and counter evidence</caption>
 <thead>
 <tr><th>Metric</th><th align="right">One physical worker</th><th align="right">12 physical workers</th><th>Interpretation</th></tr>
 </thead>
@@ -1320,7 +1373,7 @@ as the sole bottleneck or predicting gains on the EPYC build.</p>
 <p>Each row is three 20-second measurements. Solves/s is the completion count divided
 by the window; Ginst/s is counted instructions divided by the acknowledged window.
 Ginst/s measures instruction execution, not useful search progress.</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Worker scaling and SMT" tabindex="0"><table id="docs-table-26"><caption>Worker scaling and SMT</caption>
 <thead>
 <tr><th>Configuration</th><th align="right">Median solves/s [range]</th><th align="right">Median IPC</th><th align="right">Median Ginst/s [range]</th></tr>
 </thead>
@@ -1344,7 +1397,7 @@ identify the cause. Do not attribute this confidently to NUMA, throttling or
 software contention.</p>
 <h3 id="pages-and-numa-placement">Pages and NUMA placement</h3>
 <p>Actual large table mapping coverage from the start-of-window <code>smaps</code> snapshots:</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Pages and NUMA placement" tabindex="0"><table id="docs-table-27"><caption>Pages and NUMA placement</caption>
 <thead>
 <tr><th>Family</th><th align="right">Table bytes backed by THP</th></tr>
 </thead>
@@ -1375,7 +1428,7 @@ unavailable. No kernel huge-page pool was changed.</p>
 in <a href="https://docs.kernel.org/admin-guide/mm/transhuge.html">its THP guide</a>.
 These are placement snapshots, not continuous residency measurements.</p>
 <h3 id="lane-sweep-exploratory-only">Lane sweep: exploratory only</h3>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Lane sweep: exploratory only" tabindex="0"><table id="docs-table-28"><caption>Lane sweep: exploratory only</caption>
 <thead>
 <tr><th align="right">Lanes</th><th>Completed cubes in each 20-second run</th><th align="right">Observed median solves/s</th><th align="right">Median IPC</th></tr>
 </thead>
@@ -1427,7 +1480,7 @@ Software <code>task-clock</code> retains milliseconds as its original unit. Coun
 bytes and instructions are not interchangeable. The accompanying CSV also contains
 event/cycle ratios and repeat counts. Each configuration has the listed number
 of independent windows.</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Full auxiliary counter ratios" tabindex="0"><table id="docs-table-29"><caption>Full auxiliary counter ratios</caption>
 <thead>
 <tr><th>Event</th><th align="right">Repeats each</th><th align="right">1 worker /1000 insn</th><th align="right">12 workers /1000 insn</th></tr>
 </thead>
@@ -1491,7 +1544,7 @@ of independent windows.</p>
 </tbody>
 </table></div>
 <h2 id="runs">Runs</h2>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Runs" tabindex="0"><table id="docs-table-30"><caption>Runs</caption>
 <thead>
 <tr><th>run</th><th>status</th><th align="right">wall s</th><th align="right">outside load (cores)</th><th align="right">gate wait s</th><th>pages measured</th></tr>
 </thead>
@@ -2052,7 +2105,7 @@ of independent windows.</p>
 </table></div>
 <p>Total measured wall time: 29.87 h.</p>
 <h2 id="tables">Tables</h2>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Tables" tabindex="0"><table id="docs-table-31"><caption>Tables</caption>
 <thead>
 <tr><th>table</th><th align="right">size</th><th>status</th><th>generation time</th></tr>
 </thead>
@@ -2078,7 +2131,7 @@ of independent windows.</p>
 folders point there. All tables stay on disk, so nothing is deleted or regenerated between runs.
 Page columns need: 1G rows = free 1 GiB pool pages for the duration of a run (one run at a time);
 THP rows = ordinary RAM (~18 GiB is free; egg-solver's THP copy of h11 needs 58 GiB).</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Memory and hugepage steps" tabindex="0"><table id="docs-table-32"><caption>Memory and hugepage steps</caption>
 <thead>
 <tr><th>table</th><th align="right">1G row needs (free pool pages)</th><th align="right">THP row needs (ordinary RAM)</th></tr>
 </thead>
@@ -2107,4 +2160,33 @@ h9/h10 to /mnt/huge for its rows; competitors via vcube's own MAP_HUGETLB or the
 <code>cmp /data2/tables/h11.mnt /mnt/huge/h11</code>. The pool remains at 70 pages throughout; no pool
 resizing or regeneration is needed. h7 and h8 remain in /mnt/huge.</li>
 </ol>
-</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>
+
+<p class="source-link"><a href="results.md">Markdown source</a></p></main>
+<footer><a href="../../PROVENANCE.html">Sources and evidence scope</a></footer>
+<script>
+for (const wrapper of document.querySelectorAll('.table-wrap')) {
+  const table=wrapper.querySelector('table');
+  const rows=[...table.tBodies].flatMap(body=>[...body.rows]);
+  if(rows.length>50) wrapper.classList.add('long-table');
+  if(rows.length<=12) continue;
+  const tools=document.createElement('div'); tools.className='table-tools';
+  const label=document.createElement('label'); label.textContent='Filter this table';
+  const input=document.createElement('input'); input.type='search'; input.id=table.id+'-filter';
+  label.htmlFor=input.id; input.setAttribute('aria-controls',table.id);
+  const count=document.createElement('span'); count.className='note'; count.setAttribute('aria-live','polite');
+  count.textContent=rows.length+' rows';
+  input.addEventListener('input',()=>{
+    const query=input.value.trim().toLowerCase(); let shown=0;
+    for(const row of rows){row.hidden=!!query&&!row.textContent.toLowerCase().includes(query);if(!row.hidden)shown++;}
+    count.textContent=shown+' of '+rows.length+' rows';
+  });
+  tools.append(label,input,count); wrapper.before(tools);
+}
+function revealTarget(){
+  let id;try{id=decodeURIComponent(location.hash.slice(1));}catch{return;}
+  const target=document.getElementById(id);if(!target)return;
+  for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+}
+revealTarget(); window.addEventListener('hashchange',revealTarget);
+</script>
+</body></html>

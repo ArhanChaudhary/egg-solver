@@ -1,4 +1,6 @@
-# Bugs and issues found in other solvers (for the final report; the user will report them upstream)
+# Recorded competitor and harness findings
+
+These are findings against pinned historical source and supplied binaries, not claims about every later upstream release. They were not automatically reported upstream.
 
 Source commits read: nissy-core 1f7e8e9 (2026-09-17), vcube 9f5bc2c (2024-04-18), cube20src/nxopt f430921 (2025-07-18), cube_solver_test b9cca71 (2026-02-01); cubeopt30/cube48opt10 = the prebuilt binaries in ~/ (no source).
 

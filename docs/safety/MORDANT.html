@@ -1,7 +1,58 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mordant audit of egg-solver — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../index.html">Home</a><a href="../guide/OVERVIEW.html">Learn</a><a href="../comparisons/index.html">Compare</a><a href="../performance/index.html">Performance</a><a href="index.html">Safety</a><a href="../history/index.html">History</a><a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="MORDANT.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="mordant-audit-of-egg-solver">Mordant audit of egg-solver</h1>
-<p><strong>Current safety candidate audit — 2026-11-07 09:30 UTC</strong></p>
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Mordant audit of egg-solver — egg-solver</title><style>
+:root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
+header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
+header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
+header a { color:#d9f0ff; }
+header a[aria-current] { color:white; text-decoration-thickness:3px; }
+main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+h1 { margin-top:0; font-size:2rem; line-height:1.25; }
+h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
+h3 { margin-top:1.5rem; }
+a { color:var(--accent); overflow-wrap:anywhere; }
+p,li { max-width:90ch; }
+code { background:#eff3f6; border-radius:3px; padding:.1em .25em; overflow-wrap:anywhere; font-size:.9em; }
+pre { max-width:100%; padding:1rem; background:#eef3f6; overflow:auto; line-height:1.45; }
+pre code { background:none; padding:0; overflow-wrap:normal; }
+.table-wrap { max-width:100%; overflow:auto; margin:1rem 0 1.5rem; border:1px solid var(--line); }
+.table-wrap.long-table { max-height:70vh; }
+table { width:100%; border-collapse:collapse; font-size:.9rem; font-variant-numeric:tabular-nums; }
+th,td { padding:.55rem .65rem; border:1px solid var(--line); vertical-align:top; overflow-wrap:normal; }
+th { background:#eaf1f6; text-align:left; position:sticky; top:0; z-index:1; }
+tr:nth-child(even) { background:#f8fafb; }
+caption,.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+details { border:1px solid var(--line); padding:.6rem 1rem; border-radius:5px; margin:1rem 0; }
+summary { cursor:pointer; font-weight:600; }
+.table-tools { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:.6rem; background:#f4f7f9; }
+.table-tools input { font:inherit; border:1px solid #afc0ce; border-radius:4px; padding:.3rem .5rem; width:min(100%,22rem); min-width:0; }
+.note,.source-link,footer { color:var(--muted); font-size:.85rem; }
+.source-link { margin-top:2rem; }
+.archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
+footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
+svg { max-width:100%; height:auto; }
+:target { scroll-margin-top:1rem; }
+.skip-link { position:absolute; left:-10000px; }
+.skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
+@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+</style></head>
+<body>
+<a class="skip-link" href="#docs-content">Skip to content</a>
+<header><strong>egg-solver</strong><nav aria-label="Documentation"><a href="../index.html">Home</a>
+<a href="../guide/OVERVIEW.html">Learn</a>
+<a href="../comparisons/index.html">Benchmarks</a>
+<a href="../performance/index.html">Performance</a>
+<a href="index.html">Safety</a>
+<a href="../history/index.html">History</a>
+<a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<main id="docs-content"><h1 id="mordant-audit-of-egg-solver">Mordant audit of egg-solver</h1>
+<p><strong>Safety candidate audit recorded — 2026-11-07 09:30 UTC</strong></p>
 <p>Mordant was rerun on candidate <code>316597f64a9bd749e8a01b67f96c108c03611e68</code>, source SHA-256 <code>93478bc5c45ba267255574f8cb466f02f006f1c7bf558fb8f9d088ec4307a4c9</code>, after the additional safety changes. Both supported-target commands completed successfully with no compiler errors. This is a completed lint audit, not a claim of zero warnings or a memory-safety certificate.</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Mordant audit of egg-solver" tabindex="0"><table id="docs-table-1"><caption>Mordant audit of egg-solver</caption>
 <thead>
 <tr><th>Target</th><th align="right">Distinct lint diagnostics</th><th align="right">Compiler errors</th><th>Command result</th></tr>
 </thead>
@@ -11,19 +62,19 @@
 </tbody>
 </table></div>
 <p>The native findings cover the shared-search <code>Sync</code> implementation, internal constructors, enum catch-all branches, tuple return types and conditional fields. The WASI count includes 51 target-scoped unused-public-API findings and seven error-to-string conversions at the JavaScript-facing boundary. Findings overlap across targets and should not be added as distinct defects.</p>
-<p>Review of the current constructor warnings found the checks at their producers: generation validates k/base before allocating; the DFS generator validates its settings; collapse derives k from a validated source with a checked shape; shared-memory attachment validates its size before constructing <code>Memory</code>. The table constructors are now internal. The preflight metadata failure still reaches the validating loader rather than accepting a bad table. The <code>CubeCtx</code> warning remains an appropriate reminder that its <code>UnsafeCell</code> ownership protocol depends on the publication and completion rules described in <code>NO_UB.md</code>; the new tracing/publication correction addresses the reproduced overlap. Tuple and enum suggestions alone do not establish an incorrect access. No source edits were made merely to silence these diagnostics.</p>
+<p>Review of the candidate constructor warnings found the checks at their producers: generation validates k/base before allocating; the DFS generator validates its settings; collapse derives k from a validated source with a checked shape; shared-memory attachment validates its size before constructing <code>Memory</code>. The table constructors are now internal. The preflight metadata failure still reaches the validating loader rather than accepting a bad table. The <code>CubeCtx</code> warning remains an appropriate reminder that its <code>UnsafeCell</code> ownership protocol depends on the publication and completion rules described in <code>NO_UB.md</code>; the new tracing/publication correction addresses the reproduced overlap. Tuple and enum suggestions alone do not establish an incorrect access. No source edits were made merely to silence these diagnostics.</p>
 <p>The first WASI invocation compiled successfully but Mordant itself returned 101 because a cached build lacked its <code>over-baseline.txt</code> count. The cache was preserved under <code>target-safety-native/mordant-before-final-wasm-retry</code>, and a fresh-cache WASI retry completed with exit 0. The failed tool attempt remains recorded and is not counted as a passing run.</p>
-<p>Evidence: <a href="../evidence/validation/mordant/final-candidate-validation.json">source-bound validation</a>, <a href="../evidence/validation/mordant/final-candidate-findings.json">current structured findings</a>, <a href="../evidence/validation/mordant/final-candidate-first-attempt.json">preserved first attempt</a>, <a href="NO_UB.html">current UB assessment</a>.</p>
-<p><strong>Earlier snapshots and original detailed triage follow.</strong></p>
+<p>Evidence: <a href="../evidence/validation/mordant/final-candidate-validation.json">source-bound validation</a>, <a href="../evidence/validation/mordant/final-candidate-findings.json">recorded structured findings</a>, <a href="../evidence/validation/mordant/final-candidate-first-attempt.json">preserved first attempt</a>, <a href="NO_UB.html">UB assessment</a>.</p>
+<h2 id="earlier-source-snapshots-and-detailed-triage">Earlier source snapshots and detailed triage</h2>
 <p>Completed 2026-11-07 03:52 UTC.</p>
 <p>All six supported-target runs completed with exit status <strong>0</strong>. They emitted warnings; this is not a warning-free or memory-safety certification. No automatic fixes or production-source changes were made.</p>
-<p>Tool: mordant 0.1.0 (564c8da5cb0d4fc9b1717b4b42e6e60dbeef237b, rustc 1.100.0-nightly (0dfb098f3 2026-08-31)). <a href="https://github.com/scarletindustries/mordant/tree/564c8da5cb0d4fc9b1717b4b42e6e60dbeef237b">Pinned upstream source</a>. Default Mordant configuration, no baseline or added suppressions. The tool lists49 registered lints; configuration-dependent/opt-in rules were not separately enabled.</p>
-<div class="table-wrap"><table>
+<p>Tool: mordant 0.1.0 (564c8da5cb0d4fc9b1717b4b42e6e60dbeef237b, rustc 1.100.0-nightly (0dfb098f3 2026-08-31)). <a href="https://github.com/scarletindustries/mordant/tree/564c8da5cb0d4fc9b1717b4b42e6e60dbeef237b">Pinned upstream source</a>. Default Mordant configuration, no baseline or added suppressions. The tool lists 49 registered lints; configuration-dependent/opt-in rules were not separately enabled.</p>
+<div class="table-wrap" role="region" aria-label="Earlier source snapshots and detailed triage" tabindex="0"><table id="docs-table-2"><caption>Earlier source snapshots and detailed triage</caption>
 <thead>
 <tr><th>Source snapshot</th><th align="right">Native findings</th><th align="right">WASI findings</th><th align="right">Compiler errors</th></tr>
 </thead>
 <tbody>
-<tr><td>Current main <code>56ace9c</code></td><td align="right">14</td><td align="right">58</td><td align="right">0</td></tr>
+<tr><td>Earlier main <code>56ace9c</code></td><td align="right">14</td><td align="right">58</td><td align="right">0</td></tr>
 <tr><td>Pending safety fixes <code>988f289</code></td><td align="right">14</td><td align="right">58</td><td align="right">0</td></tr>
 <tr><td>SSSE3 candidate on <code>93867a4</code> plus staged changes</td><td align="right">12</td><td align="right">58</td><td align="right">0</td></tr>
 </tbody>
@@ -38,7 +89,7 @@
 <p>The initial whole-workspace Linux commands returned101 because the WASM wrapper references <code>Memory::try_anonymous</code>, which exists on its supported WebAssembly target but not the Unix memory implementation. Those logs remain preserved. The corrected commands above completed successfully without changing source.</p>
 <p>These are compiler/lint runs, not runtime tests. The WASI pass covers the non-threaded WASI library. ARM/NEON and the WASI threads target were not separately scanned by Mordant in this audit. Existing backend tests and the incomplete full Miri work are separate evidence.</p>
 <p><strong>Review of the current native findings</strong></p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Earlier source snapshots and detailed triage" tabindex="0"><table id="docs-table-3"><caption>Earlier source snapshots and detailed triage</caption>
 <thead>
 <tr><th>Lint</th><th align="right">Count</th><th>Assessment</th></tr>
 </thead>
@@ -60,8 +111,8 @@
 <p><strong><code>tuple_wants_struct</code>:</strong> Named result structs would distinguish same-typed coordinate fields, collapse dimensions, and split-search results. This is a maintainability finding, not evidence of a current swapped value. Hot-coordinate changes require codegen/performance checks.</p>
 <p><strong><code>stringified_error</code>:</strong> The wrapper uses string errors for its exported last-error interface. Converting typed errors here loses programmatic classification, but the current ABI already communicates failure through a status and error text. Keep typed errors longer if structured JavaScript error handling is added; these warnings do not demonstrate a failed solve.</p>
 <p><strong><code>unused_pub</code>:</strong> These41 findings came from the WASI library-only build, with native CLI targets, tests, and external Rust clients absent. Several named items are used by native binaries or tests. Do not remove or restrict public APIs solely from these results.</p>
-<p><strong>Current main: native locations</strong></p>
-<div class="table-wrap"><table>
+<h3 id="earlier-main-native-locations">Earlier main: native locations</h3>
+<div class="table-wrap" role="region" aria-label="Earlier main: native locations" tabindex="0"><table id="docs-table-4"><caption>Earlier main: native locations</caption>
 <thead>
 <tr><th>Lint</th><th>Location</th><th>Diagnostic</th></tr>
 </thead>
@@ -82,9 +133,9 @@
 <tr><td><code>tuple_wants_struct</code></td><td><a href="../evidence/validation/mordant/sources/main/src/lanes/share.rs.html#L3350">src/lanes/share.rs:3350</a></td><td>both of the 2 calls to <code>find_split</code> unpack the result as <code>(busy, depth, give)</code>. The names exist everywhere except in the type, and since <code>.0</code> and <code>.1</code> are both <code>usize</code> a swapped pair compiles</td></tr>
 </tbody>
 </table></div>
-<p><strong>Current main: additional WASI diagnostics</strong></p>
+<h3 id="earlier-main-additional-wasi-diagnostics">Earlier main: additional WASI diagnostics</h3>
 <p>The WASI build has10 overlapping core findings, seven typed-error-to-string findings in the wrapper, and41 public-API usage warnings. The usage warnings apply to this library-only target selection; they are not a basis for deleting APIs used by native binaries, tests or external callers.</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Earlier main: additional WASI diagnostics" tabindex="0"><table id="docs-table-5"><caption>Earlier main: additional WASI diagnostics</caption>
 <thead>
 <tr><th>Lint</th><th>Location</th><th>Diagnostic</th></tr>
 </thead>
@@ -140,5 +191,34 @@
 </tbody>
 </table></div>
 <p>Raw evidence: <a href="../evidence/validation/mordant/findings.json">all structured findings</a>, <a href="../evidence/validation/mordant/results.json">commands and exit statuses</a>, <a href="../evidence/validation/mordant/sources.json">source hashes</a>, and each run’s <code>.stdout</code>, <code>.stderr</code>, and <code>.diagnostics.txt</code> under <code>/data/agents/mordant-audit/</code>.</p>
-<p>The current main native diagnostics and pending safety native diagnostics have the same warning categories and counts. The SSSE3 candidate produces no new warning category; it compiles a different coordinate implementation, which accounts for two fewer tuple warnings. No inference about runtime safety or speed follows from that count.</p>
-</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>
+<p>The recorded main and then-pending safety-candidate diagnostics have the same warning categories and counts. The SSSE3 candidate produces no new warning category; it compiles a different coordinate implementation, which accounts for two fewer tuple warnings. No inference about runtime safety or speed follows from that count.</p>
+
+<p class="source-link"><a href="MORDANT.md">Markdown source</a></p></main>
+<footer><a href="../PROVENANCE.html">Sources and evidence scope</a></footer>
+<script>
+for (const wrapper of document.querySelectorAll('.table-wrap')) {
+  const table=wrapper.querySelector('table');
+  const rows=[...table.tBodies].flatMap(body=>[...body.rows]);
+  if(rows.length>50) wrapper.classList.add('long-table');
+  if(rows.length<=12) continue;
+  const tools=document.createElement('div'); tools.className='table-tools';
+  const label=document.createElement('label'); label.textContent='Filter this table';
+  const input=document.createElement('input'); input.type='search'; input.id=table.id+'-filter';
+  label.htmlFor=input.id; input.setAttribute('aria-controls',table.id);
+  const count=document.createElement('span'); count.className='note'; count.setAttribute('aria-live','polite');
+  count.textContent=rows.length+' rows';
+  input.addEventListener('input',()=>{
+    const query=input.value.trim().toLowerCase(); let shown=0;
+    for(const row of rows){row.hidden=!!query&&!row.textContent.toLowerCase().includes(query);if(!row.hidden)shown++;}
+    count.textContent=shown+' of '+rows.length+' rows';
+  });
+  tools.append(label,input,count); wrapper.before(tools);
+}
+function revealTarget(){
+  let id;try{id=decodeURIComponent(location.hash.slice(1));}catch{return;}
+  const target=document.getElementById(id);if(!target)return;
+  for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+}
+revealTarget(); window.addEventListener('hashchange',revealTarget);
+</script>
+</body></html>

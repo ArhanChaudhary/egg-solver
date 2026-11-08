@@ -1,316 +1,192 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>egg-solver — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../index.html">Home</a><a href="../guide/OVERVIEW.html">Learn</a><a href="../comparisons/index.html">Compare</a><a href="../performance/index.html">Performance</a><a href="../safety/index.html">Safety</a><a href="../history/index.html">History</a><a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="USER_GUIDE.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="egg-solver">egg-solver</h1>
-<p>An optimal 3x3x3 Rubik's cube solver: IDA* with an H48 pruning table
-(<code>hK</code>, K = 0..11: the larger K, the faster the solves and the more memory),
-interleaved lanes to hide table misses, and SIMD cube operations (x86 AVX2 /
-AVX-512, aarch64 NEON, or a portable scalar fallback).</p>
-<h2 id="running-on-a-laptop">Running on a laptop</h2>
-<p>The fastest table, h11, needs 58 GiB of RAM. Smaller tables give the same
-(optimal) solutions, just more slowly: each step down halves the memory and
-roughly doubles the time per cube. Pick the largest table that fits in your
-RAM with a few GB to spare:</p>
-<div class="table-wrap"><table>
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>User guide — egg-solver</title><style>
+:root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
+header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
+header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
+header a { color:#d9f0ff; }
+header a[aria-current] { color:white; text-decoration-thickness:3px; }
+main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+h1 { margin-top:0; font-size:2rem; line-height:1.25; }
+h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
+h3 { margin-top:1.5rem; }
+a { color:var(--accent); overflow-wrap:anywhere; }
+p,li { max-width:90ch; }
+code { background:#eff3f6; border-radius:3px; padding:.1em .25em; overflow-wrap:anywhere; font-size:.9em; }
+pre { max-width:100%; padding:1rem; background:#eef3f6; overflow:auto; line-height:1.45; }
+pre code { background:none; padding:0; overflow-wrap:normal; }
+.table-wrap { max-width:100%; overflow:auto; margin:1rem 0 1.5rem; border:1px solid var(--line); }
+.table-wrap.long-table { max-height:70vh; }
+table { width:100%; border-collapse:collapse; font-size:.9rem; font-variant-numeric:tabular-nums; }
+th,td { padding:.55rem .65rem; border:1px solid var(--line); vertical-align:top; overflow-wrap:normal; }
+th { background:#eaf1f6; text-align:left; position:sticky; top:0; z-index:1; }
+tr:nth-child(even) { background:#f8fafb; }
+caption,.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+details { border:1px solid var(--line); padding:.6rem 1rem; border-radius:5px; margin:1rem 0; }
+summary { cursor:pointer; font-weight:600; }
+.table-tools { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:.6rem; background:#f4f7f9; }
+.table-tools input { font:inherit; border:1px solid #afc0ce; border-radius:4px; padding:.3rem .5rem; width:min(100%,22rem); min-width:0; }
+.note,.source-link,footer { color:var(--muted); font-size:.85rem; }
+.source-link { margin-top:2rem; }
+.archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
+footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
+svg { max-width:100%; height:auto; }
+:target { scroll-margin-top:1rem; }
+.skip-link { position:absolute; left:-10000px; }
+.skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
+@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+</style></head>
+<body>
+<a class="skip-link" href="#docs-content">Skip to content</a>
+<header><strong>egg-solver</strong><nav aria-label="Documentation"><a href="../index.html">Home</a>
+<a href="../guide/OVERVIEW.html">Learn</a>
+<a href="../comparisons/index.html">Benchmarks</a>
+<a href="../performance/index.html">Performance</a>
+<a href="../safety/index.html">Safety</a>
+<a href="../history/index.html">History</a>
+<a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<main id="docs-content"><h1 id="user-guide">User guide</h1>
+<p><a href="../index.html">Documentation</a> · <a href="../guide/QUICKSTART.html">Quick start</a> · <a href="../comparisons/index.html">Benchmarks</a></p>
+<p>Commands below run from the project root. The examples use the executables under <code>target/release/</code>. Every binary has <code>--help</code>; use it for the complete option list.</p>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#build">Build</a></li><li><a href="#choose-and-generate-a-table">Choose and generate a table</a></li><li><a href="#solve-scrambles">Solve scrambles</a></li><li><a href="#tune-and-benchmark">Tune and benchmark</a></li><li><a href="#table-files">Table files</a></li><li><a href="#shared-memory-on-linux">Shared memory on Linux</a></li><li><a href="#portable-builds">Portable builds</a></li><li><a href="#webassembly">WebAssembly</a></li><li><a href="#development-and-publishing">Development and publishing</a></li></ul></details>
+<h2 id="build">Build</h2>
+<pre><code class="language-sh">cargo build --release --locked
+</code></pre>
+<p>The default x86 release targets the build machine's CPU. Build on the machine that will run the program, or choose a <a href="#portable-builds">portable target</a>. The library can be built without the CLI dependencies using <code>--no-default-features</code>.</p>
+<p><a id="running-on-a-laptop"></a></p>
+<h2 id="choose-and-generate-a-table">Choose and generate a table</h2>
+<p>See <a href="../guide/OVERVIEW.html#tables-and-memory">table sizes</a>. Choose a table that fits available RAM with room for the process and operating system. Generation and solve speed depend on CPU, memory and storage; server measurements are not laptop performance predictions.</p>
+<pre><code class="language-sh">mkdir -p tables
+target/release/gen 7 auto tables/h7
+target/release/gen check tables/h7
+</code></pre>
+<p><code>auto</code> chooses the program's recommended compression base. The base changes pruning bounds, not data capacity. Generate once and reuse the file. The <code>--parts N</code> option generates row ranges sequentially to reduce peak memory in depth-first generation; it does not apply to h11's BFS generation. Memory and disk preflight checks run before generation.</p>
+<h2 id="solve-scrambles">Solve scrambles</h2>
+<pre><code class="language-sh"># One cube, using all selected threads:
+target/release/solve --fast --table tables/h7 &quot;R U R' U' F2&quot;
+# The same scramble from stdin:
+printf '%s\n' &quot;R U R' U' F2&quot; | target/release/solve --fast --table tables/h7
+# Batch: one scramble per input line:
+target/release/solve --table tables/h7 &lt; testdata/random_state.txt
+# Complete one cube before starting the next:
+target/release/solve --table tables/h7 -c 1 &lt; testdata/random_state.txt
+</code></pre>
+<p><code>--fast</code> requires an explicit <code>--table</code>. It does not search directories for tables. With no scramble arguments it reads exactly one nonblank stdin line. Empty input is an error, not a request for a random cube. An explicitly supplied empty scramble argument represents the solved cube. Warm-up is optional: <code>--warmup SCRAMBLE</code> adds one solve before the measured solve.</p>
+<div class="table-wrap" role="region" aria-label="Solve scrambles" tabindex="0"><table id="docs-table-1"><caption>Solve scrambles</caption>
 <thead>
-<tr><th>RAM</th><th>table</th><th align="right">size</th><th align="right">generation</th><th align="right">cubes/s, 1 core</th><th align="right">cubes/s, 8 cores</th></tr>
+<tr><th>Option</th><th>Meaning</th></tr>
 </thead>
 <tbody>
-<tr><td>4 GB</td><td>h6</td><td align="right">1.8 GiB</td><td align="right">40 s</td><td align="right">1.2</td><td align="right">9.3</td></tr>
-<tr><td>8 GB</td><td>h7</td><td align="right">3.6 GiB</td><td align="right">1 min</td><td align="right">2.2</td><td align="right">17</td></tr>
-<tr><td>16 GB</td><td>h8</td><td align="right">7.3 GiB</td><td align="right">5.5 min</td><td align="right">4.0</td><td align="right">29</td></tr>
-<tr><td>32 GB</td><td>h9</td><td align="right">14.5 GiB</td><td align="right">~7 min</td><td align="right">~7.5 (est.)</td><td align="right">~55 (est.)</td></tr>
-<tr><td>64 GB</td><td>h10</td><td align="right">29 GiB</td><td align="right">~9 min</td><td align="right">~14 (est.)</td><td align="right">~105 (est.)</td></tr>
-<tr><td>96+ GB</td><td>h11</td><td align="right">58 GiB</td><td align="right">~25 min</td><td align="right">25.6</td><td align="right">197</td></tr>
+<tr><td><code>-t N</code> / <code>--threads N</code></td><td>Worker threads; default is the program's detected thread count</td></tr>
+<tr><td><code>-l N</code> / <code>--lanes N</code></td><td>Interleaved contexts per worker; otherwise use a matching tune record or table-dependent default</td></tr>
+<tr><td><code>-c 0</code></td><td>Allow the complete input batch in progress; the default</td></tr>
+<tr><td><code>-c 1</code></td><td>Complete one input before starting the next; workers still cooperate within a cube</td></tr>
+<tr><td><code>-n N</code></td><td>Read at most N scrambles in batch mode</td></tr>
+<tr><td><code>--json</code></td><td>Per-cube JSON and a batch total; <code>--fast</code> emits one JSON result</td></tr>
+<tr><td><code>-v</code></td><td>Loading and configuration diagnostics on stderr</td></tr>
 </tbody>
 </table></div>
-<p>Measured on 8 cores of a Zen 5 server (one L3 domain, about a laptop's
-worth): generation including writing the file to a slow disk (~140 MB/s),
-and solves of random positions per second (an average: the hardest
-positions take several times longer than typical ones). h9 and h10 are
-estimates: their speeds follow the measured h8 -&gt; h11 trend, and their
-generation costs about h8's plus the writing (h9 was generated here in 4
-parts, in 13 minutes). h11 is generated differently (by BFS), needs its 58
-GiB of RAM to generate too, and takes 4.4 minutes on 48 cores.</p>
-<p>An 8-12 core Apple M-series laptop should be in the same range: its cores
-are about as fast on this kind of code (expect within a factor of ~1.5
-either way). The table must fit in RAM: one that does not is read from
-disk on every miss, hundreds of times slower.</p>
-<p>Build (tuned for the CPU you build on; on Apple Silicon this uses NEON):</p>
-<pre><code class="language-sh">cargo build --release
+<p>Batch mode also accepts a positional table path. <code>EGG_SOLVER_TABLE</code> can supply it in batch mode, and <code>EGG_SOLVER_THREADS</code> can supply the thread count. <code>--fast</code> still requires a command-line <code>--table</code>.</p>
+<p>Search timing excludes table loading. The batch total measures completion of the whole batch; individual cube durations can overlap. See <a href="../comparisons/METHODS.html">timing definitions</a> before interpreting them as throughput.</p>
+<h2 id="tune-and-benchmark">Tune and benchmark</h2>
+<pre><code class="language-sh">target/release/bench tables/h7 tune
+target/release/bench --help
 </code></pre>
-<p>Generate a table once (<code>auto</code> picks the best base value for the size). It
-needs about the table's size in RAM plus 0.3 GB; <code>--parts 2</code> halves that,
-at up to twice the time:</p>
-<pre><code class="language-sh">mkdir -p ~/cube-tables
-target/release/gen 8 auto ~/cube-tables/h8
+<p>The tune command writes a <code>&lt;TABLE&gt;.tune</code> record for its measured configurations. <code>solve</code> and <code>bench</code> use a matching record unless <code>-l</code> is explicit. The built-in lane candidates end at 48, but explicit larger lane values are supported. Tuning a stream does not guarantee the best finite-batch or single-cube setting. The <a href="../performance/PARALLELISM.html">measured lane study</a> explains that distinction.</p>
+<p>The historical positional benchmark syntax remains supported. Use <code>bench --help</code> and each subcommand's help for named syntax, warm-up and measurement windows. Record the actual command with benchmark output.</p>
+<h2 id="table-files">Table files</h2>
+<p>A table has pruning data and a 4 KiB metadata trailer containing k, base, distribution and checksum. Padding can separate data and trailer. <code>gen check TABLE</code> verifies stored integrity; a checksum alone does not prove that every bound is admissible.</p>
+<div class="table-wrap" role="region" aria-label="Table files" tabindex="0"><table id="docs-table-2"><caption>Table files</caption>
+<thead>
+<tr><th>Load mode</th><th>Storage used during search</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td><code>--load copy</code></td><td>Private RAM populated before searching</td><td>Does not keep reading the original file for lookups; still requires enough physical RAM</td></tr>
+<tr><td><code>--load map</code></td><td>Read-only file mapping</td><td>Resident hugetlbfs data is RAM-backed; an ordinary file mapping can fault pages from disk</td></tr>
+<tr><td><code>--load shm</code> / <code>--shm</code></td><td>Linux System V shared-memory segment</td><td>Reuse an existing segment or create one from the file</td></tr>
+<tr><td><code>--load auto</code></td><td>Existing matching shared segment; otherwise the platform default</td><td>On Linux: map RAM-backed files, copy ordinary files; otherwise follow the platform default</td></tr>
+</tbody>
+</table></div>
+<p><code>EGG_SOLVER_LOAD</code> sets the mode. Mapping and shared-memory storage must remain unchanged while the solver uses it. Prefaulting touches mapped/shared pages at startup; <code>--prefault 0</code> defers that work until first use. Prefaulting is not a guarantee that an ordinary mapping can never be paged out.</p>
+<p>The 1 GiB-page benchmark policy describes those recorded experiments. It is not a requirement to reserve huge pages for the small quick-start example.</p>
+<h2 id="shared-memory-on-linux">Shared memory on Linux</h2>
+<pre><code class="language-sh">target/release/solve --shm-load tables/h7
+target/release/solve --shm --table tables/h7 &lt; testdata/random_state.txt
+target/release/solve --shm-remove tables/h7
 </code></pre>
-<p>Before it starts, <code>gen</code> checks that the disk (on hugetlbfs: the free huge
-pages) and the memory are enough, and stops with the numbers if not
-(<code>--force</code> skips the checks); <code>solve</code> and <code>bench</code> check the memory before
-they copy a table into it.</p>
-<p>Optionally tune the lanes per thread for your machine (about two minutes;
-saved next to the table as <code>h8.tune</code>, used by <code>solve</code> and <code>bench</code>):</p>
-<pre><code class="language-sh">target/release/bench ~/cube-tables/h8 tune
+<p>A segment persists until removal or reboot. An existing matching segment avoids reloading the table into a fresh private allocation. Metadata is checked on attachment; a mismatched segment is rejected by explicit shared mode. Keep the segment and table immutable during use.</p>
+<p><code>--shm-pages 1g</code> requests only 1 GiB pages and fails if unavailable. The default page preference is <code>1g,2m,4k</code>; <code>-v</code> reports the selected size and fallback reasons. Huge-page allocation needs both permission (the configured huge-page group or <code>CAP_IPC_LOCK</code>) and enough free reserved pages. The program's preflight reports relevant limits. <code>--shm-key</code> selects another segment key when needed.</p>
+<p><code>ipcs -m</code> lists segments. Removal releases memory after the last process detaches. These system settings depend on the host; read the loader's diagnostic before changing them.</p>
+<h2 id="portable-builds">Portable builds</h2>
+<p>On x86, replace the native target flags to build for another CPU:</p>
+<pre><code class="language-sh">RUSTFLAGS=&quot;-C target-cpu=x86-64-v4&quot; cargo build --release --locked
+RUSTFLAGS=&quot;-C target-cpu=x86-64-v3&quot; cargo build --release --locked
+RUSTFLAGS=&quot;-C target-cpu=x86-64&quot; cargo build --release --locked
+cargo build --release --locked --target aarch64-apple-darwin
 </code></pre>
-<p>Solve scrambles from stdin, one per line:</p>
-<pre><code class="language-sh">echo &quot;R U R' U' F2 D L2&quot; | target/release/solve ~/cube-tables/h8
-target/release/solve ~/cube-tables/h8 &lt; testdata/random_state.txt
-</code></pre>
-<p>The default solves the whole input as a batch on all cores (highest
-throughput); <code>solve -c 1</code> solves one cube at a time with all cores (lowest
-latency), <code>-t</code> sets the threads.</p>
-<p>Solve one supplied scramble with all selected threads. <code>--table</code> is required;
-no directories are searched. With no scramble arguments, exactly one nonblank
-line is read from stdin. Empty input is an error before loading a table.</p>
-<pre><code class="language-sh">target/release/solve --fast --table tables/h7 &quot;R U R' U' F2&quot;
-printf '%s\n' &quot;R U R' U' F2&quot; | target/release/solve --fast --table tables/h7
-</code></pre>
-<p>Warm-up solves are disabled by default. <code>--warmup SCRAMBLE</code> explicitly adds
-one; reported solve time excludes table loading and that optional warm-up.</p>
-<p>Every binary has <code>--help</code> and <code>--version</code>. <code>--json</code> prints JSON lines
-(<code>solve</code>: one per cube, then the total; <code>bench</code>; <code>gen check</code>). <code>-v</code> logs to
-stderr how the table was loaded (map or copy, page sizes) and the threads
-and lanes (<code>RUST_LOG=debug</code> for more). In batch mode the table can also come from
-<code>EGG_SOLVER_TABLE</code> (with <code>--fast</code>, use <code>--table</code> explicitly), the threads from <code>EGG_SOLVER_THREADS</code>. <code>bench</code> has
-subcommands (<code>bench stream|batch|tune &lt;table&gt; ...</code>, see <code>bench --help</code>); its
-positional form (<code>bench &lt;table&gt; stream 20 30 48</code>) still works. Shell
-completions: e.g. <code>solve --completions bash</code> (or zsh, fish, elvish,
-powershell). The binaries need the default <code>cli</code> feature; the library
-builds without it (<code>default-features = false</code>).</p>
-<h3 id="table-files">Table files</h3>
-<p>A table file holds the table data, then a 4 KiB trailer (k, base,
-distribution, checksum): <code>gen check &lt;table&gt;</code> verifies a table against it.
-Tables are the same on every machine and backend: you can generate one on a
-big machine and copy it. <code>--load map|copy|shm</code> (or <code>EGG_SOLVER_LOAD</code>) sets how
-a table is loaded (map the file, copy it into memory with transparent huge
-pages, or attach its shared memory segment, below; the default is the
-table's segment if there is one, else copy on Linux, map elsewhere), and
-<code>--prefault 0</code> (or <code>EGG_SOLVER_PREFAULT=0</code>; with map and shm) reads pages on
-first use instead of the whole table at start.</p>
-<h3 id="shared-memory">Shared memory</h3>
-<p>As with vcube's <code>--shm</code>, a table can be loaded once into a System V shared
-memory segment, which stays in memory after the process exits (until reboot
-or until it is removed); later runs attach it read-only and start at once
-(Linux only). h7 attaches in 0.00 s on 1 GiB pages, against 28 s to copy it
-from a ~140 MB/s disk, and solves as fast as from a hugetlbfs map of the
-same table:</p>
-<pre><code class="language-sh">solve --shm-load tables/h8           # make the segment from the file (or check it), and exit
-solve tables/h8 &lt; scrambles          # attaches it (the default --load auto does)
-solve --shm tables/h8 &lt; scrambles    # the same; makes the segment first if there is none
-solve --shm-remove tables/h8         # remove it (as ipcrm -M KEY)
-</code></pre>
-<p><code>--shm</code> (the same as <code>--load shm</code>, or <code>EGG_SOLVER_LOAD=shm</code>) also works with
-<code>bench</code> and <code>egg-solver</code>; <code>--load map</code> and <code>--load copy</code> never use a segment.</p>
-<ul>
-<li>
-<p><strong>Keys:</strong> ASCII &quot;co&quot; (<code>0x636f</code>), then the table's k and base, a byte each:
-<code>ipcs -m</code> lists h7 base 9 as <code>0x636f0709</code>, h11 base 10 as <code>0x636f0b0a</code>.
-<code>--shm-key</code> (or <code>EGG_SOLVER_SHM_KEY</code>) sets another, e.g. for two tables of the
-same k and base.</p>
-</li>
-<li>
-<p><strong>Checked on every attach:</strong> a segment holds the file's bytes, and in its
-last 4 KiB the file's trailer (k, base, size, distribution, checksum),
-written last, once the copy's checksum is checked. Each run compares it
-with the table file's trailer: a segment of another table under the key
-(say an older table of the same k and base) is refused by <code>--shm</code>, with how
-to remove it, and passed over by <code>auto</code>, which loads the file. A segment
-whose load was interrupted has no trailer: <code>--shm</code> removes it and loads
-again (or waits while another process is loading it). The table needs a
-checksum in its trailer (<code>gen stamp</code> adds one). A loaded segment is
-read-only: <code>ipcs -m</code> shows perms <code>400</code> (<code>600</code> while loading).</p>
-</li>
-<li>
-<p><strong>Pages:</strong> a new segment gets 1 GiB pages, else 2 MiB, else 4 KiB pages
-(<code>--shm-pages 1g,2m,4k</code>, or <code>EGG_SOLVER_SHM_PAGES</code>); <code>-v</code> logs which, and why
-larger ones could not be had. On 4 KiB pages the search is much slower
-(h7: 27% fewer solves/s at 1 thread, 32% at 48 threads, than on 1 GiB
-pages; attaching maps 0.95 million pages, 0.6 s), and every run warns. Huge-page segments need, once (root):</p>
-<ol>
-<li>the permission, which is what enables 1 GiB and 2 MiB segments: a
-group of yours in <code>vm.hugetlb_shm_group</code>, e.g. <code>sudo sysctl vm.hugetlb_shm_group=$(id -g)</code> (a file in <code>/etc/sysctl.d</code> keeps it after
-reboot), or CAP_IPC_LOCK. Without it the kernel refuses (EPERM; older
-kernels also allowed them within the memlock limit, <code>ulimit -l</code>: kernel
-7.0 on the test server refused even 2 MiB with an 11.8 GiB limit);</li>
-<li>free pages in the kernel's hugetlb pool: <code>echo N | sudo tee /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages</code> for 1 GiB
-pages (most reliably reserved at boot: <code>hugepagesz=1G hugepages=N</code>), or
-<code>hugepages-2048kB</code> for 2 MiB pages.</li>
-</ol>
-<p>A segment on 4 KiB pages gets transparent huge pages where
-<code>/sys/kernel/mm/transparent_hugepage/shmem_enabled</code> is <code>advise</code> (not tried
-here: it is <code>never</code> on the test server).</p>
-</li>
-<li>
-<p><strong>Preflight:</strong> before it copies anything, <code>--shm</code> checks the segment
-against <code>kernel.shmmax</code> (bytes per segment), <code>kernel.shmall</code> (pages in all
-segments) and <code>kernel.shmmni</code>, then the permission and the pool's free
-pages for huge pages, or free memory for 4 KiB pages (as for a copy), and
-says what to raise. A run that attaches a segment needs no free memory.</p>
-</li>
-<li>
-<p><strong>Persistence:</strong> a segment stays until reboot or removal, also when no
-process uses it. <code>ipcs -m</code> lists segments; <code>solve --shm-remove TABLE</code> or
-<code>ipcrm -M 0x636f0709</code> removes one (its memory is freed when the last
-process detaches).</p>
-</li>
-</ul>
-<pre><code class="language-text">$ solve --shm-load /mnt/huge/h7
-segment 0x636f0709 shmid 42: h7 base 9, 4.00 GiB on 1 GiB pages, made from /mnt/huge/h7 in 0.10s
-$ ipcs -m
------- Shared Memory Segments --------
-key        shmid      owner      perms      bytes      nattch     status
-0x636f0709 42         super      400        4294967296 0
-</code></pre>
-<h3 id="portable-builds">Portable builds</h3>
-<p><code>target-cpu=native</code> (in <code>.cargo/config.toml</code>, x86 only) builds for the CPU
-of the build machine. For binaries that run on other machines:</p>
-<pre><code class="language-sh">RUSTFLAGS=&quot;-C target-cpu=x86-64-v4&quot; cargo build --release  # x86 with AVX-512
-RUSTFLAGS=&quot;-C target-cpu=x86-64-v3&quot; cargo build --release  # x86 with AVX2 + BMI2
-RUSTFLAGS=&quot;-C target-cpu=x86-64&quot; cargo build --release     # any x86-64 (portable backend)
-cargo build --release --target aarch64-apple-darwin        # Apple Silicon (NEON)
-cargo build --release --features scalar                    # the scalar backend, any target
-</code></pre>
+<p>The targets above require AVX-512-class features, AVX2/BMI2-class features, baseline x86-64, or Apple Silicon respectively. Cross-compilation also needs the target toolchain and linker. The portable fallback is available through the library's <code>scalar</code> feature for correctness/backend checks.</p>
 <h2 id="webassembly">WebAssembly</h2>
-<p>The solver also compiles to WebAssembly (SIMD128) and runs in browsers and
-in <a href="https://bun.sh">Bun</a> (tested: 1.4.4): the same search on the same table
-files, with the same solutions and node counts as natively, about 5.7 times
-slower than the native x86 build (see &quot;Speed&quot;).</p>
-<h3 id="build">Build</h3>
 <pre><code class="language-sh">rustup target add wasm32-wasip1 wasm32-wasip1-threads
 wasm/build.sh
 </code></pre>
-<p>This makes <code>wasm/dist/egg-solver.wasm</code> (one thread; runs anywhere) and
-<code>wasm/dist/egg-solver-threads.wasm</code> (threads, see below), ~380 KB each. Both
-are WASI modules with a small C ABI (<code>wasm/src/lib.rs</code>); <code>wasm/egg-solver.mjs</code>
-wraps them for JavaScript and provides the few WASI functions they import,
-so neither a WASI runtime nor wasm-bindgen is needed.</p>
+<p>This creates <code>wasm/dist/egg-solver.wasm</code> and <code>egg-solver-threads.wasm</code>. The wrapper supplies the required WASI interface for browsers and Bun:</p>
 <pre><code class="language-js">import { EggSolver } from './wasm/egg-solver.mjs';
 const solver = await EggSolver.create({ wasm: 'wasm/dist/egg-solver.wasm' });
-await solver.loadTable('h6');             // a path (Bun), URL, File or bytes
-// or: await solver.generateTable(4, 8);   // h4 base 8, made in the module
-solver.solve(&quot;R U R' U' F2 D L2&quot;);         // { moves, length, nodes, lookups, seconds }
-solver.solve('UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB');  // facelets
-solver.solveMany(cubes);                   // many cubes, for throughput
+await solver.loadTable('h6');
+// Or generate a small table with the recommended base:
+// await solver.generateTable(4);
+solver.solve(&quot;R U R' U' F2&quot;);
 </code></pre>
-<p>A cube is a scramble or a facelet string: 54 stickers, face by face in the
-order U R F D L B, each face row by row as seen from outside (U with B at
-the top, D with F at the top, the others with U at the top), any six
-symbols for the colors (as in Kociemba's solvers). <code>solve</code> puts all lanes
-(and threads) on one cube; <code>solveMany</code> gives each lane its own cube.</p>
-<p><code>egg-solver.mjs</code> uses web APIs only (Worker, fetch, Blob, Atomics), plus Bun's
-<code>Bun.file</code> for local paths, so the same file serves browsers and Bun.</p>
+<p><code>solve</code> puts the selected workers on one cube; <code>solveMany</code> uses independent cube lanes. Inputs can be scrambles or 54-sticker facelet strings in U R F D L B face order, each face viewed from outside. The wrapper's facelet parser checks the representation.</p>
 <h3 id="bun">Bun</h3>
-<pre><code class="language-sh">bun wasm/demo.mjs --table ~/cube-tables/h6 &lt; testdata/random_state.txt
-bun wasm/demo.mjs --gen 4:8 --random 5:1             # h4 base 8, 5 random states
-bun wasm/demo.mjs --table ~/cube-tables/h6 --threads 8 &lt; scrambles.txt
-bun wasm/demo.mjs --table ~/cube-tables/h6 --batch &lt; scrambles.txt   # throughput
+<pre><code class="language-sh">bun wasm/demo.mjs --table tables/h6 &lt; testdata/random_state.txt
+bun wasm/demo.mjs --table tables/h6 --threads 8 --batch &lt; scrambles.txt
 </code></pre>
 <h3 id="browser">Browser</h3>
-<pre><code class="language-sh">bun wasm/serve.mjs --tables ~/cube-tables    # then open http://localhost:8000/
+<pre><code class="language-sh">bun wasm/serve.mjs --tables tables
 </code></pre>
-<p><code>wasm/index.html</code> generates h0..h4 in the page or loads a table file (file
-picker, or a URL such as <code>/tables/h6</code>), and solves scrambles, facelet
-strings or random states, in plain web JavaScript (<code>demo-worker.mjs</code>,
-<code>egg-solver.mjs</code>). Any static server works for one thread; <code>serve.mjs</code> (a
-<code>Bun.serve</code> server) also sends the headers the threads build needs.</p>
+<p>Open the local URL printed by the server. The page can generate h0–h4 or load a compatible table. Its recommended h4 option uses base 9; the explicit base-8 option trades weaker search pruning for faster generation. <a href="../comparisons/TABLE_ANALYSIS.html">The h4 study</a> records that tradeoff.</p>
 <h3 id="tables">Tables</h3>
-<p>wasm32 has at most 4 GiB of memory, for the table and everything else
-(tens of MB; ~0.2 GB with 8 threads). Each table allocation must also fit below
-Rust's <code>isize::MAX</code> limit (2 GiB on wasm32), so h0 through h6 are supported;
-h7 is rejected. Small tables can be generated in the module; larger ones are made
-by the native <code>gen</code> (see &quot;Running on a laptop&quot;) and loaded from the file.
-Time per random-state cube, one at a time, mean and median of 10 cubes
-(h4: 5), on Zen 5 cores (8 threads: one L3 domain), in V8 (Chrome's engine;
-measured in Node 26) and in Bun (JavaScriptCore, Safari's engine):</p>
-<div class="table-wrap"><table>
-<thead>
-<tr><th>table</th><th align="right">size</th><th>runs in</th><th>made by</th><th>1 thread: V8</th><th>1 thread: Bun</th><th>8 threads: V8</th><th>8 threads: Bun</th></tr>
-</thead>
-<tbody>
-<tr><td>h0..h3</td><td align="right">≤ 0.2 GiB</td><td>any browser</td><td>the module: h0 in 2.5 s</td><td>short scrambles</td><td></td><td></td><td></td></tr>
-<tr><td>h4 base 8</td><td align="right">0.45 GiB</td><td>any browser</td><td>the module: 75 s (8 threads: 13 s)</td><td>21.6 s, 20.7 s</td><td></td><td></td><td></td></tr>
-<tr><td>h5</td><td align="right">0.9 GiB</td><td>desktop browsers</td><td><code>gen 5 auto</code></td><td>19.4 s, 10.3 s</td><td></td><td></td><td></td></tr>
-<tr><td>h6</td><td align="right">1.8 GiB</td><td>desktop browsers</td><td><code>gen 6 auto</code></td><td>12.6 s, 5.0 s</td><td>12.2 s, 4.9 s</td><td>1.6 s, 0.65 s</td><td>1.6 s, 0.65 s</td></tr>
-</tbody>
-</table></div>
-<p>Loading from a file takes seconds (from a local server into headless
-Chromium: h6 3-13 s; <code>verify</code> adds a checksum pass). The 4 GiB are
-the engine's limit for wasm32; a browser tab may allow less (mobile ones
-much less). h8 and larger would need memory64 (64-bit WebAssembly memory),
-which this build does not use.</p>
+<p>The wasm32 build supports h0–h6. Each Rust allocation must fit below <code>isize::MAX</code> (2 GiB), so h7 is rejected even though wasm32 has a larger overall address space. The table and the module's other allocations must also fit the host's memory limits. Large tables are normally generated with native <code>gen</code> and then loaded.</p>
 <h3 id="threads">Threads</h3>
-<p><code>egg-solver-threads.wasm</code> is built for <code>wasm32-wasip1-threads</code> (stable Rust):
-std threads work through wasi-threads, so the work-sharing mode (<code>solve</code>,
-all threads on one cube) and the stream mode (<code>solveMany</code>) run as natively.
-<code>egg-solver.mjs</code> implements wasi-threads' <code>thread-spawn</code> with a pool of
-workers (<code>egg-solver-thread.mjs</code>, Web Workers in browsers and in Bun) that
-share the module's memory. That needs <code>SharedArrayBuffer</code>:</p>
-<ul>
-<li>In browsers, a cross-origin isolated page, served with the headers
-<code>Cross-Origin-Opener-Policy: same-origin</code> and
-<code>Cross-Origin-Embedder-Policy: require-corp</code> (<code>serve.mjs</code> sends them).</li>
-<li>The solver must run in a worker, not on the page's main thread: a solve
-waits for its threads (<code>Atomics.wait</code>), which the main thread may not do.
-<code>index.html</code> runs it in <code>demo-worker.mjs</code>.</li>
-<li>Bun needs nothing special (its main thread may wait).</li>
-</ul>
-<p><code>EggSolver.create({ wasm, threads })</code> starts the pool once (threads + 1
-workers); a call then uses all of them. Other hosts must call the module's
-<code>_initialize</code> export once, on the main thread, before anything else (as
-<code>egg-solver.mjs</code> does): it sets up wasi-libc's record of the main thread,
-without which threads end up waiting forever.</p>
-<h3 id="speed">Speed</h3>
-<p>100 depth-17 cubes on h6 (14.8M nodes each), one thread, <code>solveMany</code> /
-<code>bench</code> batch mode, on one Zen 5 core:</p>
-<div class="table-wrap"><table>
-<thead>
-<tr><th>build</th><th align="right">time</th><th align="right">Mnodes/s</th></tr>
-</thead>
-<tbody>
-<tr><td>native x86 (AVX-512, <code>simd.rs</code>)</td><td align="right">21.7 s</td><td align="right">68</td></tr>
-<tr><td>wasm in wasmtime 44</td><td align="right">122 s</td><td align="right">12.2</td></tr>
-<tr><td>wasm in V8 (Node 26)</td><td align="right">124 s</td><td align="right">11.9</td></tr>
-<tr><td>wasm in Bun 1.4.4 (JavaScriptCore)</td><td align="right">127 s</td><td align="right">11.7</td></tr>
-</tbody>
-</table></div>
-<p>(NEON was only run under qemu here, which says nothing about speed.) Two
-things matter for wasm speed, both handled:</p>
-<ul>
-<li>No prefetch instruction: <code>prefetch::read_once</code> is a plain load there,
-which starts the cache miss just as well (+53% in wasmtime, +45% in V8).
-Lanes still pay off: 1 lane 200.6 s, 8 lanes 123.8 s, flat up to 64; the
-module uses 16.</li>
-<li>V8 (Chrome) starts new code in its baseline compiler and gives a function
-optimized code only from its next call: a long first solve would run
-slowly to its end (187.7 s instead of 129.5 s here). <code>loadTable</code> and
-<code>generateTable</code> therefore run a short warm-up (<code>warmUp</code>, ~0.6 s), and all
-exports share one copy of the search loop. JavaScriptCore (Bun, Safari)
-moves a running loop to optimized code: in Bun the warm-up is skipped
-(126.5 and 127.2 s without it, 127.0 and 127.9 s with it).</li>
-</ul>
-<p>With 8 threads (<code>egg-solver-threads.wasm</code>, one L3 domain), one cube at a time
-gets 7.2-7.8 times the one-thread speed (h6: 88.6 Mnodes/s in V8, 90.7 in
-Bun; in headless Chromium 0.63-0.66 s instead of 5.15 s for the same cube),
-and generating h4 base 8 takes 13 s instead of 75 s.</p>
-<h3 id="tests">Tests</h3>
-<p><code>scripts/check.sh</code> runs the library tests in wasm under wasmtime (v44 or older:
-later versions dropped wasi-threads; <code>WASMTIME=path</code>) and <code>wasm/test.mjs</code>
-(both modules in Bun), when installed. The node counts match native ones
-(h5, 20 random states: identical nodes, lookups and lengths in x86,
-scalar, wasmtime and V8; h6, 100 depth-17 cubes: the same in Bun).</p>
-<h3 id="compatibility-with-existing-installations">Compatibility with existing installations</h3>
-<p>Settings use <code>EGG_SOLVER_*</code>; the corresponding <code>CUBEOPT_*</code> names remain fallback aliases.
-An explicitly set modern name takes precedence. Existing table files and shared-memory
-segments remain readable, and pruning-table data does not need to be regenerated.</p>
-<h3 id="library-memory-safety-contracts">Library memory safety contracts</h3>
-<p><code>Cube::from_bytes</code>, symmetry-coordinate lookups, and <code>cube_from_edge_key</code>
-return <code>Option</code> for invalid input. Table and solver internals are exposed
-through read-only accessors. <code>H48Table::from_memory</code> checks the metadata
-and allocation size; <code>get</code> returns <code>None</code> for an invalid index.</p>
-<p><code>H48Table::open_copy</code> loads private RAM and is safe. APIs that can map files
-or attach shared segments are unsafe: the backing storage must remain
-unchanged and untruncated while the table exists. This includes changes by
-other processes. The command-line mapped/shared modes require the same
-condition; <code>--load copy</code> avoids that dependence after loading. File-backed
-generation requires exclusive access to its output paths.</p>
-<p>The current packed-coordinate and table encodings require a little-endian
-target. Big-endian builds are rejected at compile time.</p>
-</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>
+<p>Browser threads need <code>SharedArrayBuffer</code> and cross-origin isolation. The local server supplies the required COOP/COEP headers. The solver runs in a Web Worker because its thread waits cannot run on a browser's main thread. Without isolation, the page uses one thread; this includes standard GitHub Pages hosting. Bun supports the threaded wrapper without those HTTP headers.</p>
+<p>The wrapper initializes the module and worker pool. Other hosts must perform the module's required initialization before calling its C ABI. See <code>wasm/src/lib.rs</code> and the JavaScript wrapper when embedding it directly.</p>
+<p><a id="speed"></a></p>
+<h3 id="performance-records">Performance records</h3>
+<p>Historical V8/Bun timings, generation times and engine warm-up experiments are preserved in the <a href="USER_GUIDE_20261107.html#speed">dated reference</a>. They are not predictions for a current browser or laptop. <a href="../performance/index.html">Performance studies</a> indexes the measured native and WebAssembly evidence.</p>
+<h2 id="development-and-publishing">Development and publishing</h2>
+<p><a href="../guide/DEVELOPMENT.html">Development checks</a> covers checks, Miri and stress runs. <a href="../guide/PUBLISHING.html">Publishing</a> describes the Pages workflow and local site build. Shell completions are available through <code>--completions</code> (bash, zsh, fish, elvish and powershell).</p>
+
+<p class="source-link"><a href="USER_GUIDE.md">Markdown source</a></p></main>
+<footer><a href="../PROVENANCE.html">Sources and evidence scope</a></footer>
+<script>
+for (const wrapper of document.querySelectorAll('.table-wrap')) {
+  const table=wrapper.querySelector('table');
+  const rows=[...table.tBodies].flatMap(body=>[...body.rows]);
+  if(rows.length>50) wrapper.classList.add('long-table');
+  if(rows.length<=12) continue;
+  const tools=document.createElement('div'); tools.className='table-tools';
+  const label=document.createElement('label'); label.textContent='Filter this table';
+  const input=document.createElement('input'); input.type='search'; input.id=table.id+'-filter';
+  label.htmlFor=input.id; input.setAttribute('aria-controls',table.id);
+  const count=document.createElement('span'); count.className='note'; count.setAttribute('aria-live','polite');
+  count.textContent=rows.length+' rows';
+  input.addEventListener('input',()=>{
+    const query=input.value.trim().toLowerCase(); let shown=0;
+    for(const row of rows){row.hidden=!!query&&!row.textContent.toLowerCase().includes(query);if(!row.hidden)shown++;}
+    count.textContent=shown+' of '+rows.length+' rows';
+  });
+  tools.append(label,input,count); wrapper.before(tools);
+}
+function revealTarget(){
+  let id;try{id=decodeURIComponent(location.hash.slice(1));}catch{return;}
+  const target=document.getElementById(id);if(!target)return;
+  for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+}
+revealTarget(); window.addEventListener('hashchange',revealTarget);
+</script>
+</body></html>

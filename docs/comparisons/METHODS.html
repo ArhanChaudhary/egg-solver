@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reading the benchmark tables — egg-solver</title><style>
+:root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
+header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
+header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
+header a { color:#d9f0ff; }
+header a[aria-current] { color:white; text-decoration-thickness:3px; }
+main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+h1 { margin-top:0; font-size:2rem; line-height:1.25; }
+h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
+h3 { margin-top:1.5rem; }
+a { color:var(--accent); overflow-wrap:anywhere; }
+p,li { max-width:90ch; }
+code { background:#eff3f6; border-radius:3px; padding:.1em .25em; overflow-wrap:anywhere; font-size:.9em; }
+pre { max-width:100%; padding:1rem; background:#eef3f6; overflow:auto; line-height:1.45; }
+pre code { background:none; padding:0; overflow-wrap:normal; }
+.table-wrap { max-width:100%; overflow:auto; margin:1rem 0 1.5rem; border:1px solid var(--line); }
+.table-wrap.long-table { max-height:70vh; }
+table { width:100%; border-collapse:collapse; font-size:.9rem; font-variant-numeric:tabular-nums; }
+th,td { padding:.55rem .65rem; border:1px solid var(--line); vertical-align:top; overflow-wrap:normal; }
+th { background:#eaf1f6; text-align:left; position:sticky; top:0; z-index:1; }
+tr:nth-child(even) { background:#f8fafb; }
+caption,.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+details { border:1px solid var(--line); padding:.6rem 1rem; border-radius:5px; margin:1rem 0; }
+summary { cursor:pointer; font-weight:600; }
+.table-tools { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:.6rem; background:#f4f7f9; }
+.table-tools input { font:inherit; border:1px solid #afc0ce; border-radius:4px; padding:.3rem .5rem; width:min(100%,22rem); min-width:0; }
+.note,.source-link,footer { color:var(--muted); font-size:.85rem; }
+.source-link { margin-top:2rem; }
+.archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
+footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
+svg { max-width:100%; height:auto; }
+:target { scroll-margin-top:1rem; }
+.skip-link { position:absolute; left:-10000px; }
+.skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
+@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+</style></head>
+<body>
+<a class="skip-link" href="#docs-content">Skip to content</a>
+<header><strong>egg-solver</strong><nav aria-label="Documentation"><a href="../index.html">Home</a>
+<a href="../guide/OVERVIEW.html">Learn</a>
+<a href="index.html">Benchmarks</a>
+<a href="../performance/index.html">Performance</a>
+<a href="../safety/index.html">Safety</a>
+<a href="../history/index.html">History</a>
+<a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<main id="docs-content"><h1 id="reading-the-benchmark-tables">Reading the benchmark tables</h1>
+<p><a href="index.html">Benchmarks</a> · <a href="../BENCHMARK_CATALOG.html">Benchmark catalog</a></p>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#choose-the-metric-first">Choose the metric first</a></li><li><a href="#units-and-configuration">Units and configuration</a></li><li><a href="#samples-and-variation">Samples and variation</a></li><li><a href="#historical-matrix-notation">Historical matrix notation</a></li><li><a href="#scope-of-the-claims">Scope of the claims</a></li></ul></details>
+<h2 id="choose-the-metric-first">Choose the metric first</h2>
+<div class="table-wrap" role="region" aria-label="Choose the metric first" tabindex="0"><table id="docs-table-1"><caption>Choose the metric first</caption>
+<thead>
+<tr><th>Metric</th><th>Calculation</th><th>Better direction</th><th>What it answers</th></tr>
+</thead>
+<tbody>
+<tr><td>Complete-batch throughput</td><td>Cubes completed ÷ batch wall seconds</td><td>Higher</td><td>How quickly does the complete workload finish?</td></tr>
+<tr><td>Batch time per cube</td><td>Batch wall seconds ÷ cubes</td><td>Lower</td><td>The throughput-equivalent cost per cube; not an individual cube's response time</td></tr>
+<tr><td>Single-cube latency</td><td>Elapsed time for that cube</td><td>Lower</td><td>How long does one solve take?</td></tr>
+<tr><td>Normalized worker time</td><td>Sum of cube durations ÷ workers ÷ cubes</td><td>Lower</td><td>A harness normalization; does not include idle time at the end of a batch</td></tr>
+</tbody>
+</table></div>
+<p>The newest nissy study uses complete-batch wall time. Some older nxopt/vcube studies use normalized worker time. Do not invert the latter and label it a measured end-to-end completion rate.</p>
+<p>For throughput, <strong>egg rate advantage = egg solves/s ÷ competitor solves/s</strong>. With identical batch sizes this also equals competitor batch time ÷ egg batch time. For latency, an advantage uses competitor time ÷ egg time. A value above 1 favors egg; the table must still identify the metric and measured source.</p>
+<h2 id="units-and-configuration">Units and configuration</h2>
+<div class="table-wrap" role="region" aria-label="Units and configuration" tabindex="0"><table id="docs-table-2"><caption>Units and configuration</caption>
+<thead>
+<tr><th>Label</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td>MB / GB</td><td>Decimal: 1,000,000 / 1,000,000,000 bytes</td></tr>
+<tr><td>MiB / GiB</td><td>Binary: 1,048,576 / 1,073,741,824 bytes</td></tr>
+<tr><td>h6, h10, etc.</td><td>H48 table setting; implementations can have different layouts and byte sizes at the same h</td></tr>
+<tr><td>Table data</td><td>Logical pruning bytes, excluding metadata and page padding</td></tr>
+<tr><td>Mapped table RAM</td><td>Allocation rounded to the actual page size; excludes the solver's other memory</td></tr>
+<tr><td>Worker / thread</td><td>An operating-system execution thread; a cube-worker process can use several threads</td></tr>
+<tr><td>Lane</td><td>Interleaved search state within a worker; not a CPU core</td></tr>
+<tr><td>1 GiB pages</td><td>Explicit huge pages backing the table, with coverage checked for the run</td></tr>
+<tr><td>THP</td><td>Transparent huge pages; historical coverage can be partial</td></tr>
+</tbody>
+</table></div>
+<p>For example, the same 486,420,480 bytes are 486.42 MB or 463.89 MiB. A different displayed unit does not establish a stronger table.</p>
+<h2 id="samples-and-variation">Samples and variation</h2>
+<p>Three runs of the same 500 states are <strong>1,500 solves of 500 distinct states</strong>. A median over fresh processes, a range over repeated groups in one process, and an interval over different cubes describe different variation. They are not interchangeable confidence estimates.</p>
+<p>The tables identify whether loading, generation, warm-up, result verification and output are timed. A resident-table search result does not predict cold startup time. Node counts can change with parallel stop timing and search order, even when all returned optimal lengths agree.</p>
+<h2 id="historical-matrix-notation">Historical matrix notation</h2>
+<p>The dated detailed matrix retains its original numbers and compact notation:</p>
+<div class="table-wrap" role="region" aria-label="Historical matrix notation" tabindex="0"><table id="docs-table-3"><caption>Historical matrix notation</caption>
+<thead>
+<tr><th>Historical label</th><th>Read it as</th></tr>
+</thead>
+<tbody>
+<tr><td>1T / 48T</td><td>One / 48 configured worker threads, except explicitly capped competitors</td></tr>
+<tr><td>1G</td><td>1 GiB table pages</td></tr>
+<tr><td><code>sec/solv</code></td><td>Seconds per cube under that section's timing formula</td></tr>
+<tr><td><code>median [min–max, repeats]</code></td><td>Median and observed range over the stated repeats</td></tr>
+<tr><td><code>±…%</code> at 1T</td><td>The report's interval over sampled cube times; not run-to-run variation</td></tr>
+<tr><td>GB·s</td><td>Decimal table GB × the section's seconds-per-cube value</td></tr>
+<tr><td><code>size</code></td><td>Competitor table size divided by the paired egg table size</td></tr>
+<tr><td><code>shipped</code>, <code>native</code>, <code>pgo</code>, <code>pf…</code></td><td>Historical build labels; see the matrix's build-screen section and raw metadata</td></tr>
+</tbody>
+</table></div>
+<h2 id="scope-of-the-claims">Scope of the claims</h2>
+<p>A result describes the stated CPU, source, executable, table, input bytes and timing boundary. It does not establish a universal fastest solver. In particular, an unidentified current Mac cubeopt release cannot be substituted for the supplied older Linux executable. Correct replay and matching known optimal lengths are checks on the tested inputs, not a proof about every program execution.</p>
+
+<p class="source-link"><a href="METHODS.md">Markdown source</a></p></main>
+<footer><a href="../PROVENANCE.html">Sources and evidence scope</a></footer>
+<script>
+for (const wrapper of document.querySelectorAll('.table-wrap')) {
+  const table=wrapper.querySelector('table');
+  const rows=[...table.tBodies].flatMap(body=>[...body.rows]);
+  if(rows.length>50) wrapper.classList.add('long-table');
+  if(rows.length<=12) continue;
+  const tools=document.createElement('div'); tools.className='table-tools';
+  const label=document.createElement('label'); label.textContent='Filter this table';
+  const input=document.createElement('input'); input.type='search'; input.id=table.id+'-filter';
+  label.htmlFor=input.id; input.setAttribute('aria-controls',table.id);
+  const count=document.createElement('span'); count.className='note'; count.setAttribute('aria-live','polite');
+  count.textContent=rows.length+' rows';
+  input.addEventListener('input',()=>{
+    const query=input.value.trim().toLowerCase(); let shown=0;
+    for(const row of rows){row.hidden=!!query&&!row.textContent.toLowerCase().includes(query);if(!row.hidden)shown++;}
+    count.textContent=shown+' of '+rows.length+' rows';
+  });
+  tools.append(label,input,count); wrapper.before(tools);
+}
+function revealTarget(){
+  let id;try{id=decodeURIComponent(location.hash.slice(1));}catch{return;}
+  const target=document.getElementById(id);if(!target)return;
+  for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+}
+revealTarget(); window.addEventListener('hashchange',revealTarget);
+</script>
+</body></html>

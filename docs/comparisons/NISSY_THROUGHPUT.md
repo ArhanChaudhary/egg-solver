@@ -1,101 +1,87 @@
-# Nissy versus egg-solver: 500-state throughput, h6–h10
+# Nissy versus egg: 500-state batch throughput
 
-2026-11-08. Complete: five table sizes, three final 500-state batches per solver and size, on the same 48-core VM. These results describe this dataset, machine, source and configuration grid.
+[Benchmarks](README.md) · [Timing definitions](METHODS.md) · [Lane and scaling study](../performance/PARALLELISM.md)
 
-## Final throughput
+Measured **November 8, 2026**, on the **48-core AMD EPYC 9V45 VM**. Each final run completes the same **500 distinct random states**, in repository order, with resident **1 GiB table pages**. The result is the median of **three fresh-process batches per solver and table**. Higher throughput is faster.
 
-Medians of three complete batch walls, after tuning. Each final process solves all 500 states. Higher solves/s is better.
+## Results
 
-| h | Egg batch wall | Nissy batch wall | Egg solves/s | Nissy solves/s | Nissy time / egg time |
-|---:|---:|---:|---:|---:|---:|
-| 6 | 14.405752 s | 102.252591 s | 34.71 | 4.89 | 7.10× |
-| 7 | 7.187605 s | 51.486321 s | 69.56 | 9.71 | 7.16× |
-| 8 | 3.407542 s | 34.367007 s | 146.73 | 14.55 | 10.09× |
-| 9 | 1.722188 s | 15.977747 s | 290.33 | 31.29 | 9.28× |
-| 10 | 0.891859 s | 8.560985 s | 560.63 | 58.40 | 9.60× |
+| Table | RAM each (GiB) | Egg (solves/s) | Nissy (solves/s) | Egg advantage |
+|---|---:|---:|---:|---:|
+| h6 | 2 | 34.71 | 4.89 | 7.10× |
+| h7 | 4 | 69.56 | 9.71 | 7.16× |
+| h8 | 8 | 146.73 | 14.55 | 10.09× |
+| h9 | 15 | 290.33 | 31.29 | 9.28× |
+| h10 | 29 | 560.63 | 58.40 | 9.60× |
 
-Every selected egg configuration uses 48 workers, 24 lanes per worker, and concurrency zero (the complete input batch). Nissy uses 6 cube workers × 8 threads/cube for h6–h8, and 12 × 4 for h9–h10. Its selected build is retained PGO for h6/h8/h9/h10 and upstream default compiler flags for h7. PGO training overlap and the upstream rank issue are disclosed below.
+“RAM each” is the mapped table allocation for either solver, rounded to 1 GiB pages; it excludes other process memory. “Egg advantage” is egg's solves/s divided by nissy's solves/s. It is specific to this host, dataset and tested configurations.
 
-## Running the measured egg configuration
+For example, h10 completes all 500 cubes in a median **0.891859 s for egg** and **8.560985 s for nissy**. Dividing 500 by those times gives the rates above. Batch time per cube is not the response time of an individual concurrent solve.
 
-On this 48-core VM, with an already resident table:
+All 15,000 final solutions (30 batches × 500) replayed successfully in **both** independent cube models. Every accepted run also matched the previously cross-checked optimal lengths. This checks the recorded inputs and results, not every possible program execution.
 
-```bash
+## Selected configurations
+
+Every egg row uses **48 worker threads, 24 lanes per worker, concurrency zero** (the whole batch). Nissy uses cube-worker processes sharing one read-only table; each process can use several threads.
+
+| Tables | Nissy cube workers | Threads per cube | Total threads | Nissy build |
+|---|---:|---:|---:|---|
+| h6 | 6 | 8 | 48 | Retained PGO |
+| h7 | 6 | 8 | 48 | Upstream compiler flags |
+| h8 | 6 | 8 | 48 | Retained PGO |
+| h9–h10 | 12 | 4 | 48 | Retained PGO |
+
+On the measured VM, the egg command is:
+
+```sh
 target/release/solve --table /path/to/table --load map -t 48 -l 24 -c 0 --json < testdata/random_state.txt
 ```
 
-Pass the table path explicitly. The lane result is specific to this machine and batch. Existing global defaults are preserved.
+The table path is explicit. Ordinary disk-file mapping is not equivalent to the benchmark's resident huge-page table. See [load modes](../reference/USER_GUIDE.md#table-files). Global defaults were not changed from one machine's screen.
 
-## Every final raw output
+## All final raw outputs
 
-The links contain unedited per-state results and the total line. The value shown is that run's complete batch wall. Three repeats are 1,500 solves of the same 500 distinct states, not 1,500 distinct states.
+Each link opens the **untouched 500-result JSONL**, followed by its total. The displayed number is **batch wall seconds**, not seconds per cube. Three repeats are 1,500 solves of the same 500 states.
 
-| h | Solver | Configuration | Repeat 1, raw | Repeat 2, raw | Repeat 3, raw |
-|---:|---|---|---:|---:|---:|
-| 6 | egg | `48_24_0` | [14.405751919 s](../data/nissy-throughput-20261108/raw/h6-egg-48_24_0-all500-final-r1.jsonl) | [14.429995963 s](../data/nissy-throughput-20261108/raw/h6-egg-48_24_0-all500-final-r2.jsonl) | [14.391931563 s](../data/nissy-throughput-20261108/raw/h6-egg-48_24_0-all500-final-r3.jsonl) |
-| 6 | nissy | `pgo_6_8` | [102.445444972 s](../data/nissy-throughput-20261108/raw/h6-nissy-pgo_6_8-all500-final-r1.jsonl) | [102.252591182 s](../data/nissy-throughput-20261108/raw/h6-nissy-pgo_6_8-all500-final-r2.jsonl) | [102.101806420 s](../data/nissy-throughput-20261108/raw/h6-nissy-pgo_6_8-all500-final-r3.jsonl) |
-| 7 | egg | `48_24_0` | [7.369067400 s](../data/nissy-throughput-20261108/raw/h7-egg-48_24_0-all500-final-r1.jsonl) | [7.165320625 s](../data/nissy-throughput-20261108/raw/h7-egg-48_24_0-all500-final-r2.jsonl) | [7.187604711 s](../data/nissy-throughput-20261108/raw/h7-egg-48_24_0-all500-final-r3.jsonl) |
-| 7 | nissy | `shipped_6_8` | [51.221875536 s](../data/nissy-throughput-20261108/raw/h7-nissy-shipped_6_8-all500-final-r1.jsonl) | [51.486320916 s](../data/nissy-throughput-20261108/raw/h7-nissy-shipped_6_8-all500-final-r2.jsonl) | [51.545883987 s](../data/nissy-throughput-20261108/raw/h7-nissy-shipped_6_8-all500-final-r3.jsonl) |
-| 8 | egg | `48_24_0` | [3.402620848 s](../data/nissy-throughput-20261108/raw/h8-egg-48_24_0-all500-final-r1.jsonl) | [3.454722068 s](../data/nissy-throughput-20261108/raw/h8-egg-48_24_0-all500-final-r2.jsonl) | [3.407541722 s](../data/nissy-throughput-20261108/raw/h8-egg-48_24_0-all500-final-r3.jsonl) |
-| 8 | nissy | `pgo_6_8` | [34.338833650 s](../data/nissy-throughput-20261108/raw/h8-nissy-pgo_6_8-all500-final-r1.jsonl) | [34.367007481 s](../data/nissy-throughput-20261108/raw/h8-nissy-pgo_6_8-all500-final-r2.jsonl) | [34.396046823 s](../data/nissy-throughput-20261108/raw/h8-nissy-pgo_6_8-all500-final-r3.jsonl) |
-| 9 | egg | `48_24_0` | [1.735110983 s](../data/nissy-throughput-20261108/raw/h9-egg-48_24_0-all500-final-r1.jsonl) | [1.707409881 s](../data/nissy-throughput-20261108/raw/h9-egg-48_24_0-all500-final-r2.jsonl) | [1.722188139 s](../data/nissy-throughput-20261108/raw/h9-egg-48_24_0-all500-final-r3.jsonl) |
-| 9 | nissy | `pgo_12_4` | [15.984476809 s](../data/nissy-throughput-20261108/raw/h9-nissy-pgo_12_4-all500-final-r1.jsonl) | [15.977747455 s](../data/nissy-throughput-20261108/raw/h9-nissy-pgo_12_4-all500-final-r2.jsonl) | [15.919720810 s](../data/nissy-throughput-20261108/raw/h9-nissy-pgo_12_4-all500-final-r3.jsonl) |
-| 10 | egg | `48_24_0` | [0.898266926 s](../data/nissy-throughput-20261108/raw/h10-egg-48_24_0-all500-final-r1.jsonl) | [0.891859069 s](../data/nissy-throughput-20261108/raw/h10-egg-48_24_0-all500-final-r2.jsonl) | [0.887208175 s](../data/nissy-throughput-20261108/raw/h10-egg-48_24_0-all500-final-r3.jsonl) |
-| 10 | nissy | `pgo_12_4` | [8.551037397 s](../data/nissy-throughput-20261108/raw/h10-nissy-pgo_12_4-all500-final-r1.jsonl) | [8.560984671 s](../data/nissy-throughput-20261108/raw/h10-nissy-pgo_12_4-all500-final-r2.jsonl) | [8.561392890 s](../data/nissy-throughput-20261108/raw/h10-nissy-pgo_12_4-all500-final-r3.jsonl) |
+| Table | Solver | Run 1 (s) | Run 2 (s) | Run 3 (s) |
+|---|---|---:|---:|---:|
+| h6 | egg | [14.405751919](../data/nissy-throughput-20261108/raw/h6-egg-48_24_0-all500-final-r1.jsonl) | [14.429995963](../data/nissy-throughput-20261108/raw/h6-egg-48_24_0-all500-final-r2.jsonl) | [14.391931563](../data/nissy-throughput-20261108/raw/h6-egg-48_24_0-all500-final-r3.jsonl) |
+| h6 | nissy | [102.445444972](../data/nissy-throughput-20261108/raw/h6-nissy-pgo_6_8-all500-final-r1.jsonl) | [102.252591182](../data/nissy-throughput-20261108/raw/h6-nissy-pgo_6_8-all500-final-r2.jsonl) | [102.101806420](../data/nissy-throughput-20261108/raw/h6-nissy-pgo_6_8-all500-final-r3.jsonl) |
+| h7 | egg | [7.369067400](../data/nissy-throughput-20261108/raw/h7-egg-48_24_0-all500-final-r1.jsonl) | [7.165320625](../data/nissy-throughput-20261108/raw/h7-egg-48_24_0-all500-final-r2.jsonl) | [7.187604711](../data/nissy-throughput-20261108/raw/h7-egg-48_24_0-all500-final-r3.jsonl) |
+| h7 | nissy | [51.221875536](../data/nissy-throughput-20261108/raw/h7-nissy-shipped_6_8-all500-final-r1.jsonl) | [51.486320916](../data/nissy-throughput-20261108/raw/h7-nissy-shipped_6_8-all500-final-r2.jsonl) | [51.545883987](../data/nissy-throughput-20261108/raw/h7-nissy-shipped_6_8-all500-final-r3.jsonl) |
+| h8 | egg | [3.402620848](../data/nissy-throughput-20261108/raw/h8-egg-48_24_0-all500-final-r1.jsonl) | [3.454722068](../data/nissy-throughput-20261108/raw/h8-egg-48_24_0-all500-final-r2.jsonl) | [3.407541722](../data/nissy-throughput-20261108/raw/h8-egg-48_24_0-all500-final-r3.jsonl) |
+| h8 | nissy | [34.338833650](../data/nissy-throughput-20261108/raw/h8-nissy-pgo_6_8-all500-final-r1.jsonl) | [34.367007481](../data/nissy-throughput-20261108/raw/h8-nissy-pgo_6_8-all500-final-r2.jsonl) | [34.396046823](../data/nissy-throughput-20261108/raw/h8-nissy-pgo_6_8-all500-final-r3.jsonl) |
+| h9 | egg | [1.735110983](../data/nissy-throughput-20261108/raw/h9-egg-48_24_0-all500-final-r1.jsonl) | [1.707409881](../data/nissy-throughput-20261108/raw/h9-egg-48_24_0-all500-final-r2.jsonl) | [1.722188139](../data/nissy-throughput-20261108/raw/h9-egg-48_24_0-all500-final-r3.jsonl) |
+| h9 | nissy | [15.984476809](../data/nissy-throughput-20261108/raw/h9-nissy-pgo_12_4-all500-final-r1.jsonl) | [15.977747455](../data/nissy-throughput-20261108/raw/h9-nissy-pgo_12_4-all500-final-r2.jsonl) | [15.919720810](../data/nissy-throughput-20261108/raw/h9-nissy-pgo_12_4-all500-final-r3.jsonl) |
+| h10 | egg | [0.898266926](../data/nissy-throughput-20261108/raw/h10-egg-48_24_0-all500-final-r1.jsonl) | [0.891859069](../data/nissy-throughput-20261108/raw/h10-egg-48_24_0-all500-final-r2.jsonl) | [0.887208175](../data/nissy-throughput-20261108/raw/h10-egg-48_24_0-all500-final-r3.jsonl) |
+| h10 | nissy | [8.551037397](../data/nissy-throughput-20261108/raw/h10-nissy-pgo_12_4-all500-final-r1.jsonl) | [8.560984671](../data/nissy-throughput-20261108/raw/h10-nissy-pgo_12_4-all500-final-r2.jsonl) | [8.561392890](../data/nissy-throughput-20261108/raw/h10-nissy-pgo_12_4-all500-final-r3.jsonl) |
 
-All 305 accepted measurements, including the exploratory probe and configuration screens, appear in [the run index](../data/nissy-throughput-20261108/run-index.csv). The [analysis JSON](../data/nissy-throughput-20261108/analysis.json), [manifest](../data/nissy-throughput-20261108/manifest.json) and [cross-replay result](../data/nissy-throughput-20261108/cross-replay.json) are machine-readable.
+## Timing, inputs and checks
 
-## Workload and metric
+The timer starts after input parsing, table loading and validation. It includes worker creation/join, solution replay, output and the finishing tail. Throughput is **500 ÷ complete batch wall seconds**. Summed overlapping cube durations are not divided by a nominal worker count.
 
-Both solvers receive the same 500 states, in the original order of `testdata/random_state.txt`. The SHA-256 is `616810c31d090a78ea1357684750642ab017ff394bfa08ba131bb65cc6905de3`.
+The input is `testdata/random_state.txt`. Its SHA-256 is:
 
-The primary measurement is the wall time to finish the entire finite batch. Throughput is `500 / batch wall seconds`; milliseconds per cube is `1000 × batch wall / 500`. This includes the idle tail, worker startup and shutdown, verification, and output. Input parsing, table validation and loading occur before the batch timer. Summed overlapping cube latencies are not divided by a nominal thread count.
+```text
+616810c31d090a78ea1357684750642ab017ff394bfa08ba131bb65cc6905de3
+```
 
-Every benchmark pruning table is mapped from **1 GiB hugetlbfs**. The runner records actual HugeTLB mapping coverage for each accepted run. The 2 MiB huge-page pool is zero. Tables remain resident in RAM throughout a run.
+Runs hold exclusive benchmark locks, check unrelated CPU use, verify table integrity and record actual HugeTLB coverage. There are no hardware PMU counters on this VM. [Raw-index metadata](../data/nissy-throughput-20261108/run-index.csv) identifies all **305 accepted measurements**, including screens and separately labeled exploratory runs. [Cross-replay](../data/nissy-throughput-20261108/cross-replay.json) and [grid/hash/page audit](../data/nissy-throughput-20261108/evidence-audit.json) record acceptance checks.
 
-The machine is the 48-core AMD EPYC VM identified in the retained manifest. There are no hardware PMU counters here. Timing runs and builds hold the same exclusive locks; unrelated CPU use is checked before and around each measurement.
+## Tuning and source limits
 
-## Source and tuning
+Egg's measured CLI inputs match published source `947c20d` except a generator help-text edit that is not linked into `solve`. Binary and source hashes are in the [manifest](../data/nissy-throughput-20261108/manifest.json). The native release uses `target-cpu=native`.
 
-Egg's published upstream is `https://github.com/ArhanChaudhary/egg-solver`, checked at `947c20d93564f150aad9c292486ab730a329b86c`. All recorded Rust/build inputs for the retained native CLI match the published-base worktree except `src/bin/gen.rs`, whose help text changed and is not linked into `solve`. The CLI and research-probe binary hashes are retained separately.
+Production egg screens used the shipped CLI at 8, 16, 24, 32, 40, 48, 64, 96 and 128 lanes, then tested 8–48 worker threads at the winning lane count. **Lanes 12 and 20 were not tested.** An ordinary `Pool::run` research caller had different timings and lane rankings from the CLI's fixed-stack-placement path. Its raw results are preserved as exploratory evidence and excluded from final configuration selection.
 
-The native build uses the project's release profile and `target-cpu=native`. All primary egg configuration screens and final rows use the shipped CLI with explicit table, worker count, lane count and concurrency zero. The screen tests 8–128 lanes per worker and worker counts from 8 to 48. The CLI fixes the placement of worker state and stack frames; this is not CPU-affinity pinning. A separate research probe uses the public APIs for scheduling/counter evidence. Its ordinary `Pool::run` path produced substantially different timing and rankings from the CLI's `run_pinned` path, so its times are retained as exploratory evidence and excluded from production throughput selection.
+Nissy-core was pinned to `1f7e8e9`. Five builds were screened on a fixed 100-state pilot with 48 single-thread cube workers: upstream flags, native, retained PGO, rank-initialized native, and a rank-initialized compile-time single-thread build. The selected build's allocations were checked on all 500 states, including all factorizations of 48 threads. Builds and allocations were not exhaustively crossed. These are the best observed settings in the declared grid, not a global optimum.
 
-Nissy-core is checked at `1f7e8e937d0e71e7eb3b5deab38b34d0a0159d88`. A C harness calls its public API, sharing one read-only table between cube-worker processes. It screens upstream `-O3 -mavx2`, native, retained PGO, rank-initialized native, and a rank-initialized compile-time single-thread build. Build screening uses a declared 100-state pilot. Worker-allocation candidates for the selected build are then checked on all 500 states: independent workers and all factorizations of 48 CPU workers into cube workers × threads per cube. CPU allocation never exceeds 48.
+**PGO overlap:** the retained nissy profile was trained on a subset of the legacy training file, which overlaps this 500-state evaluation. This is not a held-out result. Unmodified nissy builds also retain the identified uninitialized task-rank issue; patched controls and the one-line patch are included. Correct replay does not establish absence of undefined behavior in upstream C.
 
-Two limitations are explicit. The retained PGO profile was trained on a subset of the legacy training file, which overlaps the present 500-state evaluation; it is not a held-out PGO result. The unmodified Nissy builds also retain the previously identified uninitialized task-rank issue. Rank-initialized controls and the one-line patch are included. Output replay does not establish that upstream C has no undefined behavior.
+The implementations use their own table layouts and slightly different data sizes. Exact file bytes, logical data bytes, base values and page padding are retained in [table metadata](../data/nissy-throughput-20261108/status.json) and the [restoration record](../data/nissy-throughput-20261108/restored-tables.json).
 
-After configuration selection, three fresh processes per solver and table run with alternating solver order. Reported final values are medians of those three complete batches, with all individual walls and raw outputs linked. These are the best observed configurations within the declared grid, not a proof of a global optimum or a prediction for another CPU.
+## Recheck and scope
 
-## Tables and correctness
+[Analysis JSON](../data/nissy-throughput-20261108/analysis.json) contains every final wall, range and rate. [Reproduction](../reproduce/README.md) explains how to recompute the table without rerunning solvers. [The evidence directory](../data/nissy-throughput-20261108/README.md) contains the harnesses, datasets, compiler records and rejected attempts.
 
-| h | Egg pruning-data bytes | Nissy table file bytes | Resident allocation per solver | Page size |
-|---:|---:|---:|---:|---:|
-| 6 | 1,945,681,920 | 1,897,951,528 | 2 GiB | 1 GiB |
-| 7 | 3,891,363,840 | 3,793,842,344 | 4 GiB | 1 GiB |
-| 8 | 7,782,727,680 | 7,585,624,040 | 8 GiB | 1 GiB |
-| 9 | 15,565,455,360 | 15,169,187,432 | 15 GiB | 1 GiB |
-| 10 | 31,130,910,720 | 30,336,314,216 | 29 GiB | 1 GiB |
-
-Egg's persistent h7/h8 working-copy files contain alignment padding; the exact file sizes and logical pruning-data sizes are recorded separately in the per-table metadata and `restored-tables.json`. Mapped copies are rounded to whole 1 GiB pages, with the egg metadata trailer relocated to the end. Every table is validated before use. These are each implementation's native H48 tables at the same h; their layouts and byte sizes differ.
-
-Each accepted run must contain every requested input index exactly once, replay all solutions successfully, and match the previously cross-checked optimal lengths. All 15,000 final solutions additionally replayed in both independent cube models: [cross-replay evidence](../data/nissy-throughput-20261108/cross-replay.json). Matching lengths and replays provide dataset-specific correctness evidence; timing is not a universal optimality or safety proof.
-
-## Interpreting this comparison
-
-The historical reports contain different source builds, sample sizes and latency/stream formulas. Their ratios must not be substituted for this finite-batch result. In particular, this is a fresh nissy comparison, not a new measurement of closed-source cubeopt or the reported MacBook release. These numbers do not establish a cross-machine or universal solver ranking.
-
-The build screen and allocation screen are separate: builds were screened with 48 independent single-thread workers, then the selected build's allocations were screened on all 500 states. Every compiler build was not exhaustively crossed with every allocation. Lane counts 12 and 20 were not in this experiment's explicit lane grid. “Best observed” means exactly the recorded search, not every possible parameter combination.
-
-## Raw evidence
-
-The live evidence directory is `../data/nissy-throughput-20261108/`:
-
-- `raw/`: unedited per-state JSONL and stderr, including configuration screens.
-- `meta/`: exact commands, validity decisions, raw-output hashes, resource use, and page samples.
-- `datasets/`: all 500 states, the fixed pilot, pilot indices, and the separate scaling subset.
-- `manifest.json`: machine, compiler, source identities, binary hashes and PGO provenance.
-- `analysis.json` and `run-index.csv`: derived summaries; `analyze.py` verifies raw hashes before summarizing.
-- `src/`: research harnesses, the measured Rust probe source, rank-initialization patch, and counter probe.
-
-Setup failures, when present, remain in `rejected/` and are excluded from results. A controller checkpoint preserves a fully completed child measurement without changing its raw output or batch timer; such metadata explicitly omits the unavailable parent process wall.
+These figures do not replace the differently measured historical latency/stream results. They are not a new measurement of closed-source cubeopt, the reported MacBook release or another CPU.

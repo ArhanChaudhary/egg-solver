@@ -1,0 +1,110 @@
+{
+  "date": "2026-11-08",
+  "base_commit": "9974a629721e9244ce2c22ec5029638748ea1fd2",
+  "scope": "Documentation, rendering and validation tools; no Rust solver changes or new timing runs.",
+  "structure_and_links": "PASS: 573 HTML pages, 48152 local links, curated table/heading structure, benchmark headline values",
+  "browser": {
+    "status": "PASS",
+    "pages": 18,
+    "checked": [
+      {
+        "route": "index.html",
+        "width": 1280
+      },
+      {
+        "route": "comparisons/index.html",
+        "width": 1280
+      },
+      {
+        "route": "comparisons/NISSY_THROUGHPUT.html",
+        "width": 1280
+      },
+      {
+        "route": "comparisons/RESULTS.html",
+        "width": 1280
+      },
+      {
+        "route": "comparisons/archive/MATRIX_20261107.html",
+        "width": 1280
+      },
+      {
+        "route": "performance/PARALLELISM.html",
+        "width": 1280
+      },
+      {
+        "route": "reference/USER_GUIDE.html",
+        "width": 1280
+      },
+      {
+        "route": "safety/NO_UB.html",
+        "width": 1280
+      },
+      {
+        "route": "history/index.html",
+        "width": 1280
+      },
+      {
+        "route": "index.html",
+        "width": 390
+      },
+      {
+        "route": "comparisons/index.html",
+        "width": 390
+      },
+      {
+        "route": "comparisons/NISSY_THROUGHPUT.html",
+        "width": 390
+      },
+      {
+        "route": "comparisons/RESULTS.html",
+        "width": 390
+      },
+      {
+        "route": "comparisons/archive/MATRIX_20261107.html",
+        "width": 390
+      },
+      {
+        "route": "performance/PARALLELISM.html",
+        "width": 390
+      },
+      {
+        "route": "reference/USER_GUIDE.html",
+        "width": 390
+      },
+      {
+        "route": "safety/NO_UB.html",
+        "width": 390
+      },
+      {
+        "route": "history/index.html",
+        "width": 390
+      }
+    ],
+    "scoped_filter": true,
+    "raw_batch": true,
+    "legacy_fragment": true,
+    "errors": []
+  },
+  "usage": {
+    "status": "PASS",
+    "table_check": true,
+    "short_solve_length": 5,
+    "batch_verified": true,
+    "empty_input_rejected": true
+  },
+  "preservation": {
+    "status": "PASS",
+    "human_readme_prefix_unchanged": true,
+    "historical_matrix_numerical_rows_preserved": 1531,
+    "raw_evidence_unchanged": true,
+    "rust_source_unchanged": true
+  },
+  "negative_checks": {
+    "status": "PASS",
+    "changed_benchmark_headline_rejected": true,
+    "stale_generated_html_rejected": true
+  },
+  "historical_reconstruction": "PASS: 552 recorded runs; numerical tables match.",
+  "throughput_reconstruction": "All five final comparisons and both scaling studies recomputed from recorded raw hashes.",
+  "pages_build": "PASS; single-thread and threaded WebAssembly modules plus documentation staged successfully."
+}

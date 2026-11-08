@@ -1,19 +1,104 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>nxopt with the large PS=16 table — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../index.html">Home</a><a href="../guide/OVERVIEW.html">Learn</a><a href="index.html">Compare</a><a href="../performance/index.html">Performance</a><a href="../safety/index.html">Safety</a><a href="../history/index.html">History</a><a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="NXOPT32.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="nxopt-with-the-large-ps-16-table">nxopt with the large PS=16 table</h1>
-<p>Measured on 2026-11-07 on the 48-core AMD EPYC 9V45 VM. This completes the requested experiment with nxopt's nominal 62.3 GB table: the generated file is <strong>62,474,158,084 bytes</strong> (62.474 decimal GB). The program is labeled <code>nxopt32</code> in the retained files.</p>
-<p>Both programs used resident 1 GiB huge pages. Egg used h11, 62,277,025,792 bytes, with 40 lanes per worker and batch concurrency. The nxopt source was commit <code>f430921a48306874864b9f2ac8a059b43492fd3a</code>, built with its native optimization flags and <code>-DPS=16</code>. These results concern this host, build, table, dataset prefix and measurement formula; they do not establish a ranking on other machines or against larger tables.</p>
-<div class="table-wrap"><table>
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Nxopt with the 62.474 GB table — egg-solver</title><style>
+:root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
+header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
+header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
+header a { color:#d9f0ff; }
+header a[aria-current] { color:white; text-decoration-thickness:3px; }
+main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+h1 { margin-top:0; font-size:2rem; line-height:1.25; }
+h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
+h3 { margin-top:1.5rem; }
+a { color:var(--accent); overflow-wrap:anywhere; }
+p,li { max-width:90ch; }
+code { background:#eff3f6; border-radius:3px; padding:.1em .25em; overflow-wrap:anywhere; font-size:.9em; }
+pre { max-width:100%; padding:1rem; background:#eef3f6; overflow:auto; line-height:1.45; }
+pre code { background:none; padding:0; overflow-wrap:normal; }
+.table-wrap { max-width:100%; overflow:auto; margin:1rem 0 1.5rem; border:1px solid var(--line); }
+.table-wrap.long-table { max-height:70vh; }
+table { width:100%; border-collapse:collapse; font-size:.9rem; font-variant-numeric:tabular-nums; }
+th,td { padding:.55rem .65rem; border:1px solid var(--line); vertical-align:top; overflow-wrap:normal; }
+th { background:#eaf1f6; text-align:left; position:sticky; top:0; z-index:1; }
+tr:nth-child(even) { background:#f8fafb; }
+caption,.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+details { border:1px solid var(--line); padding:.6rem 1rem; border-radius:5px; margin:1rem 0; }
+summary { cursor:pointer; font-weight:600; }
+.table-tools { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:.6rem; background:#f4f7f9; }
+.table-tools input { font:inherit; border:1px solid #afc0ce; border-radius:4px; padding:.3rem .5rem; width:min(100%,22rem); min-width:0; }
+.note,.source-link,footer { color:var(--muted); font-size:.85rem; }
+.source-link { margin-top:2rem; }
+.archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
+footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
+svg { max-width:100%; height:auto; }
+:target { scroll-margin-top:1rem; }
+.skip-link { position:absolute; left:-10000px; }
+.skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
+@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+</style></head>
+<body>
+<a class="skip-link" href="#docs-content">Skip to content</a>
+<header><strong>egg-solver</strong><nav aria-label="Documentation"><a href="../index.html">Home</a>
+<a href="../guide/OVERVIEW.html">Learn</a>
+<a href="index.html">Benchmarks</a>
+<a href="../performance/index.html">Performance</a>
+<a href="../safety/index.html">Safety</a>
+<a href="../history/index.html">History</a>
+<a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<main id="docs-content"><h1 id="nxopt-with-the-62-474-gb-table">Nxopt with the 62.474 GB table</h1>
+<p><a href="index.html">Benchmarks</a> · <a href="METHODS.html">Timing definitions</a> · <a href="../data/nxopt32-20261107/index.html">Raw records</a></p>
+<p>Measured <strong>November 7, 2026</strong>, on the <strong>48-core EPYC 9V45 VM</strong>, with resident <strong>1 GiB pages</strong>. Nxopt used EO3/EP2 with <code>PS=16</code>: a <strong>62,474,158,084-byte</strong> table (62.474 decimal GB). <code>nxopt32</code> is this experiment's configuration label, not a release version. Egg used h11 and 40 lanes per worker.</p>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#results-and-metric-boundary">Results and metric boundary</a></li><li><a href="#builds-and-correctness">Builds and correctness</a></li><li><a href="#scope-and-records">Scope and records</a></li></ul></details>
+<h2 id="results-and-metric-boundary">Results and metric boundary</h2>
+<p><strong>Lower reported time is faster</strong>, but the two multi-worker columns use different timing formulas. Egg measures complete batch wall time ÷ cubes. Nxopt reports summed cube durations ÷ workers ÷ cubes. Nxopt's normalization can omit the idle finishing tail. Its reciprocal is not a measured end-to-end throughput rate.</p>
+<div class="table-wrap" role="region" aria-label="Results and metric boundary" tabindex="0"><table id="docs-table-1"><caption>Results and metric boundary</caption>
 <thead>
-<tr><th>Workers</th><th align="right">Unique random states</th><th align="right">Repeated groups</th><th align="right">Egg batch wall time/cube</th><th align="right">nxopt normalized time/cube</th><th align="right">nxopt time / egg time</th></tr>
+<tr><th align="right">Workers</th><th align="right">Distinct states</th><th align="right">Egg batch time/cube (ms)</th><th align="right">Nxopt normalized time/cube (ms)</th></tr>
 </thead>
 <tbody>
-<tr><td>1</td><td align="right">50</td><td align="right">3</td><td align="right">41.803 ms</td><td align="right">715.342 ms</td><td align="right">17.11×</td></tr>
-<tr><td>48</td><td align="right">200</td><td align="right">3</td><td align="right">1.1584 ms</td><td align="right">15.9014 ms</td><td align="right">13.73×</td></tr>
+<tr><td align="right">1</td><td align="right">50</td><td align="right">41.803</td><td align="right">715.342</td></tr>
+<tr><td align="right">48</td><td align="right">200</td><td align="right">1.1584</td><td align="right">15.9014</td></tr>
 </tbody>
 </table></div>
-<p><strong>Metric limitation:</strong> nxopt's figure is the sum of per-cube solve durations divided by the number of cubes and workers, as in the original comparison harness. Egg's figure is measured batch wall time divided by cubes. Uneven worker completion can make nxopt's normalized value smaller than its actual batch wall time per cube. Do not present nxopt's reciprocal as a directly measured end-to-end completion rate. Table loading and generation are excluded for both.</p>
-<p>The three groups repeat the same prefix inside one process; they are not three independent process starts or 150/600 distinct states. Nxopt's group ranges were 714.942–715.625 ms at one worker and 15.824–15.945 ms at 48 workers. Its mean node counts were 3.317M and 3.292M respectively; node instrumentation is implementation-specific.</p>
-<p>A profile-guided build trained on 24 disjoint positions was also tested. It measured 717.845 ms at one worker and 15.9460 ms at 48 workers, so it did not improve this sample. The native build is the main result.</p>
-<p>All returned solution lengths matched egg for all 150 one-worker and 600 48-worker solves, for each nxopt build. Egg also verified that its solutions solved the input states. Agreement is a cross-check on these inputs, not a proof covering every possible state.</p>
-<p>The 182 GB and 546 GB nxopt configurations were not measured. The earlier nxopt22 results use a different table and must not be substituted for these PS=16 results.</p>
-<p>Evidence: <code>comparison.json</code>, <code>raw/</code>, <code>meta/</code>, <code>datasets/</code>, <code>src/</code>, <code>build.sh</code>, <code>build-pgo.sh</code>, <code>run.py</code>, and <code>analyze.py</code> in this directory. The h11 reconstruction certificate preserves the exact previously loaded table, including its trailer. Restoring the h11/h7/h8 RAM copies is recorded separately in <code>restored-tables.json</code> when finished.</p>
-</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>
+<p>Each row repeats the same input prefix in <strong>three groups inside one process</strong>. They are not three independent process starts. Nxopt's group ranges were 714.942–715.625 ms at one worker and 15.824–15.945 ms at 48 workers. Loading and generation are excluded.</p>
+<p>The ratios of the reported columns are 17.11× and 13.73×. The second is a ratio of these specific timing formulas, not a direct ratio of two measured batch completion rates.</p>
+<h2 id="builds-and-correctness">Builds and correctness</h2>
+<p>Nxopt source was <code>f430921a48306874864b9f2ac8a059b43492fd3a</code>, using its native optimization flags and <code>-DPS=16</code>. A PGO build trained on 24 disjoint positions measured 717.845 ms and 15.9460 ms under the same formulas, so it did not improve this sample. The native build is reported above. Egg's source/build fingerprint and table bytes are in the <a href="../data/nxopt32-20261107/index.html">experiment metadata</a>.</p>
+<p>For each nxopt build, all 150 one-worker and 600 48-worker returned lengths matched egg. Egg also replayed its solutions. Those are checks on the measured inputs, not universal correctness proofs.</p>
+<h2 id="scope-and-records">Scope and records</h2>
+<p>The 182 GB and 546 GB nxopt configurations remain unmeasured. Earlier nxopt22/31 results use smaller tables. Neither dataset substitutes for this large-table experiment or establishes a ranking against every nxopt configuration.</p>
+<p><a href="../data/nxopt32-20261107/index.html">The evidence directory</a> contains <code>comparison.json</code>, raw output, commands, datasets, source/build records and analysis. Its restoration files describe the machine at that earlier date. The <a href="../data/nissy-throughput-20261108/restored-tables.json">November 8 page record</a> describes the later h6–h10 RAM working set; neither is a requirement for running the program elsewhere.</p>
+
+<p class="source-link"><a href="NXOPT32.md">Markdown source</a></p></main>
+<footer><a href="../PROVENANCE.html">Sources and evidence scope</a></footer>
+<script>
+for (const wrapper of document.querySelectorAll('.table-wrap')) {
+  const table=wrapper.querySelector('table');
+  const rows=[...table.tBodies].flatMap(body=>[...body.rows]);
+  if(rows.length>50) wrapper.classList.add('long-table');
+  if(rows.length<=12) continue;
+  const tools=document.createElement('div'); tools.className='table-tools';
+  const label=document.createElement('label'); label.textContent='Filter this table';
+  const input=document.createElement('input'); input.type='search'; input.id=table.id+'-filter';
+  label.htmlFor=input.id; input.setAttribute('aria-controls',table.id);
+  const count=document.createElement('span'); count.className='note'; count.setAttribute('aria-live','polite');
+  count.textContent=rows.length+' rows';
+  input.addEventListener('input',()=>{
+    const query=input.value.trim().toLowerCase(); let shown=0;
+    for(const row of rows){row.hidden=!!query&&!row.textContent.toLowerCase().includes(query);if(!row.hidden)shown++;}
+    count.textContent=shown+' of '+rows.length+' rows';
+  });
+  tools.append(label,input,count); wrapper.before(tools);
+}
+function revealTarget(){
+  let id;try{id=decodeURIComponent(location.hash.slice(1));}catch{return;}
+  const target=document.getElementById(id);if(!target)return;
+  for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+}
+revealTarget(); window.addEventListener('hashchange',revealTarget);
+</script>
+</body></html>

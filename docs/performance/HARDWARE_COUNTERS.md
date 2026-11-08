@@ -1,9 +1,11 @@
-# phack hardware-counter analysis
+# Xeon X5650 hardware-counter study
+
+[Performance studies](README.md) · [Raw counter records](../data/phack/README.md)
+
+Collected on a **separate physical Xeon X5650 host on November 6, 2026**. These are not hardware counters from the EPYC VM, which has no PMU access.
 
 Archive: `egg-solver-pmu-phack-20261106T194245Z.tar.gz`.
-SHA256: `e4367ce0595fffacadda8647a22024761a4be542e4aae1040a0514c587fa33a3`. Analysis is reproducible with
-`/data/agents/codex-resume/analyze-phack.py`; checked aggregates are in
-`/data/agents/codex-resume/phack-analysis/audit.json` and `counter-ratios.csv`.
+SHA256: `e4367ce0595fffacadda8647a22024761a4be542e4aae1040a0514c587fa33a3`. The [preserved analyzer](../reproduce/historical/analyze-phack.py) records the formulas. [Raw-data notes](../data/phack/README.md) identify the included aggregates and inputs; full binary replay requires the separately retained archive.
 
 All **242/242 collection runs succeeded**: **236 counted runs**, **621 counter rows**,
 and **six sampled profiles**. Every raw stat value matches `runs.json` and every
@@ -88,7 +90,7 @@ Each row is three 20-second measurements. Solves/s is the completion count divid
 by the window; Ginst/s is counted instructions divided by the acknowledged window.
 Ginst/s measures instruction execution, not useful search progress.
 
-| Configuration | Median solves/s [range] | Median IPC | Median Ginst/s [range] |
+| Configuration | Solves/s: median [min–max] | Median IPC | Ginst/s: median [min–max] |
 |---|---:|---:|---:|
 |1 worker, local memory|0.15 [0.15–0.15]|1.762|5.35 [5.33–5.36]|
 |6 physical workers, one socket|1.05 [0.85–1.05]|1.790|22.50 [21.24–22.75]|

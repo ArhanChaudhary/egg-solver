@@ -9,11 +9,12 @@ Run from the project root. Build output follows `CARGO_TARGET_DIR` when set.
 | `scripts/stress.sh TABLE [set] [threads] [lanes]` | Compare solution lengths across search modes |
 | `scripts/bench.sh TABLE [runs] [lanes] [threads]` | Repeated stream throughput measurements |
 | `wasm/build.sh` | Build browser/Bun WebAssembly modules |
-| `bun scripts/render-docs.mjs` | Regenerate offline HTML from documentation Markdown |
+| `bun scripts/render-docs.mjs` | Regenerate HTML from Markdown (`--check` verifies it is fresh) |
+| `python3 scripts/check-docs.py` | Check local links, document/table structure and headline benchmark values |
 | `scripts/build-pages.sh OUTPUT_DIRECTORY` | Build the browser solver and stage documentation for Pages |
 
 Miri requires a nightly toolchain with the Miri component. See
-`miri.sh` for toolchain, log-directory and provenance options. Backend checks
+[scripts/miri.sh](miri.sh) for toolchain, log-directory and provenance options. Backend checks
 report missing tools rather than claiming those backends passed.
 
 `scripts/experiments/pgo-solve.sh` retains the optional historical PGO experiment.

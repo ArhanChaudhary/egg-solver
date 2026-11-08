@@ -1,8 +1,59 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PMU-guided optimization review — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../index.html">Home</a><a href="../guide/OVERVIEW.html">Learn</a><a href="../comparisons/index.html">Compare</a><a href="index.html">Performance</a><a href="../safety/index.html">Safety</a><a href="../history/index.html">History</a><a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="OPTIMIZATION_REVIEW.md">Markdown source</a> · Offline document</p><details><summary>On this page</summary><ul><li><a href="#measurement-method-and-limits">Measurement method and limits</a></li><li><a href="#complete-1t-paired-screen">Complete 1T paired screen</a></li><li><a href="#complete-48t-paired-rounds">Complete 48T paired rounds</a></li><li><a href="#preserved-branches-and-validation">Preserved branches and validation</a></li></ul></details><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="pmu-guided-optimization-review">PMU-guided optimization review</h1>
-<p>Release decision: retain the existing native search-loop implementation. Both PMU-guided native experiments remain rejected and are now archived with the required 1-thread and 48-thread before/after tables. The separately explored older-x86 backend remains an unmerged experiment, excluded from the release and perf package.</p>
-<div class="table-wrap"><table>
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Historical PMU-guided optimization experiments — egg-solver</title><style>
+:root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
+header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
+header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
+header a { color:#d9f0ff; }
+header a[aria-current] { color:white; text-decoration-thickness:3px; }
+main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+h1 { margin-top:0; font-size:2rem; line-height:1.25; }
+h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
+h3 { margin-top:1.5rem; }
+a { color:var(--accent); overflow-wrap:anywhere; }
+p,li { max-width:90ch; }
+code { background:#eff3f6; border-radius:3px; padding:.1em .25em; overflow-wrap:anywhere; font-size:.9em; }
+pre { max-width:100%; padding:1rem; background:#eef3f6; overflow:auto; line-height:1.45; }
+pre code { background:none; padding:0; overflow-wrap:normal; }
+.table-wrap { max-width:100%; overflow:auto; margin:1rem 0 1.5rem; border:1px solid var(--line); }
+.table-wrap.long-table { max-height:70vh; }
+table { width:100%; border-collapse:collapse; font-size:.9rem; font-variant-numeric:tabular-nums; }
+th,td { padding:.55rem .65rem; border:1px solid var(--line); vertical-align:top; overflow-wrap:normal; }
+th { background:#eaf1f6; text-align:left; position:sticky; top:0; z-index:1; }
+tr:nth-child(even) { background:#f8fafb; }
+caption,.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+details { border:1px solid var(--line); padding:.6rem 1rem; border-radius:5px; margin:1rem 0; }
+summary { cursor:pointer; font-weight:600; }
+.table-tools { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:.6rem; background:#f4f7f9; }
+.table-tools input { font:inherit; border:1px solid #afc0ce; border-radius:4px; padding:.3rem .5rem; width:min(100%,22rem); min-width:0; }
+.note,.source-link,footer { color:var(--muted); font-size:.85rem; }
+.source-link { margin-top:2rem; }
+.archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
+footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
+svg { max-width:100%; height:auto; }
+:target { scroll-margin-top:1rem; }
+.skip-link { position:absolute; left:-10000px; }
+.skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
+@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+</style></head>
+<body>
+<a class="skip-link" href="#docs-content">Skip to content</a>
+<header><strong>egg-solver</strong><nav aria-label="Documentation"><a href="../index.html">Home</a>
+<a href="../guide/OVERVIEW.html">Learn</a>
+<a href="../comparisons/index.html">Benchmarks</a>
+<a href="index.html">Performance</a>
+<a href="../safety/index.html">Safety</a>
+<a href="../history/index.html">History</a>
+<a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<main id="docs-content"><h1 id="historical-pmu-guided-optimization-experiments">Historical PMU-guided optimization experiments</h1>
+<p>Recorded November 7 decision: retain the existing native search-loop implementation. Both PMU-guided native experiments remain rejected and are now archived with the required 1-thread and 48-thread before/after tables. The separately explored older-x86 backend remains an unmerged experiment, excluded from the release and perf package.</p>
+<div class="table-wrap" role="region" aria-label="Historical PMU-guided optimization experiments" tabindex="0"><table id="docs-table-1"><caption>Historical PMU-guided optimization experiments</caption>
 <thead>
-<tr><th>Experiment</th><th align="right">1T median change (12 pairs)</th><th align="right">48T median change (5 pairs)</th><th>Decision</th></tr>
+<tr><th>Experiment</th><th align="right">1-worker throughput change (12 pairs)</th><th align="right">48-worker throughput change (5 pairs)</th><th>Decision</th></tr>
 </thead>
 <tbody>
 <tr><td>Read packed table values through byte-sized loads</td><td align="right">-0.83%</td><td align="right">-0.28%</td><td>Reject</td></tr>
@@ -10,6 +61,7 @@
 </tbody>
 </table></div>
 <p>The experiments use historical baseline <code>93867a4597ab821b4064a0d407d3c89e133c9013</code> on this EPYC VM. They are not measurements of the final safety build. Higher throughput is better; headline changes are medians of paired ratios, not ratios of marginal medians.</p>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#measurement-method-and-limits">Measurement method and limits</a></li><li><a href="#complete-1t-paired-screen">Complete 1T paired screen</a></li><li><a href="#complete-48t-paired-rounds">Complete 48T paired rounds</a></li><li><a href="#preserved-branches-and-validation">Preserved branches and validation</a></li></ul></details>
 <h2 id="measurement-method-and-limits">Measurement method and limits</h2>
 <p>The 1T screen used h8, one worker, 24 lanes, seed 2026, a 10-second warm-up and a 60-second measured window. Each experiment was paired with the baseline at four code-padding settings, with three repeats per setting and rotating CPU slots. Every setting had a negative median result. Baseline padding 0, byte-load padding 0 and outlined-advance padding 16 were selected by the original control-normalized screen and frozen before the 48T measurements.</p>
 <p>The 48T archival measurements used the same h8 table and frozen binaries, 24 lanes per worker, seed 2026, a 20-second warm-up and a 30-second measured window. Five sequential rounds rotated the three binary orders. One baseline run per round was shared across both experiments. Two exclusive machine holds were separated by a 90-second yield; every accepted run had less than 1.5 cores of measured outside load. The binary hashes were checked before execution.</p>
@@ -17,7 +69,7 @@
 <p>The initial review stopped after the negative 1T screen. The user's standing rule also required 48T tables for rejected-experiment commits. The supplementary measurements and archival commits below complete that evidence requirement. The earlier review, release receipt and pre-measurement candidate-evidence snapshot are preserved with their original hashes.</p>
 <h2 id="complete-1t-paired-screen">Complete 1T paired screen</h2>
 <p>All rates are completed solves/s. Candidate and baseline use the same padding within each row.</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Complete 1T paired screen" tabindex="0"><table id="docs-table-2"><caption>Complete 1T paired screen</caption>
 <thead>
 <tr><th align="right">Pad</th><th align="right">Repeat</th><th align="right">Baseline</th><th align="right">Byte loads</th><th align="right">Byte / baseline</th><th align="right">Outlined advance</th><th align="right">Outline / baseline</th></tr>
 </thead>
@@ -38,7 +90,7 @@
 </table></div>
 <h2 id="complete-48t-paired-rounds">Complete 48T paired rounds</h2>
 <p>Rates are completed solves/s. Each row shares the same baseline. Outside-load values follow the execution order.</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Complete 48T paired rounds" tabindex="0"><table id="docs-table-3"><caption>Complete 48T paired rounds</caption>
 <thead>
 <tr><th align="right">Round</th><th>Order</th><th align="right">Baseline</th><th align="right">Byte loads</th><th align="right">Byte / baseline</th><th align="right">Outlined advance</th><th align="right">Outline / baseline</th><th>Outside cores</th></tr>
 </thead>
@@ -51,7 +103,7 @@
 </tbody>
 </table></div>
 <h2 id="preserved-branches-and-validation">Preserved branches and validation</h2>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Preserved branches and validation" tabindex="0"><table id="docs-table-4"><caption>Preserved branches and validation</caption>
 <thead>
 <tr><th>Experiment</th><th>Negative branch</th><th>Commit</th></tr>
 </thead>
@@ -65,4 +117,33 @@
 <p>The earlier phack PMU collection motivated these mechanisms: reducing packed-lookup work and reducing instruction footprint. Their timing results did not justify adoption.</p>
 <p>A separate SSSE3 implementation was explored for older x86-64 machines. Its native correctness, lint and focused vector Miri checks passed. It does not alter the AVX2/BMI2 path used by this VM. The experiment is retained under <code>/data/agents/pmu-westmere/</code>. Adoption would require complete validation of a rebased candidate and measurements on the intended physical host; it is excluded from main and the shipped profiling kit.</p>
 <p>Evidence: <a href="../data/pmu-experiments/screen-summary.json">1T screen</a>, <a href="../data/pmu-experiments/negative-48t/summary.json">48T rounds and identity</a>, <a href="../data/pmu-experiments/build-validation.json">native/focused checks</a>, <a href="../data/pmu-experiments/negative-archive.json">archive receipt</a>, <a href="../data/pmu-experiments/release-decision.json">initial release decision</a>, <a href="HARDWARE_COUNTERS.html">phack PMU analysis</a>.</p>
-</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>
+
+<p class="source-link"><a href="OPTIMIZATION_REVIEW.md">Markdown source</a></p></main>
+<footer><a href="../PROVENANCE.html">Sources and evidence scope</a></footer>
+<script>
+for (const wrapper of document.querySelectorAll('.table-wrap')) {
+  const table=wrapper.querySelector('table');
+  const rows=[...table.tBodies].flatMap(body=>[...body.rows]);
+  if(rows.length>50) wrapper.classList.add('long-table');
+  if(rows.length<=12) continue;
+  const tools=document.createElement('div'); tools.className='table-tools';
+  const label=document.createElement('label'); label.textContent='Filter this table';
+  const input=document.createElement('input'); input.type='search'; input.id=table.id+'-filter';
+  label.htmlFor=input.id; input.setAttribute('aria-controls',table.id);
+  const count=document.createElement('span'); count.className='note'; count.setAttribute('aria-live','polite');
+  count.textContent=rows.length+' rows';
+  input.addEventListener('input',()=>{
+    const query=input.value.trim().toLowerCase(); let shown=0;
+    for(const row of rows){row.hidden=!!query&&!row.textContent.toLowerCase().includes(query);if(!row.hidden)shown++;}
+    count.textContent=shown+' of '+rows.length+' rows';
+  });
+  tools.append(label,input,count); wrapper.before(tools);
+}
+function revealTarget(){
+  let id;try{id=decodeURIComponent(location.hash.slice(1));}catch{return;}
+  const target=document.getElementById(id);if(!target)return;
+  for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+}
+revealTarget(); window.addEventListener('hashchange',revealTarget);
+</script>
+</body></html>

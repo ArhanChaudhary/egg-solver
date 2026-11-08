@@ -4,12 +4,12 @@
 
 This archive preserves **478 surviving commit-message records**, including their before/after tables and explanations. Each record names its source commit and date. A commit reachable from the release is history, not necessarily a separate optimization that still applies unchanged.
 
-- [Negative and neutral experiments](NEGATIVE_EXPERIMENTS.md): all 151 current negative branch tips.
+- [Negative and neutral experiments](NEGATIVE_EXPERIMENTS.md): 151 retained negative/neutral branch-tip records.
 - [Archived experiment branches](ARCHIVED_EXPERIMENTS.md): all 59 archived tips.
-- [Complete searchable CSV](commit-index.csv) and [JSON](commit-index.json): all surviving records and their current references.
+- [Complete searchable CSV](commit-index.csv) and [JSON](commit-index.json): all surviving records and references recorded at collection.
 - [Technique inventories](../reference/inventories/README.md): guided reviews of competing solvers and optimization opportunities.
 
-These are dated experiment notes. Older “pending” statements, test counts and source paths describe the historical state. Use the current comparison and safety chapters for the release. Percentages use different baselines and workloads and are not additive. Some records contain only a diagnostic or an untested hypothesis; they are retained as such, not turned into measured wins. The two specifically excluded backend timing comparisons were removed from their historical messages; their remaining evidence is preserved.
+These are dated experiment notes. Older “pending” statements, test counts and source paths describe the historical state. Use the comparison and safety guides for the measured source scope. Percentages use different baselines and workloads and are not additive. Some records contain only a diagnostic or an untested hypothesis; they are retained as such, not turned into measured wins. The two specifically excluded backend timing comparisons were removed from their historical messages; their remaining evidence is preserved.
 
 ## History reachable from the release
 

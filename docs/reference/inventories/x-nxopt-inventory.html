@@ -1,4 +1,56 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>nxopt technique inventory (agent x-nx) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../../history/index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="x-nxopt-inventory.md">Markdown source</a> · Offline document</p><details><summary>On this page</summary><ul><li><a href="#a-search-loop">A. Search loop</a></li><li><a href="#b-pruning-table-design-and-encoding">B. Pruning table design and encoding</a></li><li><a href="#c-coordinates-cube-moves-symmetry">C. Coordinates, cube moves, symmetry</a></li><li><a href="#d-lookup-scheduling-memory-threads-compiler-i-o">D. Lookup scheduling, memory, threads, compiler, I/O</a></li><li><a href="#e-table-generation-not-on-the-solve-path">E. Table generation (not on the solve path)</a></li><li><a href="#f-brainstorm-ideas-assigned-to-x-nx-p-ideas-txt">F. Brainstorm ideas assigned to x-nx ($P/ideas.txt)</a></li><li><a href="#m-measurements-and-prototypes-x-nx">M. Measurements and prototypes (x-nx)</a></li><li><a href="#notes-why-the-mapping-holds">Notes: why the mapping holds</a></li></ul></details><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="nxopt-technique-inventory-agent-x-nx">nxopt technique inventory (agent x-nx)</h1>
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>nxopt technique inventory (agent x-nx) — egg-solver</title><style>
+:root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
+header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
+header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
+header a { color:#d9f0ff; }
+header a[aria-current] { color:white; text-decoration-thickness:3px; }
+main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+h1 { margin-top:0; font-size:2rem; line-height:1.25; }
+h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
+h3 { margin-top:1.5rem; }
+a { color:var(--accent); overflow-wrap:anywhere; }
+p,li { max-width:90ch; }
+code { background:#eff3f6; border-radius:3px; padding:.1em .25em; overflow-wrap:anywhere; font-size:.9em; }
+pre { max-width:100%; padding:1rem; background:#eef3f6; overflow:auto; line-height:1.45; }
+pre code { background:none; padding:0; overflow-wrap:normal; }
+.table-wrap { max-width:100%; overflow:auto; margin:1rem 0 1.5rem; border:1px solid var(--line); }
+.table-wrap.long-table { max-height:70vh; }
+table { width:100%; border-collapse:collapse; font-size:.9rem; font-variant-numeric:tabular-nums; }
+th,td { padding:.55rem .65rem; border:1px solid var(--line); vertical-align:top; overflow-wrap:normal; }
+th { background:#eaf1f6; text-align:left; position:sticky; top:0; z-index:1; }
+tr:nth-child(even) { background:#f8fafb; }
+caption,.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+details { border:1px solid var(--line); padding:.6rem 1rem; border-radius:5px; margin:1rem 0; }
+summary { cursor:pointer; font-weight:600; }
+.table-tools { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:.6rem; background:#f4f7f9; }
+.table-tools input { font:inherit; border:1px solid #afc0ce; border-radius:4px; padding:.3rem .5rem; width:min(100%,22rem); min-width:0; }
+.note,.source-link,footer { color:var(--muted); font-size:.85rem; }
+.source-link { margin-top:2rem; }
+.archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
+footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
+svg { max-width:100%; height:auto; }
+:target { scroll-margin-top:1rem; }
+.skip-link { position:absolute; left:-10000px; }
+.skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
+@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+</style></head>
+<body>
+<a class="skip-link" href="#docs-content">Skip to content</a>
+<header><strong>egg-solver</strong><nav aria-label="Documentation"><a href="../../index.html">Home</a>
+<a href="../../guide/OVERVIEW.html">Learn</a>
+<a href="../../comparisons/index.html">Benchmarks</a>
+<a href="../../performance/index.html">Performance</a>
+<a href="../../safety/index.html">Safety</a>
+<a href="../../history/index.html">History</a>
+<a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<main id="docs-content"><h1 id="nxopt-technique-inventory-agent-x-nx">nxopt technique inventory (agent x-nx)</h1>
+<p class="archive-note">Historical snapshot. Its source, timings and pending statements belong to the recorded experiment, not the current checkout. <a href="../../index.html">Documentation home</a>.</p>
 <p>Sources read in full: <code>~/ref/cube20src/nxopt.w</code> (2062 lines), <code>nxopt.md</code>, <code>makefile-nxopt</code>, <code>README.md</code>,
 <code>TODO.md</code>, <code>cubepos.w</code> (move, inverse, movepc, symmetry, canonical sequences, threading), <code>kocsymm.w</code>,
 <code>phase1prune.w</code>, <code>phase1prune2.w</code> (the last three are the two-phase solver's, but they are in the
@@ -11,8 +63,9 @@ among the 18 moves. In our kernel a node branches on one side (the &quot;moved&q
 side <code>b</code> is premultiplied by <code>m^-1</code>, so its value depends on the coset <code>H m^-1 b</code>.</p>
 <p>Verdicts: <strong>done</strong> (we have it, or something strictly stronger), <strong>gap</strong> (applies, we lack it),
 <strong>n/a</strong> (does not apply to H48 / our setting), <strong>neg</strong> (tried, measured not to pay).</p>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#a-search-loop">A. Search loop</a></li><li><a href="#b-pruning-table-design-and-encoding">B. Pruning table design and encoding</a></li><li><a href="#c-coordinates-cube-moves-symmetry">C. Coordinates, cube moves, symmetry</a></li><li><a href="#d-lookup-scheduling-memory-threads-compiler-i-o">D. Lookup scheduling, memory, threads, compiler, I/O</a></li><li><a href="#e-table-generation-not-on-the-solve-path">E. Table generation (not on the solve path)</a></li><li><a href="#f-brainstorm-ideas-assigned-to-x-nx-p-ideas-txt">F. Brainstorm ideas assigned to x-nx ($P/ideas.txt)</a></li><li><a href="#m-measurements-and-prototypes-x-nx">M. Measurements and prototypes (x-nx)</a></li><li><a href="#notes-why-the-mapping-holds">Notes: why the mapping holds</a></li></ul></details>
 <h2 id="a-search-loop">A. Search loop</h2>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="A. Search loop" tabindex="0"><table id="docs-table-1"><caption>A. Search loop</caption>
 <thead>
 <tr><th>#</th><th>technique</th><th>where in nxopt</th><th>what it does</th><th>ours</th><th>applies to H48?</th><th>expected gain</th><th>verdict</th></tr>
 </thead>
@@ -44,7 +97,7 @@ side <code>b</code> is premultiplied by <code>m^-1</code>, so its value depends 
 </tbody>
 </table></div>
 <h2 id="b-pruning-table-design-and-encoding">B. Pruning table design and encoding</h2>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="B. Pruning table design and encoding" tabindex="0"><table id="docs-table-2"><caption>B. Pruning table design and encoding</caption>
 <thead>
 <tr><th>#</th><th>technique</th><th>where in nxopt</th><th>what it does</th><th>ours</th><th>applies?</th><th>expected gain</th><th>verdict</th></tr>
 </thead>
@@ -65,7 +118,7 @@ side <code>b</code> is premultiplied by <code>m^-1</code>, so its value depends 
 </tbody>
 </table></div>
 <h2 id="c-coordinates-cube-moves-symmetry">C. Coordinates, cube moves, symmetry</h2>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="C. Coordinates, cube moves, symmetry" tabindex="0"><table id="docs-table-3"><caption>C. Coordinates, cube moves, symmetry</caption>
 <thead>
 <tr><th>#</th><th>technique</th><th>where in nxopt</th><th>what it does</th><th>ours</th><th>applies?</th><th>gain</th><th>verdict</th></tr>
 </thead>
@@ -80,7 +133,7 @@ side <code>b</code> is premultiplied by <code>m^-1</code>, so its value depends 
 </tbody>
 </table></div>
 <h2 id="d-lookup-scheduling-memory-threads-compiler-i-o">D. Lookup scheduling, memory, threads, compiler, I/O</h2>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="D. Lookup scheduling, memory, threads, compiler, I/O" tabindex="0"><table id="docs-table-4"><caption>D. Lookup scheduling, memory, threads, compiler, I/O</caption>
 <thead>
 <tr><th>#</th><th>technique</th><th>where in nxopt</th><th>what it does</th><th>ours</th><th>applies?</th><th>gain</th><th>verdict</th></tr>
 </thead>
@@ -96,7 +149,7 @@ side <code>b</code> is premultiplied by <code>m^-1</code>, so its value depends 
 </tbody>
 </table></div>
 <h2 id="e-table-generation-not-on-the-solve-path">E. Table generation (not on the solve path)</h2>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="E. Table generation (not on the solve path)" tabindex="0"><table id="docs-table-5"><caption>E. Table generation (not on the solve path)</caption>
 <thead>
 <tr><th>#</th><th>technique</th><th>where in nxopt</th><th>what it does</th><th>ours</th><th>applies?</th><th>gain</th><th>verdict</th></tr>
 </thead>
@@ -110,7 +163,7 @@ side <code>b</code> is premultiplied by <code>m^-1</code>, so its value depends 
 </tbody>
 </table></div>
 <h2 id="f-brainstorm-ideas-assigned-to-x-nx-p-ideas-txt">F. Brainstorm ideas assigned to x-nx (<code>$P/ideas.txt</code>)</h2>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="F. Brainstorm ideas assigned to x-nx ($P/ideas.txt)" tabindex="0"><table id="docs-table-6"><caption>F. Brainstorm ideas assigned to x-nx ($P/ideas.txt)</caption>
 <thead>
 <tr><th>#</th><th>idea</th><th>ours</th><th>measurement</th><th>verdict</th></tr>
 </thead>
@@ -124,7 +177,7 @@ side <code>b</code> is premultiplied by <code>m^-1</code>, so its value depends 
 <h2 id="m-measurements-and-prototypes-x-nx">M. Measurements and prototypes (x-nx)</h2>
 <p>All counts: <code>count.sh</code> (8 threads, deterministic), lengths identical unless noted.</p>
 <p><strong>M1, A10 axis inheritance</strong> (nodes identical by construction; lookups):</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="M. Measurements and prototypes (x-nx)" tabindex="0"><table id="docs-table-7"><caption>M. Measurements and prototypes (x-nx)</caption>
 <thead>
 <tr><th>set</th><th>main 55e048e lookups/cube</th><th>axis (v2) lookups/cube</th><th>change</th></tr>
 </thead>
@@ -139,7 +192,7 @@ v3 (known flag in <code>skip</code> bits) -15.6/-15.0%. <code>stream_thread</cod
 (consumer only), 316 (v2), 319 (v3). The ceiling (~2.4% of lookups) is below the cost of every
 form. Negative.</p>
 <p><strong>M2, B3 base</strong> (simulated from the base-10 table on random:1000:2026; x-h48's exact base-11 emulation: +10.2% nodes):</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="M. Measurements and prototypes (x-nx)" tabindex="0"><table id="docs-table-8"><caption>M. Measurements and prototypes (x-nx)</caption>
 <thead>
 <tr><th>base</th><th>rule</th><th>nodes/cube</th><th>lookups/cube</th></tr>
 </thead>
@@ -166,7 +219,7 @@ whatever their parents' bounds. Measured with path bound = max over prefixes of 
 <p><strong>M5, 5.4 duplicates beyond commuting order</strong> (reference solver, random:200:2026, every generated
 node hashed with its remaining depth; a node is a duplicate if the same position was generated
 before with at least as many moves left):</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="M. Measurements and prototypes (x-nx)" tabindex="0"><table id="docs-table-9"><caption>M. Measurements and prototypes (x-nx)</caption>
 <thead>
 <tr><th>depth from root</th><th>nodes</th><th>within the job</th><th>within the iteration (any job)</th></tr>
 </thead>
@@ -201,4 +254,33 @@ not commute with X2, so nothing else is shared; and the moved side's cosets <cod
 <li>A4 has no analog: a tight H48 probe forbids only the 6 half turns at its end; nothing forbids the
 quarter turns without probing the children.</li>
 </ul>
-</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>
+
+<p class="source-link"><a href="x-nxopt-inventory.md">Markdown source</a></p></main>
+<footer><a href="../../PROVENANCE.html">Sources and evidence scope</a></footer>
+<script>
+for (const wrapper of document.querySelectorAll('.table-wrap')) {
+  const table=wrapper.querySelector('table');
+  const rows=[...table.tBodies].flatMap(body=>[...body.rows]);
+  if(rows.length>50) wrapper.classList.add('long-table');
+  if(rows.length<=12) continue;
+  const tools=document.createElement('div'); tools.className='table-tools';
+  const label=document.createElement('label'); label.textContent='Filter this table';
+  const input=document.createElement('input'); input.type='search'; input.id=table.id+'-filter';
+  label.htmlFor=input.id; input.setAttribute('aria-controls',table.id);
+  const count=document.createElement('span'); count.className='note'; count.setAttribute('aria-live','polite');
+  count.textContent=rows.length+' rows';
+  input.addEventListener('input',()=>{
+    const query=input.value.trim().toLowerCase(); let shown=0;
+    for(const row of rows){row.hidden=!!query&&!row.textContent.toLowerCase().includes(query);if(!row.hidden)shown++;}
+    count.textContent=shown+' of '+rows.length+' rows';
+  });
+  tools.append(label,input,count); wrapper.before(tools);
+}
+function revealTarget(){
+  let id;try{id=decodeURIComponent(location.hash.slice(1));}catch{return;}
+  const target=document.getElementById(id);if(!target)return;
+  for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+}
+revealTarget(); window.addEventListener('hashchange',revealTarget);
+</script>
+</body></html>

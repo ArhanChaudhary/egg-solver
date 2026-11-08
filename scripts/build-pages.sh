@@ -8,6 +8,7 @@ if [ -e "$output" ]; then
     exit 2
 fi
 bun scripts/render-docs.mjs
+python3 scripts/check-docs.py
 wasm/build.sh
 mkdir -p "$output/dist"
 cp wasm/index.html wasm/demo-worker.mjs wasm/egg-solver.mjs wasm/egg-solver-thread.mjs "$output/"

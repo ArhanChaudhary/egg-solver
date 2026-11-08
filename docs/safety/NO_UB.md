@@ -1,242 +1,53 @@
-# Undefined-behavior evidence report
+# Undefined-behavior evidence
 
-**My assessment — 2026-11-07 15:18:23 UTC**
+[Safety overview](README.md) · [Complete dated assessment](NO_UB_20261107.md) · [Validation records](../evidence/validation/ub-audit/REPORT.md)
 
-**I believe the identified UB mechanisms have been addressed in the validated code now integrated into main. I do not claim that every possible execution is free of UB.** Both complete Miri catalogues passed, as did the source-bound native/backend, focused Miri, ThreadSanitizer and AddressSanitizer checks. Final performance validation, report checks and the refreshed perf package have completed.
+**Assessment recorded November 7, 2026.** The identified defects below were fixed and the stated checks passed on the audited source. **This is not a proof that every possible execution is free of undefined behavior.** Checksums, solution replay and finite Miri runs answer different questions.
 
-Current main is `842a5043abfd550313a86a3d9bb5254f4b457540`, with a clean working tree. Its audited source fingerprint is `93478bc5c45ba267255574f8cb466f02f006f1c7bf558fb8f9d088ec4307a4c9`, identical to candidate `316597f64a9bd749e8a01b67f96c108c03611e68`. The validated fixes are now present in the release binaries; this statement is no longer limited to an isolated candidate.
+## Source covered by the audit
 
-My confidence is strongest in the specific input-validation and ownership fixes, because the changes remove the conditions that produced the observed failures. The complete concurrent search protocol and native platform boundaries still depend on interacting invariants that finite tests and this manual review do not exhaustively establish. There is no defensible numerical percentage of all possible UB eliminated. The implementation review and concrete limits below remain part of the assessment.
-
-<!-- CURRENT-UB-AUDIT-START -->
-**Current audit status — 2026-11-07 15:18 UTC**
-
-Candidate: `316597f64a9bd749e8a01b67f96c108c03611e68`; source SHA-256 `93478bc5c45ba267255574f8cb466f02f006f1c7bf558fb8f9d088ec4307a4c9`.
-The audited fixes are integrated into main.
-All listed validation gates passed on these source bytes.
-
-**The code has not been proven free of UB.** Finite tests and manual review cannot establish safety for every input, caller, interleaving and platform.
-
-The additional audit reproduced these failures with Miri:
-
-| Finding | Evidence | Candidate fix |
-|---|---|---|
-| Out-of-range table read | [x86 diagnostic](../evidence/validation/ub-audit/x86-table_index.log) | Checked getter and validated backing storage |
-| Symmetry index 48 | [diagnostic](../evidence/validation/ub-audit/release-x86-symmetry_index.log) | Reject invalid symmetry indices |
-| Malformed cube bytes `[4;32]` | [diagnostic](../evidence/validation/ub-audit/release-x86-malformed_cube_rank.log) | Validate cube construction and hide raw fields |
-| Reserved edge-coordinate key 0 | [diagnostic](../evidence/validation/ub-audit/release-x86-malformed_coordinate.log) | Reject reserved slots and invalid ranks |
-| Search tracing after publication | [seed-15 diagnostic](../evidence/validation/ub-audit/trace-before-fix.log) | Finish tracing before workers can claim jobs |
-
-The first four reproductions use only safe public API calls and also failed on the portable backend. The tracing reproduction uses a real shared search with tracing enabled and a test-only delay after publication to expose the handoff. The saved diagnostic identifies another worker obtaining a mutable reference while `trace_build` still holds its argument reference.
-
-Manual review also found an unpublished shared-memory trailer payload read; the reader now waits for its Release marker. Staged-sort setup no longer carries a mutable argument borrow across publication. Mapping and shared-memory inspection APIs now state their unsafe storage contracts, while `open_copy` loads private RAM safely. Construction guards cover metadata, allocation lengths, endianness and ISA features. wasm32 h7 is rejected because its allocation exceeds `isize::MAX`; h0–h6 remain supported. These are compatibility changes, not a universal safety guarantee.
-
-| Validation of the final candidate | Status |
-|---|---|
-| Native/backend suite | PASS |
-| Focused strict-provenance Miri, both backends | PASS |
-| ThreadSanitizer: shared search and boundary tests | PASS |
-| AddressSanitizer: native library and integration tests | PASS |
-| Full x86 Miri catalogue and 16 shared-search seeds | PASS |
-| Full portable Miri catalogue and 16 shared-search seeds | PASS |
-
-The native run includes 58 library tests, 14 CLI tests, 16 correctness tests, two no-panic scanner tests and four compile-fail doctests, plus binary and backend checks. ARM/QEMU, WASI/wasmtime and Bun checks passed; one WASI test remains explicitly ignored in its harness. The source-bound focused Miri checks exercise three new boundary/publication tests and 16 trailer-publication seeds on each backend. ThreadSanitizer instruments the tested native code and standard library. These counts describe executions, not percentages of possible behaviors.
-
-Both hot-code comparisons passed: search-loop instructions, required page offsets and frame sizes match the preceding safety candidate. Final 1T/48T performance confirmation has completed; its measurements are recorded separately from the safety evidence.
-
-Evidence: [native/backends](../evidence/validation/ub-audit/native-validation.json), [complete native log](../evidence/validation/ub-audit/full-check.log), [focused Miri](../evidence/validation/ub-audit/focused-miri-validation.json), [ThreadSanitizer](../evidence/validation/ub-audit/tsan-validation.json), [AddressSanitizer](../evidence/validation/ub-audit/asan-validation.json), [full audit](../evidence/validation/ub-audit/REPORT.md), [live Miri state](../evidence/validation/continuation/miri-state.txt).
-
-Full Miri uses default provenance handling because the shipped synchronization dependency uses exposed provenance; warnings are retained and no UB checks are disabled. Actual mmap/SysV behavior, native assembly/AVX-512, NEON, WASM host behavior and all possible weak-memory executions are not interpreted by these runs. The historical evidence and exclusions below remain relevant, but their old source identity must not be confused with the new candidate.
-<!-- CURRENT-UB-AUDIT-END -->
-
-
-
-
-
-
-**Why I think the identified defects are addressed**
-
-| Area | Reason for confidence | Remaining qualification |
-|---|---|---|
-| Cube and coordinate inputs | Public construction validates representations; invalid symmetry indices and reserved coordinate values are rejected before reaching unchecked lookups. Raw fields and unchecked construction helpers are restricted to the crate. The focused boundary tests pass on both backends under strict-provenance Miri. | Trusted internal construction and generated lookup data still need to preserve the same invariants. Checking the public boundary does not prove every internal producer correct. |
-| Table indexing and cached pointers | Table construction checks metadata and backing size; the public getter checks logical and physical bounds. Private fields prevent callers from independently replacing metadata, memory or solver references that cached pointers depend on. | Allocation lifetime, alignment and internal hot-path index bounds remain safety obligations. Valid storage does not establish that table contents are mathematically correct lower bounds. |
-| Atomic writes versus byte views | Obtaining atomic words now requires an explicit unsafe contract. The formerly safe conflicting-view example fails to compile without an unsafe block, and the permitted write-then-read sequence passes Miri. | This closes the safe-API hole. An unsafe caller must still avoid overlapping incompatible accesses; the type change alone cannot enforce that caller's behavior. |
-| Search publication and tracing | Tracing now finishes before the Release publication that allows another worker to rebuild the state. Staged-sort setup also ends its mutable borrow before publishing work. The x86 full run includes the tracing regression under all 16 scheduler seeds. | This repairs the identified reference overlap. It does not establish every ownership transition involving `UnsafeCell<Inner>`. The staged-sort concern was found by review, not by a separate failing reproduction. |
-| Shared-memory trailer publication | The reader copies payload only after its Acquire load observes the publication marker, matching the writer's Release operation. The actual copy helper passes the focused publication tests and scheduling seeds. | The argument requires one-time publication, initialized storage and no later external payload mutation. Miri checks the helper, not an actual System V attachment or arbitrary external writers. |
-| Dependency syscall boundary | The vendored futex call passes explicitly typed raw pointers in place of the incompatible C-variadic argument that Miri rejected. Subsequent contention and shared-search tests pass on the candidate. | This addresses the diagnosed ABI error; it is not a complete audit of the dependency or all operating-system implementations. |
-| Storage and target constraints | Allocation/mapping sizes are bounded by `isize::MAX`; metadata and trailer arithmetic are checked; null mappings are rejected. Unsupported endianness is rejected, and the AVX-512 blend guard requires both BW and VL. | These changes encode necessary preconditions. Actual mapping behavior, machine instructions and foreign callers still require separate reasoning and native validation. |
-
-The relevant implementations are [table ownership and getters](../evidence/validation/ub-audit/fix/src/tables.rs.html#L803), [search publication](../evidence/validation/ub-audit/fix/src/lanes/share.rs.html#L2171), [staged-sort publication](../evidence/validation/ub-audit/fix/src/lanes/share.rs.html#L1689), and [the shared-memory payload reader](../evidence/validation/ub-audit/fix/src/tables/shm.rs.html#L36). The [additional audit record](../evidence/validation/ub-audit/REPORT.md) distinguishes reproduced failures from manual findings and defensive hardening.
-
-Mapped storage deserves a precise qualification. Marking an API unsafe documents who must uphold its storage contract; it does not prevent a different process from modifying or truncating the backing file. The CLI's mapped/shared modes still require that contract. `H48Table::open_copy` instead creates private RAM, removing dependence on subsequent external changes to the file. My assessment is conditional on the contracts of whichever storage mode is used.
-
-**What the completed evidence establishes**
-
-The complete x86 Miri run finished at **08:52:15 UTC** on the candidate's exact source fingerprint. Its catalogue contains **56 named tests: 50 executed successfully and six explicitly ignored**. All names were accounted for. Four shared-search tests ran under each of 16 scheduler seeds, giving 64 shared-search test executions; these repetitions do not increase the number of distinct test names. The previously unfinished checksum test passed. The [first complete x86 acceptance record](../evidence/validation/ub-audit/x86-first-complete-validation.json) lists the source fingerprint, compiler, flags, test names and exclusions, and the [raw run log](../evidence/validation/continuation/miri-current.log) records completion.
-
-The portable Miri run also completed successfully: 54 catalogued names, 48 executed unique tests and 6 explicitly ignored tests. All 16 shared-search seed harnesses passed all four tests. The checksum and lane-splitting groups finished. See the [portable acceptance record](../evidence/validation/continuation/miri-portable-validation.json) for the exact source and validation timestamp.
-
-The final portable lane-splitting test was still active as its original four-hour wrapper limit approached. At 10:35 UTC, the existing watchdog was extended by setting three hours of remaining time, giving a deadline of 13:35 UTC. At 13:03 UTC, with the same test still active and no reported failure, a second bounded extension set three hours remaining, ending at 16:03 UTC. Neither operation restarted or attached a debugger to the interpreter, or changed its source, test inputs or checks; only the timeout supervisor's timer changed. These deadlines are bounds, not ETAs or passing results. Evidence: [first extension](../evidence/validation/ub-audit/watchdog-extension.json), [second extension](../evidence/validation/ub-audit/watchdog-extension-second.json).
-
-Native/backend validation, focused strict-provenance Miri, ThreadSanitizer and AddressSanitizer all passed on the same candidate fingerprint. These methods add different evidence: Miri checks executed Rust-level accesses and aliasing; the sanitizers exercise instrumented native executions; backend and correctness tests check behavior on their selected inputs. Agreement between them is useful, but their coverage overlaps and none independently proves the complete program sound. In particular, AddressSanitizer does not verify Rust's full aliasing rules, and ThreadSanitizer does not explore every possible schedule.
-
-The earlier candidate passed native checks, focused Miri and ThreadSanitizer before the tracing regression exposed another defect. That is a concrete reason to remain cautious, not merely a theoretical disclaimer: the earlier passing tests did not exercise the relevant overlap. The new tracing test improves that coverage, but cannot establish that no similar untested transition exists. [Earlier validation and tracing finding](../evidence/validation/ub-audit/REPORT.md).
-
-**What still prevents a stronger conclusion**
-
-| Remaining issue | Current assessment and next step |
-|---|---|
-| Validation and source identity | Both full Miri runs passed and the checked source is integrated. The final binaries and perf archive are tied to that source. These results remain specific to its source bytes, compiler and tested configurations. |
-| Concurrent ownership protocol | Review claims, stage completion, buffer reuse, tracing and reclamation as one state machine. Targeted model checking of small protocol components could strengthen the finite-seed evidence. No exhaustive concurrency model or formal proof has been completed. |
-| Native assembly, SIMD and OS boundaries | Continue checking instruction constraints, supported features, pointer bounds/lifetimes and mapping contracts. Miri's alternative implementations do not validate the original assembly; successful native/sanitizer tests cover their executed cases only. |
-| Unsafe callers and foreign interfaces | Preserve the validated representation, storage and pointer-lifetime obligations at every internal and FFI entry. WASM's borrowed worker callback relies on all workers finishing before return and the shipped abort-on-panic configuration; unwinding or a changed join protocol requires fresh review. |
-| Exclusions and scale | The six ignored x86 Miri tests remain exclusions. The interpreted searches use smaller fixtures and fewer workers than production, and Cargo integration tests are outside this Miri runner. Keep native evidence separate and preserve these limits in any final claim. |
-| Source and configuration changes | Recheck applicable invariants and rerun relevant validation after edits, compiler changes or newly supported targets. A passing source fingerprint does not certify later source bytes. |
-
-I also keep the user's no-panic requirement separate from memory safety. Replacing a checked access with an unchecked access is justified only by a sound invariant. The no-panic scanner passing is evidence about the constructs it scans, not proof that every possible implicit panic has been eliminated. Likewise, solution replay and optimality comparisons address solver correctness; they do not establish absence of UB.
-
-For candidate `316597f`, the supported conclusion is: **the identified failure mechanisms have fixes supported by code review and completed regression checks, with no further UB reported in those completed executions. Both complete Miri runs and integration are finished; absence of UB across all supported executions remains unproven.**
-
-<details>
-<summary>Historical evidence from 06:21 UTC, before the additional audit (superseded status)</summary>
-
-The following material is retained for provenance. Its candidate, test counts, pending tasks and status statements describe the earlier snapshot; use the assessment and current status above for the present state.
-
-Snapshot: 2026-11-07 06:21 UTC. This is a record of observed evidence, not a claim that validation has finished.
-
-**The code has not been proven free of undefined behavior. The complete Miri validation has not passed. Miri has found real defects, and their prepared fixes have not yet been merged into main.**
-
-Passing Miri tests would strengthen the evidence, but would still not prove that every input, caller, thread interleaving, platform, and compiled machine-code path is safe. Miri's own documentation explicitly distinguishes checking particular executions from establishing library soundness, and notes incomplete weak-memory exploration. [Miri documentation](https://github.com/rust-lang/miri/blob/master/README.md).
-
-**Source identity and current status**
-
-| Item | Exact state |
-|---|---|
-| Current main | `56ace9c10792b91d3fa521ca4af24801ca8b71fc`, `/home/super/egg-solver` |
-| Safety-fix candidate | `988f289fed03f2490359fe660297d9f502363845`, `/data/agents/ub-audit/source`; clean checkout when inspected |
-| Candidate source fingerprint | `e08ec2fb8aac3a4cc6ce991522fe238d26d16aa628b8ee3ca44ad1dd36681a32` |
-| Latest complete native/backend validation of that fingerprint | PASS, 2026-11-07 00:12:05 UTC |
-| Latest complete-suite x86 Miri attempt | Started 00:12:06 UTC; killed by the 5,400-second wrapper limit at 01:42:06 UTC |
-| Unfinished test at that timeout | `tables::file::tests::checksum_sees_every_byte` |
-| Complete portable Miri pass on that candidate | Not completed; its full run has not started |
-| Full-source Miri acceptance records | Neither `miri-validation.json` nor `miri-portable-validation.json` exists |
-| Integration into main | Not performed; main does not contain these pending safety fixes |
-| Retry | Scheduled after the comparison coordinator exits, with a 14,400-second bound per backend; this limit is not an ETA |
-
-The fingerprint covers tracked Rust sources, manifests, Cargo.lock, build configuration, validation scripts, and the vendored dependency sources. It is a source identity check, not a safety proof. Main also has the previously preserved uncommitted `miri.sh` edit; a commit hash alone does not describe that working tree.
-
-Evidence: [native validation](../evidence/validation/continuation/miri-before-additional-ub-audit/miri-hardening-validation.json), [timeout record](../evidence/validation/continuation/miri-before-additional-ub-audit/miri-current-timeout.json), [Miri state](../evidence/validation/continuation/miri-before-additional-ub-audit/miri-state.txt), [source fingerprint implementation](../evidence/validation/continuation/source_provenance.py).
-
-**Defects Miri actually exposed**
-
-1. **The safe memory-view API permitted an invalid aliasing sequence.** A program using only safe calls could keep a shared byte slice, obtain atomic words for the same allocation, write through them, and then read the old byte slice. Miri reported that the write invalidated the byte reference's borrow tag.
-
-   The reproduction was:
-
-   ```rust
-   use egg_solver::tables::Memory;
-   use std::sync::atomic::Ordering;
-
-   fn main() {
-       let memory = Memory::anonymous(8).unwrap();
-       let bytes = memory.bytes().unwrap();
-       let words = memory.words().unwrap();
-       words[0].store(1, Ordering::Relaxed);
-       std::hint::black_box(bytes[0]);
-   }
-   ```
-
-   This is a diagnostic test program; its `unwrap` calls are not proposed production code. The candidate makes the atomic-word accessor and low-level generator entry unsafe with explicit caller obligations, and updates internal callers. The old safe reproduction is now rejected with compiler error E0133. The positive test `tables::tests::atomic_updates_finish_before_byte_reads` passed under Miri. Requiring an unsafe block prevents this particular misuse through an entirely safe call sequence; it does not prove every unsafe caller meets its contract.
-
-   Evidence: [original Miri diagnostic](../evidence/validation/continuation/miri-memory-api-probe.log), [compile-fail rejection](../evidence/validation/continuation/miri-before-additional-ub-audit/miri-memory-api-compile-fail.log), [positive-test log](../evidence/validation/continuation/miri-before-additional-ub-audit/miri-current/3-1.log).
-
-2. **A dependency's futex syscall arguments had an incompatible C-variadic type.** A scheduling-seed run reached `parking_lot_core 0.9.12`'s Linux futex wait. Miri expected a raw `*mut u32` argument and received an atomic reference. It reported undefined behavior at that call. The candidate vendors the dependency and applies explicit raw-pointer argument conversions, including the timeout pointer's type. The subsequent 16 shared-search seed harnesses completed without that diagnostic.
-
-   Evidence: [original futex diagnostic](../evidence/validation/continuation/miri-before-futex-abi-backport/miri-current/6.log), [candidate dependency implementation](../evidence/validation/ub-audit/source/vendor/parking_lot_core/src/thread_parker/linux.rs.html), [subsequent seed logs](../evidence/validation/continuation/miri-before-additional-ub-audit/miri-current/6.log).
-
-These are positive demonstrations that the testing found defects. They are also reasons not to describe current main as established to be UB-free. The preserved evidence does not establish that ordinary solver use triggers every defect; the first reproduction establishes a safe-public-API soundness problem.
-
-**What the latest x86 attempt completed**
-
-The runner catalogued 52 distinct unit-test names from the library and binaries. Reading the individual successful harness logs yields:
-
-| Category | Distinct names | Meaning |
-|---|---:|---|
-| Completed in successful harnesses | 45 | No Miri UB diagnostic in those completed executions |
-| Explicitly ignored | 6 | Listed but not executed under Miri |
-| Unfinished | 1 | The checksum test was still running when the wrapper killed the attempt |
-
-This is not 45/52 coverage of the program's behaviors. It counts named test cases only. Three shared-search tests were each run under 16 scheduler seeds, giving 48 test executions within that subset; they remain three distinct test names.
-
-Those three tests are `share_protocol_with_tiny_search`, `share_first_pass_reports_the_shortest_solution`, and `share_fresh_cube_solved_by_others_at_once`. All 16 seed harnesses report three passed tests and zero failed tests. The completed set also includes concurrent staged-sort/split tests, coordinate cross-checks, symmetry checks, mutex contention, and the valid atomic-update/byte-read sequence. These exercise useful invariants but do not exhaust them.
-
-Evidence: [catalogue](../evidence/validation/continuation/miri-before-additional-ub-audit/miri-current/catalogue.log), [all raw x86 logs](../evidence/validation/continuation/miri-before-additional-ub-audit/miri-current/README.md), [seed results](../evidence/validation/continuation/miri-before-additional-ub-audit/miri-current/6.log), [unfinished checksum log](../evidence/validation/continuation/miri-before-additional-ub-audit/miri-current/3-4.log).
-
-The run used:
+The tested candidate was `316597f64a9bd749e8a01b67f96c108c03611e68`, integrated as `842a5043abfd550313a86a3d9bb5254f4b457540`. The recorded source fingerprint is:
 
 ```text
-miri 0.1.0 (1c3a650696 2026-11-02)
-rustc 1.101.0-nightly (1c3a65069 2026-11-02)
-host: x86_64-unknown-linux-gnu
-RUSTFLAGS: -C target-cpu=x86-64-v3
-MIRIFLAGS: -Zmiri-symbolic-alignment-check -Zmiri-num-cpus=4
-shared-search scheduling seeds: 0..16, upper bound exclusive
+93478bc5c45ba267255574f8cb466f02f006f1c7bf558fb8f9d088ec4307a4c9
 ```
 
-The runner uses `cargo +nightly miri test --lib --bins` for build/catalogue steps, filtered library harnesses, and binary unit tests. It does not execute every Cargo test category. It checks worker failures and compares the catalogue with accounted test names before printing its completion marker. That marker was not reached in this attempt. A test-start line alone is not accepted as success in this evidence report.
+These identifiers state what was audited; they do not name today's repository `main`. Later source changes need applicable validation. The current documentation cleanup does not change the Rust search implementation or create a new Miri certificate.
 
-Default provenance checking and its warnings were retained. The earlier strict-provenance run stopped on the dependency's exposed-provenance pointer tagging. That unsupported-operation result was not classified as a successful test or, by itself, as a UB finding. The supported run did not use flags disabling alias, data-race, or validity checking. The precise tool behavior remains tied to the compiler version above. [Runner](../evidence/validation/ub-audit/source/miri.sh), [run header](../evidence/validation/continuation/miri-before-additional-ub-audit/miri-current.log), [preserved strict-mode attempt](../evidence/validation/continuation/miri-strict-attempt/README.md).
+## Reproduced defects and fixes
 
-**Explicit omissions and differences from production execution**
+| Defect | Fix / contract | Recorded evidence |
+|---|---|---|
+| Out-of-range public table read | Checked getter and validated backing size | [Miri diagnostic](../evidence/validation/ub-audit/x86-table_index.log) |
+| Invalid symmetry index 48 | Reject invalid symmetry indices | [Miri diagnostic](../evidence/validation/ub-audit/release-x86-symmetry_index.log) |
+| Malformed cube bytes | Validate construction; restrict raw fields | [Miri diagnostic](../evidence/validation/ub-audit/release-x86-malformed_cube_rank.log) |
+| Reserved edge-coordinate slot | Reject invalid keys/ranks | [Miri diagnostic](../evidence/validation/ub-audit/release-x86-malformed_coordinate.log) |
+| Tracing after shared-search publication | Finish tracing before another worker may claim/rebuild the state | [Seed-15 diagnostic](../evidence/validation/ub-audit/trace-before-fix.log) |
+| Shared-memory trailer publication, found by review | Read payload after observing the Release/Acquire marker | [Focused validation](../evidence/validation/ub-audit/focused-miri-validation.json) |
 
-| Gap | Consequence |
-|---|---|
-| Native inline assembly | Coordinate code uses `cfg(miri)` intrinsic equivalents. The original assembly is not interpreted by this run. |
-| Native AVX-512 paths | The complete-suite attempt targets x86-64-v3; it does not establish the safety of all native AVX-512 code. |
-| Linux System V shared memory | The actual implementation and its OS tests are excluded under `cfg(miri)`; basic configuration tests are not equivalent to testing real attachments. |
-| Large tables and full-depth searches | Small/truncated fixtures are used; the Miri runs are not full-size h7–h11 production searches. |
-| Thread schedules and weak-memory behavior | Sixteen seeds sample schedules. They do not enumerate all schedules, all 48-thread behaviors, or all hardware memory-order outcomes. |
-| Cargo integration tests and doctests | The current Miri runner selects library/binary unit tests, not the complete integration-test or doctest sets. |
-| Native allocation, file mapping and FFI | Miri substitutions and unsupported APIs limit correspondence to the actual operating system. |
-| Other targets and future versions | These results do not transfer automatically to ARM/NEON, WASM threads, different compiler versions, or changed sources. |
+Review also ended staged-sort mutable argument borrows before publication. Mapping and shared-memory APIs state unsafe storage contracts; safe copying owns private storage. These changes address concrete mechanisms. They do not exhaust every ownership transition, external writer or platform behavior.
 
-The six explicitly ignored named tests are:
+## Completed validation
 
-| Test | Recorded reason |
-|---|---|
-| `solver::tests::hot_index_matches_reference_index` | `Cocsep::generate` too slow under Miri |
-| `tables::tests::cocsep_classes_and_distribution` | `Cocsep::generate` too slow under Miri |
-| `tables::tests::table_from_file_memory_is_checked` | 29 MiB checksum too slow under Miri |
-| `tables::file::tests::trailer_write_keeps_data` | Files |
-| `tables::tests::opened_table_file_is_read_only` | Files |
-| `tables::tests::table_meta_and_size_are_checked` | Files |
+| Check | Recorded result | Scope |
+|---|---|---|
+| Full x86 Miri catalogue | 50 of 56 named tests passed; 6 explicitly excluded | Tested interpreted paths |
+| Full portable Miri catalogue | 48 of 54 named tests passed; 6 explicitly excluded | Tested interpreted paths |
+| Shared-search scheduling | 16 seeds per backend passed | Repeated schedules, not exhaustive interleavings |
+| Focused strict-provenance Miri | Passed on both tested backends | Boundary and publication helpers |
+| AddressSanitizer | Passed | Instrumented native library/integration paths |
+| ThreadSanitizer | Passed | Instrumented shared-search and boundary paths |
+| Native/backend checks | Passed with documented harness exclusions | Native, ARM/QEMU, WASI/wasmtime and Bun checks |
 
-There are additional reductions inside tests. Examples: the tiny shared-search test uses five cubes instead of 64 and two configurations instead of six; the first-pass test uses three cubes instead of 40 and one configuration instead of four; a staged-split test uses 9,000 jobs instead of 30,000; portable vector randomized checks use 50 rounds instead of 20,000. These are finite samples and reduced test fixtures, not exhaustive production-domain verification. The parallel-runner change preserved the existing Miri datasets; it did not make them identical to native datasets. [Shared-search test source](../evidence/validation/ub-audit/source/src/lanes/share.rs.html#L3883), [portable vector test source](../evidence/validation/ub-audit/source/src/portable/mod.rs.html#L707).
+[Native validation](../evidence/validation/ub-audit/native-validation.json), [focused Miri](../evidence/validation/ub-audit/focused-miri-validation.json), [ASan](../evidence/validation/ub-audit/asan-validation.json) and [TSan](../evidence/validation/ub-audit/tsan-validation.json) bind the results to source and tool settings. The [full dated assessment](NO_UB_20261107.md) retains test names, compiler versions, all six exclusions, earlier failed attempts and the detailed invariant review.
 
-**Separate experimental-code evidence**
+## Limits and caller obligations
 
-The packed-byte decoder experiment passed its focused reference-comparison test in both x86 and portable Miri configurations, with strict provenance and symbolic alignment checking. Its 12,288 input combinations concern that decoder test, not the whole solver. [x86 log](../data/pmu-experiments/logs/bytes-miri-x86.log), [portable log](../data/pmu-experiments/logs/bytes-miri-portable.log), [experiment provenance](../data/pmu-experiments/candidate-evidence.json).
+- Full Miri runs used default provenance handling because the synchronization dependency uses exposed provenance. Warnings are retained; no UB checks were disabled. Focused strict-provenance passes do not replace this qualification.
+- Actual file mappings, System V attachments, native assembly/AVX-512, NEON and WASM host behavior are outside the interpreted runs. Native/backend checks provide different evidence.
+- Unit-test catalogues do not cover every integration test, doctest, input or weak-memory execution.
+- Mapped/shared table storage must remain valid and immutable while borrowed. Private ownership after copying avoids external file-mutation dependencies.
+- Metadata/checksums establish storage shape and integrity, not mathematical admissibility of every pruning bound.
+- Removing intentional panic calls does not prove that dependencies or implicit operations can never panic.
 
-The unmerged SSSE3 candidate passed three focused Miri vector tests: randomized reference agreement, every byte lookup index in every lane, and unaligned input/bit-mask checks. That is useful coverage of the new intrinsic wrapper, not a full-source Miri pass. [Vector-test log](../evidence/validation/westmere-experiment/logs/ssse3-miri-vector-operations.log), [candidate build/validation record](../evidence/validation/westmere-experiment/build-validation.json).
-
-These experiments have separate source snapshots. Their focused passes cannot be substituted for completion of the canonical safety candidate or attributed to current main.
-
-**Complementary evidence and its limits**
-
-Native tests, backend builds, clippy, search-identity checks and hot-instruction comparisons have passed for the safety candidate. They provide regression and compilation evidence, not a proof of memory safety. Mordant completed on the inspected snapshots and highlighted, among other things, the unsafe `Sync` implementation around `CubeCtx`'s `UnsafeCell<Inner>`. Its correctness depends on the shared-search ownership and publication protocol and requires manual review. [Native evidence](../evidence/validation/continuation/miri-before-additional-ub-audit/miri-hardening-validation.json), [Mordant report](MORDANT.md).
-
-The project's ban on intentional runtime panic calls is a separate property. Avoiding a panic does not make an unchecked pointer/index valid. Safe failure handling, successful solves, and zero explicit panic macros do not establish absence of UB.
-
-**Outstanding work**
-
-1. Complete the exact-source x86 and portable Miri attempts, retain failures and exclusions, and integrate the safety fixes only after their validation gates pass.
-2. Audit every unsafe operation's bounds, initialization, alignment, lifetime, aliasing, provenance and synchronization preconditions, including whether safe public callers can violate them.
-3. Audit the `CubeCtx` publication/reclamation protocol and dependency FFI boundaries. Use targeted tests and concurrency modeling where they can test a concrete invariant; 16 scheduling seeds are not a substitute for that analysis.
-4. Review actual native assembly/SIMD and OS-backed memory paths using appropriate native checks. Miri fallback results alone cannot close those gaps.
-5. Tie subsequent evidence to the final merged source and its compiler/configuration. Any changed source needs its own applicable validation.
-
-At this snapshot, no formal verification of the complete codebase has been performed. The supported claim is that Miri detected specific defects and found no further UB in the completed executions of the corrected candidate. Absence of UB throughout the codebase remains unestablished.
-
-</details>
-
-An evidence manifest records the checked source identity, counts, certificate presence and SHA-256 hashes of the underlying logs: [no-ub-evidence.json](../evidence/validation/continuation/miri-before-additional-ub-audit/no-ub-evidence.json). Logs from the timed-out attempt will be preserved under `miri-before-extended-timeout` when the scheduled retry begins; the recorded hashes identify the original evidence even after that move.
+The strongest evidence concerns the reproduced failures and the fixes that remove their triggering conditions. There is no defensible percentage of all possible UB eliminated. [Optimality checks](README.md) and [benchmark replay evidence](../comparisons/NISSY_THROUGHPUT.md) must not be presented as a universal memory-safety proof.

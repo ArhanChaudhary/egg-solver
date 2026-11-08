@@ -1,8 +1,8 @@
-# PMU-guided optimization review
+# Historical PMU-guided optimization experiments
 
-Release decision: retain the existing native search-loop implementation. Both PMU-guided native experiments remain rejected and are now archived with the required 1-thread and 48-thread before/after tables. The separately explored older-x86 backend remains an unmerged experiment, excluded from the release and perf package.
+Recorded November 7 decision: retain the existing native search-loop implementation. Both PMU-guided native experiments remain rejected and are now archived with the required 1-thread and 48-thread before/after tables. The separately explored older-x86 backend remains an unmerged experiment, excluded from the release and perf package.
 
-| Experiment | 1T median change (12 pairs) | 48T median change (5 pairs) | Decision |
+| Experiment | 1-worker throughput change (12 pairs) | 48-worker throughput change (5 pairs) | Decision |
 |---|---:|---:|---|
 | Read packed table values through byte-sized loads | -0.83% | -0.28% | Reject |
 | Move lane advancement out of the stream loop | -7.44% | -10.72% | Reject |

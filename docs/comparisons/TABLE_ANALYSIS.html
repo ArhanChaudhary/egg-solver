@@ -1,24 +1,76 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Current cubeopt pruning-table investigation — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../index.html">Home</a><a href="../guide/OVERVIEW.html">Learn</a><a href="index.html">Compare</a><a href="../performance/index.html">Performance</a><a href="../safety/index.html">Safety</a><a href="../history/index.html">History</a><a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="TABLE_ANALYSIS.md">Markdown source</a> · Offline document</p><details><summary>On this page</summary><ul><li><a href="#verified-size">Verified size</a></li><li><a href="#what-can-differ-despite-equal-sizes">What can differ despite equal sizes</a></li><li><a href="#experiment">Experiment</a></li><li><a href="#exact-files-and-provenance">Exact files and provenance</a></li><li><a href="#direct-pruning-strength">Direct pruning strength</a></li><li><a href="#controlled-native-solve-experiment">Controlled native solve experiment</a></li><li><a href="#implemented-change">Implemented change</a></li><li><a href="#conclusion-and-limits">Conclusion and limits</a></li></ul></details><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="current-cubeopt-pruning-table-investigation">Current cubeopt pruning-table investigation</h1>
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>cstimer h4: table size and compression base — egg-solver</title><style>
+:root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
+header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
+header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
+header a { color:#d9f0ff; }
+header a[aria-current] { color:white; text-decoration-thickness:3px; }
+main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+h1 { margin-top:0; font-size:2rem; line-height:1.25; }
+h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
+h3 { margin-top:1.5rem; }
+a { color:var(--accent); overflow-wrap:anywhere; }
+p,li { max-width:90ch; }
+code { background:#eff3f6; border-radius:3px; padding:.1em .25em; overflow-wrap:anywhere; font-size:.9em; }
+pre { max-width:100%; padding:1rem; background:#eef3f6; overflow:auto; line-height:1.45; }
+pre code { background:none; padding:0; overflow-wrap:normal; }
+.table-wrap { max-width:100%; overflow:auto; margin:1rem 0 1.5rem; border:1px solid var(--line); }
+.table-wrap.long-table { max-height:70vh; }
+table { width:100%; border-collapse:collapse; font-size:.9rem; font-variant-numeric:tabular-nums; }
+th,td { padding:.55rem .65rem; border:1px solid var(--line); vertical-align:top; overflow-wrap:normal; }
+th { background:#eaf1f6; text-align:left; position:sticky; top:0; z-index:1; }
+tr:nth-child(even) { background:#f8fafb; }
+caption,.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+details { border:1px solid var(--line); padding:.6rem 1rem; border-radius:5px; margin:1rem 0; }
+summary { cursor:pointer; font-weight:600; }
+.table-tools { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:.6rem; background:#f4f7f9; }
+.table-tools input { font:inherit; border:1px solid #afc0ce; border-radius:4px; padding:.3rem .5rem; width:min(100%,22rem); min-width:0; }
+.note,.source-link,footer { color:var(--muted); font-size:.85rem; }
+.source-link { margin-top:2rem; }
+.archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
+footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
+svg { max-width:100%; height:auto; }
+:target { scroll-margin-top:1rem; }
+.skip-link { position:absolute; left:-10000px; }
+.skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
+@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+</style></head>
+<body>
+<a class="skip-link" href="#docs-content">Skip to content</a>
+<header><strong>egg-solver</strong><nav aria-label="Documentation"><a href="../index.html">Home</a>
+<a href="../guide/OVERVIEW.html">Learn</a>
+<a href="index.html">Benchmarks</a>
+<a href="../performance/index.html">Performance</a>
+<a href="../safety/index.html">Safety</a>
+<a href="../history/index.html">History</a>
+<a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<main id="docs-content"><h1 id="cstimer-h4-table-size-and-compression-base">cstimer h4: table size and compression base</h1>
 <p>Measured investigation completed 2026-11-08. The requested exact target is <strong>cube48opt4 on https://cstimer.net/cubeopt/</strong>, displayed as <strong>486M</strong>.</p>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#verified-size">Verified size</a></li><li><a href="#what-can-differ-despite-equal-sizes">What can differ despite equal sizes</a></li><li><a href="#experiment">Experiment</a></li><li><a href="#exact-files-and-provenance">Exact files and provenance</a></li><li><a href="#direct-pruning-strength">Direct pruning strength</a></li><li><a href="#controlled-native-solve-experiment">Controlled native solve experiment</a></li><li><a href="#implemented-change">Implemented change</a></li><li><a href="#conclusion-and-limits">Conclusion and limits</a></li></ul></details>
 <h2 id="verified-size">Verified size</h2>
 <p>The deployed Opt4 module reports <code>h48prun31h4.dat</code>, <strong>486,420,480 bytes</strong>. Egg h4 has exactly the same data size:</p>
 <p><code>3393 corner classes × 70 edge separations × 2^4 retained orientation values × 128 bytes/row = 486,420,480 bytes</code>.</p>
-<p>This is <strong>486.420480 decimal MB = 463.886719 MiB</strong>. Egg's browser labels it <strong>464 MiB</strong>; cstimer labels it <strong>486M</strong>. The displayed size difference is a unit conversion, not additional table capacity. Egg's metadata trailer is additional file overhead, not pruning data.</p>
-<p>The web page currently offers Opt1–9, up to 15,565,455,360 bytes. The existing local cube48opt10 table is 31,130,910,720 bytes. The freshly downloaded Opt9 WASM and wrapper match the retained copies byte-for-byte (WASM SHA-256 <code>a041e72e9a05182425722c18a1c262cd0ac6018014c5dcd817069693883a734f</code>). This does not establish the version of the friend's Mac executable.</p>
+<p>This is <strong>486.420480 decimal MB = 463.886719 MiB</strong>. At the start of the investigation egg displayed <strong>464 MiB</strong> and cstimer <strong>486M</strong>; egg's updated selector displays both units. The displayed size difference is a unit conversion, not additional table capacity. Egg's metadata trailer is additional file overhead, not pruning data.</p>
+<p>At the November 8 capture, the web page offered Opt1–9, up to 15,565,455,360 bytes. The existing local cube48opt10 table is 31,130,910,720 bytes. The freshly downloaded Opt9 WASM and wrapper match the retained copies byte-for-byte (WASM SHA-256 <code>a041e72e9a05182425722c18a1c262cd0ac6018014c5dcd817069693883a734f</code>). This does not establish the version of the friend's Mac executable.</p>
 <h2 id="what-can-differ-despite-equal-sizes">What can differ despite equal sizes</h2>
 <p>Both families use symmetry-reduced corner data, edge slice/separation data, a projection of edge orientation, two-bit distance codes, and a four-bit minimum shared by a 16-byte group. Equal file sizes do not imply identical coordinate numbering, orientation conventions, projections, compression bases or distance values. Byte comparisons at equal offsets cannot establish relative pruning strength when index mappings differ.</p>
-<p>The compression base changes the represented lower bounds while keeping the table size fixed. Code zero uses a shared group minimum plus a corner bound; the other codes describe the base plus one, two, or at least three moves. Egg native recommends base 9 for h4; its browser previously explicitly requested base 8. The existing native recommendations record stronger pruning at base 9, but a new paired test is needed before reporting the effect in this experiment.</p>
+<p>The compression base changes the represented lower bounds while keeping the table size fixed. Code zero uses a shared group minimum plus a corner bound; the other codes describe the base plus one, two, or at least three moves. Egg native recommends base 9 for h4; its browser previously explicitly requested base 8. The controlled native experiment below measures the base-9 tradeoff.</p>
 <p>A smaller node count can also come from search ordering, canonical move pruning, symmetry handling, stopping after the first optimal solution, parallel scheduling or different instrumentation. It is not evidence by itself that a table is stronger.</p>
 <h2 id="experiment">Experiment</h2>
 <p>Artifacts are under <code>/data/agents/cubeopt-current/</code>. The exact deployed modules are downloaded without modification for generation. The query oracle adds exports to a checksum-pinned in-memory copy, leaving function code and table values unchanged. It evaluates corresponding physical states rather than assuming matching raw indices.</p>
-<p>The corpus contains the 500 published random states followed by their scramble prefixes: <strong>10,568 states</strong>, evaluated in normal and inverse directions. Prefix lengths provide known upper bounds; solved and short prefixes check near-goal behavior. Native egg h4 base 8 and base 9 were generated and compared against fresh web Opt4 data. Tests will distinguish direct lower-bound strength, actual search node counts, wall time, and correctness.</p>
+<p>The corpus contains the 500 published random states followed by their scramble prefixes: <strong>10,568 states</strong>, evaluated in normal and inverse directions. Prefix lengths provide known upper bounds; solved and short prefixes check near-goal behavior. Native egg h4 base 8 and base 9 were generated and compared against fresh web Opt4 data. The tests distinguished direct lower-bound strength, actual search node counts, wall time, and correctness.</p>
 <p>The measurements below support changing the browser’s recommended compression base. They do not establish that the web table dominates egg’s table or explain the friend’s Mac h10 result.</p>
 <h2 id="exact-files-and-provenance">Exact files and provenance</h2>
 <p>The freshly downloaded Opt4 WASM SHA-256 is <code>9980620d29f954557adcd05f692b34deacf2e04c8a45f2c172fcd7cf921ef53e</code>; its wrapper is <code>37ac455c506b4f734b87a6717fb7e8322d966301ae69bc43fe189e0fc764c9bd</code>. Both match the retained upstream assets. The fresh web-generated table SHA-256 is <code>4e7da22fec3e10a1f3a151d1eed5454c1e6a16a884794f4251f0f90a48bde200</code>.</p>
-<p>Egg table files are 486,424,576 bytes: identical pruning-data capacity plus a 4,096-byte metadata trailer. All artifact hashes are in <code>h4-files.json</code>. Generation completed successfully for web Opt4, egg h4 base 8, egg h4 base 9, and the additionally investigated web Opt9. No new upstream generator release was found in these deployed assets.</p>
+<p>Egg table files are 486,424,576 bytes: identical pruning-data capacity plus a 4,096-byte metadata trailer. All artifact hashes are in <a href="../data/cubeopt-audit-20261108/h4-files.json">h4-files.json</a>. Generation completed successfully for web Opt4, egg h4 base 8, egg h4 base 9, and the additionally investigated web Opt9. No new upstream generator release was found in these deployed assets.</p>
 <h2 id="direct-pruning-strength">Direct pruning strength</h2>
 <p>Each comparison evaluates corresponding physical states, including their inverses, with each implementation's own coordinate code and table. The native tool calls the public <code>Solver::lower_bound</code>; the web oracle runs the original <code>step1_query</code> with checksum-pinned context layouts. Neither substitutes one table's bytes under the other's coordinate mapping.</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Direct pruning strength" tabindex="0"><table id="docs-table-1"><caption>Direct pruning strength</caption>
 <thead>
 <tr><th>Comparison (left versus right)</th><th align="right">Queries</th><th align="right">Left higher</th><th align="right">Equal</th><th align="right">Right higher</th></tr>
 </thead>
@@ -31,11 +83,11 @@
 <tr><td>Egg base 9 / egg base 8; 10,568 states, both directions</td><td align="right">21,136</td><td align="right">263</td><td align="right">20,087</td><td align="right">786</td></tr>
 </tbody>
 </table></div>
-<p>The current web table and egg base 9 each give stronger bounds on some states. Thus neither is a pointwise stronger replacement on this corpus. They use different coordinate conventions/projections, and raw byte differences do not identify stronger data. All tested bounds stay below known optimal lengths for the 500 full states and known scramble-length upper bounds for the prefixes. Those checks are evidence on this corpus, not a universal admissibility proof.</p>
+<p>The captured web table and egg base 9 each give stronger bounds on some states. Thus neither is a pointwise stronger replacement on this corpus. They use different coordinate conventions/projections, and raw byte differences do not identify stronger data. All tested bounds stay below known optimal lengths for the 500 full states and known scramble-length upper bounds for the prefixes. Those checks are evidence on this corpus, not a universal admissibility proof.</p>
 <p>Base 9 also has a tradeoff: it is stronger more often on the full random states but weaker more often on the prefix-heavy corpus. Averaging root bounds across arbitrary prefixes is not a substitute for measuring search work. Base 9 increases the encoded ceiling from 11 to 12 while making the code-zero fallback less precise for some low distances.</p>
 <h2 id="controlled-native-solve-experiment">Controlled native solve experiment</h2>
-<p>Both rows use the same prebuilt current egg executable, AMD EPYC 9V45 VM, 48 threads, 40 lanes, batch concurrency, copy loading, all 500 input states once, and serialized runs under the benchmark locks. Loading is excluded. These are ordinary copied tables; explicit 1 GiB page coverage is not claimed for this experiment. Source identity matches the published Rust source at <code>947c20d93564f150aad9c292486ab730a329b86c</code>.</p>
-<div class="table-wrap"><table>
+<p>Both rows use the same retained native egg executable, AMD EPYC 9V45 VM, 48 threads, 40 lanes, batch concurrency, copy loading, all 500 input states once, and serialized runs under the benchmark locks. Loading is excluded. These are ordinary copied tables; explicit 1 GiB page coverage is not claimed for this experiment. Source identity matches the published Rust source at <code>947c20d93564f150aad9c292486ab730a329b86c</code>.</p>
+<div class="table-wrap" role="region" aria-label="Controlled native solve experiment" tabindex="0"><table id="docs-table-2"><caption>Controlled native solve experiment</caption>
 <thead>
 <tr><th>Egg h4</th><th align="right">Batch wall time</th><th align="right">Wall time/cube</th><th align="right">Mean nodes/cube</th></tr>
 </thead>
@@ -46,12 +98,41 @@
 </table></div>
 <p>Base 9 used <strong>20.15% fewer nodes</strong> and <strong>17.00% less wall time</strong>, or 1.205× throughput. This is one process per setting, not a repeated-run confidence estimate. Node accounting is compared within egg; no native-versus-WASM speedup is inferred.</p>
 <p>Every one of the 500 solutions from each setting passed egg's replay verification and matched the known optimal lengths from the h10 cross-check. The web Opt4 sample's first 100 completed solutions also matched those lengths; all 100 were independently replayed through egg and returned the solved cube.</p>
-<p>The web solve log began with all 500 inputs and was deliberately stopped after 100 complete records to bound this additional experiment. <code>run-limit.json</code> records the stop. Its mean was 429,578,004.26 nodes/cube and 3273.759 ms at 14 threads in WASM latency mode. There is no complete-process wall-time rate for this partial run, and its timer is not paired with the native batch timers. The original full-500 cube48opt10 and egg h10 raw outputs remain separately available under <code>/home/super/cubeopt-egg-500/</code>.</p>
+<p>The web solve log began with all 500 inputs and was deliberately stopped after 100 complete records to bound this additional experiment. <code>run-limit.json</code> records the stop. Its mean was 429,578,004.26 nodes/cube and 3273.759 ms at 14 threads in WASM latency mode. There is no complete-process wall-time rate for this partial run, and its timer is not paired with the native batch timers. The <a href="CUBEOPT_AUDIT.html">cubeopt audit</a> links the separate full-500 h10 outputs.</p>
 <h2 id="implemented-change">Implemented change</h2>
 <p>The previous browser comment explicitly chose base 8 to reduce generation time; that was a startup-versus-search tradeoff, not a corrupt or undersized table. Both choices are retained. The browser h4 option now calls <code>generateTable(4)</code> through the existing automatic-base path instead of forcing base 8. That selects the already established native recommendation, base 9. The label displays both 486 MB and 464 MiB. An explicit base-8 choice remains available for faster generation. No new Rust search code, table format, unsafe block or panic path was introduced; native defaults were already correct. The generator help text also corrects h8 capacity from 3.6 GiB to 7.2 GiB.</p>
 <p>The actual threaded WASM module generated h4 with automatic base 9 and exactly 486,420,480 data bytes. Three short solves and independent replays passed. Both existing single-thread and threaded WASM smoke suites also passed. A Chromium test verified that the automatic h4 option sends base zero and the faster-generation choice sends base eight; that routing test uses a mock worker, separately from the real WASM generation test. The direct browser-option parse still uses the existing <code>k:base</code> parser; omitted base passes zero, which the Rust API resolves via <code>default_base(k)</code>.</p>
 <p>Initialization is the cost: native generation took 2.1 s for base 8 and 7.6 s for base 9 in these runs. The actual eight-thread Bun/WASM base-9 test took 149.0 s to generate. Chrome timing was not measured, and these generator implementations/timings should not be conflated. Reusing a saved table avoids regeneration.</p>
 <h2 id="conclusion-and-limits">Conclusion and limits</h2>
 <p>The exact size observation is explained by decimal MB versus binary MiB. Fresh generation and semantic queries do not show that current cstimer Opt4 contains universally better pruning data. A useful existing table optimization was being bypassed by egg's browser selector; that selector is now corrected and tested. It does not explain 4.88M nodes for the unidentified Mac h10 implementation, and no claim is made about that release or an unmeasured larger table.</p>
-<p>Reproduction: <code>native-h4.sh</code>, <code>opt4/generate.mjs</code>, <code>opt4/query-web.mjs</code>, <code>egg/examples/table_bounds.rs</code>, <code>analyze.py</code>, the pinned assets, input corpus, logs and <code>analysis.json</code> under <code>/data/agents/cubeopt-current/</code>. Raw timings, node counts, witnesses and stop reasons are retained. The native generation commands are <code>gen 4 8 FILE -t 48</code> and <code>gen 4 auto FILE -t 48</code>; solve commands are preserved in <code>native-h4.sh</code>.</p>
-</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>
+<p>Reproduction records are indexed in <a href="../data/cubeopt-audit-20261108/index.html">the evidence directory</a>. The original research layout contained <code>native-h4.sh</code>, <code>opt4/generate.mjs</code>, <code>opt4/query-web.mjs</code>, <code>egg/examples/table_bounds.rs</code>, <code>analyze.py</code>, the pinned assets, input corpus, logs and <code>analysis.json</code> under <code>/data/agents/cubeopt-current/</code>. Raw timings, node counts, witnesses and stop reasons are retained. The native generation commands are <code>gen 4 8 FILE -t 48</code> and <code>gen 4 auto FILE -t 48</code>; solve commands are preserved in <code>native-h4.sh</code>.</p>
+
+<p class="source-link"><a href="TABLE_ANALYSIS.md">Markdown source</a></p></main>
+<footer><a href="../PROVENANCE.html">Sources and evidence scope</a></footer>
+<script>
+for (const wrapper of document.querySelectorAll('.table-wrap')) {
+  const table=wrapper.querySelector('table');
+  const rows=[...table.tBodies].flatMap(body=>[...body.rows]);
+  if(rows.length>50) wrapper.classList.add('long-table');
+  if(rows.length<=12) continue;
+  const tools=document.createElement('div'); tools.className='table-tools';
+  const label=document.createElement('label'); label.textContent='Filter this table';
+  const input=document.createElement('input'); input.type='search'; input.id=table.id+'-filter';
+  label.htmlFor=input.id; input.setAttribute('aria-controls',table.id);
+  const count=document.createElement('span'); count.className='note'; count.setAttribute('aria-live','polite');
+  count.textContent=rows.length+' rows';
+  input.addEventListener('input',()=>{
+    const query=input.value.trim().toLowerCase(); let shown=0;
+    for(const row of rows){row.hidden=!!query&&!row.textContent.toLowerCase().includes(query);if(!row.hidden)shown++;}
+    count.textContent=shown+' of '+rows.length+' rows';
+  });
+  tools.append(label,input,count); wrapper.before(tools);
+}
+function revealTarget(){
+  let id;try{id=decodeURIComponent(location.hash.slice(1));}catch{return;}
+  const target=document.getElementById(id);if(!target)return;
+  for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+}
+revealTarget(); window.addEventListener('hashchange',revealTarget);
+</script>
+</body></html>

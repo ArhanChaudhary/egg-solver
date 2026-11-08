@@ -1,4 +1,56 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>phack hardware-counter analysis — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../../history/index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="pmu-phack-analysis.md">Markdown source</a> · Offline document</p><details><summary>On this page</summary><ul><li><a href="#scope-and-measurement-quality">Scope and measurement quality</a></li><li><a href="#cycle-profile-and-counter-evidence">Cycle profile and counter evidence</a></li><li><a href="#worker-scaling-and-smt">Worker scaling and SMT</a></li><li><a href="#pages-and-numa-placement">Pages and NUMA placement</a></li><li><a href="#lane-sweep-exploratory-only">Lane sweep: exploratory only</a></li><li><a href="#precise-sampling-and-useful-next-experiments">Precise sampling and useful next experiments</a></li><li><a href="#full-auxiliary-counter-ratios">Full auxiliary counter ratios</a></li></ul></details><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="phack-hardware-counter-analysis">phack hardware-counter analysis</h1>
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>phack hardware-counter analysis — egg-solver</title><style>
+:root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
+header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
+header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
+header a { color:#d9f0ff; }
+header a[aria-current] { color:white; text-decoration-thickness:3px; }
+main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+h1 { margin-top:0; font-size:2rem; line-height:1.25; }
+h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
+h3 { margin-top:1.5rem; }
+a { color:var(--accent); overflow-wrap:anywhere; }
+p,li { max-width:90ch; }
+code { background:#eff3f6; border-radius:3px; padding:.1em .25em; overflow-wrap:anywhere; font-size:.9em; }
+pre { max-width:100%; padding:1rem; background:#eef3f6; overflow:auto; line-height:1.45; }
+pre code { background:none; padding:0; overflow-wrap:normal; }
+.table-wrap { max-width:100%; overflow:auto; margin:1rem 0 1.5rem; border:1px solid var(--line); }
+.table-wrap.long-table { max-height:70vh; }
+table { width:100%; border-collapse:collapse; font-size:.9rem; font-variant-numeric:tabular-nums; }
+th,td { padding:.55rem .65rem; border:1px solid var(--line); vertical-align:top; overflow-wrap:normal; }
+th { background:#eaf1f6; text-align:left; position:sticky; top:0; z-index:1; }
+tr:nth-child(even) { background:#f8fafb; }
+caption,.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+details { border:1px solid var(--line); padding:.6rem 1rem; border-radius:5px; margin:1rem 0; }
+summary { cursor:pointer; font-weight:600; }
+.table-tools { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:.6rem; background:#f4f7f9; }
+.table-tools input { font:inherit; border:1px solid #afc0ce; border-radius:4px; padding:.3rem .5rem; width:min(100%,22rem); min-width:0; }
+.note,.source-link,footer { color:var(--muted); font-size:.85rem; }
+.source-link { margin-top:2rem; }
+.archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
+footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
+svg { max-width:100%; height:auto; }
+:target { scroll-margin-top:1rem; }
+.skip-link { position:absolute; left:-10000px; }
+.skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
+@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+</style></head>
+<body>
+<a class="skip-link" href="#docs-content">Skip to content</a>
+<header><strong>egg-solver</strong><nav aria-label="Documentation"><a href="../../index.html">Home</a>
+<a href="../../guide/OVERVIEW.html">Learn</a>
+<a href="../../comparisons/index.html">Benchmarks</a>
+<a href="../../performance/index.html">Performance</a>
+<a href="../../safety/index.html">Safety</a>
+<a href="../../history/index.html">History</a>
+<a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<main id="docs-content"><h1 id="phack-hardware-counter-analysis">phack hardware-counter analysis</h1>
+<p class="archive-note">Recorded evidence. Commands, paths and status messages describe the measurement environment and date. <a href="../../index.html">Documentation home</a>.</p>
 <p>Archive: <code>egg-solver-pmu-phack-20261106T194245Z.tar.gz</code>.
 SHA256: <code>e4367ce0595fffacadda8647a22024761a4be542e4aae1040a0514c587fa33a3</code>. Analysis is reproducible with
 <code>/data/agents/codex-resume/analyze-phack.py</code>; checked aggregates are in
@@ -9,6 +61,7 @@ counter reports <strong>100% running</strong>. All six profiles report <strong>z
 The returned bench/gen/solve SHA256 hashes match the included build manifest.
 These checks validate collection consistency; they do not establish that every
 derived comparison has enough completed solves or that every CPU event is free of hardware errata.</p>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#scope-and-measurement-quality">Scope and measurement quality</a></li><li><a href="#cycle-profile-and-counter-evidence">Cycle profile and counter evidence</a></li><li><a href="#worker-scaling-and-smt">Worker scaling and SMT</a></li><li><a href="#pages-and-numa-placement">Pages and NUMA placement</a></li><li><a href="#lane-sweep-exploratory-only">Lane sweep: exploratory only</a></li><li><a href="#precise-sampling-and-useful-next-experiments">Precise sampling and useful next experiments</a></li><li><a href="#full-auxiliary-counter-ratios">Full auxiliary counter ratios</a></li></ul></details>
 <h2 id="scope-and-measurement-quality">Scope and measurement quality</h2>
 <p>This is the dual-socket Xeon X5650, family 6/model 44, with 12 physical cores and
 24 logical CPUs. The tested source is <strong>935cb7fa369248161244507b7c13aa9c405f9ff1</strong>, plus the included
@@ -38,7 +91,7 @@ annotated instruction's percentage is not its exclusive cost. Both recovered
 annotations concentrate on the same hot regions, with integer/vector unpacking,
 stack traffic and loop control visible. This locates work; it does not prove an
 optimization or its gain.</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Cycle profile and counter evidence" tabindex="0"><table id="docs-table-1"><caption>Cycle profile and counter evidence</caption>
 <thead>
 <tr><th>Metric</th><th align="right">One physical worker</th><th align="right">12 physical workers</th><th>Interpretation</th></tr>
 </thead>
@@ -78,7 +131,7 @@ as the sole bottleneck or predicting gains on the EPYC build.</p>
 <p>Each row is three 20-second measurements. Solves/s is the completion count divided
 by the window; Ginst/s is counted instructions divided by the acknowledged window.
 Ginst/s measures instruction execution, not useful search progress.</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Worker scaling and SMT" tabindex="0"><table id="docs-table-2"><caption>Worker scaling and SMT</caption>
 <thead>
 <tr><th>Configuration</th><th align="right">Median solves/s [range]</th><th align="right">Median IPC</th><th align="right">Median Ginst/s [range]</th></tr>
 </thead>
@@ -102,7 +155,7 @@ identify the cause. Do not attribute this confidently to NUMA, throttling or
 software contention.</p>
 <h2 id="pages-and-numa-placement">Pages and NUMA placement</h2>
 <p>Actual large table mapping coverage from the start-of-window <code>smaps</code> snapshots:</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Pages and NUMA placement" tabindex="0"><table id="docs-table-3"><caption>Pages and NUMA placement</caption>
 <thead>
 <tr><th>Family</th><th align="right">Table bytes backed by THP</th></tr>
 </thead>
@@ -133,7 +186,7 @@ unavailable. No kernel huge-page pool was changed.</p>
 in <a href="https://docs.kernel.org/admin-guide/mm/transhuge.html">its THP guide</a>.
 These are placement snapshots, not continuous residency measurements.</p>
 <h2 id="lane-sweep-exploratory-only">Lane sweep: exploratory only</h2>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Lane sweep: exploratory only" tabindex="0"><table id="docs-table-4"><caption>Lane sweep: exploratory only</caption>
 <thead>
 <tr><th align="right">Lanes</th><th>Completed cubes in each 20-second run</th><th align="right">Observed median solves/s</th><th align="right">Median IPC</th></tr>
 </thead>
@@ -185,7 +238,7 @@ Software <code>task-clock</code> retains milliseconds as its original unit. Coun
 bytes and instructions are not interchangeable. The accompanying CSV also contains
 event/cycle ratios and repeat counts. Each configuration has the listed number
 of independent windows.</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Full auxiliary counter ratios" tabindex="0"><table id="docs-table-5"><caption>Full auxiliary counter ratios</caption>
 <thead>
 <tr><th>Event</th><th align="right">Repeats each</th><th align="right">1 worker /1000 insn</th><th align="right">12 workers /1000 insn</th></tr>
 </thead>
@@ -248,4 +301,33 @@ of independent windows.</p>
 <tr><td><code>OFFCORE_RESPONSE.DEMAND_DATA_RD.REMOTE_DRAM</code></td><td align="right">1</td><td align="right">0.000156</td><td align="right">0.595690</td></tr>
 </tbody>
 </table></div>
-</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>
+
+<p class="source-link"><a href="pmu-phack-analysis.md">Markdown source</a></p></main>
+<footer><a href="../../PROVENANCE.html">Sources and evidence scope</a></footer>
+<script>
+for (const wrapper of document.querySelectorAll('.table-wrap')) {
+  const table=wrapper.querySelector('table');
+  const rows=[...table.tBodies].flatMap(body=>[...body.rows]);
+  if(rows.length>50) wrapper.classList.add('long-table');
+  if(rows.length<=12) continue;
+  const tools=document.createElement('div'); tools.className='table-tools';
+  const label=document.createElement('label'); label.textContent='Filter this table';
+  const input=document.createElement('input'); input.type='search'; input.id=table.id+'-filter';
+  label.htmlFor=input.id; input.setAttribute('aria-controls',table.id);
+  const count=document.createElement('span'); count.className='note'; count.setAttribute('aria-live','polite');
+  count.textContent=rows.length+' rows';
+  input.addEventListener('input',()=>{
+    const query=input.value.trim().toLowerCase(); let shown=0;
+    for(const row of rows){row.hidden=!!query&&!row.textContent.toLowerCase().includes(query);if(!row.hidden)shown++;}
+    count.textContent=shown+' of '+rows.length+' rows';
+  });
+  tools.append(label,input,count); wrapper.before(tools);
+}
+function revealTarget(){
+  let id;try{id=decodeURIComponent(location.hash.slice(1));}catch{return;}
+  const target=document.getElementById(id);if(!target)return;
+  for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+}
+revealTarget(); window.addEventListener('hashchange',revealTarget);
+</script>
+</body></html>

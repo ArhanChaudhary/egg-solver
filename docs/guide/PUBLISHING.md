@@ -29,6 +29,8 @@ python3 -m http.server 8000 --directory /tmp/egg-solver-pages
 
 Choose an output directory that does not already exist. Open
 `http://localhost:8000/`. This plain HTTP server exercises the one-thread
-hosting mode. Build artifacts are generated locally and are not committed.
+hosting mode. WebAssembly binaries and staged site directories are generated locally and are not committed. The documentation HTML companions are committed for offline reading.
+
+After rendering, `python3 scripts/check-docs.py` checks local links, table/heading structure and the latest benchmark headline against its recorded analysis. The Pages build runs this check before building the browser module.
 
 Markdown is the canonical documentation source. The Pages build regenerates its HTML companions with Bun 1.4.4, so a stale generated page cannot retain removed or duplicated sections. HTML remains included for offline browsing; run `bun scripts/render-docs.mjs` to refresh it locally. Historical benchmark results keep their recorded build and hardware provenance.

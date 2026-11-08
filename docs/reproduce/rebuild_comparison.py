@@ -1,6 +1,9 @@
 """Rebuild the recorded comparison without executing benchmark binaries."""
 from pathlib import Path
-import contextlib,io,json,runpy,shutil,sys,tempfile
+import argparse,contextlib,io,json,runpy,shutil,sys,tempfile
+parser=argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--output",type=Path,help="optionally save the reconstructed historical report")
+options=parser.parse_args()
 docs=Path(__file__).resolve().parents[1]
 with tempfile.TemporaryDirectory(prefix="egg-report-") as directory:
     out=Path(directory)/"comparison"
@@ -14,6 +17,6 @@ with tempfile.TemporaryDirectory(prefix="egg-report-") as directory:
     actual_tables=[line for line in text.splitlines() if line.startswith("|")]
     expected_tables=[line for line in expected.splitlines() if line.startswith("|")]
     if actual_tables!=expected_tables:raise SystemExit("Reproduced table rows differ from the packaged reference")
-    destination=docs/"reproduced-comparison.md"
-    destination.write_text(text)
-    print(f"PASS: {len(data['runs'])} recorded runs; numerical tables match. Wrote {destination}")
+    if options.output is not None:
+        options.output.write_text(text)
+    print(f"PASS: {len(data['runs'])} recorded runs; numerical tables match.")

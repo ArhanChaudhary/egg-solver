@@ -1,20 +1,104 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Inspect and reproduce the report — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../index.html">Home</a><a href="../guide/OVERVIEW.html">Learn</a><a href="../comparisons/index.html">Compare</a><a href="../performance/index.html">Performance</a><a href="../safety/index.html">Safety</a><a href="../history/index.html">History</a><a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="README.md">Markdown source</a> · Offline document</p><details><summary>On this page</summary><ul><li><a href="#verify-the-bundle">Verify the bundle</a></li><li><a href="#rebuild-the-comparison-tables-from-the-recorded-logs">Rebuild the comparison tables from the recorded logs</a></li><li><a href="#collect-new-measurements">Collect new measurements</a></li><li><a href="#physical-host-analysis-code">Physical-host analysis code</a></li></ul></details><h1 id="inspect-and-reproduce-the-report">Inspect and reproduce the report</h1>
-<p><a href="../index.html">Documentation home</a> · <a href="../BENCHMARK_CATALOG.html">Benchmark catalog</a></p>
-<h2 id="verify-the-bundle">Verify the bundle</h2>
-<p>From the <code>docs/</code> directory, run:</p>
-<pre><code class="language-sh">python3 reproduce/verify_bundle.py
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Check and reproduce recorded results — egg-solver</title><style>
+:root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
+header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
+header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
+header a { color:#d9f0ff; }
+header a[aria-current] { color:white; text-decoration-thickness:3px; }
+main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+h1 { margin-top:0; font-size:2rem; line-height:1.25; }
+h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
+h3 { margin-top:1.5rem; }
+a { color:var(--accent); overflow-wrap:anywhere; }
+p,li { max-width:90ch; }
+code { background:#eff3f6; border-radius:3px; padding:.1em .25em; overflow-wrap:anywhere; font-size:.9em; }
+pre { max-width:100%; padding:1rem; background:#eef3f6; overflow:auto; line-height:1.45; }
+pre code { background:none; padding:0; overflow-wrap:normal; }
+.table-wrap { max-width:100%; overflow:auto; margin:1rem 0 1.5rem; border:1px solid var(--line); }
+.table-wrap.long-table { max-height:70vh; }
+table { width:100%; border-collapse:collapse; font-size:.9rem; font-variant-numeric:tabular-nums; }
+th,td { padding:.55rem .65rem; border:1px solid var(--line); vertical-align:top; overflow-wrap:normal; }
+th { background:#eaf1f6; text-align:left; position:sticky; top:0; z-index:1; }
+tr:nth-child(even) { background:#f8fafb; }
+caption,.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+details { border:1px solid var(--line); padding:.6rem 1rem; border-radius:5px; margin:1rem 0; }
+summary { cursor:pointer; font-weight:600; }
+.table-tools { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:.6rem; background:#f4f7f9; }
+.table-tools input { font:inherit; border:1px solid #afc0ce; border-radius:4px; padding:.3rem .5rem; width:min(100%,22rem); min-width:0; }
+.note,.source-link,footer { color:var(--muted); font-size:.85rem; }
+.source-link { margin-top:2rem; }
+.archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
+footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
+svg { max-width:100%; height:auto; }
+:target { scroll-margin-top:1rem; }
+.skip-link { position:absolute; left:-10000px; }
+.skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
+@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+</style></head>
+<body>
+<a class="skip-link" href="#docs-content">Skip to content</a>
+<header><strong>egg-solver</strong><nav aria-label="Documentation"><a href="../index.html">Home</a>
+<a href="../guide/OVERVIEW.html">Learn</a>
+<a href="../comparisons/index.html">Benchmarks</a>
+<a href="../performance/index.html">Performance</a>
+<a href="../safety/index.html">Safety</a>
+<a href="../history/index.html">History</a>
+<a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<main id="docs-content"><h1 id="check-and-reproduce-recorded-results">Check and reproduce recorded results</h1>
+<p><a href="../index.html">Documentation</a> · <a href="../BENCHMARK_CATALOG.html">Benchmark catalog</a></p>
+<p>Run the commands below from the project root. They read recorded evidence; they do not require pruning tables or rerun solver benchmarks.</p>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#check-file-integrity">Check file integrity</a></li><li><a href="#recompute-the-newest-throughput-table">Recompute the newest throughput table</a></li><li><a href="#check-the-historical-matrix">Check the historical matrix</a></li><li><a href="#collect-new-measurements">Collect new measurements</a></li><li><a href="#physical-host-analysis">Physical-host analysis</a></li></ul></details>
+<h2 id="check-file-integrity">Check file integrity</h2>
+<pre><code class="language-sh">python3 docs/reproduce/verify_bundle.py
 </code></pre>
-<p>The manifest checks file contents, not the truth of a benchmark claim. The original run metadata, source commits and report methods supply the context for those claims.</p>
-<h2 id="rebuild-the-comparison-tables-from-the-recorded-logs">Rebuild the comparison tables from the recorded logs</h2>
-<p>This needs Python3 and the files in this bundle; it does not run solvers or require large tables:</p>
-<pre><code class="language-sh">python3 reproduce/rebuild_comparison.py
+<p>This compares documentation files with <code>docs/MANIFEST.sha256</code>. A matching hash establishes file integrity, not the validity of a performance or safety claim. <a href="../PROVENANCE.html">Provenance</a> explains source versions and original-origin hashes.</p>
+<h2 id="recompute-the-newest-throughput-table">Recompute the newest throughput table</h2>
+<pre><code class="language-sh">python3 docs/data/nissy-throughput-20261108/analyze.py --require-complete
 </code></pre>
-<p>The parser and aggregation logic come from the comparison report generator. Only its wiki and bug-report input paths were made relative. The packaging check confirmed that <strong>every Markdown table line</strong> reproduced identically to the accepted report before presentation/link adaptation. The script writes a new <code>reproduced-comparison.md</code>; it preserves the packaged report and data.</p>
-<p>The benchmark run index marks eligibility and selected builds. Preserve the differences between sample intervals, repeat ranges and paired ratios when doing your own analysis. Do not combine chunked distance-20 probes into a headline timing unless the requested sample is complete.</p>
+<p>The analyzer checks accepted raw-output hashes and recomputes the final medians, rates and single-cube scaling. It refreshes the derived <code>analysis.json</code> and <code>run-index.csv</code> in that study directory; the raw logs are unchanged. The <a href="../comparisons/NISSY_THROUGHPUT.html">report</a> links every final raw batch.</p>
+<h2 id="check-the-historical-matrix">Check the historical matrix</h2>
+<pre><code class="language-sh">python3 docs/reproduce/rebuild_comparison.py
+# Optionally save the reconstructed report:
+python3 docs/reproduce/rebuild_comparison.py --output /tmp/egg-historical-comparison.md
+</code></pre>
+<p>This runs the recorded parser/aggregator and compares every numerical table row against the immutable reference under <code>data/comparison/</code>. The reader-facing historical overview can have different presentation. The reconstructed report retains the old formulas and is not a current-source benchmark.</p>
 <h2 id="collect-new-measurements">Collect new measurements</h2>
-<p>Build the source on the target machine and record the source commit, compiler, CPU flags and binary hash. Generate or copy a verified table that fits available RAM. Use the same cube inputs, table-size group, page type, worker count and solve semantics for both solvers. Separate startup/table loading from search time. Record actual page coverage and outside CPU load. Alternate A/B order and repeat measurements before interpreting small effects.</p>
-<p>The full report gives the sampling and acceptance rules. <code>harness/runtest.sh</code> is the extended historical harness with its license; it refers to separately installed competitor projects and the original machine layout. It is provided for method inspection, not as a one-command installer. The source project's own <code>bench</code>, <code>solve</code>, <code>gen</code> and shell tools are documented in the user guide.</p>
-<p>No new timing measurements were performed to assemble this documentation archive.</p>
-<h2 id="physical-host-analysis-code">Physical-host analysis code</h2>
-<p><code>historical/analyze-phack.py</code> preserves the counter audit and normalization formulas used for the physical-host report. Its original full audit also verifies executable hashes and refers to the original VM paths; running it requires the original returned archive, which contains binaries outside this documentation bundle. <code>historical/pmu_reporting.py</code> and <code>historical/replay-phack-exports.py</code> preserve the annotation/export corrections. The CSV/JSON input and checked counter-ratio output are included under <code>data/phack/</code> for independent analysis.</p>
-</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>
+<p>Record the source commit, compiler, CPU, binary hash, input bytes, table sizes, page coverage, worker allocation and timing boundaries. Distinguish one-cube latency, finite-batch wall time and fixed-window streaming. Repeat fresh processes, alternate solver order, and check results before interpreting small differences. <a href="../comparisons/METHODS.html">Methods</a> defines the metrics used here.</p>
+<p>The archived competitor harness and measurement scripts contain paths and dependencies from the original machines. They are method records, not portable installers. The project commands are documented in the <a href="../reference/USER_GUIDE.html">user guide</a>.</p>
+<h2 id="physical-host-analysis">Physical-host analysis</h2>
+<p>The <a href="../performance/HARDWARE_COUNTERS.html">Xeon study</a> has its own host, source and counter definitions. <code>historical/analyze-phack.py</code>, <code>pmu_reporting.py</code> and <code>replay-phack-exports.py</code> retain the analysis and export corrections. Full replay needs the separately retained original counter archive; available CSV/JSON and checked aggregates are under <code>data/phack/</code>. This VM has no hardware PMU counters.</p>
+
+<p class="source-link"><a href="README.md">Markdown source</a></p></main>
+<footer><a href="../PROVENANCE.html">Sources and evidence scope</a></footer>
+<script>
+for (const wrapper of document.querySelectorAll('.table-wrap')) {
+  const table=wrapper.querySelector('table');
+  const rows=[...table.tBodies].flatMap(body=>[...body.rows]);
+  if(rows.length>50) wrapper.classList.add('long-table');
+  if(rows.length<=12) continue;
+  const tools=document.createElement('div'); tools.className='table-tools';
+  const label=document.createElement('label'); label.textContent='Filter this table';
+  const input=document.createElement('input'); input.type='search'; input.id=table.id+'-filter';
+  label.htmlFor=input.id; input.setAttribute('aria-controls',table.id);
+  const count=document.createElement('span'); count.className='note'; count.setAttribute('aria-live','polite');
+  count.textContent=rows.length+' rows';
+  input.addEventListener('input',()=>{
+    const query=input.value.trim().toLowerCase(); let shown=0;
+    for(const row of rows){row.hidden=!!query&&!row.textContent.toLowerCase().includes(query);if(!row.hidden)shown++;}
+    count.textContent=shown+' of '+rows.length+' rows';
+  });
+  tools.append(label,input,count); wrapper.before(tools);
+}
+function revealTarget(){
+  let id;try{id=decodeURIComponent(location.hash.slice(1));}catch{return;}
+  const target=document.getElementById(id);if(!target)return;
+  for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+}
+revealTarget(); window.addEventListener('hashchange',revealTarget);
+</script>
+</body></html>

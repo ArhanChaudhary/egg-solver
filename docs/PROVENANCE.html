@@ -1,8 +1,99 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Provenance and scope — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="index.html">Home</a><a href="guide/OVERVIEW.html">Learn</a><a href="comparisons/index.html">Compare</a><a href="performance/index.html">Performance</a><a href="safety/index.html">Safety</a><a href="history/index.html">History</a><a href="BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="PROVENANCE.md">Markdown source</a> · Offline document</p><h1 id="provenance-and-scope">Provenance and scope</h1>
-<p><a href="index.html">Documentation home</a> · <a href="BENCHMARK_CATALOG.html">Benchmark catalog</a></p>
-<p>The original evidence bundle accompanied source <code>842a504</code>. The documentation now lives in the project's <code>docs/</code> directory; current usage guides reflect the subsequent CLI and packaging cleanup. Historical measurements and safety reports retain their original source identities. The principal competitor comparison measured <code>229b99f</code>; final-source A/B records disclose the later differences. The physical-host PMU collection used <code>935cb7f</code> with its recorded profiling build. Individual historical commits identify their own baselines.</p>
-<p>Coverage: 230 matrix cells; 552 comparison run groups; 242 PMU runs, 621 counter rows and 6 sampled profiles; 478 surviving commit messages, 151 negative/neutral branch tips and 59 archived tips. These counts describe records and requested coverage, not percentages of all possible workloads or program behaviors.</p>
-<p><code>MANIFEST.sha256</code> covers distributed file bytes. <code>SOURCES.json</code> records original source paths and hashes for copied evidence, and presentation edits where applicable. Plain machine paths inside raw logs are historical provenance. Reader-facing links were made relative or mapped to included source views. Original live-status files and internal task conversations are not reader documentation.</p>
-<p>The documentation includes raw text/CSV/JSON results, datasets, methods, licenses, selected source views and historical commit messages. It excludes executables, build caches, pruning-table data, binary perf.data recordings, and the source Git database. The project archive includes this <code>docs/</code> directory. The physical-host runner remains a separate deliverable.</p>
-<p>The requested excluded backend performance comparisons are absent from the comparison data and historical prose. Backend implementation identities and safety-test evidence remain where necessary for interpreting the validation and physical-machine profile. Historical experimental results are preserved as history rather than presented as current-source guarantees.</p>
-</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Source identities and evidence scope — egg-solver</title><style>
+:root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
+header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
+header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
+header a { color:#d9f0ff; }
+header a[aria-current] { color:white; text-decoration-thickness:3px; }
+main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+h1 { margin-top:0; font-size:2rem; line-height:1.25; }
+h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
+h3 { margin-top:1.5rem; }
+a { color:var(--accent); overflow-wrap:anywhere; }
+p,li { max-width:90ch; }
+code { background:#eff3f6; border-radius:3px; padding:.1em .25em; overflow-wrap:anywhere; font-size:.9em; }
+pre { max-width:100%; padding:1rem; background:#eef3f6; overflow:auto; line-height:1.45; }
+pre code { background:none; padding:0; overflow-wrap:normal; }
+.table-wrap { max-width:100%; overflow:auto; margin:1rem 0 1.5rem; border:1px solid var(--line); }
+.table-wrap.long-table { max-height:70vh; }
+table { width:100%; border-collapse:collapse; font-size:.9rem; font-variant-numeric:tabular-nums; }
+th,td { padding:.55rem .65rem; border:1px solid var(--line); vertical-align:top; overflow-wrap:normal; }
+th { background:#eaf1f6; text-align:left; position:sticky; top:0; z-index:1; }
+tr:nth-child(even) { background:#f8fafb; }
+caption,.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+details { border:1px solid var(--line); padding:.6rem 1rem; border-radius:5px; margin:1rem 0; }
+summary { cursor:pointer; font-weight:600; }
+.table-tools { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:.6rem; background:#f4f7f9; }
+.table-tools input { font:inherit; border:1px solid #afc0ce; border-radius:4px; padding:.3rem .5rem; width:min(100%,22rem); min-width:0; }
+.note,.source-link,footer { color:var(--muted); font-size:.85rem; }
+.source-link { margin-top:2rem; }
+.archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
+footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
+svg { max-width:100%; height:auto; }
+:target { scroll-margin-top:1rem; }
+.skip-link { position:absolute; left:-10000px; }
+.skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
+@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+</style></head>
+<body>
+<a class="skip-link" href="#docs-content">Skip to content</a>
+<header><strong>egg-solver</strong><nav aria-label="Documentation"><a href="index.html">Home</a>
+<a href="guide/OVERVIEW.html">Learn</a>
+<a href="comparisons/index.html">Benchmarks</a>
+<a href="performance/index.html">Performance</a>
+<a href="safety/index.html">Safety</a>
+<a href="history/index.html">History</a>
+<a href="BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<main id="docs-content"><h1 id="source-identities-and-evidence-scope">Source identities and evidence scope</h1>
+<p><a href="index.html">Documentation</a> · <a href="comparisons/index.html">Benchmarks</a> · <a href="reproduce/index.html">Verification</a></p>
+<p>Usage guides describe the commands in this source checkout. Benchmark and safety reports describe the specific source bytes they tested. A dated source identifier is not a claim that it is still the repository's current <code>main</code>.</p>
+<div class="table-wrap" role="region" aria-label="Source identities and evidence scope" tabindex="0"><table id="docs-table-1"><caption>Source identities and evidence scope</caption>
+<thead>
+<tr><th>Evidence</th><th>Measured source / scope</th><th>Record</th></tr>
+</thead>
+<tbody>
+<tr><td>November 8 nissy throughput</td><td>Published source <code>947c20d</code>; retained CLI build inputs match except generator help text not linked into <code>solve</code></td><td><a href="comparisons/NISSY_THROUGHPUT.html">Report</a>, <a href="data/nissy-throughput-20261108/manifest.json">manifest</a></td></tr>
+<tr><td>Earlier multi-solver matrix</td><td>Egg <code>229b99f</code>; later <code>842a504</code> checked separately</td><td><a href="comparisons/RESULTS.html">Historical matrix</a></td></tr>
+<tr><td>Miri and sanitizer audit</td><td>Candidate <code>316597f</code>, integrated as <code>842a504</code>; source fingerprint recorded</td><td><a href="safety/NO_UB.html">Safety assessment</a></td></tr>
+<tr><td>Physical Xeon counters</td><td><code>935cb7f</code> plus the recorded profiling patch; Westmere build</td><td><a href="performance/HARDWARE_COUNTERS.html">Counter study</a></td></tr>
+<tr><td>Other experiments</td><td>Their own pinned sources, compilers, inputs and timing formulas</td><td><a href="BENCHMARK_CATALOG.html">Catalog</a>, <a href="history/index.html">history</a></td></tr>
+</tbody>
+</table></div>
+<p>The retained evidence includes raw text/CSV/JSON, datasets, methods, licenses, source snapshots and dated experiment notes. Executables, build caches, pruning-table data and binary PMU recordings are excluded. Machine paths in raw records identify the measurement environment; they are not installation requirements.</p>
+<p><code>MANIFEST.sha256</code> checks the current documentation file bytes. <code>SOURCES.json</code> records origins and hashes from the original evidence collection; it is a provenance record, not the checksum list for later edited guides. Individual studies also retain their own raw-output hashes. These checks detect changed files, not incorrect scientific claims.</p>
+<p>Historical evidence is preserved when a summary is rewritten. Old status messages, pending work, test counts and benchmark formulas are interpreted at their recorded date. Backend correctness identities remain where relevant; the excluded backend performance comparisons are not republished.</p>
+
+<p class="source-link"><a href="PROVENANCE.md">Markdown source</a></p></main>
+<footer><a href="PROVENANCE.html">Sources and evidence scope</a></footer>
+<script>
+for (const wrapper of document.querySelectorAll('.table-wrap')) {
+  const table=wrapper.querySelector('table');
+  const rows=[...table.tBodies].flatMap(body=>[...body.rows]);
+  if(rows.length>50) wrapper.classList.add('long-table');
+  if(rows.length<=12) continue;
+  const tools=document.createElement('div'); tools.className='table-tools';
+  const label=document.createElement('label'); label.textContent='Filter this table';
+  const input=document.createElement('input'); input.type='search'; input.id=table.id+'-filter';
+  label.htmlFor=input.id; input.setAttribute('aria-controls',table.id);
+  const count=document.createElement('span'); count.className='note'; count.setAttribute('aria-live','polite');
+  count.textContent=rows.length+' rows';
+  input.addEventListener('input',()=>{
+    const query=input.value.trim().toLowerCase(); let shown=0;
+    for(const row of rows){row.hidden=!!query&&!row.textContent.toLowerCase().includes(query);if(!row.hidden)shown++;}
+    count.textContent=shown+' of '+rows.length+' rows';
+  });
+  tools.append(label,input,count); wrapper.before(tools);
+}
+function revealTarget(){
+  let id;try{id=decodeURIComponent(location.hash.slice(1));}catch{return;}
+  const target=document.getElementById(id);if(!target)return;
+  for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+}
+revealTarget(); window.addEventListener('hashchange',revealTarget);
+</script>
+</body></html>

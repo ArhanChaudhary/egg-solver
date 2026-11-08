@@ -1,79 +1,108 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Comparing egg-solver with other solvers — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../index.html">Home</a><a href="../guide/OVERVIEW.html">Learn</a><a href="index.html">Compare</a><a href="../performance/index.html">Performance</a><a href="../safety/index.html">Safety</a><a href="../history/index.html">History</a><a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="README.md">Markdown source</a> · Offline document</p><details><summary>On this page</summary><ul><li><a href="#reading-the-measurements">Reading the measurements</a></li><li><a href="#november-8-follow-up">November 8 follow-up</a></li><li><a href="#selected-results">Selected results</a></li><li><a href="#final-solver-validation">Final solver validation</a></li><li><a href="#what-makes-the-comparison-fair-and-what-still-differs">What makes the comparison fair—and what still differs</a></li><li><a href="#which-source-do-the-numbers-describe">Which source do the numbers describe?</a></li><li><a href="#larger-nxopt-tables">Larger nxopt tables</a></li></ul></details><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="comparing-egg-solver-with-other-solvers">Comparing egg-solver with other solvers</h1>
-<p><a href="../index.html">Documentation home</a> · <a href="RESULTS.html">All tables</a> · <a href="../BENCHMARK_CATALOG.html">Benchmark catalog</a></p>
-<p>The comparison covers nxopt, vcube, nissy-core H48, cubeopt30, cube48opt10 and cube48opt-rust. The full report groups results by table size, page type, worker count and solve mode. Start with the conditions, then read the speedups.</p>
-<h2 id="reading-the-measurements">Reading the measurements</h2>
-<div class="table-wrap"><table>
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Solver benchmarks — egg-solver</title><style>
+:root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
+header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
+header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
+header a { color:#d9f0ff; }
+header a[aria-current] { color:white; text-decoration-thickness:3px; }
+main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+h1 { margin-top:0; font-size:2rem; line-height:1.25; }
+h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
+h3 { margin-top:1.5rem; }
+a { color:var(--accent); overflow-wrap:anywhere; }
+p,li { max-width:90ch; }
+code { background:#eff3f6; border-radius:3px; padding:.1em .25em; overflow-wrap:anywhere; font-size:.9em; }
+pre { max-width:100%; padding:1rem; background:#eef3f6; overflow:auto; line-height:1.45; }
+pre code { background:none; padding:0; overflow-wrap:normal; }
+.table-wrap { max-width:100%; overflow:auto; margin:1rem 0 1.5rem; border:1px solid var(--line); }
+.table-wrap.long-table { max-height:70vh; }
+table { width:100%; border-collapse:collapse; font-size:.9rem; font-variant-numeric:tabular-nums; }
+th,td { padding:.55rem .65rem; border:1px solid var(--line); vertical-align:top; overflow-wrap:normal; }
+th { background:#eaf1f6; text-align:left; position:sticky; top:0; z-index:1; }
+tr:nth-child(even) { background:#f8fafb; }
+caption,.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+details { border:1px solid var(--line); padding:.6rem 1rem; border-radius:5px; margin:1rem 0; }
+summary { cursor:pointer; font-weight:600; }
+.table-tools { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:.6rem; background:#f4f7f9; }
+.table-tools input { font:inherit; border:1px solid #afc0ce; border-radius:4px; padding:.3rem .5rem; width:min(100%,22rem); min-width:0; }
+.note,.source-link,footer { color:var(--muted); font-size:.85rem; }
+.source-link { margin-top:2rem; }
+.archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
+footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
+svg { max-width:100%; height:auto; }
+:target { scroll-margin-top:1rem; }
+.skip-link { position:absolute; left:-10000px; }
+.skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
+@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+</style></head>
+<body>
+<a class="skip-link" href="#docs-content">Skip to content</a>
+<header><strong>egg-solver</strong><nav aria-label="Documentation"><a href="../index.html">Home</a>
+<a href="../guide/OVERVIEW.html">Learn</a>
+<a href="index.html" aria-current="page">Benchmarks</a>
+<a href="../performance/index.html">Performance</a>
+<a href="../safety/index.html">Safety</a>
+<a href="../history/index.html">History</a>
+<a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<main id="docs-content"><h1 id="solver-benchmarks">Solver benchmarks</h1>
+<p><a href="../index.html">Documentation</a> · <a href="METHODS.html">How to read a benchmark</a> · <a href="../BENCHMARK_CATALOG.html">Raw-record catalog</a></p>
+<p>Start with the study that matches your question. Results from different CPUs, table sizes, source versions or timing methods cannot be combined into one ranking.</p>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#latest-matched-throughput-study">Latest matched throughput study</a></li><li><a href="#other-comparisons">Other comparisons</a></li><li><a href="#timing-conventions">Timing conventions</a></li></ul></details>
+<h2 id="latest-matched-throughput-study">Latest matched throughput study</h2>
+<p><a href="NISSY_THROUGHPUT.html">Nissy versus egg-solver, h6–h10</a> measures the time to finish <strong>all 500 repository random states</strong>, on the 48-core EPYC VM with <strong>1 GiB table pages</strong>. It includes the tested configurations, three final batches per solver and table, and every final raw output. This is the clearest starting point for batch throughput.</p>
+<p>The <a href="../performance/PARALLELISM.html">parallelism study</a> explains the lane screen and the separate one-cube-at-a-time scaling measurements. Neither study measures performance on a GPU or on a Mac.</p>
+<h2 id="other-comparisons">Other comparisons</h2>
+<div class="table-wrap" role="region" aria-label="Other comparisons" tabindex="0"><table id="docs-table-1"><caption>Other comparisons</caption>
 <thead>
-<tr><th>Term</th><th>Meaning here</th></tr>
+<tr><th>Study</th><th>Question answered</th><th>Important boundary</th></tr>
 </thead>
 <tbody>
-<tr><td>1T / 48T</td><td>One worker / the all-thread test configuration on the 48-core VM; cube48opt-rust latency has an explicit 18-thread cap</td></tr>
-<tr><td>Latency</td><td>Time for one cube with workers cooperating on it</td></tr>
-<tr><td>Throughput</td><td>Rate across many cubes; batch and steady-state stream details are stated separately</td></tr>
-<tr><td>1G / THP</td><td>1 GiB explicit huge pages / transparent huge pages; actual coverage was sampled</td></tr>
-<tr><td>Table GB</td><td>Decimal table-data size; compare similar sizes and note remaining differences</td></tr>
-<tr><td>sec/solv</td><td>Seconds per solved cube under the report's stated formula; lower is better</td></tr>
-<tr><td>Speedup</td><td>Competitor seconds per solve divided by egg-solver seconds per solve for the matched row</td></tr>
-<tr><td>95% interval at 1T</td><td>Variation over sampled cubes, not a guarantee about all future machines or states</td></tr>
+<tr><td><a href="CUBEOPT_AUDIT.html">Supplied Linux cubeopt binary</a></td><td>What did the old cubeopt speedups actually measure?</td><td>Identified x86 Linux executable; no paired measurement of the reported M4 Pro release</td></tr>
+<tr><td><a href="NXOPT32.html">Large nxopt table</a></td><td>How did nxopt's 62.474 GB table perform?</td><td>Nxopt's reported time is normalized from overlapping cube durations, not complete batch wall time</td></tr>
+<tr><td><a href="TABLE_ANALYSIS.html">cstimer table study</a></td><td>Is “486 MB” more pruning data than “464 MiB”?</td><td>Same h4 data capacity; semantic bounds and compression bases were tested separately</td></tr>
+<tr><td><a href="RESULTS.html">Historical multi-solver matrix</a></td><td>What was measured against cubeopt30, cube48opt-rust, nissy, nxopt and vcube earlier?</td><td>Earlier egg build, several timing formulas and table sizes; dated results, not a current release ranking</td></tr>
+<tr><td><a href="COMPETITOR_FINDINGS.html">Competitor findings</a></td><td>Which implementation and harness issues affected interpretation?</td><td>Findings apply to the pinned source versions or supplied binaries</td></tr>
 </tbody>
 </table></div>
-<p>The host was an AMD EPYC 9V45 VM with 48 cores and about 94 GiB of RAM. It has no hardware PMU counters. The physical Xeon counter study is a separate experiment and should not be used as a direct speed comparison with this VM.</p>
-<h2 id="november-8-follow-up">November 8 follow-up</h2>
+<h2 id="timing-conventions">Timing conventions</h2>
 <ul>
-<li><a href="NISSY_THROUGHPUT.html">Nissy versus egg: all 500 states, h6–h10</a>: complete batch walls, throughput tuning, all final raw outputs, and explicit PGO/source limits.</li>
-<li><a href="../performance/PARALLELISM.html">Lanes and parallelism</a>: why 48 is a tuning candidate, exact cubeopt empty-slot counters, and measured scaling within one cube.</li>
-<li><a href="CUBEOPT_AUDIT.html">Cubeopt comparison audit</a>: exact old binary identity, historical arithmetic, fresh 14-thread and full 500-state h10 runs.</li>
-<li><a href="TABLE_ANALYSIS.html">Exact cstimer Opt4 table study</a>: 486 MB versus 464 MiB, semantic pruning queries, and the browser base-selection fix.</li>
-<li><a href="NXOPT32.html">Large nxopt PS=16 table</a>: the requested 62.474 GB experiment and its measurement limits.</li>
-<li><a href="../data/cubeopt-audit-20261108/index.html">Raw evidence</a>.</li>
+<li><strong>Batch throughput:</strong> completed cubes divided by the time to finish the entire batch. Higher is faster.</li>
+<li><strong>Single-cube latency:</strong> time to solve one cube. Lower is faster.</li>
+<li><strong>Normalized worker time:</strong> summed cube durations divided by workers and cube count. It omits an uneven finishing tail and is not measured batch wall time.</li>
 </ul>
-<h2 id="selected-results">Selected results</h2>
-<p>Selected results on this VM using <strong>1 GiB pages</strong>, with matching latency or throughput semantics. Speedups below are from the immutable comparison build <strong>229b99f</strong>, not newly attributed to current main. Table sizes are decimal GB; cubeopt30 uses a smaller table than egg-solver h7. The full report includes all tested sizes, both page modes for small/medium tables, build selection, sample sizes and variation.</p>
-<div class="table-wrap"><table>
-<thead>
-<tr><th>Competitor / egg-solver table</th><th>Mode</th><th align="right">Table GB, competitor / egg</th><th align="right">1T speedup</th><th align="right">48T speedup</th></tr>
-</thead>
-<tbody>
-<tr><td>cubeopt30 / h7</td><td>latency</td><td align="right">2.60 / 3.89</td><td align="right">10.1×</td><td align="right">13.8×</td></tr>
-<tr><td>cube48opt10 / h10</td><td>latency</td><td align="right">31.13 / 31.13</td><td align="right">5.4×</td><td align="right">20.3×</td></tr>
-<tr><td>nissy H48 h11 / h11</td><td>latency</td><td align="right">60.67 / 62.26</td><td align="right">10.4×</td><td align="right">31.4×</td></tr>
-<tr><td>nxopt22 / h8</td><td>throughput</td><td align="right">7.81 / 7.78</td><td align="right">21.3×</td><td align="right">18.0×</td></tr>
-<tr><td>vcube208 / h8</td><td>throughput</td><td align="right">7.81 / 7.78</td><td align="right">14.2×</td><td align="right">12.3×</td></tr>
-<tr><td>cube48opt-rust Opt8 / h8</td><td>throughput</td><td align="right">7.78 / 7.78</td><td align="right">3.9×</td><td align="right">3.2×</td></tr>
-</tbody>
-</table></div>
-<h2 id="final-solver-validation">Final solver validation</h2>
-<p>The recorded release source <code>842a5043abfd550313a86a3d9bb5254f4b457540</code> had the same audited Rust-source fingerprint as the fully checked safety candidate. Its search node/lookup counts and solution-length histograms match the verification datasets. Its separate h11 timing checks measured:</p>
-<div class="table-wrap"><table>
-<thead>
-<tr><th>Final build versus comparison build</th><th align="right">Paired runs</th><th align="right">Measured change</th></tr>
-</thead>
-<tbody>
-<tr><td>1T stream throughput</td><td align="right">8</td><td align="right">-1.28%</td></tr>
-<tr><td>48T stream throughput</td><td align="right">5</td><td align="right">-1.01%</td></tr>
-<tr><td>48T latency: random_state</td><td align="right">6</td><td align="right">+0.16% time</td></tr>
-<tr><td>48T latency: random_move_17f</td><td align="right">6</td><td align="right">+2.84% time</td></tr>
-<tr><td>48T latency: random_state_depth17</td><td align="right">6</td><td align="right">+1.20% time</td></tr>
-</tbody>
-</table></div>
-<p>Higher throughput and lower latency are better. The final build's measured throughput and latency regressions are retained explicitly. Competitor timing tables continue to identify their original measured build.</p>
-<p>Both complete Miri catalogues passed with documented exclusions, along with native/backend checks, focused strict-provenance Miri, AddressSanitizer and ThreadSanitizer. <a href="../safety/NO_UB.html">NO_UB.md</a> records the identified fixes, evidence and limits. Universal absence of undefined behavior remains unproven. Correctness and optimality cross-checks are described in the full comparison below.</p>
-<h2 id="what-makes-the-comparison-fair-and-what-still-differs">What makes the comparison fair—and what still differs</h2>
-<p>The report matches page types, comparable table sizes, the cube sample, and latency/throughput semantics. Available source builds were screened for compiler and PGO choices. Prebuilt closed binaries could not be retuned. Large tables were tested on 1 GiB pages only. Some THP coverage is partial and is reported. Each solver's node count follows its own instrumentation and is not directly comparable across implementations.</p>
-<p>For nxopt and vcube, the historical harness divides summed per-cube times by the number of workers; that can favor them relative to a batch wall-time measure with an idle tail. The report describes this explicitly. Small effects also require care because code placement and interference were measured sources of noise.</p>
-<p>Read the <strong>Fairness</strong>, <strong>Build screening</strong>, <strong>Distance-20</strong>, and <strong>Solution lengths</strong> sections of the <a href="RESULTS.html">complete report</a> before reusing a number. <a href="COMPETITOR_FINDINGS.html">Competitor findings</a> documents the investigated issues and their evidence.</p>
-<h2 id="which-source-do-the-numbers-describe">Which source do the numbers describe?</h2>
-<p>The competitor matrix measured <code>229b99f</code>. The downloadable source is <code>842a504</code>, after the later safety changes and rename. The final-source A/B table above discloses its regressions. Historical optimization gains apply to their own baselines and cannot be added together or substituted for a current-source competitor run.</p>
-<p>All 230 required matrix cells are complete. The <a href="../data/comparison/run-index.csv">raw run index</a>, <a href="../data/comparison/build-selection.json">build-selection record</a>, and <a href="../data/comparison/reproduction-check.json">reproduction check</a> make the accepted evidence inspectable. Rejected and preliminary runs are explicitly separated in the data and methods.</p>
-<h2 id="larger-nxopt-tables">Larger nxopt tables</h2>
-<p>The historical matrix measured nxopt31 (2.60 GB) and nxopt22 (7.81 GB).
-The later <a href="NXOPT32.html">EO3/EP2 follow-up</a> measured the requested 62.474 GB
-table and records its source, raw timings and limits. EO3/EP3 (182 GB) and
-EO2/EP4 (546 GB) remain unmeasured.
-The larger configurations were considered in the <a href="../reference/inventories/x-nxopt-inventory.html">source inventory</a>,
-which is not a timing comparison. The 182 GB and 546 GB tables exceed this
-VM's RAM. Results for the measured configurations do not establish that
-egg-solver is faster than those larger configurations.</p>
-<p>The current command-line cleanup is later than the recorded release and has
-not been substituted into the historical timing or Miri results.</p>
-</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>
+<p>A ratio always states its direction. Counts of nodes and lookups use each solver's instrumentation and are not interchangeable. <a href="METHODS.html">Methods</a> defines units, repeats and the historical table notation.</p>
+
+<p class="source-link"><a href="README.md">Markdown source</a></p></main>
+<footer><a href="../PROVENANCE.html">Sources and evidence scope</a></footer>
+<script>
+for (const wrapper of document.querySelectorAll('.table-wrap')) {
+  const table=wrapper.querySelector('table');
+  const rows=[...table.tBodies].flatMap(body=>[...body.rows]);
+  if(rows.length>50) wrapper.classList.add('long-table');
+  if(rows.length<=12) continue;
+  const tools=document.createElement('div'); tools.className='table-tools';
+  const label=document.createElement('label'); label.textContent='Filter this table';
+  const input=document.createElement('input'); input.type='search'; input.id=table.id+'-filter';
+  label.htmlFor=input.id; input.setAttribute('aria-controls',table.id);
+  const count=document.createElement('span'); count.className='note'; count.setAttribute('aria-live','polite');
+  count.textContent=rows.length+' rows';
+  input.addEventListener('input',()=>{
+    const query=input.value.trim().toLowerCase(); let shown=0;
+    for(const row of rows){row.hidden=!!query&&!row.textContent.toLowerCase().includes(query);if(!row.hidden)shown++;}
+    count.textContent=shown+' of '+rows.length+' rows';
+  });
+  tools.append(label,input,count); wrapper.before(tools);
+}
+function revealTarget(){
+  let id;try{id=decodeURIComponent(location.hash.slice(1));}catch{return;}
+  const target=document.getElementById(id);if(!target)return;
+  for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+}
+revealTarget(); window.addEventListener('hashchange',revealTarget);
+</script>
+</body></html>

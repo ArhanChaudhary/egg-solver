@@ -1,40 +1,44 @@
-# What egg-solver does
+# Tables, memory and solve modes
 
-[Documentation home](../README.md) · Next: [Quick start](QUICKSTART.md)
+[Documentation](../README.md) · [Quick start](QUICKSTART.md) · [Glossary](GLOSSARY.md)
 
-egg-solver accepts a cube state or a scramble and searches for a shortest solution. It uses the **half-turn metric**: turning one face by 90°, 180°, or 270° counts as one move. “Optimal” describes the solution length. Runtime speed is measured separately.
+egg-solver searches for a shortest solution in the **half-turn metric**: a 90°, 180° or 270° turn of one face counts as one move. The native CLI reads scrambles. The JavaScript/browser interface can also read a 54-sticker facelet string.
 
-The main tradeoff is memory. A large precomputed **pruning table** tells the search when a partial path cannot reach a solution within its remaining move budget. Better bounds let the solver discard more work. Smaller tables retain optimal-search semantics but usually require more searching.
+A precomputed pruning table supplies lower bounds on the moves still needed. Larger tables retain more information and usually reduce search work. Optimal-search semantics do not require the largest table.
 
 ## Tables and memory
 
-The supported tables are named h0 through h11. Each increase in K approximately doubles the table's storage. Leave RAM for the program, operating system, and other applications.
+These are logical egg pruning-data sizes, rounded for display. Files add a 4 KiB trailer and may contain page padding. The process also needs memory for search state, auxiliary data and the operating system.
 
-| Table | Approximate data size | Typical use |
-|---|---:|---|
-| h0 | 28 MiB | Small examples, tests and learning the workflow |
-| h6 | 1.8 GiB | Machines with limited memory |
-| h7 | 3.6 GiB | A smaller practical table |
-| h8 | 7.3 GiB | A larger laptop or desktop table |
-| h9 | 14.5 GiB | Higher-memory desktop |
-| h10 | 29 GiB | Workstation |
-| h11 | 58 GiB | Large-memory workstation or server |
+| Table | Pruning data |
+|---|---:|
+| h0 | 28.99 MiB |
+| h1 | 57.99 MiB |
+| h2 | 115.97 MiB |
+| h3 | 231.94 MiB |
+| h4 | 463.89 MiB |
+| h5 | 927.77 MiB |
+| h6 | 1.81 GiB |
+| h7 | 3.62 GiB |
+| h8 | 7.25 GiB |
+| h9 | 14.50 GiB |
+| h10 | 28.99 GiB |
+| h11 | 57.99 GiB |
 
-These are data sizes; files can also contain metadata or page padding. The comparison tables use **decimal GB**, while this guide uses **GiB**. That explains numbers such as 62.26 GB versus 58 GiB for h11.
+Choose a table that fits comfortably in **available** RAM. The same table data can be moved between supported machines and backends. Generation, loading and search are separate operations. The [user guide](../reference/USER_GUIDE.md) explains generation and loading options.
 
-Generate a table once and reuse it. Table generation and loading are separate costs from searching. The principal comparison timings exclude both, so consult the generation and shared-memory evidence if startup time matters to your application.
+A 1 GiB-page benchmark rounds each table allocation to whole GiB pages. That is why the h6–h10 benchmark lists 2, 4, 8, 15 and 29 GiB of mapped table RAM. It is not a different data size. [Benchmark units](../comparisons/METHODS.md#units-and-configuration) explains GB versus GiB.
 
-## One cube or many cubes
+## One cube or many
 
-For an interactive solve, several workers can cooperate on one cube. For a batch, workers and interleaved search lanes process many cubes concurrently. These are different workloads:
+- **One cube:** use `solve --fast --table PATH SCRAMBLE`, or `-c 1` for sequential stdin. Workers cooperate within each search.
+- **A finite batch:** use the default concurrency (`-c 0`). The reported batch wall time includes waiting for the last cube.
+- **A stream:** use the benchmark stream mode to measure completed work over a declared window. Its warm-up/window metrics differ from a fixed 500-state batch.
 
-- **Latency:** how long a particular cube takes to finish.
-- **Throughput:** how many cubes finish per second over a batch or stream.
+Lanes are interleaved search contexts, not extra CPU threads. More lanes are not always faster. The [parallelism study](../performance/PARALLELISM.md) records the measured tradeoff.
 
-The [comparison guide](../comparisons/README.md) keeps these measurements separate. A throughput lead does not by itself specify interactive response time.
+## Platforms and evidence
 
-## Supported execution paths
+The project has native x86, ARM/NEON and WebAssembly paths. CPU features, browser memory limits and thread support affect which build can run. WebAssembly currently supports h0–h6; h7 exceeds its single-allocation limit.
 
-The source includes native x86 and ARM/NEON implementations and a WebAssembly interface for browsers and Bun. Build choices depend on the target CPU. The full [user guide](../reference/USER_GUIDE.md) describes cross-compilation, portable builds, table files, shared-memory loading, and browser deployment.
-
-The code is intended to solve optimally. The evidence includes independent short-state checks, known optimal lengths, agreement across search modes and solvers, and solution verification. Read [Correctness and safety](../safety/README.md) for what those checks establish and what they do not.
+[How the search works](HOW_IT_WORKS.md) explains the algorithm. [Safety](../safety/README.md) separates solution replay, optimality checks and undefined-behavior evidence. The [benchmark guide](../comparisons/README.md) keeps performance claims tied to their measured source and host.

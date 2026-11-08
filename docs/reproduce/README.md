@@ -1,37 +1,41 @@
-# Inspect and reproduce the report
+# Check and reproduce recorded results
 
-[Documentation home](../README.md) · [Benchmark catalog](../BENCHMARK_CATALOG.md)
+[Documentation](../README.md) · [Benchmark catalog](../BENCHMARK_CATALOG.md)
 
-## Verify the bundle
+Run the commands below from the project root. They read recorded evidence; they do not require pruning tables or rerun solver benchmarks.
 
-From the `docs/` directory, run:
-
-```sh
-python3 reproduce/verify_bundle.py
-```
-
-The manifest checks file contents, not the truth of a benchmark claim. The original run metadata, source commits and report methods supply the context for those claims.
-
-## Rebuild the comparison tables from the recorded logs
-
-This needs Python3 and the files in this bundle; it does not run solvers or require large tables:
+## Check file integrity
 
 ```sh
-python3 reproduce/rebuild_comparison.py
+python3 docs/reproduce/verify_bundle.py
 ```
 
-The parser and aggregation logic come from the comparison report generator. Only its wiki and bug-report input paths were made relative. The packaging check confirmed that **every Markdown table line** reproduced identically to the accepted report before presentation/link adaptation. The script writes a new `reproduced-comparison.md`; it preserves the packaged report and data.
+This compares documentation files with `docs/MANIFEST.sha256`. A matching hash establishes file integrity, not the validity of a performance or safety claim. [Provenance](../PROVENANCE.md) explains source versions and original-origin hashes.
 
-The benchmark run index marks eligibility and selected builds. Preserve the differences between sample intervals, repeat ranges and paired ratios when doing your own analysis. Do not combine chunked distance-20 probes into a headline timing unless the requested sample is complete.
+## Recompute the newest throughput table
+
+```sh
+python3 docs/data/nissy-throughput-20261108/analyze.py --require-complete
+```
+
+The analyzer checks accepted raw-output hashes and recomputes the final medians, rates and single-cube scaling. It refreshes the derived `analysis.json` and `run-index.csv` in that study directory; the raw logs are unchanged. The [report](../comparisons/NISSY_THROUGHPUT.md) links every final raw batch.
+
+## Check the historical matrix
+
+```sh
+python3 docs/reproduce/rebuild_comparison.py
+# Optionally save the reconstructed report:
+python3 docs/reproduce/rebuild_comparison.py --output /tmp/egg-historical-comparison.md
+```
+
+This runs the recorded parser/aggregator and compares every numerical table row against the immutable reference under `data/comparison/`. The reader-facing historical overview can have different presentation. The reconstructed report retains the old formulas and is not a current-source benchmark.
 
 ## Collect new measurements
 
-Build the source on the target machine and record the source commit, compiler, CPU flags and binary hash. Generate or copy a verified table that fits available RAM. Use the same cube inputs, table-size group, page type, worker count and solve semantics for both solvers. Separate startup/table loading from search time. Record actual page coverage and outside CPU load. Alternate A/B order and repeat measurements before interpreting small effects.
+Record the source commit, compiler, CPU, binary hash, input bytes, table sizes, page coverage, worker allocation and timing boundaries. Distinguish one-cube latency, finite-batch wall time and fixed-window streaming. Repeat fresh processes, alternate solver order, and check results before interpreting small differences. [Methods](../comparisons/METHODS.md) defines the metrics used here.
 
-The full report gives the sampling and acceptance rules. `harness/runtest.sh` is the extended historical harness with its license; it refers to separately installed competitor projects and the original machine layout. It is provided for method inspection, not as a one-command installer. The source project's own `bench`, `solve`, `gen` and shell tools are documented in the user guide.
+The archived competitor harness and measurement scripts contain paths and dependencies from the original machines. They are method records, not portable installers. The project commands are documented in the [user guide](../reference/USER_GUIDE.md).
 
-No new timing measurements were performed to assemble this documentation archive.
+## Physical-host analysis
 
-## Physical-host analysis code
-
-`historical/analyze-phack.py` preserves the counter audit and normalization formulas used for the physical-host report. Its original full audit also verifies executable hashes and refers to the original VM paths; running it requires the original returned archive, which contains binaries outside this documentation bundle. `historical/pmu_reporting.py` and `historical/replay-phack-exports.py` preserve the annotation/export corrections. The CSV/JSON input and checked counter-ratio output are included under `data/phack/` for independent analysis.
+The [Xeon study](../performance/HARDWARE_COUNTERS.md) has its own host, source and counter definitions. `historical/analyze-phack.py`, `pmu_reporting.py` and `replay-phack-exports.py` retain the analysis and export corrections. Full replay needs the separately retained original counter archive; available CSV/JSON and checked aggregates are under `data/phack/`. This VM has no hardware PMU counters.

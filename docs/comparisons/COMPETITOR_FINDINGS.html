@@ -1,7 +1,59 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bugs and issues found in other solvers (for the final report; the user will report them upstream) — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../index.html">Home</a><a href="../guide/OVERVIEW.html">Learn</a><a href="index.html">Compare</a><a href="../performance/index.html">Performance</a><a href="../safety/index.html">Safety</a><a href="../history/index.html">History</a><a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="COMPETITOR_FINDINGS.md">Markdown source</a> · Offline document</p><details><summary>On this page</summary><ul><li><a href="#1-nissy-core-h11-table-slightly-inadmissible-generator-skips-the-last-hash-slot">1. nissy-core: h11 table slightly inadmissible (generator skips the last hash slot)</a></li><li><a href="#2-4-cube-solver-test-harness-issues-found-by-f1-while-extending-it">2–4. cube_solver_test harness issues (found by f1 while extending it)</a></li><li><a href="#5-6-huge-page-handling-performance-not-correctness">5–6. Huge-page handling (performance, not correctness)</a></li><li><a href="#f1-exact-locations-for-2-6-and-new-findings-7-10-f1-2026-11-04">f1: exact locations for #2-#6, and new findings #7-#10 (f1, 2026-11-04)</a></li><li><a href="#shm1-vcube-shared-memory-found-while-porting-shm-2026-11-05">shm1: vcube shared memory (found while porting --shm, 2026-11-05)</a></li><li><a href="#continuation-review-2026-11-05">Continuation review (2026-11-05)</a></li><li><a href="#pinned-source-links">Pinned source links</a></li></ul></details><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="bugs-and-issues-found-in-other-solvers-for-the-final-report-the-user-will-report-them-upstream">Bugs and issues found in other solvers (for the final report; the user will report them upstream)</h1>
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Recorded competitor and harness findings — egg-solver</title><style>
+:root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
+header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
+header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
+header a { color:#d9f0ff; }
+header a[aria-current] { color:white; text-decoration-thickness:3px; }
+main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+h1 { margin-top:0; font-size:2rem; line-height:1.25; }
+h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
+h3 { margin-top:1.5rem; }
+a { color:var(--accent); overflow-wrap:anywhere; }
+p,li { max-width:90ch; }
+code { background:#eff3f6; border-radius:3px; padding:.1em .25em; overflow-wrap:anywhere; font-size:.9em; }
+pre { max-width:100%; padding:1rem; background:#eef3f6; overflow:auto; line-height:1.45; }
+pre code { background:none; padding:0; overflow-wrap:normal; }
+.table-wrap { max-width:100%; overflow:auto; margin:1rem 0 1.5rem; border:1px solid var(--line); }
+.table-wrap.long-table { max-height:70vh; }
+table { width:100%; border-collapse:collapse; font-size:.9rem; font-variant-numeric:tabular-nums; }
+th,td { padding:.55rem .65rem; border:1px solid var(--line); vertical-align:top; overflow-wrap:normal; }
+th { background:#eaf1f6; text-align:left; position:sticky; top:0; z-index:1; }
+tr:nth-child(even) { background:#f8fafb; }
+caption,.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+details { border:1px solid var(--line); padding:.6rem 1rem; border-radius:5px; margin:1rem 0; }
+summary { cursor:pointer; font-weight:600; }
+.table-tools { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:.6rem; background:#f4f7f9; }
+.table-tools input { font:inherit; border:1px solid #afc0ce; border-radius:4px; padding:.3rem .5rem; width:min(100%,22rem); min-width:0; }
+.note,.source-link,footer { color:var(--muted); font-size:.85rem; }
+.source-link { margin-top:2rem; }
+.archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
+footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
+svg { max-width:100%; height:auto; }
+:target { scroll-margin-top:1rem; }
+.skip-link { position:absolute; left:-10000px; }
+.skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
+@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+</style></head>
+<body>
+<a class="skip-link" href="#docs-content">Skip to content</a>
+<header><strong>egg-solver</strong><nav aria-label="Documentation"><a href="../index.html">Home</a>
+<a href="../guide/OVERVIEW.html">Learn</a>
+<a href="index.html">Benchmarks</a>
+<a href="../performance/index.html">Performance</a>
+<a href="../safety/index.html">Safety</a>
+<a href="../history/index.html">History</a>
+<a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<main id="docs-content"><h1 id="recorded-competitor-and-harness-findings">Recorded competitor and harness findings</h1>
+<p>These are findings against pinned historical source and supplied binaries, not claims about every later upstream release. They were not automatically reported upstream.</p>
 <p>Source commits read: nissy-core 1f7e8e9 (2026-09-17), vcube 9f5bc2c (2024-04-18), cube20src/nxopt f430921 (2025-07-18), cube_solver_test b9cca71 (2026-02-01); cubeopt30/cube48opt10 = the prebuilt binaries in ~/ (no source).</p>
 <p>Each entry: project, file:line at the commit we read, what is wrong, a repro or proof, impact, and a suggested fix.</p>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="Recorded competitor and harness findings" tabindex="0"><table id="docs-table-1"><caption>Recorded competitor and harness findings</caption>
 <thead>
 <tr><th>#</th><th>project</th><th>severity</th><th>summary</th></tr>
 </thead>
@@ -14,6 +66,7 @@
 <tr><td>6</td><td>nxopt</td><td>performance</td><td>the table is one malloc per corner row with no MADV_HUGEPAGE: 4K pages on THP=madvise systems, ~11% slower</td></tr>
 </tbody>
 </table></div>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#1-nissy-core-h11-table-slightly-inadmissible-generator-skips-the-last-hash-slot">1. nissy-core: h11 table slightly inadmissible (generator skips the last hash slot)</a></li><li><a href="#2-4-cube-solver-test-harness-issues-found-by-f1-while-extending-it">2–4. cube_solver_test harness issues (found by f1 while extending it)</a></li><li><a href="#5-6-huge-page-handling-performance-not-correctness">5–6. Huge-page handling (performance, not correctness)</a></li><li><a href="#f1-exact-locations-for-2-6-and-new-findings-7-10-f1-2026-11-04">f1: exact locations for #2-#6, and new findings #7-#10 (f1, 2026-11-04)</a></li><li><a href="#shm1-vcube-shared-memory-found-while-porting-shm-2026-11-05">shm1: vcube shared memory (found while porting --shm, 2026-11-05)</a></li><li><a href="#continuation-review-2026-11-05">Continuation review (2026-11-05)</a></li><li><a href="#pinned-source-links">Pinned source links</a></li></ul></details>
 <h2 id="1-nissy-core-h11-table-slightly-inadmissible-generator-skips-the-last-hash-slot">1. nissy-core: h11 table slightly inadmissible (generator skips the last hash slot)</h2>
 <ul>
 <li><strong>Where:</strong> h48/gendata_h48.h:307-316 (<code>gendata_h48_runthread</code>) with h48/map.h:68-87 (<code>h48map_nextkvpair</code> post-increments the slot index).
@@ -87,7 +140,7 @@
 </ul>
 </li>
 </ul>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="f1: exact locations for #2-#6, and new findings #7-#10 (f1, 2026-11-04)" tabindex="0"><table id="docs-table-2"><caption>f1: exact locations for #2-#6, and new findings #7-#10 (f1, 2026-11-04)</caption>
 <thead>
 <tr><th>#</th><th>project</th><th>severity</th><th>summary</th></tr>
 </thead>
@@ -171,7 +224,7 @@
 <li>No bug. It looks like a one-off cost right after generation (THP compaction / first touch).</li>
 </ul>
 <h2 id="shm1-vcube-shared-memory-found-while-porting-shm-2026-11-05">shm1: vcube shared memory (found while porting <code>--shm</code>, 2026-11-05)</h2>
-<div class="table-wrap"><table>
+<div class="table-wrap" role="region" aria-label="shm1: vcube shared memory (found while porting --shm, 2026-11-05)" tabindex="0"><table id="docs-table-3"><caption>shm1: vcube shared memory (found while porting --shm, 2026-11-05)</caption>
 <thead>
 <tr><th>#</th><th>project</th><th>severity</th><th>summary</th></tr>
 </thead>
@@ -207,4 +260,33 @@
 <li><a href="https://github.com/rokicki/cube20src/tree/f430921a48306874864b9f2ac8a059b43492fd3a">cube20src source snapshot</a></li>
 <li><a href="https://github.com/cs0x7f/cube_solver_test/tree/b9cca71cdf3f6e57bd3c7bfdc2491e5b806dda31">cube_solver_test source snapshot</a></li>
 </ul>
-</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>
+
+<p class="source-link"><a href="COMPETITOR_FINDINGS.md">Markdown source</a></p></main>
+<footer><a href="../PROVENANCE.html">Sources and evidence scope</a></footer>
+<script>
+for (const wrapper of document.querySelectorAll('.table-wrap')) {
+  const table=wrapper.querySelector('table');
+  const rows=[...table.tBodies].flatMap(body=>[...body.rows]);
+  if(rows.length>50) wrapper.classList.add('long-table');
+  if(rows.length<=12) continue;
+  const tools=document.createElement('div'); tools.className='table-tools';
+  const label=document.createElement('label'); label.textContent='Filter this table';
+  const input=document.createElement('input'); input.type='search'; input.id=table.id+'-filter';
+  label.htmlFor=input.id; input.setAttribute('aria-controls',table.id);
+  const count=document.createElement('span'); count.className='note'; count.setAttribute('aria-live','polite');
+  count.textContent=rows.length+' rows';
+  input.addEventListener('input',()=>{
+    const query=input.value.trim().toLowerCase(); let shown=0;
+    for(const row of rows){row.hidden=!!query&&!row.textContent.toLowerCase().includes(query);if(!row.hidden)shown++;}
+    count.textContent=shown+' of '+rows.length+' rows';
+  });
+  tools.append(label,input,count); wrapper.before(tools);
+}
+function revealTarget(){
+  let id;try{id=decodeURIComponent(location.hash.slice(1));}catch{return;}
+  const target=document.getElementById(id);if(!target)return;
+  for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+}
+revealTarget(); window.addEventListener('hashchange',revealTarget);
+</script>
+</body></html>

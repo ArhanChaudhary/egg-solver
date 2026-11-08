@@ -1,44 +1,34 @@
-# Build it and solve a cube
+# Build and solve a cube
 
-[Documentation home](../README.md) · Previous: [Overview](OVERVIEW.md) · Next: [Comparisons](../comparisons/README.md)
+[Documentation](../README.md) · [Tables and memory](OVERVIEW.md) · [Full command reference](../reference/USER_GUIDE.md)
 
-Run these commands from the extracted source directory containing `Cargo.toml`. Rust and Cargo are required. Cargo downloads the locked dependencies if they are not already cached.
+Run these commands from a source checkout containing `Cargo.toml`. Rust and Cargo are required. The release build targets the build machine's CPU by default.
+
+## First solve
 
 ```sh
 cargo build --release --locked
 mkdir -p tables
 target/release/gen 0 auto tables/h0 -t 2
-printf "%s\n" "R U R' U' F2" | target/release/solve tables/h0 --load copy -t 2 -c 1
+target/release/solve --fast --table tables/h0 -t 2 "R U R' U' F2"
 ```
 
-This small example uses h0 to keep setup lightweight. The source ZIP was independently extracted, built for generic x86-64, and exercised with this scramble. It returned the five-move solution `F2 U R U' R'`, and its internal solution check passed. A correct solver may return a different shortest sequence.
+h0 contains about 29 MiB of pruning data and keeps this example small. A possible shortest solution is `F2 U R U' R'`; a different shortest sequence is also valid. The solver verifies the returned moves.
 
-Use h0 for short examples. For arbitrary random states, choose a larger table that fits your RAM. For example, a machine with enough free RAM for h7 can generate and use it with:
+## Arbitrary states and batches
+
+Choose a [larger table that fits in RAM](OVERVIEW.md#tables-and-memory) for arbitrary random states. Generate it once, then reuse it:
 
 ```sh
 target/release/gen 7 auto tables/h7
-target/release/solve tables/h7 -c 1 < testdata/random_state.txt
-```
-
-`-c 1` solves one cube at a time using the selected workers. Omit it for the default batch mode. `-t N` sets the worker count. `--json` emits structured results; `--help` lists the options.
-
-## Loading tables into RAM
-
-`--load copy` reads the table into private RAM before the search. Mapping and shared-memory modes are also available. Ensure the table fits comfortably in available memory: the operating system can otherwise introduce paging. Table-load time is excluded from the main solver comparison timings.
-
-After generating a table, verify its stored checksum and distribution:
-
-```sh
 target/release/gen check tables/h7
+target/release/solve --table tables/h7 < testdata/random_state.txt
 ```
 
-For the one-cube convenience command, specify your table explicitly:
+Each input line is a scramble. The default batch mode allows workers to share searches across the input. Add `-c 1` to finish one cube before starting the next. `-t N` chooses worker threads; `-l N` chooses interleaved lanes per worker. `--json` emits one result per cube and a final total.
 
-```sh
-target/release/solve --fast --table tables/h7 "R U R' U' F2"
-```
+## One solve and table loading
 
-`--fast` also accepts one nonblank stdin line. It requires an explicit `--table`,
-rejects empty input, and performs no warm-up unless `--warmup SCRAMBLE` is supplied.
+`--fast` requires an explicit `--table` and one scramble, either as arguments or as exactly one nonblank stdin line. Empty input is an error; there is no random fallback or automatic warm-up. `--warmup SCRAMBLE` explicitly adds a warm-up solve.
 
-The full [user guide](../reference/USER_GUIDE.md) covers lane tuning, table sizing, load modes, environment variables, WebAssembly and shared memory. The [packaging validation record](../evidence/validation/continuation/source-release.json) identifies the exact source and fresh-build checks.
+`--load copy` reads the table into private RAM before searching. Mapping and Linux shared-memory modes are also available. See [load modes](../reference/USER_GUIDE.md#table-files) for residency, page size and backing-file requirements. Search timers exclude table loading; startup is a separate cost.

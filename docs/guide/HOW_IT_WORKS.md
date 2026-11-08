@@ -12,7 +12,7 @@ With valid lower bounds and complete search of shorter limits, the first success
 
 ## Keep useful work in flight
 
-Large pruning tables do not fit in CPU caches. The fast stream loop maintains several **lanes** per worker. A lane computes a lookup address, issues a prefetch, and yields. Other lanes advance while that memory access is outstanding. The worker later returns to use the value.
+Large pruning tables do not fit in CPU caches. The search loops maintain several **lanes** per worker. A lane computes a lookup address, issues a prefetch, and yields. Other lanes advance while that memory access is outstanding. The worker later returns to use the value.
 
 ```mermaid
 flowchart LR
@@ -30,7 +30,7 @@ A lane is search state, not an operating-system thread. Increasing lane count ca
 
 The shared-search mode divides a cube's search into jobs. Workers can donate pieces of a search to idle workers. Job ordering aims to find a solution earlier in the successful iteration; synchronization must still ensure that shorter iterations are handled correctly and that each published job is safe to read.
 
-The [safety report](../safety/NO_UB.md) discusses the ownership and publication checks, including a reproduced concurrency defect that was fixed before the final release.
+The [safety report](../safety/NO_UB.md) discusses the ownership and publication checks, including a reproduced concurrency defect that was fixed in the audited source.
 
 ## Source map
 
@@ -46,3 +46,5 @@ The [safety report](../safety/NO_UB.md) discusses the ownership and publication 
 | [`tests/correctness.rs`](../reference/source/tests/correctness.rs.html) | Independent search and optimal-length cross-checks |
 
 The linked source views are snapshots from release `842a504`. Historical performance records name their own source commits; line numbers and mechanisms can differ in those older versions.
+
+See [parallelism measurements](../performance/PARALLELISM.md) for the distinction between CPU workers, software lanes, query-slot occupancy and measured speedup.

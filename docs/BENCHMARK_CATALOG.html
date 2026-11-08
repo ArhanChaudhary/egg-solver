@@ -1,27 +1,117 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Benchmark catalog — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="index.html">Home</a><a href="guide/OVERVIEW.html">Learn</a><a href="comparisons/index.html">Compare</a><a href="performance/index.html">Performance</a><a href="safety/index.html">Safety</a><a href="history/index.html">History</a><a href="BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="BENCHMARK_CATALOG.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="benchmark-catalog">Benchmark catalog</h1>
-<p><a href="index.html">Documentation home</a> · <a href="comparisons/index.html">Comparison guide</a> · <a href="reproduce/index.html">Reproduction</a></p>
-<p>This catalog separates the studies by the question they answer. It includes negative and rejected results so that the reader can inspect how the final conclusions were chosen.</p>
-<div class="table-wrap"><table>
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Benchmark and evidence catalog — egg-solver</title><style>
+:root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
+header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
+header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
+header a { color:#d9f0ff; }
+header a[aria-current] { color:white; text-decoration-thickness:3px; }
+main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+h1 { margin-top:0; font-size:2rem; line-height:1.25; }
+h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
+h3 { margin-top:1.5rem; }
+a { color:var(--accent); overflow-wrap:anywhere; }
+p,li { max-width:90ch; }
+code { background:#eff3f6; border-radius:3px; padding:.1em .25em; overflow-wrap:anywhere; font-size:.9em; }
+pre { max-width:100%; padding:1rem; background:#eef3f6; overflow:auto; line-height:1.45; }
+pre code { background:none; padding:0; overflow-wrap:normal; }
+.table-wrap { max-width:100%; overflow:auto; margin:1rem 0 1.5rem; border:1px solid var(--line); }
+.table-wrap.long-table { max-height:70vh; }
+table { width:100%; border-collapse:collapse; font-size:.9rem; font-variant-numeric:tabular-nums; }
+th,td { padding:.55rem .65rem; border:1px solid var(--line); vertical-align:top; overflow-wrap:normal; }
+th { background:#eaf1f6; text-align:left; position:sticky; top:0; z-index:1; }
+tr:nth-child(even) { background:#f8fafb; }
+caption,.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+details { border:1px solid var(--line); padding:.6rem 1rem; border-radius:5px; margin:1rem 0; }
+summary { cursor:pointer; font-weight:600; }
+.table-tools { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:.6rem; background:#f4f7f9; }
+.table-tools input { font:inherit; border:1px solid #afc0ce; border-radius:4px; padding:.3rem .5rem; width:min(100%,22rem); min-width:0; }
+.note,.source-link,footer { color:var(--muted); font-size:.85rem; }
+.source-link { margin-top:2rem; }
+.archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
+footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
+svg { max-width:100%; height:auto; }
+:target { scroll-margin-top:1rem; }
+.skip-link { position:absolute; left:-10000px; }
+.skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
+@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+</style></head>
+<body>
+<a class="skip-link" href="#docs-content">Skip to content</a>
+<header><strong>egg-solver</strong><nav aria-label="Documentation"><a href="index.html">Home</a>
+<a href="guide/OVERVIEW.html">Learn</a>
+<a href="comparisons/index.html">Benchmarks</a>
+<a href="performance/index.html">Performance</a>
+<a href="safety/index.html">Safety</a>
+<a href="history/index.html">History</a>
+<a href="BENCHMARK_CATALOG.html" aria-current="page">Catalog</a></nav></header>
+<main id="docs-content"><h1 id="benchmark-and-evidence-catalog">Benchmark and evidence catalog</h1>
+<p><a href="index.html">Documentation</a> · <a href="comparisons/index.html">Benchmark guide</a> · <a href="reproduce/index.html">Reproduction</a></p>
+<p>Choose a study by its metric and source. Record counts below are not distinct cube counts or interchangeable measures of coverage.</p>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#solver-comparisons">Solver comparisons</a></li><li><a href="#performance-mechanisms">Performance mechanisms</a></li><li><a href="#correctness-and-validation">Correctness and validation</a></li><li><a href="#historical-and-rejected-work">Historical and rejected work</a></li></ul></details>
+<h2 id="solver-comparisons">Solver comparisons</h2>
+<div class="table-wrap" role="region" aria-label="Solver comparisons" tabindex="0"><table id="docs-table-1"><caption>Solver comparisons</caption>
 <thead>
-<tr><th>Study</th><th>Coverage</th><th>Where to start</th></tr>
+<tr><th>Study</th><th>Date / measurement</th><th>Reader report</th><th>Raw records</th></tr>
 </thead>
 <tbody>
-<tr><td>November 8 throughput and parallelism</td><td>305 accepted measurements; h6–h10, 500 states, three final batches per solver/size, 1 GiB pages; separate single-cube scaling</td><td><a href="comparisons/NISSY_THROUGHPUT.html">Nissy comparison</a>, <a href="performance/PARALLELISM.html">parallelism</a>, <a href="data/nissy-throughput-20261108/run-index.csv">raw index</a></td></tr>
-<tr><td>Main solver comparison</td><td>230 completed cells: 86 headline, 64 distance-20, 80 wiki; 1T/48T, table-size groups, page modes</td><td><a href="comparisons/RESULTS.html">Full report</a></td></tr>
-<tr><td>Raw comparisons and build screening</td><td>552 retained run groups with raw output, summary and metadata; frozen compiler/PGO choices</td><td><a href="data/comparison/run-index.csv">Run index</a>, <a href="data/comparison/build-selection.json">build selection</a></td></tr>
-<tr><td>Distance-20 and interference checks</td><td>Separate harder-state datasets; serial nissy fallback after the interference check</td><td>Full report's Distance-20 section; <a href="data/datasets/index.html">datasets</a></td></tr>
-<tr><td>Table contents and generation</td><td>h9/h10 generation and equality checks; cube48opt10/h10 mapping and byte differences</td><td><a href="data/comparison/ours-gen/index.html">Generation records</a>, <a href="reference/inventories/cube48opt10-table.html">table inventory</a></td></tr>
-<tr><td>Final source versus measured source</td><td>8 paired 1T streams, 5 paired 48T streams, 6 paired latency rounds for each of 3 datasets</td><td><a href="data/final-build/final-main-validation.json">Final validation JSON</a>, <a href="comparisons/index.html">comparison guide</a></td></tr>
-<tr><td>Physical-host PMU</td><td>242 runs, 621 counter rows, 6 sampled profiles; workers/SMT, lanes, pages, NUMA and event groups</td><td><a href="performance/HARDWARE_COUNTERS.html">Analysis</a>, <a href="data/phack/index.html">raw-data index</a></td></tr>
-<tr><td>PMU-guided native changes</td><td>12 paired 1T results and 5 paired 48T results per candidate; two rejected ideas</td><td><a href="performance/OPTIMIZATION_REVIEW.html">Optimization review</a></td></tr>
-<tr><td>Search and scheduling optimizations</td><td>Lane interleaving, bounds/pruning, job ordering, symmetry, work sharing and prefetch studies</td><td><a href="history/index.html">History</a></td></tr>
-<tr><td>Compiler and layout experiments</td><td>Code placement, flags, LTO, PGO, BOLT, instruction/branch studies, neutral results</td><td><a href="reference/inventories/perf-book-audit.html">Performance Book review</a>, <a href="history/NEGATIVE_EXPERIMENTS.html">negative experiments</a></td></tr>
-<tr><td>Startup, shared memory and page size</td><td>Loading/attachment, search with page configurations, allocation/page-fault and placement studies</td><td><a href="reference/USER_GUIDE.html">User guide</a>, historical shared-memory and placement records</td></tr>
-<tr><td>WebAssembly and Bun</td><td>Engine warm-up, prefetch/lane behavior, worker scaling and table generation</td><td><a href="reference/USER_GUIDE.html#webassembly">User guide</a>, historical WASM records</td></tr>
-<tr><td>Correctness and safety</td><td>Optimal-length cross-checks, Miri, sanitizers, lint review and source identity</td><td><a href="safety/index.html">Safety guide</a></td></tr>
+<tr><td>Nissy, h6–h10</td><td>Nov 8; complete 500-state batch wall, 1 GiB pages</td><td><a href="comparisons/NISSY_THROUGHPUT.html">Throughput</a></td><td><a href="data/nissy-throughput-20261108/run-index.csv">305 accepted measurements</a></td></tr>
+<tr><td>Supplied Linux cubeopt h10</td><td>Nov 8; 500 one-cube latency solves, 48 threads</td><td><a href="comparisons/CUBEOPT_AUDIT.html">Audit</a></td><td><a href="data/cubeopt-audit-20261108/index.html">Commands, logs and metadata</a></td></tr>
+<tr><td>Large nxopt EO3/EP2</td><td>Nov 7; first 50/200 states, normalized worker timing</td><td><a href="comparisons/NXOPT32.html">62.474 GB study</a></td><td><a href="data/nxopt32-20261107/index.html">Experiment directory</a></td></tr>
+<tr><td>Earlier multi-solver matrix</td><td>Nov 7 snapshot; egg <code>229b99f</code>, 230 report cells, several metrics</td><td><a href="comparisons/RESULTS.html">Historical overview</a></td><td><a href="data/comparison/run-index.csv">Run index</a>, <a href="data/comparison/build-selection.json">build choices</a></td></tr>
 </tbody>
 </table></div>
-<h2 id="accepted-historical-and-rejected">Accepted, historical, and rejected</h2>
-<p><code>data/comparison/raw</code>, <code>sum</code>, and <code>meta</code> retain the collected comparison run groups. The run index marks which pass the report's eligibility checks and which use the selected build. Eligible does not mean every row contributes to every published aggregate: dataset coverage, sample alignment and report grouping also apply. <code>data/comparison/rejected</code> retains failed/contaminated attempts and reasons. Use the published tables or the reproduction script to obtain the headline aggregates.</p>
-<p>The historical commit archive is deliberately broader than successful performance changes. It includes missing/limited measurements and noisy results with their recorded qualifications. No universal speed ranking across machines is claimed. The physically collected PMU results use their own older source and compatible build, stated in their manifest.</p>
-</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>
+<p>The newest throughput study has <strong>30 final batches × 500 states = 15,000 solves</strong> of <strong>500 distinct states</strong>. Its 305 accepted measurements also include configuration screens, scaling and exploratory research calls. The historical matrix's report cells and retained run groups are different quantities.</p>
+<h2 id="performance-mechanisms">Performance mechanisms</h2>
+<div class="table-wrap" role="region" aria-label="Performance mechanisms" tabindex="0"><table id="docs-table-2"><caption>Performance mechanisms</caption>
+<thead>
+<tr><th>Study</th><th>Scope</th><th>Evidence</th></tr>
+</thead>
+<tbody>
+<tr><td>Worker/lane scaling and cubeopt slots</td><td>Nov 8 CPU measurements; three-state single-cube sample</td><td><a href="performance/PARALLELISM.html">Parallelism</a>, <a href="data/nissy-throughput-20261108/analysis.json">analysis</a></td></tr>
+<tr><td>h4 compression and cstimer table capacity</td><td>Nov 8 semantic bounds, native base-8/base-9 batches and browser generation</td><td><a href="comparisons/TABLE_ANALYSIS.html">Table study</a>, <a href="data/cubeopt-audit-20261108/index.html">raw records</a></td></tr>
+<tr><td>Physical Xeon PMU</td><td>Separate host and older source; 242 collection runs, 621 counter rows, 6 profiles</td><td><a href="performance/HARDWARE_COUNTERS.html">Counter analysis</a>, <a href="data/phack/index.html">data</a></td></tr>
+<tr><td>PMU-motivated native changes</td><td>Two rejected experiments; paired 1/48-worker throughput</td><td><a href="performance/OPTIMIZATION_REVIEW.html">Review</a></td></tr>
+<tr><td>Generation, pages, startup and compiler/layout work</td><td>Each recorded source and machine</td><td><a href="data/comparison/ours-gen/index.html">Generation</a>, <a href="history/index.html">history</a></td></tr>
+<tr><td>Earlier WebAssembly timings</td><td>Historical engines, source and workloads</td><td><a href="reference/USER_GUIDE_20261107.html#speed">Dated reference</a></td></tr>
+</tbody>
+</table></div>
+<h2 id="correctness-and-validation">Correctness and validation</h2>
+<p><a href="safety/index.html">Safety</a> separates replay, optimal-length evidence and UB checks. <a href="safety/NO_UB.html">The detailed assessment</a> identifies the audited source and Miri/sanitizer limits. <a href="data/final-build/final-main-validation.json">Final-build validation</a> records the older source A/B check; it is not a fresh timing of every later commit.</p>
+<h2 id="historical-and-rejected-work">Historical and rejected work</h2>
+<p><a href="history/index.html">History</a> indexes 478 retained commit-message records, with <a href="history/NEGATIVE_EXPERIMENTS.html">151 negative/neutral tips</a> and <a href="history/ARCHIVED_EXPERIMENTS.html">59 archived tips</a>. Old pending statements and file paths describe their snapshot date. Gains have different baselines and are not additive.</p>
+<p>Raw rejected/incomplete attempts remain separated from accepted results. An accepted run can still be a tuning or exploratory measurement rather than a headline result. Use each report's inclusion rules and <a href="comparisons/METHODS.html">timing definitions</a>, not a raw record count, to reconstruct the published tables.</p>
+
+<p class="source-link"><a href="BENCHMARK_CATALOG.md">Markdown source</a></p></main>
+<footer><a href="PROVENANCE.html">Sources and evidence scope</a></footer>
+<script>
+for (const wrapper of document.querySelectorAll('.table-wrap')) {
+  const table=wrapper.querySelector('table');
+  const rows=[...table.tBodies].flatMap(body=>[...body.rows]);
+  if(rows.length>50) wrapper.classList.add('long-table');
+  if(rows.length<=12) continue;
+  const tools=document.createElement('div'); tools.className='table-tools';
+  const label=document.createElement('label'); label.textContent='Filter this table';
+  const input=document.createElement('input'); input.type='search'; input.id=table.id+'-filter';
+  label.htmlFor=input.id; input.setAttribute('aria-controls',table.id);
+  const count=document.createElement('span'); count.className='note'; count.setAttribute('aria-live','polite');
+  count.textContent=rows.length+' rows';
+  input.addEventListener('input',()=>{
+    const query=input.value.trim().toLowerCase(); let shown=0;
+    for(const row of rows){row.hidden=!!query&&!row.textContent.toLowerCase().includes(query);if(!row.hidden)shown++;}
+    count.textContent=shown+' of '+rows.length+' rows';
+  });
+  tools.append(label,input,count); wrapper.before(tools);
+}
+function revealTarget(){
+  let id;try{id=decodeURIComponent(location.hash.slice(1));}catch{return;}
+  const target=document.getElementById(id);if(!target)return;
+  for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+}
+revealTarget(); window.addEventListener('hashchange',revealTarget);
+</script>
+</body></html>

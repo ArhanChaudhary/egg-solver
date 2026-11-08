@@ -1,6 +1,6 @@
 # Mordant audit of egg-solver
 
-**Current safety candidate audit — 2026-11-07 09:30 UTC**
+**Safety candidate audit recorded — 2026-11-07 09:30 UTC**
 
 Mordant was rerun on candidate `316597f64a9bd749e8a01b67f96c108c03611e68`, source SHA-256 `93478bc5c45ba267255574f8cb466f02f006f1c7bf558fb8f9d088ec4307a4c9`, after the additional safety changes. Both supported-target commands completed successfully with no compiler errors. This is a completed lint audit, not a claim of zero warnings or a memory-safety certificate.
 
@@ -11,23 +11,23 @@ Mordant was rerun on candidate `316597f64a9bd749e8a01b67f96c108c03611e68`, sourc
 
 The native findings cover the shared-search `Sync` implementation, internal constructors, enum catch-all branches, tuple return types and conditional fields. The WASI count includes 51 target-scoped unused-public-API findings and seven error-to-string conversions at the JavaScript-facing boundary. Findings overlap across targets and should not be added as distinct defects.
 
-Review of the current constructor warnings found the checks at their producers: generation validates k/base before allocating; the DFS generator validates its settings; collapse derives k from a validated source with a checked shape; shared-memory attachment validates its size before constructing `Memory`. The table constructors are now internal. The preflight metadata failure still reaches the validating loader rather than accepting a bad table. The `CubeCtx` warning remains an appropriate reminder that its `UnsafeCell` ownership protocol depends on the publication and completion rules described in `NO_UB.md`; the new tracing/publication correction addresses the reproduced overlap. Tuple and enum suggestions alone do not establish an incorrect access. No source edits were made merely to silence these diagnostics.
+Review of the candidate constructor warnings found the checks at their producers: generation validates k/base before allocating; the DFS generator validates its settings; collapse derives k from a validated source with a checked shape; shared-memory attachment validates its size before constructing `Memory`. The table constructors are now internal. The preflight metadata failure still reaches the validating loader rather than accepting a bad table. The `CubeCtx` warning remains an appropriate reminder that its `UnsafeCell` ownership protocol depends on the publication and completion rules described in `NO_UB.md`; the new tracing/publication correction addresses the reproduced overlap. Tuple and enum suggestions alone do not establish an incorrect access. No source edits were made merely to silence these diagnostics.
 
 The first WASI invocation compiled successfully but Mordant itself returned 101 because a cached build lacked its `over-baseline.txt` count. The cache was preserved under `target-safety-native/mordant-before-final-wasm-retry`, and a fresh-cache WASI retry completed with exit 0. The failed tool attempt remains recorded and is not counted as a passing run.
 
-Evidence: [source-bound validation](../evidence/validation/mordant/final-candidate-validation.json), [current structured findings](../evidence/validation/mordant/final-candidate-findings.json), [preserved first attempt](../evidence/validation/mordant/final-candidate-first-attempt.json), [current UB assessment](NO_UB.md).
+Evidence: [source-bound validation](../evidence/validation/mordant/final-candidate-validation.json), [recorded structured findings](../evidence/validation/mordant/final-candidate-findings.json), [preserved first attempt](../evidence/validation/mordant/final-candidate-first-attempt.json), [UB assessment](NO_UB.md).
 
-**Earlier snapshots and original detailed triage follow.**
+## Earlier source snapshots and detailed triage
 
 Completed 2026-11-07 03:52 UTC.
 
 All six supported-target runs completed with exit status **0**. They emitted warnings; this is not a warning-free or memory-safety certification. No automatic fixes or production-source changes were made.
 
-Tool: mordant 0.1.0 (564c8da5cb0d4fc9b1717b4b42e6e60dbeef237b, rustc 1.100.0-nightly (0dfb098f3 2026-08-31)). [Pinned upstream source](https://github.com/scarletindustries/mordant/tree/564c8da5cb0d4fc9b1717b4b42e6e60dbeef237b). Default Mordant configuration, no baseline or added suppressions. The tool lists49 registered lints; configuration-dependent/opt-in rules were not separately enabled.
+Tool: mordant 0.1.0 (564c8da5cb0d4fc9b1717b4b42e6e60dbeef237b, rustc 1.100.0-nightly (0dfb098f3 2026-08-31)). [Pinned upstream source](https://github.com/scarletindustries/mordant/tree/564c8da5cb0d4fc9b1717b4b42e6e60dbeef237b). Default Mordant configuration, no baseline or added suppressions. The tool lists 49 registered lints; configuration-dependent/opt-in rules were not separately enabled.
 
 | Source snapshot | Native findings | WASI findings | Compiler errors |
 |---|---:|---:|---:|
-| Current main `56ace9c` | 14 | 58 | 0 |
+| Earlier main `56ace9c` | 14 | 58 | 0 |
 | Pending safety fixes `988f289` | 14 | 58 | 0 |
 | SSSE3 candidate on `93867a4` plus staged changes | 12 | 58 | 0 |
 
@@ -78,7 +78,7 @@ The highest-priority manual review is the `unsafe impl Sync for CubeCtx`: its `U
 
 **`unused_pub`:** These41 findings came from the WASI library-only build, with native CLI targets, tests, and external Rust clients absent. Several named items are used by native binaries or tests. Do not remove or restrict public APIs solely from these results.
 
-**Current main: native locations**
+### Earlier main: native locations
 
 | Lint | Location | Diagnostic |
 |---|---|---|
@@ -97,7 +97,7 @@ The highest-priority manual review is the `unsafe impl Sync for CubeCtx`: its `U
 | `tuple_wants_struct` | [src/gen/collapse.rs:54](../evidence/validation/mordant/sources/main/src/gen/collapse.rs.html#L54) | both of the 2 calls to `collapse_shape` unpack the result as `(rows, factor)`. The names exist everywhere except in the type, and since both members are `usize` a swapped pair compiles |
 | `tuple_wants_struct` | [src/lanes/share.rs:3350](../evidence/validation/mordant/sources/main/src/lanes/share.rs.html#L3350) | both of the 2 calls to `find_split` unpack the result as `(busy, depth, give)`. The names exist everywhere except in the type, and since `.0` and `.1` are both `usize` a swapped pair compiles |
 
-**Current main: additional WASI diagnostics**
+### Earlier main: additional WASI diagnostics
 
 The WASI build has10 overlapping core findings, seven typed-error-to-string findings in the wrapper, and41 public-API usage warnings. The usage warnings apply to this library-only target selection; they are not a basis for deleting APIs used by native binaries, tests or external callers.
 
@@ -154,4 +154,4 @@ The WASI build has10 overlapping core findings, seven typed-error-to-string find
 
 Raw evidence: [all structured findings](../evidence/validation/mordant/findings.json), [commands and exit statuses](../evidence/validation/mordant/results.json), [source hashes](../evidence/validation/mordant/sources.json), and each run’s `.stdout`, `.stderr`, and `.diagnostics.txt` under `/data/agents/mordant-audit/`.
 
-The current main native diagnostics and pending safety native diagnostics have the same warning categories and counts. The SSSE3 candidate produces no new warning category; it compiles a different coordinate implementation, which accounts for two fewer tuple warnings. No inference about runtime safety or speed follows from that count.
+The recorded main and then-pending safety-candidate diagnostics have the same warning categories and counts. The SSSE3 candidate produces no new warning category; it compiles a different coordinate implementation, which accounts for two fewer tuple warnings. No inference about runtime safety or speed follows from that count.
