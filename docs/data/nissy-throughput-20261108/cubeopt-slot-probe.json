@@ -1,0 +1,59 @@
+{
+  "method": "Original pinned Opt4 query function with its original generated table. Inactive slots have completed status; assigned slots hold valid U-move cubes, normal orientation and negative budget. Function code and table data are unchanged.",
+  "provenance": {
+    "variant": 4,
+    "memory64": false,
+    "wasm": "/data/agents/xcr/src/cuberoot.me/core/packages/client/public/cubeopt/cube48opt4.wasm",
+    "wasmSha256": "9980620d29f954557adcd05f692b34deacf2e04c8a45f2c172fcd7cf921ef53e",
+    "wrapper": "/data/agents/xcr/src/cuberoot.me/core/packages/client/public/cubeopt/cube48opt4.mjs",
+    "wrapperSha256": "37ac455c506b4f734b87a6717fb7e8322d966301ae69bc43fe189e0fc764c9bd",
+    "oracleSha256": "4737ea78e86e70d8a6cddc33433c9cbd279e563573027e2ae66952026c32daf5",
+    "variantsSha256": "e2f56088ba27b9e3e7557f896b4cea51da615972b496dcd493945012ef9f71a6",
+    "patchedWasmSha256": "5a3f7c4d1582ab6023f1a1a1992e4199d0d972b13d57f8d509a12623e52ae351",
+    "extraExports": {
+      "oracle_step1_query": 37,
+      "oracle_cubie2fast": 40,
+      "oracle_input_scramble": 71,
+      "oracle_init_cubeopt": 72,
+      "oracle_corn_mult": 89,
+      "oracle_edge_mult": 90,
+      "oracle_solved_cubie": 92,
+      "oracle_is_solved": 93,
+      "oracle_cube_move": 94,
+      "oracle_edge_conj": 95,
+      "oracle_corn_conj": 96,
+      "oracle_set_corn_idx": 98,
+      "oracle_set_edge_idx": 99
+    }
+  },
+  "rows": [
+    {
+      "assigned": 0,
+      "rc": 0,
+      "counter0": "8",
+      "counter8": "0",
+      "counter16": "0"
+    },
+    {
+      "assigned": 1,
+      "rc": 0,
+      "counter0": "7",
+      "counter8": "1",
+      "counter16": "1"
+    },
+    {
+      "assigned": 4,
+      "rc": 0,
+      "counter0": "4",
+      "counter8": "4",
+      "counter16": "4"
+    },
+    {
+      "assigned": 8,
+      "rc": 0,
+      "counter0": "0",
+      "counter8": "8",
+      "counter16": "8"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "native_h10_48t_all500": {
+    "solves": 500,
+    "occupied_query_slots": 3350197488,
+    "empty_query_slots": 58856861,
+    "total_query_slots": 3409054349,
+    "weighted_slot_occupancy": 0.9827351356198634,
+    "median_per_solve_slot_occupancy": 0.9692572327991555
+  },
+  "web_opt4_14t_first100": {
+    "solves": 100,
+    "occupied_query_slots": 42957800426,
+    "empty_query_slots": 730518,
+    "total_query_slots": 42958530944,
+    "weighted_slot_occupancy": 0.9999829948095537,
+    "median_per_solve_slot_occupancy": 0.9999638331109176
+  }
+}

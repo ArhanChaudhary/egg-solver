@@ -1,0 +1,351 @@
+{
+  "utc": "2026-11-08T15:03:29Z",
+  "host": {
+    "lscpu": [
+      {
+        "field": "Architecture:",
+        "data": "x86_64"
+      },
+      {
+        "field": "CPU op-mode(s):",
+        "data": "32-bit, 64-bit"
+      },
+      {
+        "field": "Address sizes:",
+        "data": "48 bits physical, 48 bits virtual"
+      },
+      {
+        "field": "Byte Order:",
+        "data": "Little Endian"
+      },
+      {
+        "field": "CPU(s):",
+        "data": "48"
+      },
+      {
+        "field": "On-line CPU(s) list:",
+        "data": "0-47"
+      },
+      {
+        "field": "Vendor ID:",
+        "data": "AuthenticAMD"
+      },
+      {
+        "field": "Model name:",
+        "data": "AMD EPYC 9V45 96-Core Processor"
+      },
+      {
+        "field": "CPU family:",
+        "data": "26"
+      },
+      {
+        "field": "Model:",
+        "data": "2"
+      },
+      {
+        "field": "Thread(s) per core:",
+        "data": "1"
+      },
+      {
+        "field": "Core(s) per socket:",
+        "data": "48"
+      },
+      {
+        "field": "Socket(s):",
+        "data": "1"
+      },
+      {
+        "field": "Stepping:",
+        "data": "1"
+      },
+      {
+        "field": "BogoMIPS:",
+        "data": "5192.24"
+      },
+      {
+        "field": "Flags:",
+        "data": "fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush mmx fxsr sse sse2 ht syscall nx mmxext fxsr_opt pdpe1gb rdtscp lm constant_tsc rep_good nopl xtopology tsc_reliable nonstop_tsc cpuid extd_apicid aperfmperf tsc_known_freq pni pclmulqdq ssse3 fma cx16 pcid sse4_1 sse4_2 x2apic movbe popcnt aes xsave avx f16c rdrand hypervisor lahf_lm cmp_legacy svm cr8_legacy abm sse4a misalignsse 3dnowprefetch osvw topoext vmmcall fsgsbase bmi1 avx2 smep bmi2 erms invpcid avx512f avx512dq rdseed adx smap avx512ifma clflushopt clwb avx512cd sha_ni avx512bw avx512vl xsaveopt xsavec xgetbv1 xsaves user_shstk avx_vnni avx512_bf16 clzero xsaveerptr rdpru arat npt nrip_save tsc_scale vmcb_clean flushbyasid decodeassists pausefilter pfthreshold v_vmsave_vmload avx512vbmi umip avx512_vbmi2 gfni vaes vpclmulqdq avx512_vnni avx512_bitalg avx512_vpopcntdq rdpid fsrm avx512_vp2intersect"
+      },
+      {
+        "field": "Virtualization:",
+        "data": "AMD-V"
+      },
+      {
+        "field": "Hypervisor vendor:",
+        "data": "Microsoft"
+      },
+      {
+        "field": "Virtualization type:",
+        "data": "full"
+      },
+      {
+        "field": "L1d cache:",
+        "data": "2.3 MiB (48 instances)"
+      },
+      {
+        "field": "L1i cache:",
+        "data": "1.5 MiB (48 instances)"
+      },
+      {
+        "field": "L2 cache:",
+        "data": "48 MiB (48 instances)"
+      },
+      {
+        "field": "L3 cache:",
+        "data": "192 MiB (6 instances)"
+      },
+      {
+        "field": "NUMA node(s):",
+        "data": "1"
+      },
+      {
+        "field": "NUMA node0 CPU(s):",
+        "data": "0-47"
+      },
+      {
+        "field": "Vulnerability Gather data sampling:",
+        "data": "Not affected"
+      },
+      {
+        "field": "Vulnerability Ghostwrite:",
+        "data": "Not affected"
+      },
+      {
+        "field": "Vulnerability Indirect target selection:",
+        "data": "Not affected"
+      },
+      {
+        "field": "Vulnerability Itlb multihit:",
+        "data": "Not affected"
+      },
+      {
+        "field": "Vulnerability L1tf:",
+        "data": "Not affected"
+      },
+      {
+        "field": "Vulnerability Mds:",
+        "data": "Not affected"
+      },
+      {
+        "field": "Vulnerability Meltdown:",
+        "data": "Not affected"
+      },
+      {
+        "field": "Vulnerability Mmio stale data:",
+        "data": "Not affected"
+      },
+      {
+        "field": "Vulnerability Old microcode:",
+        "data": "Not affected"
+      },
+      {
+        "field": "Vulnerability Reg file data sampling:",
+        "data": "Not affected"
+      },
+      {
+        "field": "Vulnerability Retbleed:",
+        "data": "Not affected"
+      },
+      {
+        "field": "Vulnerability Spec rstack overflow:",
+        "data": "Vulnerable: Safe RET, no microcode"
+      },
+      {
+        "field": "Vulnerability Spec store bypass:",
+        "data": "Vulnerable"
+      },
+      {
+        "field": "Vulnerability Spectre v1:",
+        "data": "Mitigation; usercopy/swapgs barriers and __user pointer sanitization"
+      },
+      {
+        "field": "Vulnerability Spectre v2:",
+        "data": "Mitigation; Retpolines; STIBP disabled; RSB filling; PBRSB-eIBRS Not affected; BHI Not affected"
+      },
+      {
+        "field": "Vulnerability Srbds:",
+        "data": "Not affected"
+      },
+      {
+        "field": "Vulnerability Tsa:",
+        "data": "Not affected"
+      },
+      {
+        "field": "Vulnerability Tsx async abort:",
+        "data": "Not affected"
+      },
+      {
+        "field": "Vulnerability Vmscape:",
+        "data": "Not affected"
+      }
+    ]
+  },
+  "kernel": "Linux claude-cube 7.0.0-1017-azure #17~24.04.1-Ubuntu SMP PREEMPT Thu Sep 24 18:46:57 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux",
+  "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)\nbinary: rustc\ncommit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67\ncommit-date: 2026-10-13\nhost: x86_64-unknown-linux-gnu\nrelease: 1.99.1\nLLVM version: 23.1.1",
+  "cc": "cc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+  "egg_upstream": "https://github.com/ArhanChaudhary/egg-solver",
+  "egg_published_base": "947c20d93564f150aad9c292486ab730a329b86c",
+  "egg_source_files": {
+    "src/env.rs": "76a866f3dc3e7f5acae323dc18e6f6e537535f1415dc3fdec99c989f07fbe1a9",
+    "src/gen.rs": "d055abe633cd0f0808fbf0ec8c20ae0992d6397f239b87edea24089d99716285",
+    "src/cubie.rs": "d8dec35d77e5d17cf24d818668c7044dc613fc98f408fdc12e43b8b1be3740a9",
+    "src/symstart.rs": "caa6fbc9a0c8ddf2aec40005f41ef5139e1fe77160658828d04f58ec8df26dc3",
+    "src/lanes.rs": "ef9a9920945ce139a5be8ecfad0f49ef1a07ea671e1e3bcc47a0ff2bde5caee4",
+    "src/cli.rs": "9ae6db8e7b24b2251d8439307a34d0fa4cd5a96c1015dd6b477e6579400e4b07",
+    "src/main.rs": "61937f05a52472564398b3117b80196f336589f3abe7aac1ab8f5c063d33b37e",
+    "src/parallel.rs": "4e1ba16e14c54d6081e059e32e7606faca21aadc9b8a3eeca1fc6d03a35d16e9",
+    "src/hot.rs": "117f967de5420237bae1aec67e38a8b600a3bf5d54ab3514de4195dcdb0fdf35",
+    "src/coord.rs": "1d4f678a5b2ec32fd733facf2bccb2553f9d9d17573b3faff4f7d9df06c164b7",
+    "src/tables.rs": "c4041a7d82f033faf406a0c8173b7a8488a5eda2699edf199b9e36d04e7f2d77",
+    "src/prefetch.rs": "0c60758fc2b66ad9eb190eabd0dc2b03b885a72c2ea89ca8ecb9279623b4e0a3",
+    "src/simd.rs": "8bfca4219bf8db08ba8a716661c4668bd360ac368e8467eac9a60bb3ffe50331",
+    "src/lib.rs": "8cf017f6c50fb0205ea4d8ab89af93df23892f3027feaab51910a42ec799ec0d",
+    "src/solver.rs": "fdabef3fbfc50424ac95303e43a500f08ba250334fde28f484f50d702194a9ee",
+    "src/gen/progress.rs": "a4505dfd96977c890c091785e3c2bcfab07ff37939bc29cc912ecf95f4d8c150",
+    "src/gen/collapse.rs": "16518c1ece7a5509da6cc6d8c9de094fbedb12d3c5d562b43fe771f50dc06f73",
+    "src/gen/dfs.rs": "27ad1a9c63ce77bd9a1df5248729df114d26367816f88fad624983716952daa5",
+    "src/lanes/share.rs": "3c6e520c8c29cb0af62980f76c523fc77317a67822b4b3678e819cc7332dd2b5",
+    "src/bin/gen.rs": "935ced7266068ac473ed5dc1ae1625dbe684b3310d45643ccb51fe2a3a319f52",
+    "src/bin/solve.rs": "2faa580667874f5b8f700d6523d7eb83cb3792dc57874dd5a5daedb4cf3b4b29",
+    "src/bin/bench.rs": "833028cd86f21fc5f8c9ed092fbbb83f09c2341de0ec6d35bfdb56736fd2e894",
+    "src/cli/preflight.rs": "1d29de5b58b96abca5e5d561f9c2d8590859bd47741e16ba7d4d129a0957b65f",
+    "src/tables/shm.rs": "3089c568b99d2d5235c4c2e20aba27a992a093679d8c24743ef28515a907553f",
+    "src/tables/file.rs": "60eaa783ba88bd67a8d6b0b822a6921712fdb394cf6faf90b66e649111c4ee40",
+    "src/portable/v16_wasm.rs": "f2eca154b114434352bfce3fdf9b52c637fc72f63ecbb35179097ea313f3cc56",
+    "src/portable/v16_scalar.rs": "93bb7a144e403f1b9e2ad4ea9ce14b140539dc18b261bdd82d6f845f8c97c8b5",
+    "src/portable/coord.rs": "ccf3db8212892356ca4012f9c25f22ae93b641ed385cdeacf56e0a7f03a4d298",
+    "src/portable/v16_neon.rs": "aca2042a02100da9602a3f6b5a789f4255fd4323ac2b7cdc0613d091fbaecde0",
+    "src/portable/mod.rs": "0f112d64fc279ed8969739f47547db6cdf495e9a1f55cf70446a3b5981febcd9",
+    "Cargo.toml": "29f1c64db8d423497df30a8c30367b7c65c41c26aa55cfb8ac8cafd330db8416",
+    "Cargo.lock": "e22754f2587d9d3b69602f527c8463b2980d801d390958c430672cda5940b345",
+    ".cargo/config.toml": "478c472cc4f69a3ab10002854133640e8f941f1d15aceafcdc6cea78726636e9",
+    "build.rs": "73983562007590337f48e2b0a33c445ce8f6d561142372d5e90a97ad2f9096e6"
+  },
+  "egg_cli_source_manifest": "egg-cli-source-files.json",
+  "egg_cli_source_difference_from_worktree": [
+    "src/bin/gen.rs (help text only; not linked into solve)"
+  ],
+  "nissy_upstream": "https://github.com/sebastianotronto/nissy-core",
+  "nissy_commit": "1f7e8e937d0e71e7eb3b5deab38b34d0a0159d88",
+  "binaries_sha256": {
+    "hugecp": "5b2dfd61cfc1c0fe1633333082e836fb677d11975d223a5584c4a75b82fb3cdc",
+    "nissy-fixed": "ba60ac0a0d190ac80e679706f61211c4be06dec49a8527b999cb193f0d4332e8",
+    "nissy-single": "2e36a7fe4687ebe4a5271edad0733e9c86258ce6cd76c1882e804c7cfc3e7e45",
+    "nissy-pgo": "033e43acb1cbf7fc0d3382bec523c1836248b1602c6ed4ae354dbb6e529ed17b",
+    "nissy-native": "30ab70e6a4921c396858a4db7573fac6faffbc026b4277f9f9ba0367d0e71df4",
+    "nissy-shipped": "cea5d2eb62b2cf8c3bd916db883cc14c1e00bd630e9345dcf2982375dbdf8a18",
+    "egg-throughput": "af31d07332875c48c0480d19555f0bc11bf0d5e3f39cfb01f16a166d4b1d80af",
+    "egg-solve": "ffff82e47ebc4db9d210cf8eec61c97959bdf5cde31973254439ca45bf6bc092"
+  },
+  "dataset_sha256": "616810c31d090a78ea1357684750642ab017ff394bfa08ba131bb65cc6905de3",
+  "pilot_rng": "Python random.Random(20261108).sample(range(500),100)",
+  "page_policy": "Every benchmark pruning table is mapped from 1-GiB hugetlbfs; zero 2-MiB huge pages reserved. Per-run mapped page coverage recorded.",
+  "pgo_training": {
+    "legacy_training_file_sha256": "8dd8260c5dafeccff71380e51688e7d9fd873e8dffb177f5e09617f274ea4cf8",
+    "legacy_training_lines": 100,
+    "overlap_test_indices": [
+      300,
+      301,
+      302,
+      303,
+      304,
+      305,
+      306,
+      307,
+      308,
+      309,
+      310,
+      311,
+      312,
+      313,
+      314,
+      315,
+      316,
+      317,
+      318,
+      319,
+      320,
+      321,
+      322,
+      323,
+      324,
+      325,
+      326,
+      327,
+      328,
+      329,
+      330,
+      331,
+      332,
+      333,
+      334,
+      335,
+      336,
+      337,
+      338,
+      339,
+      340,
+      341,
+      342,
+      343,
+      344,
+      345,
+      346,
+      347,
+      348,
+      349,
+      350,
+      351,
+      352,
+      353,
+      354,
+      355,
+      356,
+      357,
+      358,
+      359,
+      360,
+      361,
+      362,
+      363,
+      364,
+      365,
+      366,
+      367,
+      368,
+      369,
+      370,
+      371,
+      372,
+      373,
+      374,
+      375,
+      376,
+      377,
+      378,
+      379,
+      380,
+      381,
+      382,
+      383,
+      384,
+      385,
+      386,
+      387,
+      388,
+      389,
+      390,
+      391,
+      392,
+      393,
+      394,
+      395,
+      396,
+      397,
+      398,
+      399
+    ],
+    "note": "The retained PGO build was trained on a subset of this file. It is not held out from the current all500 evaluation. Exact legacy training scripts and logs are retained; use the matching-dataset scope, not unseen-input generalization."
+  },
+  "measurement": "Complete finite-batch wall, after table validation and input parsing; excludes table loading and preparation; includes worker creation/join, replay verification and output. No PMU available."
+}

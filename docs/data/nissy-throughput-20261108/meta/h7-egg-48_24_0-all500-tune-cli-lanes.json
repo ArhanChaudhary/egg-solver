@@ -1,0 +1,44 @@
+{
+  "unrelated_cpu_cores_estimate": 0.018532010055397886,
+  "resource": {
+    "user": 349.94,
+    "system": 0.1,
+    "maxrss_kib": 195336
+  },
+  "utc_start": 1794153724.076641,
+  "utc_end": 1794153732.1707458,
+  "id": "h7-egg-48_24_0-all500-tune-cli-lanes",
+  "solver": "egg",
+  "h": 7,
+  "config": "48_24_0",
+  "dataset": "all500",
+  "command": [
+    "/data/agents/nxopt32/bin/egg-solve",
+    "--table",
+    "/mnt/huge/egg-h7",
+    "--load",
+    "map",
+    "-t",
+    "48",
+    "-l",
+    "24",
+    "-c",
+    "0",
+    "--json"
+  ],
+  "returncode": 0,
+  "valid": true,
+  "process_wall_with_loading": 8.094106197357178,
+  "total": {
+    "type": "total",
+    "cubes": 500,
+    "wall": 7.302699722,
+    "wall_per_cube": 0.014605399444,
+    "nodes_per_cube": 52566747.642,
+    "threads": 48,
+    "lanes": 24,
+    "concurrency": 0
+  },
+  "max_hugetlb_kib": 4194304,
+  "raw_sha256": "9d90813655ac14caccf54fa644ea9fc50f175d03f6f5e181d1e7a87f350cad99"
+}

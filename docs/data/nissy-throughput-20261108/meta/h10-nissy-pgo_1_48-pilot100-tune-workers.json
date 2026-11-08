@@ -1,0 +1,40 @@
+{
+  "unrelated_cpu_cores_estimate": 0.004130431584242831,
+  "resource": {
+    "user": 219.1,
+    "system": 3.81,
+    "maxrss_kib": 11288
+  },
+  "utc_start": 1794159372.609829,
+  "utc_end": 1794159384.7151031,
+  "id": "h10-nissy-pgo_1_48-pilot100-tune-workers",
+  "solver": "nissy",
+  "h": 10,
+  "config": "pgo_1_48",
+  "dataset": "pilot100",
+  "command": [
+    "/data/agents/nissy-throughput-20261108/bin/nissy-pgo",
+    "h48h10",
+    "/mnt/huge/nissy-h10",
+    "/data/agents/nissy-throughput-20261108/datasets/pilot100.txt",
+    "1",
+    "48"
+  ],
+  "returncode": 0,
+  "valid": true,
+  "process_wall_with_loading": 12.105275869369507,
+  "total": {
+    "type": "total",
+    "cubes": 100,
+    "wall": 5.831726704,
+    "wall_per_cube": 0.058317267,
+    "workers": 1,
+    "threads_per_cube": 48,
+    "child_cpu_seconds": 93.745928,
+    "failures": 0,
+    "table_bytes": 30336314216,
+    "page_bytes": 1073741824
+  },
+  "max_hugetlb_kib": 30408704,
+  "raw_sha256": "fe19daa3a19c208627437f10f06561a29b5e787144c62319dab39a6e68d19fa1"
+}

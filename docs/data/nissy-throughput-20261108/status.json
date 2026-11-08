@@ -1,0 +1,120 @@
+{
+  "stage": "COMPLETE: measurements, cross-replay, 1-GiB restoration, reports and documentation checks passed",
+  "input_sha256": "616810c31d090a78ea1357684750642ab017ff394bfa08ba131bb65cc6905de3",
+  "completed": [
+    {
+      "id": "h10-egg-32_24_1-single30-parallelism",
+      "valid": true,
+      "wall": 0.19633276
+    },
+    {
+      "id": "h10-egg-48_24_1-single30-parallelism",
+      "valid": true,
+      "wall": 0.162692161
+    }
+  ],
+  "tables": {
+    "6": {
+      "egg": {
+        "source": "/data/agents/nissy-throughput-20261108/tables/egg-h6",
+        "path": "/mnt/huge/egg-h6",
+        "bytes": 1945686016,
+        "mapped_bytes": 2147483648,
+        "page_bytes": 1073741824
+      },
+      "nissy": {
+        "source": "/data/agents/nissy-throughput-20261108/tables/nissy-h6",
+        "path": "/mnt/huge/nissy-h6",
+        "bytes": 1897951528,
+        "mapped_bytes": 2147483648,
+        "page_bytes": 1073741824
+      },
+      "selected": {
+        "egg": "48_24_0",
+        "nissy": "pgo_6_8"
+      }
+    },
+    "7": {
+      "egg": {
+        "source": "/data/tables/h7.mnt",
+        "path": "/mnt/huge/egg-h7",
+        "bytes": 4294967296,
+        "mapped_bytes": 4294967296,
+        "page_bytes": 1073741824
+      },
+      "nissy": {
+        "source": "/data/competitors/h48/h48h7",
+        "path": "/mnt/huge/nissy-h7",
+        "bytes": 3793842344,
+        "mapped_bytes": 4294967296,
+        "page_bytes": 1073741824
+      },
+      "selected": {
+        "egg": "48_24_0",
+        "nissy": "shipped_6_8"
+      }
+    },
+    "8": {
+      "egg": {
+        "source": "/data/tables/h8.mnt",
+        "path": "/mnt/huge/egg-h8",
+        "bytes": 8589934592,
+        "mapped_bytes": 8589934592,
+        "page_bytes": 1073741824
+      },
+      "nissy": {
+        "source": "/data2/competitors/h48/h48h8",
+        "path": "/mnt/huge/nissy-h8",
+        "bytes": 7585624040,
+        "mapped_bytes": 8589934592,
+        "page_bytes": 1073741824
+      },
+      "selected": {
+        "egg": "48_24_0",
+        "nissy": "pgo_6_8"
+      }
+    },
+    "9": {
+      "egg": {
+        "source": "/data2/tables/h9",
+        "path": "/mnt/huge/egg-h9",
+        "bytes": 15565459456,
+        "mapped_bytes": 16106127360,
+        "page_bytes": 1073741824
+      },
+      "nissy": {
+        "source": "/data2/competitors/h48/h48h9",
+        "path": "/mnt/huge/nissy-h9",
+        "bytes": 15169187432,
+        "mapped_bytes": 16106127360,
+        "page_bytes": 1073741824
+      },
+      "selected": {
+        "egg": "48_24_0",
+        "nissy": "pgo_12_4"
+      }
+    },
+    "10": {
+      "egg": {
+        "source": "/data2/tables/h10",
+        "path": "/mnt/huge/egg-h10",
+        "bytes": 31130914816,
+        "mapped_bytes": 31138512896,
+        "page_bytes": 1073741824
+      },
+      "nissy": {
+        "source": "/data2/competitors/h48/h48h10",
+        "path": "/mnt/huge/nissy-h10",
+        "bytes": 30336314216,
+        "mapped_bytes": 31138512896,
+        "page_bytes": 1073741824
+      },
+      "selected": {
+        "egg": "48_24_0",
+        "nissy": "pgo_12_4"
+      }
+    }
+  },
+  "updated": "2026-11-08T21:08:41Z",
+  "analysis_status": "COMPLETE"
+}

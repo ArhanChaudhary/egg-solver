@@ -1,0 +1,21 @@
+{
+  "id": "h6-egg-48_8_stream-all500-tune-lanes",
+  "solver": "egg",
+  "h": 6,
+  "config": "48_8_stream",
+  "dataset": "all500",
+  "command": [
+    "/data2/build/egg-solver-target/release/examples/throughput",
+    "/mnt/huge/egg-h6",
+    "/data/agents/nissy-throughput-20261108/datasets/all500.txt",
+    "48",
+    "8",
+    "stream"
+  ],
+  "returncode": 1,
+  "valid": false,
+  "process_wall_with_loading": 0.27790307998657227,
+  "total": null,
+  "max_hugetlb_kib": 0,
+  "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

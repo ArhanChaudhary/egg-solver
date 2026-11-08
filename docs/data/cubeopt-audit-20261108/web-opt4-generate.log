@@ -1,0 +1,84 @@
+{"name":"h48prun31h4.dat","size":"486420480","status":1}
+use wasm
+uniq_sym_states = 3393
+use hash table
+solved idx=2
+depth=0, size=385, uniq=2, tsize=3800160
+depth=1, size=170, uniq=6, tsize=3800160
+depth=2, size=308, uniq=40, tsize=3800160
+depth=3, size=1606, uniq=373, tsize=3800160
+depth=4, size=18881, uniq=4188, tsize=3800160
+depth=5, size=155272, uniq=49570, tsize=3800160
+depth=6, size=1549124, uniq=598132, tsize=3800160
+small table init end, depth=7, size=0
+handled 10%, node_cnt=3187213215
+handled 19%, node_cnt=5966205880
+handled 20%, node_cnt=6028381605
+handled 21%, node_cnt=6390066308
+handled 24%, node_cnt=7174803627
+handled 25%, node_cnt=7634634908
+handled 32%, node_cnt=9633467694
+handled 33%, node_cnt=9914016596
+handled 34%, node_cnt=10202584596
+handled 35%, node_cnt=10510691077
+handled 36%, node_cnt=10782700234
+handled 37%, node_cnt=11119255593
+handled 38%, node_cnt=11383641684
+handled 39%, node_cnt=11666958123
+handled 40%, node_cnt=11971239010
+handled 41%, node_cnt=12274986411
+handled 42%, node_cnt=12556042778
+handled 44%, node_cnt=13157205009
+handled 47%, node_cnt=14172169864
+handled 48%, node_cnt=14246391612
+handled 49%, node_cnt=14545290149
+handled 50%, node_cnt=14768200705
+handled 51%, node_cnt=15107113237
+handled 52%, node_cnt=15306541482
+handled 53%, node_cnt=15650995543
+handled 54%, node_cnt=15746559609
+handled 55%, node_cnt=16033739087
+handled 59%, node_cnt=17023803249
+handled 60%, node_cnt=17270883090
+handled 61%, node_cnt=17532712535
+handled 62%, node_cnt=17784381820
+handled 63%, node_cnt=18024197053
+handled 64%, node_cnt=18274212249
+handled 65%, node_cnt=18548033446
+handled 66%, node_cnt=18825551915
+handled 67%, node_cnt=19116866448
+handled 68%, node_cnt=19413317767
+handled 69%, node_cnt=19708572860
+handled 70%, node_cnt=19999648434
+handled 71%, node_cnt=20276642806
+handled 72%, node_cnt=20567934527
+handled 73%, node_cnt=20828052212
+handled 74%, node_cnt=21118708891
+handled 75%, node_cnt=21385506494
+handled 76%, node_cnt=21670469775
+handled 77%, node_cnt=21955213948
+handled 78%, node_cnt=22241936474
+handled 79%, node_cnt=22525726976
+handled 80%, node_cnt=22817364949
+handled 81%, node_cnt=23118103804
+handled 82%, node_cnt=23410400833
+handled 83%, node_cnt=23716666481
+handled 84%, node_cnt=23973001588
+handled 85%, node_cnt=24256557081
+handled 86%, node_cnt=24518952384
+handled 87%, node_cnt=24801775340
+handled 88%, node_cnt=25085598989
+handled 89%, node_cnt=25371247695
+handled 90%, node_cnt=25653327690
+handled 91%, node_cnt=25951937788
+handled 92%, node_cnt=26280524614
+handled 93%, node_cnt=26577436632
+handled 94%, node_cnt=26850728361
+handled 95%, node_cnt=27129701419
+handled 96%, node_cnt=27405843196
+handled 97%, node_cnt=27694569792
+handled 98%, node_cnt=28068002665
+handled 99%, node_cnt=28404650135
+
+GENERATED 0 15520
+SAVED /data2/competitors/cubeopt-current/h48prun31h4.dat 486420480

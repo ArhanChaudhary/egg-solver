@@ -6,6 +6,7 @@ This catalog separates the studies by the question they answer. It includes nega
 
 | Study | Coverage | Where to start |
 |---|---|---|
+| November 8 throughput and parallelism | 305 accepted measurements; h6–h10, 500 states, three final batches per solver/size, 1 GiB pages; separate single-cube scaling | [Nissy comparison](comparisons/NISSY_THROUGHPUT.md), [parallelism](performance/PARALLELISM.md), [raw index](data/nissy-throughput-20261108/run-index.csv) |
 | Main solver comparison | 230 completed cells: 86 headline, 64 distance-20, 80 wiki; 1T/48T, table-size groups, page modes | [Full report](comparisons/RESULTS.html) |
 | Raw comparisons and build screening | 552 retained run groups with raw output, summary and metadata; frozen compiler/PGO choices | [Run index](data/comparison/run-index.csv), [build selection](data/comparison/build-selection.json) |
 | Distance-20 and interference checks | Separate harder-state datasets; serial nissy fallback after the interference check | Full report's Distance-20 section; [datasets](data/datasets/README.md) |

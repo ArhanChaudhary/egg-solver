@@ -1,0 +1,35 @@
+{
+  "cubeopt48": {
+    "cubes": 500,
+    "sum_solve_seconds": 23.827288,
+    "mean_solve_ms": 47.654576,
+    "solves_per_solve_second": 20.984343665128822,
+    "mean_nodes": 6700394.976,
+    "ns_per_node": 7.112204007479096,
+    "first200_mean_ms": 48.177805,
+    "first200_mean_nodes": 7209174.765,
+    "last300_mean_nodes": 6361208.45,
+    "total_line": null,
+    "process_wall_seconds_with_loading": 222.14851260185242
+  },
+  "egg-solver": {
+    "cubes": 500,
+    "sum_solve_seconds": 1.181751,
+    "mean_solve_ms": 2.363502,
+    "solves_per_solve_second": 423.1009747400256,
+    "mean_nodes": 6293506.514,
+    "ns_per_node": 0.375546127543104,
+    "first200_mean_ms": 2.40114,
+    "first200_mean_nodes": 6317148.705,
+    "last300_mean_nodes": 6277745.053333334,
+    "total_line": {
+      "cubes": 500,
+      "wall": 1.185386,
+      "wall_per_cube": 0.002371,
+      "raw": "total 500 cubes wall 1.185386 wall/cube 0.002371 nodes/cube 6293507 threads 48 lanes 32 concurrency 1"
+    },
+    "process_wall_seconds_with_loading": 1.297931432723999
+  },
+  "lengths_match": 500,
+  "note": "One measured process per solver. Latency mode, 48 threads, resident h10 tables on 1 GiB pages. Solve times exclude loading. Cubeopt48 is the supplied cube48opt10 Linux executable."
+}

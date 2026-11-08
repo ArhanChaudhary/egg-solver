@@ -8,6 +8,7 @@ The main comparison answers how the solver performed against other implementatio
 
 | Topic | Main evidence | How to interpret it |
 |---|---|---|
+| Lanes, empty slots and parallel search width | [Parallelism study](PARALLELISM.md) and [fresh nissy throughput](../comparisons/NISSY_THROUGHPUT.md) | Production CLI versus exploratory probe; 1–48-worker scaling is a CPU measurement, not GPU utilization |
 | Table lookup cost, stalls, branches and caches | [Physical-host counters](HARDWARE_COUNTERS.md) | Measured on the Xeon X5650 with its compatible build; no cross-machine speed inference |
 | Two PMU-motivated native changes | [Optimization review](OPTIMIZATION_REVIEW.md) | Both rejected; full 1T and 48T tables retained |
 | Lane scheduling, pruning, job ordering and sharing | [Optimization history](../history/README.md) | Dated baseline-to-candidate results, often with node and lookup identity |

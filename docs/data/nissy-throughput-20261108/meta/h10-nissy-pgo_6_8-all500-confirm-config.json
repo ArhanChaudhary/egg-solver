@@ -1,0 +1,40 @@
+{
+  "unrelated_cpu_cores_estimate": 0.023388634365277487,
+  "resource": {
+    "user": 490.57,
+    "system": 2.39,
+    "maxrss_kib": 11684
+  },
+  "utc_start": 1794159385.216422,
+  "utc_end": 1794159399.3258412,
+  "id": "h10-nissy-pgo_6_8-all500-confirm-config",
+  "solver": "nissy",
+  "h": 10,
+  "config": "pgo_6_8",
+  "dataset": "all500",
+  "command": [
+    "/data/agents/nissy-throughput-20261108/bin/nissy-pgo",
+    "h48h10",
+    "/mnt/huge/nissy-h10",
+    "/data/agents/nissy-throughput-20261108/datasets/all500.txt",
+    "6",
+    "8"
+  ],
+  "returncode": 0,
+  "valid": true,
+  "process_wall_with_loading": 14.10942006111145,
+  "total": {
+    "type": "total",
+    "cubes": 500,
+    "wall": 9.101748267,
+    "wall_per_cube": 0.018203497,
+    "workers": 6,
+    "threads_per_cube": 8,
+    "child_cpu_seconds": 362.166509,
+    "failures": 0,
+    "table_bytes": 30336314216,
+    "page_bytes": 1073741824
+  },
+  "max_hugetlb_kib": 30408704,
+  "raw_sha256": "fdb1ce38ed1532c8751c1b887e191d50fe8092ddacb21075a3bf2ff6de2e3b21"
+}

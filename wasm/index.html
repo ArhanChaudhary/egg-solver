@@ -44,7 +44,8 @@
       <option value="1">h1 (58 MiB)</option>
       <option value="2">h2 (116 MiB)</option>
       <option value="3">h3 (232 MiB)</option>
-      <option value="4:8">h4 base 8 (464 MiB, a minute or more)</option>
+      <option value="4">h4 (486 MB / 464 MiB, recommended base)</option>
+      <option value="4:8">h4 base 8 (464 MiB, faster generation)</option>
     </select></label>
     <button id="generate" disabled>Generate</button>
   </div>
@@ -121,7 +122,7 @@ $('init').onclick = () => busy('start', async () => {
   log(`module ready, ${threads} thread(s)`);
 });
 $('generate').onclick = () => busy('generate', async () => {
-  // (Base 8 for h4: its default, 9, takes ten times longer to generate.)
+  // Use the recommended base unless a faster-generation option requests base 8.
   const [k, base] = $('k').value.split(':').map(Number);
   log(`generating h${k} ...`);
   const start = performance.now();

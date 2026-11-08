@@ -19,7 +19,7 @@ The demo uses one thread when cross-origin isolation is unavailable, including
 standard GitHub Pages hosting. Local `wasm/serve.mjs` enables multiple threads
 by serving the required isolation headers.
 
-To build the same site locally:
+To build the same site locally, install Bun 1.4.4 and the Rust targets:
 
 ```sh
 rustup target add wasm32-wasip1 wasm32-wasip1-threads
@@ -31,6 +31,4 @@ Choose an output directory that does not already exist. Open
 `http://localhost:8000/`. This plain HTTP server exercises the one-thread
 hosting mode. Build artifacts are generated locally and are not committed.
 
-Documentation HTML is included for offline browsing. After editing Markdown,
-run `bun scripts/render-docs.mjs` before committing. Historical benchmark
-results keep their recorded build and hardware provenance.
+Markdown is the canonical documentation source. The Pages build regenerates its HTML companions with Bun 1.4.4, so a stale generated page cannot retain removed or duplicated sections. HTML remains included for offline browsing; run `bun scripts/render-docs.mjs` to refresh it locally. Historical benchmark results keep their recorded build and hardware provenance.

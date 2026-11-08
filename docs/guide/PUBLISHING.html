@@ -15,7 +15,7 @@ select your own table file; large pruning tables are not uploaded to Pages.
 The demo uses one thread when cross-origin isolation is unavailable, including
 standard GitHub Pages hosting. Local <code>wasm/serve.mjs</code> enables multiple threads
 by serving the required isolation headers.</p>
-<p>To build the same site locally:</p>
+<p>To build the same site locally, install Bun 1.4.4 and the Rust targets:</p>
 <pre><code class="language-sh">rustup target add wasm32-wasip1 wasm32-wasip1-threads
 scripts/build-pages.sh /tmp/egg-solver-pages
 python3 -m http.server 8000 --directory /tmp/egg-solver-pages
@@ -23,7 +23,5 @@ python3 -m http.server 8000 --directory /tmp/egg-solver-pages
 <p>Choose an output directory that does not already exist. Open
 <code>http://localhost:8000/</code>. This plain HTTP server exercises the one-thread
 hosting mode. Build artifacts are generated locally and are not committed.</p>
-<p>Documentation HTML is included for offline browsing. After editing Markdown,
-run <code>bun scripts/render-docs.mjs</code> before committing. Historical benchmark
-results keep their recorded build and hardware provenance.</p>
+<p>Markdown is the canonical documentation source. The Pages build regenerates its HTML companions with Bun 1.4.4, so a stale generated page cannot retain removed or duplicated sections. HTML remains included for offline browsing; run <code>bun scripts/render-docs.mjs</code> to refresh it locally. Historical benchmark results keep their recorded build and hardware provenance.</p>
 </main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

@@ -1,0 +1,41 @@
+{
+  "unrelated_cpu_cores_estimate": 0.04754726345680915,
+  "resource": {
+    "user": 3255.8,
+    "system": 0.26,
+    "maxrss_kib": 196416
+  },
+  "utc_start": 1794146613.5293834,
+  "utc_end": 1794146681.8824246,
+  "id": "h6-egg-48_24_0-all500-tune-lanes",
+  "solver": "egg",
+  "h": 6,
+  "config": "48_24_0",
+  "dataset": "all500",
+  "command": [
+    "/data2/build/egg-solver-target/release/examples/throughput",
+    "/mnt/huge/egg-h6",
+    "/data/agents/nissy-throughput-20261108/datasets/all500.txt",
+    "48",
+    "24",
+    "0"
+  ],
+  "returncode": 0,
+  "valid": true,
+  "process_wall_with_loading": 68.35304236412048,
+  "total": {
+    "counters": "active lanes/round 24.00 rounds 1832719165 lane_visits 43985259959 jobs 42094286 fresh 500 open 1179 pieces 0 splits 0 donated 0 builds 1377 idle_waits 0 refills 1775 refill_fails 97 open_scans 1276 pass_solutions 0",
+    "cubes": 500,
+    "failures": 0,
+    "lanes": 24,
+    "lookups_per_cube": 87970519.92,
+    "mode": "0",
+    "nodes_per_cube": 103781203.49,
+    "threads": 48,
+    "type": "total",
+    "wall": 67.909700485,
+    "wall_per_cube": 0.13581940097
+  },
+  "max_hugetlb_kib": 2097152,
+  "raw_sha256": "b00d2406e91686e26ca9d9b97854e2dc175213860ba06fcb2cd5e4c6a1e65bbb"
+}

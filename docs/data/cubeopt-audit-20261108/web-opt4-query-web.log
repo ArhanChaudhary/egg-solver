@@ -1,0 +1,218 @@
+[wasm]  0           53
+[wasm]  1           32
+[wasm]  2          131
+[wasm]  3         1056
+[wasm]  4         9221
+[wasm]  5        77062
+[wasm]  6       629021
+[wasm]  7      4736982
+[wasm]  8     25682471
+[wasm]  9     46188524
+[wasm] 10    544276614
+[wasm] 11   1140236792
+[wasm] 12    119241241
+[wasm] Avg: 10.672, 1881079200 entry, checksum=0xe03723c6 ok
+[wasm] use wasm
+[wasm] uniq_sym_states = 3393
+Queried 10568 states in both directions
+BEGIN_ALL_500_14_THREADS
+[wasm] Solution found!: D' B' L2 B2 L  U' F2 B2 L  B' U  B' D  F' B  U2 F  B' 
+[wasm] Cube1 finished in 18, 212150020/8348 node(s), tt=1617.153 ms, 7.62ns/node, 6.40ns/probe, 0.262 inv/node, 1.190 probe/node 8570 split, 205358506 pnode
+[wasm] Solution found!: R  F' B' R  F  L' U  B' R' L' U  B  U  R  F  L2 D  
+[wasm] Cube2 finished in 17, 54834040/4480 node(s), tt=429.646 ms, 7.84ns/node, 6.51ns/probe, 0.282 inv/node, 1.204 probe/node 4520 split, 12599986 pnode
+[wasm] Solution found!: D2 F' B2 L2 F2 D  F  B  R  L2 F2 U2 F' L' F' L2 B2 L  
+[wasm] Cube3 finished in 18, 197855056/6984 node(s), tt=1521.201 ms, 7.69ns/node, 6.41ns/probe, 0.273 inv/node, 1.200 probe/node 7312 split, 180820494 pnode
+[wasm] Solution found!: F' D' B  U  B2 L  B  L  F2 U2 L' U' F  B2 L2 F' U2 L2 
+[wasm] Cube4 finished in 18, 220143108/6556 node(s), tt=1689.663 ms, 7.68ns/node, 6.38ns/probe, 0.277 inv/node, 1.204 probe/node 6497 split, 157120214 pnode
+[wasm] Solution found!: R2 B' U' B' L  D2 R2 U  D' B2 R  D' B' L2 B2 D' R  F2 
+[wasm] Cube5 finished in 18, 1257521423/9545 node(s), tt=9536.523 ms, 7.58ns/node, 6.36ns/probe, 0.268 inv/node, 1.193 probe/node 9166 split, 196434990 pnode
+[wasm] Solution found!: R2 L' F' R  F  L' D  F2 R  U' B  D2 L  F2 U2 D' B2 L' 
+[wasm] Cube6 finished in 18, 234169093/8043 node(s), tt=1802.494 ms, 7.70ns/node, 6.42ns/probe, 0.273 inv/node, 1.198 probe/node 8283 split, 184536713 pnode
+[wasm] Solution found!: U' R' L2 U' D2 L' F' U2 D' L  U' L' U  B  L' F2 L2 U' 
+[wasm] Cube7 finished in 18, 270108654/8746 node(s), tt=2060.645 ms, 7.63ns/node, 6.46ns/probe, 0.253 inv/node, 1.181 probe/node 8820 split, 202642759 pnode
+[wasm] Solution found!: L2 B  L2 F  D' L  U' F  B  D' B' D  B2 R2 L' B  L' B2 
+[wasm] Cube8 finished in 18, 135389795/6853 node(s), tt=1052.148 ms, 7.77ns/node, 6.42ns/probe, 0.281 inv/node, 1.210 probe/node 6643 split, 130065875 pnode
+[wasm] Solution found!: D' B' D' R' U' B2 R2 U  L  F2 B' R  F2 L  D  L  
+[wasm] Cube9 finished in 16, 2559259/3781 node(s), tt=25.458 ms, 9.95ns/node, 8.28ns/probe, 0.277 inv/node, 1.201 probe/node 3518 split, 829062 pnode
+[wasm] Solution found!: B  L  B  U2 B  L  U  L  F2 R  U' F  L  D  B2 L  U2 
+[wasm] Cube10 finished in 17, 156687933/6635 node(s), tt=1203.831 ms, 7.68ns/node, 6.43ns/probe, 0.270 inv/node, 1.194 probe/node 5936 split, 16587936 pnode
+[wasm] Solution found!: F' D  B  L2 F' L2 B2 U2 F' U' F' B' L  B' L  R' U2 L2 F' 
+[wasm] Cube11 finished in 19, 2513162750/12074 node(s), tt=19152.065 ms, 7.62ns/node, 6.35ns/probe, 0.271 inv/node, 1.200 probe/node 16060 split, 2418587265 pnode
+[wasm] Solution found!: F  B2 D' R2 U  R  B' R  B' U' R' L' U' L2 D  B  D' U' 
+[wasm] Cube12 finished in 18, 244579667/8549 node(s), tt=1882.763 ms, 7.70ns/node, 6.40ns/probe, 0.276 inv/node, 1.202 probe/node 7817 split, 166647691 pnode
+[wasm] Solution found!: F2 U2 R  B  L' U' F' B' R2 F' U  B  D2 R2 L' D  L2 D2 
+[wasm] Cube13 finished in 18, 331945369/9807 node(s), tt=2545.796 ms, 7.67ns/node, 6.41ns/probe, 0.272 inv/node, 1.197 probe/node 8117 split, 192403994 pnode
+[wasm] Solution found!: B' D  F  U  L2 F2 D  B  U  F2 D2 R2 F2 U  B  U2 R  L  
+[wasm] Cube14 finished in 18, 1107938048/10336 node(s), tt=8425.267 ms, 7.60ns/node, 6.44ns/probe, 0.254 inv/node, 1.180 probe/node 9868 split, 236091102 pnode
+[wasm] Solution found!: R  F  B2 L' B  R  F' B  R' L  U  R' B  L' F  B  U' F2 
+[wasm] Cube15 finished in 18, 197252400/7112 node(s), tt=1521.737 ms, 7.71ns/node, 6.40ns/probe, 0.275 inv/node, 1.205 probe/node 5643 split, 107213345 pnode
+[wasm] Solution found!: R2 B' R' U  B2 R2 F  L  F2 R' D  U  B' R  U' R' B' F' 
+[wasm] Cube16 finished in 18, 633717010/8398 node(s), tt=4827.236 ms, 7.62ns/node, 6.39ns/probe, 0.268 inv/node, 1.192 probe/node 8854 split, 209157638 pnode
+[wasm] Solution found!: U' D  F' U' L' F' L  F  R2 U' F2 U2 F' B2 D' F' R  L2 
+[wasm] Cube17 finished in 18, 179750994/7790 node(s), tt=1370.561 ms, 7.62ns/node, 6.38ns/probe, 0.264 inv/node, 1.194 probe/node 7956 split, 171779230 pnode
+[wasm] Solution found!: R  U' F  L' D  R2 D2 B2 U2 F  B2 D' B' U' F  B  L2 
+[wasm] Cube18 finished in 17, 12975159/4105 node(s), tt=108.393 ms, 8.35ns/node, 6.90ns/probe, 0.284 inv/node, 1.210 probe/node 3914 split, 11285024 pnode
+[wasm] Solution found!: D2 L' U2 D' B' R2 F2 D' B' R  F  R  D' F2 B' L' B2 
+[wasm] Cube19 finished in 17, 66282044/7444 node(s), tt=514.693 ms, 7.77ns/node, 6.53ns/probe, 0.271 inv/node, 1.189 probe/node 8327 split, 23650787 pnode
+[wasm] Solution found!: R  U' D2 R  U2 F' R  U' B2 U2 F  R  F  R  B2 L2 U2 D2 
+[wasm] Cube20 finished in 18, 174045542/7434 node(s), tt=1335.440 ms, 7.67ns/node, 6.35ns/probe, 0.281 inv/node, 1.209 probe/node 7612 split, 160898290 pnode
+[wasm] Solution found!: U' R' B  R  B  U' F  D  F' R' D  L  B' U2 B' L2 
+[wasm] Cube21 finished in 16, 11851608/6688 node(s), tt=97.763 ms, 8.25ns/node, 6.89ns/probe, 0.281 inv/node, 1.197 probe/node 7665 split, 1960285 pnode
+[wasm] Solution found!: D' B2 L' D' B  R  U' R  F' D  F' L' U' F2 R' U  L' 
+[wasm] Cube22 finished in 17, 89039505/5783 node(s), tt=679.808 ms, 7.63ns/node, 6.39ns/probe, 0.272 inv/node, 1.194 probe/node 5301 split, 14237471 pnode
+[wasm] Solution found!: U' L  B  R' L2 F2 D' F' U  L2 F2 R' B2 F  L  B' D  U' 
+[wasm] Cube23 finished in 18, 267340316/7828 node(s), tt=2023.810 ms, 7.57ns/node, 6.32ns/probe, 0.272 inv/node, 1.197 probe/node 8086 split, 191092032 pnode
+[wasm] Solution found!: R' F2 U  R' L2 B2 R' F' U2 F  D' R2 B' U  D  R' U2 D2 
+[wasm] Cube24 finished in 18, 265424579/8701 node(s), tt=2012.375 ms, 7.58ns/node, 6.38ns/probe, 0.262 inv/node, 1.189 probe/node 9792 split, 220146356 pnode
+[wasm] Solution found!: F2 D' F' R  D  R' F2 R2 U  B2 R2 F  L' B  R' U  B  F' 
+[wasm] Cube25 finished in 18, 319410800/8288 node(s), tt=2401.864 ms, 7.52ns/node, 6.32ns/probe, 0.263 inv/node, 1.190 probe/node 7289 split, 148743707 pnode
+[wasm] Solution found!: U' F' L  F' R' U2 B2 L' U' B2 D2 F' R  B  L  R' U' 
+[wasm] Cube26 finished in 17, 19509126/6386 node(s), tt=157.393 ms, 8.07ns/node, 6.82ns/probe, 0.257 inv/node, 1.184 probe/node 6376 split, 16542148 pnode
+[wasm] Solution found!: B2 U  B' R' D  F2 U  D2 L' B' D  L2 F2 L  B' F  L  
+[wasm] Cube27 finished in 17, 32347709/6587 node(s), tt=254.871 ms, 7.88ns/node, 6.62ns/probe, 0.268 inv/node, 1.191 probe/node 6533 split, 17097755 pnode
+[wasm] Solution found!: F' U' D2 R2 L2 U  B2 U2 R' D' U' B' L  U  B  D  R' F  
+[wasm] Cube28 finished in 18, 178658650/7814 node(s), tt=1361.157 ms, 7.62ns/node, 6.32ns/probe, 0.279 inv/node, 1.206 probe/node 7876 split, 170644028 pnode
+[wasm] Solution found!: U' R  B  D2 F  L' D2 B' U  B  R' U  R  L2 U2 R2 U  L2 
+[wasm] Cube29 finished in 18, 1020451268/7236 node(s), tt=7671.647 ms, 7.52ns/node, 6.29ns/probe, 0.269 inv/node, 1.196 probe/node 7390 split, 169649790 pnode
+[wasm] Solution found!: F  R  U2 F2 D  F2 B' R2 U' R' B  R  L' D' R2 F' L  U  
+[wasm] Cube30 finished in 18, 1370905044/8220 node(s), tt=10376.410 ms, 7.57ns/node, 6.32ns/probe, 0.270 inv/node, 1.197 probe/node 7598 split, 162250363 pnode
+[wasm] Solution found!: F2 L2 B' D2 L2 F2 L' F2 B  D' B  U' R2 U  R  F  D2 L  
+[wasm] Cube31 finished in 18, 382184997/8123 node(s), tt=2932.861 ms, 7.67ns/node, 6.40ns/probe, 0.276 inv/node, 1.199 probe/node 7885 split, 180802096 pnode
+[wasm] Solution found!: L' B  U  F2 U2 F' L2 U' F  D' U2 B  F' U  F  D' L' U' 
+[wasm] Cube32 finished in 18, 1943828248/8384 node(s), tt=14828.956 ms, 7.63ns/node, 6.37ns/probe, 0.271 inv/node, 1.198 probe/node 8719 split, 184386394 pnode
+[wasm] Solution found!: L2 F2 R  L  D  R' D2 R  U' F' D' B' L  U  D' B2 
+[wasm] Cube33 finished in 16, 1802174/3866 node(s), tt=19.230 ms, 10.67ns/node, 8.86ns/probe, 0.282 inv/node, 1.204 probe/node 3185 split, 779979 pnode
+[wasm] Solution found!: B  R2 L2 F2 D  R' B' U' R' U  D2 B2 U  L2 U2 L' B  F  
+[wasm] Cube34 finished in 18, 418023481/9527 node(s), tt=3217.989 ms, 7.70ns/node, 6.43ns/probe, 0.275 inv/node, 1.198 probe/node 8645 split, 234550424 pnode
+[wasm] Solution found!: F2 R  U  R' B2 D2 F' U2 L2 D2 B2 L2 F  U  L' D' U  
+[wasm] Cube35 finished in 17, 14406869/5219 node(s), tt=122.019 ms, 8.47ns/node, 6.99ns/probe, 0.287 inv/node, 1.212 probe/node 4671 split, 13080597 pnode
+[wasm] Solution found!: R2 L  D2 F2 R' L2 F' D  R' F  R' U  R' D2 F2 D2 B2 R  
+[wasm] Cube36 finished in 18, 612773204/8316 node(s), tt=4694.340 ms, 7.66ns/node, 6.41ns/probe, 0.272 inv/node, 1.195 probe/node 8548 split, 218417946 pnode
+[wasm] Solution found!: R2 B  U' R  L  U' B' U' L' F2 B  U' L2 U' F' U  F2 
+[wasm] Cube37 finished in 17, 86552064/6552 node(s), tt=673.627 ms, 7.78ns/node, 6.51ns/probe, 0.277 inv/node, 1.196 probe/node 6656 split, 19272285 pnode
+[wasm] Solution found!: R  F2 B  D2 B  R' U  F' U  D' R  D2 R2 U' F' L  D' 
+[wasm] Cube38 finished in 17, 75414908/4972 node(s), tt=582.389 ms, 7.72ns/node, 6.53ns/probe, 0.256 inv/node, 1.183 probe/node 4678 split, 11387595 pnode
+[wasm] Solution found!: L2 F2 R  U' D  B2 L' U  B  U' D  B2 R  L  D2 B2 R  F  
+[wasm] Cube39 finished in 18, 253456929/12119 node(s), tt=1952.019 ms, 7.70ns/node, 6.47ns/probe, 0.264 inv/node, 1.190 probe/node 10798 split, 247320350 pnode
+[wasm] Solution found!: F' B' L  U' L2 B' U2 F2 L  B2 D2 R2 B2 U2 R  F2 U  B' 
+[wasm] Cube40 finished in 18, 190675460/7972 node(s), tt=1467.831 ms, 7.70ns/node, 6.40ns/probe, 0.276 inv/node, 1.202 probe/node 8680 split, 181682201 pnode
+[wasm] Solution found!: D  B' L' F  R' B  L  F2 R  B2 U' L2 F2 L2 B  R  B  R  U2 
+[wasm] Cube41 finished in 19, 2417859072/11448 node(s), tt=18402.553 ms, 7.61ns/node, 6.34ns/probe, 0.271 inv/node, 1.200 probe/node 13454 split, 1763950501 pnode
+[wasm] Solution found!: B  U  B  L  D2 L  B2 U' B  U' F  D2 B' U2 L  U' L  
+[wasm] Cube42 finished in 17, 148998327/6137 node(s), tt=1149.155 ms, 7.71ns/node, 6.48ns/probe, 0.269 inv/node, 1.190 probe/node 6529 split, 17894560 pnode
+[wasm] Solution found!: F  U2 B  D' L' B' D' R  U  R  U2 R  F2 D2 F2 R  D' 
+[wasm] Cube43 finished in 17, 16941068/5948 node(s), tt=141.184 ms, 8.33ns/node, 6.92ns/probe, 0.279 inv/node, 1.205 probe/node 5670 split, 15183627 pnode
+[wasm] Solution found!: B  R' B2 L' D' B  U2 R  B2 L2 U  B2 R' U' R' U2 R2 B2 
+[wasm] Cube44 finished in 18, 220400932/8796 node(s), tt=1707.081 ms, 7.75ns/node, 6.43ns/probe, 0.279 inv/node, 1.204 probe/node 7458 split, 172978774 pnode
+[wasm] Solution found!: D' R' F' R' F' D  R' B' L  F' R  L' F  R  F  R' U  B2 
+[wasm] Cube45 finished in 18, 307188825/10023 node(s), tt=2362.255 ms, 7.69ns/node, 6.45ns/probe, 0.268 inv/node, 1.192 probe/node 9565 split, 227330500 pnode
+[wasm] Solution found!: F  R' U' B' L  B2 D2 F  R' F' L  F  D' L  D' B' U  F' 
+[wasm] Cube46 finished in 18, 301830685/6267 node(s), tt=2319.861 ms, 7.69ns/node, 6.41ns/probe, 0.273 inv/node, 1.199 probe/node 6507 split, 136997934 pnode
+[wasm] Solution found!: L' F' U  R  B' D  F' B2 R  B2 U2 D2 L' B' R2 F  B  U' 
+[wasm] Cube47 finished in 18, 227556579/8661 node(s), tt=1753.473 ms, 7.71ns/node, 6.43ns/probe, 0.273 inv/node, 1.198 probe/node 8449 split, 212494246 pnode
+[wasm] Solution found!: U  L  U' R' F' D2 R  D  B' L' U  L' B  R  L  B2 U2 L' 
+[wasm] Cube48 finished in 18, 316408510/6890 node(s), tt=2430.250 ms, 7.68ns/node, 6.42ns/probe, 0.271 inv/node, 1.195 probe/node 8063 split, 207811995 pnode
+[wasm] Solution found!: L  F' D2 F' B  D2 L  F  R2 F2 L  R' U' B' F  R  D  L' 
+[wasm] Cube49 finished in 18, 207833839/9137 node(s), tt=1605.242 ms, 7.72ns/node, 6.45ns/probe, 0.270 inv/node, 1.197 probe/node 8731 split, 199174037 pnode
+[wasm] Solution found!: F' R  F' R  L' U' F  D  R' B  R  B2 L2 B  U  L  B  R2 
+[wasm] Cube50 finished in 18, 292641443/7509 node(s), tt=2258.000 ms, 7.72ns/node, 6.43ns/probe, 0.276 inv/node, 1.200 probe/node 6993 split, 161088195 pnode
+[wasm] Solution found!: R2 F' R2 D' L  U2 L  F2 U' F' B' D2 F  B2 R' F' R' 
+[wasm] Cube51 finished in 17, 18292937/6319 node(s), tt=151.933 ms, 8.31ns/node, 6.94ns/probe, 0.271 inv/node, 1.196 probe/node 6116 split, 17513222 pnode
+[wasm] Solution found!: R  F  D' B  R' B2 U  B  D' B2 D' R  F' L2 U2 R2 F  L' 
+[wasm] Cube52 finished in 18, 519211590/5522 node(s), tt=3986.444 ms, 7.68ns/node, 6.40ns/probe, 0.272 inv/node, 1.200 probe/node 5713 split, 110018322 pnode
+[wasm] Solution found!: R  D2 L2 F' D  L' B' D  R  D  U2 R2 F2 U' B  F' R  U' 
+[wasm] Cube53 finished in 18, 600493586/7998 node(s), tt=4615.792 ms, 7.69ns/node, 6.39ns/probe, 0.277 inv/node, 1.202 probe/node 6825 split, 145362813 pnode
+[wasm] Solution found!: B  R2 L  U  F' B  L  F' U2 F' L' F  R  F' D2 B  
+[wasm] Cube54 finished in 16, 4875003/5325 node(s), tt=43.605 ms, 8.94ns/node, 7.56ns/probe, 0.263 inv/node, 1.184 probe/node 5399 split, 1288363 pnode
+[wasm] Solution found!: F' R  D' B2 U  R2 B' L2 B  D' F' B' U  L2 R  U  F  R' 
+[wasm] Cube55 finished in 18, 1219899963/7885 node(s), tt=9334.721 ms, 7.65ns/node, 6.40ns/probe, 0.268 inv/node, 1.195 probe/node 7134 split, 167932352 pnode
+[wasm] Solution found!: R  L2 F' D  F  U' F' U' F' L' D  R2 U2 F  D2 L' D  
+[wasm] Cube56 finished in 17, 9268107/3805 node(s), tt=80.699 ms, 8.71ns/node, 7.16ns/probe, 0.287 inv/node, 1.216 probe/node 3798 split, 9079899 pnode
+[wasm] Solution found!: U2 F  L  U  D' L' B2 L2 B  L2 D' R2 F' R  L2 F' R' D2 
+[wasm] Cube57 finished in 18, 758069930/7446 node(s), tt=5845.794 ms, 7.71ns/node, 6.39ns/probe, 0.284 inv/node, 1.207 probe/node 6965 split, 171801496 pnode
+[wasm] Solution found!: R  F  B  U' D2 F  L' F' D  R2 B  L' U  R' F  D  L2 D' 
+[wasm] Cube58 finished in 18, 328225315/6661 node(s), tt=2500.809 ms, 7.62ns/node, 6.40ns/probe, 0.263 inv/node, 1.190 probe/node 7306 split, 165725059 pnode
+[wasm] Solution found!: B2 L  F  L2 D' R2 L2 U  D' R' F  U  B2 R' F  R' B2 
+[wasm] Cube59 finished in 17, 21069529/9343 node(s), tt=172.971 ms, 8.21ns/node, 6.93ns/probe, 0.260 inv/node, 1.185 probe/node 8605 split, 20583305 pnode
+[wasm] Solution found!: L2 D' F  L  F' D  B  D' L  B2 L  U  R' D  F  R' B  D' 
+[wasm] Cube60 finished in 18, 174027648/7064 node(s), tt=1339.570 ms, 7.70ns/node, 6.35ns/probe, 0.286 inv/node, 1.212 probe/node 7321 split, 155974998 pnode
+[wasm] Solution found!: L2 F' R' D' F' R  U' D2 L  D2 L2 B' D' F' R2 D  R' 
+[wasm] Cube61 finished in 17, 47776301/4147 node(s), tt=372.464 ms, 7.80ns/node, 6.49ns/probe, 0.276 inv/node, 1.202 probe/node 3557 split, 8130327 pnode
+[wasm] Solution found!: F  B2 D  B  R  D2 F2 B  U' R' D  L' D2 L  D  R2 U' F2 
+[wasm] Cube62 finished in 18, 231583934/5938 node(s), tt=1780.756 ms, 7.69ns/node, 6.37ns/probe, 0.280 inv/node, 1.206 probe/node 6169 split, 129539632 pnode
+[wasm] Solution found!: R  B' R  F2 U' B2 L  D  B' D' B  D' R' L2 U' R  F  D' 
+[wasm] Cube63 finished in 18, 1200226427/8909 node(s), tt=9156.360 ms, 7.63ns/node, 6.36ns/probe, 0.273 inv/node, 1.199 probe/node 8238 split, 153411657 pnode
+[wasm] Solution found!: L' B' U' L2 F2 D' R' U2 R  L2 U' L' D2 F2 B  L2 B2 
+[wasm] Cube64 finished in 17, 24372912/4520 node(s), tt=196.326 ms, 8.06ns/node, 6.72ns/probe, 0.275 inv/node, 1.199 probe/node 4171 split, 11505048 pnode
+[wasm] Solution found!: D  F' B  R2 U' B2 D  F2 U  B' R' L  F  D  R  U2 L  B2 
+[wasm] Cube65 finished in 18, 1366581988/7628 node(s), tt=10418.810 ms, 7.62ns/node, 6.38ns/probe, 0.267 inv/node, 1.196 probe/node 7186 split, 145876263 pnode
+[wasm] Solution found!: F2 R2 L2 D2 R' L  B' U  B  U' R' D  B' D  B  D2 B2 
+[wasm] Cube66 finished in 17, 158587310/8802 node(s), tt=1224.359 ms, 7.72ns/node, 6.49ns/probe, 0.272 inv/node, 1.190 probe/node 9717 split, 26206713 pnode
+[wasm] Solution found!: L2 U  R' D2 F  R' F  R  B2 D2 L  U  F2 U  R' L2 U2 D  
+[wasm] Cube67 finished in 18, 238380287/8281 node(s), tt=1837.036 ms, 7.71ns/node, 6.46ns/probe, 0.265 inv/node, 1.193 probe/node 9005 split, 231852580 pnode
+[wasm] Solution found!: L  D' F  D2 B  U' R2 F' D  L  F2 U2 R2 D  B2 R2 U2 
+[wasm] Cube68 finished in 17, 19588577/4247 node(s), tt=160.300 ms, 8.18ns/node, 6.82ns/probe, 0.277 inv/node, 1.201 probe/node 4111 split, 10645049 pnode
+[wasm] Solution found!: L  F' B2 L' B' D' B2 R2 B' D' R  B' U' L  D2 L2 B2 D  
+[wasm] Cube69 finished in 18, 261348438/9482 node(s), tt=2001.711 ms, 7.66ns/node, 6.47ns/probe, 0.256 inv/node, 1.184 probe/node 10413 split, 242830760 pnode
+[wasm] Solution found!: L2 U2 R' U' B' U  R  L2 F  U' B  F2 U  L2 R' U  L  F2 D' 
+[wasm] Cube70 finished in 19, 2016356032/12656 node(s), tt=15426.659 ms, 7.65ns/node, 6.36ns/probe, 0.273 inv/node, 1.203 probe/node 14693 split, 1863932368 pnode
+[wasm] Solution found!: L' U2 D2 R' F' D  U  F2 R' U' B2 F' R2 F2 D2 L' 
+[wasm] Cube71 finished in 16, 2108524/3780 node(s), tt=21.413 ms, 10.16ns/node, 8.42ns/probe, 0.285 inv/node, 1.206 probe/node 3570 split, 995914 pnode
+[wasm] Solution found!: U  F2 D2 B  U' D  F' L  F2 B' R2 B2 L' B' D' F2 B  
+[wasm] Cube72 finished in 17, 22596624/6528 node(s), tt=185.838 ms, 8.22ns/node, 6.88ns/probe, 0.274 inv/node, 1.195 probe/node 6309 split, 18117815 pnode
+[wasm] Solution found!: F' U2 B2 L' F  R  L  F' D' L' B  D  B  U  F' U2 L2 B  
+[wasm] Cube73 finished in 18, 327132648/8576 node(s), tt=2520.093 ms, 7.70ns/node, 6.48ns/probe, 0.266 inv/node, 1.189 probe/node 8964 split, 202733740 pnode
+[wasm] Solution found!: L  F2 D' R  L  F2 U' R' F2 U' R  F  B' U' R2 U  L  R' 
+[wasm] Cube74 finished in 18, 151268858/7238 node(s), tt=1172.031 ms, 7.75ns/node, 6.45ns/probe, 0.271 inv/node, 1.201 probe/node 7028 split, 141669514 pnode
+[wasm] Solution found!: R  B  L  D  L2 B  U' D  R  U2 F2 R' B2 L  F2 R' B' 
+[wasm] Cube75 finished in 17, 22445949/6075 node(s), tt=183.642 ms, 8.18ns/node, 6.85ns/probe, 0.271 inv/node, 1.194 probe/node 6480 split, 20127096 pnode
+[wasm] Solution found!: D  R2 B  D' L2 U  F' R  F  R' F' D' L  F2 B  U2 B2 D  
+[wasm] Cube76 finished in 18, 285190192/6120 node(s), tt=2190.834 ms, 7.68ns/node, 6.41ns/probe, 0.270 inv/node, 1.198 probe/node 6436 split, 125828825 pnode
+[wasm] Solution found!: U2 B2 U  R2 U  R2 L' U  F  D' L  B2 U  F' U' D' F2 R' 
+[wasm] Cube77 finished in 18, 1244720188/6044 node(s), tt=9485.794 ms, 7.62ns/node, 6.39ns/probe, 0.262 inv/node, 1.192 probe/node 5930 split, 134567055 pnode
+[wasm] Solution found!: U2 D2 L' D  L2 D  B' L2 U' D2 B' L' R  D  B  U' R  B  
+[wasm] Cube78 finished in 18, 1476401255/9361 node(s), tt=11126.963 ms, 7.54ns/node, 6.38ns/probe, 0.257 inv/node, 1.182 probe/node 9395 split, 225835806 pnode
+[wasm] Solution found!: D  F2 B2 D  B  L  D' L  D2 B2 D  B  L2 U2 F2 U' 
+[wasm] Cube79 finished in 16, 1197863/4393 node(s), tt=14.933 ms, 12.47ns/node, 10.37ns/probe, 0.275 inv/node, 1.202 probe/node 3766 split, 986560 pnode
+[wasm] Solution found!: U' R  F  L' U2 R' U  F  R2 U' R  U2 F2 B2 U' F2 B' U2 
+[wasm] Cube80 finished in 18, 476809475/7045 node(s), tt=3613.666 ms, 7.58ns/node, 6.30ns/probe, 0.279 inv/node, 1.203 probe/node 7107 split, 164392173 pnode
+[wasm] Solution found!: F2 L2 U2 F' D2 R' B2 U' R  L  F2 U2 R' D' F' R' F2 
+[wasm] Cube81 finished in 17, 41542463/4753 node(s), tt=322.469 ms, 7.76ns/node, 6.55ns/probe, 0.260 inv/node, 1.185 probe/node 4720 split, 10992484 pnode
+[wasm] Solution found!: R' F  U2 D' F2 L' F2 B2 R  U  F2 L' R2 B2 U' R  U  R' 
+[wasm] Cube82 finished in 18, 262745782/8538 node(s), tt=2010.609 ms, 7.65ns/node, 6.40ns/probe, 0.269 inv/node, 1.195 probe/node 8408 split, 207388355 pnode
+[wasm] Solution found!: F  R  L2 D' L  U' F2 D' B  D' R2 U  R  D2 R' U' F  U  B2 
+[wasm] Cube83 finished in 19, 2074526039/10729 node(s), tt=15646.521 ms, 7.54ns/node, 6.30ns/probe, 0.267 inv/node, 1.198 probe/node 13898 split, 2014859322 pnode
+[wasm] Solution found!: R2 D2 F2 B' R' U2 B2 U  F' L  D  L  U2 D2 B  U' R2 L' 
+[wasm] Cube84 finished in 18, 319958805/7611 node(s), tt=2451.904 ms, 7.66ns/node, 6.35ns/probe, 0.283 inv/node, 1.207 probe/node 7937 split, 164692563 pnode
+[wasm] Solution found!: R2 F  U2 D' R2 D2 R2 B  L  F  L2 D2 R2 U  F' L  D2 
+[wasm] Cube85 finished in 17, 144842020/5276 node(s), tt=1107.171 ms, 7.64ns/node, 6.43ns/probe, 0.264 inv/node, 1.188 probe/node 5830 split, 15764016 pnode
+[wasm] Solution found!: D' L  U2 F  B2 U  F2 U' F2 B' R  F' D' L' F' D  F2 B  
+[wasm] Cube86 finished in 18, 397508600/6912 node(s), tt=3032.037 ms, 7.63ns/node, 6.36ns/probe, 0.275 inv/node, 1.200 probe/node 6782 split, 134593058 pnode
+[wasm] Solution found!: R' B  R2 U2 B2 U2 D' B' U2 D  L2 D  B' U  R' U  R2 B' 
+[wasm] Cube87 finished in 18, 536249726/8290 node(s), tt=4086.738 ms, 7.62ns/node, 6.39ns/probe, 0.270 inv/node, 1.192 probe/node 8767 split, 196435808 pnode
+[wasm] Solution found!: F2 L  D  L  F2 L2 B  D' L  U' R  F2 L  D2 L' F2 R  U2 
+[wasm] Cube88 finished in 18, 217437656/8560 node(s), tt=1668.584 ms, 7.67ns/node, 6.41ns/probe, 0.272 inv/node, 1.198 probe/node 9081 split, 207411520 pnode
+[wasm] Solution found!: R  D2 F2 U  F  B  L  D' L2 B  R  U2 B2 D  F' L' B' L' 
+[wasm] Cube89 finished in 18, 1234063421/6203 node(s), tt=9322.959 ms, 7.55ns/node, 6.23ns/probe, 0.285 inv/node, 1.213 probe/node 5767 split, 118403735 pnode
+[wasm] Solution found!: F2 L2 F2 U2 D' F  U' F2 B' D2 B' L' U2 D2 F2 U  B  
+[wasm] Cube90 finished in 17, 42448170/5486 node(s), tt=328.888 ms, 7.75ns/node, 6.55ns/probe, 0.260 inv/node, 1.183 probe/node 5205 split, 14614658 pnode
+[wasm] Solution found!: D' R' D  F2 B' U  R2 U2 L  B' R' F2 D' F' L' B' F' 
+[wasm] Cube91 finished in 17, 37186776/3896 node(s), tt=288.564 ms, 7.76ns/node, 6.50ns/probe, 0.267 inv/node, 1.193 probe/node 3471 split, 8466372 pnode
+[wasm] Solution found!: R2 L  F' U' D' B  D' F' U' F' U  B2 U' R  D' L2 D' R2 
+[wasm] Cube92 finished in 18, 169032146/5998 node(s), tt=1290.959 ms, 7.64ns/node, 6.32ns/probe, 0.281 inv/node, 1.208 probe/node 6225 split, 146773673 pnode
+[wasm] Solution found!: F2 L  D2 F' B' U' D  R2 D2 F' U' F' D  R' B2 D2 L' U' 
+[wasm] Cube93 finished in 18, 1172720200/9336 node(s), tt=8747.181 ms, 7.46ns/node, 6.28ns/probe, 0.263 inv/node, 1.187 probe/node 9523 split, 227031183 pnode
+[wasm] Solution found!: R  L' B  L2 U  L2 F  U2 B2 D' L2 B2 R2 B  U2 F2 R2 L' 
+[wasm] Cube94 finished in 18, 165308478/8506 node(s), tt=1252.766 ms, 7.58ns/node, 6.31ns/probe, 0.271 inv/node, 1.201 probe/node 8423 split, 163445958 pnode
+[wasm] Solution found!: L' B2 U' F2 D' R  U  B2 R' F2 R' B2 R2 U2 R2 U2 F' 
+[wasm] Cube95 finished in 17, 26669340/6548 node(s), tt=211.380 ms, 7.93ns/node, 6.65ns/probe, 0.270 inv/node, 1.192 probe/node 6587 split, 17384664 pnode
+[wasm] Solution found!: D' R2 L' B  L' F2 R2 F  L' U  R' B  D  L  U' D  R2 
+[wasm] Cube96 finished in 17, 106507890/4358 node(s), tt=804.983 ms, 7.56ns/node, 6.31ns/probe, 0.271 inv/node, 1.198 probe/node 4014 split, 10810386 pnode
+[wasm] Solution found!: U' R  U2 R2 F  R2 D  R  F  U2 B2 L  D' R  D' R' F  R' 
+[wasm] Cube97 finished in 18, 568379422/7898 node(s), tt=4276.342 ms, 7.52ns/node, 6.27ns/probe, 0.276 inv/node, 1.200 probe/node 7467 split, 163377283 pnode
+[wasm] Solution found!: L  D' L' B' U  L' F  B' R' L' B  U2 R  L  D  R' L2 B  
+[wasm] Cube98 finished in 18, 178010980/6892 node(s), tt=1361.992 ms, 7.65ns/node, 6.28ns/probe, 0.291 inv/node, 1.218 probe/node 7813 split, 157175321 pnode
+[wasm] Solution found!: D2 L2 F' U2 B' R  F2 L  U2 R2 D  L  F2 L2 D2 U' F  R  
+[wasm] Cube99 finished in 18, 1677795431/7849 node(s), tt=12630.052 ms, 7.53ns/node, 6.32ns/probe, 0.266 inv/node, 1.191 probe/node 8710 split, 208131602 pnode
+[wasm] Solution found!: F2 R' B  D  B  D' L  F2 B  R2 F2 B2 U' D' R' F' L2 U' 
+[wasm] Cube100 finished in 18, 141976108/7324 node(s), tt=1091.333 ms, 7.69ns/node, 6.38ns/probe, 0.275 inv/node, 1.205 probe/node 7092 split, 139850480 pnode

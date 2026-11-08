@@ -117,7 +117,7 @@ enum Command {
 #[derive(Args, Debug)]
 struct GenerateArgs {
     /// The table: hK for K = 0..11 (larger: faster solves, more memory:
-    /// h8 3.6 GiB, h11 58 GiB).
+    /// h8 7.2 GiB, h11 58 GiB).
     #[arg(value_parser = clap::value_parser!(u32).range(0..=11))]
     k: u32,
     /// The base (0..12), or `auto` for the measured best for K.

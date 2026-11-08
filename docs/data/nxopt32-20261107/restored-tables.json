@@ -1,0 +1,24 @@
+[
+  {
+    "path": "/mnt/huge/h11",
+    "bytes": 62277025792,
+    "sha256": "c25bc2a3a3526f732fec389f744d4eaa35150163ff228e179f1d580ae0b9bbe7",
+    "seconds": 516.2763965129852,
+    "state": "restored and verified"
+  },
+  {
+    "path": "/mnt/huge/h7",
+    "bytes": 4294967296,
+    "sha256": "c96b0d0c79335eb521ab494ebd893496f5b17bf69e2c7130a9a24eecb23724bf",
+    "seconds": 33.29833245277405,
+    "state": "restored and verified"
+  },
+  {
+    "path": "/mnt/huge/h8",
+    "backing": "/mnt/huge2m/h8",
+    "bytes": 8589934592,
+    "state": "restored and byte-for-byte verified",
+    "page_size": "2 MiB",
+    "note": "File bind mount preserves the original path. Kernel could reserve only 63 one-GiB pages after the experiment; h11 and h7 use 62 of them. Released the spare page and used eight GiB of 2-MiB pages for h8. This differs from historical 1-GiB h8 runs."
+  }
+]

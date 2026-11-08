@@ -1,0 +1,73 @@
+
+/home/super/cube48opt10:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+0000000000005579 <step1_query(ida_context*, stat_info&)+0x229>:
+    5579:	inc    %r15d
+    557c:	mov    %rax,0x940(%r13)
+    5583:	add    $0x960,%r13
+    558a:	cmp    $0x8,%r15d
+    558e:	je     5658 <step1_query(ida_context*, stat_info&)+0x308>
+    5594:	mov    0x930(%r13),%rdx
+    559b:	xor    %eax,%eax
+    559d:	test   %rdx,%rdx
+    55a0:	sete   %al
+    55a3:	add    %rax,(%r12)
+    55a7:	xor    %eax,%eax
+    55a9:	test   %rdx,%rdx
+    55ac:	setne  %al
+    55af:	add    %rax,0x8(%r12)
+    55b4:	cmpq   $0x0,0x938(%r13)
+    55bc:	jne    53a8 <step1_query(ida_context*, stat_info&)+0x58>
+
+/home/super/cube48opt10:     file format elf64-x86-64
+
+
+Disassembly of section .text:
+
+00000000000031b0 <main+0x7f0>:
+    31b0:	call   23f0 <std::chrono::_V2::system_clock::now()@plt>
+    31b5:	mov    -0x168(%rbp),%r8
+    31bc:	mov    -0x170(%rbp),%r9
+    31c3:	mov    -0x160(%rbp),%rsi
+    31ca:	add    %r9,-0x1f0(%rbp)
+    31d1:	add    %rsi,-0x1e8(%rbp)
+    31d8:	add    %r8,%r13
+    31db:	add    -0x158(%rbp),%rbx
+    31e2:	add    -0x150(%rbp),%r15
+    31e9:	cmp    $0x1,%r8
+    31ed:	jbe    3100 <main+0x740>
+    31f3:	mov    0x1cbe7(%rip),%edi        # 1fde0 <DEBUG>
+    31f9:	test   %edi,%edi
+    31fb:	je     3100 <main+0x740>
+    3201:	sub    -0x1f8(%rbp),%rax
+    3208:	mov    %rax,%rcx
+    320b:	movabs $0x20c49ba5e353f7cf,%rax
+    3215:	imul   %rcx
+    3218:	mov    %rcx,%rax
+    321b:	sar    $0x3f,%rax
+    321f:	sar    $0x7,%rdx
+    3223:	sub    %rax,%rdx
+    3226:	js     35d0 <main+0xc10>
+    322c:	vxorpd %xmm5,%xmm5,%xmm5
+    3230:	vcvtsi2sd %rdx,%xmm5,%xmm0
+    3235:	vmulsd 0x152ab(%rip),%xmm0,%xmm3        # 184e8 <typeinfo name for std::thread::_State_impl<std::thread::_Invoker<std::tuple<int (*)(cubie const&, int, int*, stat_info&, heuris_info*, int, int), std::reference_wrapper<cubie>, int, int*, std::reference_wrapper<stat_info>, heuris_info*, int, int> > >+0xa8>
+    323d:	test   %rsi,%rsi
+    3240:	js     35a8 <main+0xbe8>
+    3246:	vxorpd %xmm6,%xmm6,%xmm6
+    324a:	vcvtsi2sd %rsi,%xmm6,%xmm2
+    324f:	vdivsd %xmm2,%xmm3,%xmm2
+    3253:	test   %r8,%r8
+    3256:	js     3580 <main+0xbc0>
+    325c:	vxorpd %xmm7,%xmm7,%xmm7
+    3260:	vcvtsi2sd %r8,%xmm7,%xmm1
+    3265:	mov    %r9,%rcx
+    3268:	mov    %r8,%rdx
+    326b:	mov    $0x1,%edi
+    3270:	mov    $0x3,%eax
+    3275:	lea    0x14e64(%rip),%rsi        # 180e0 <_IO_stdin_used+0xe0>
+    327c:	vdivsd 0x15264(%rip),%xmm0,%xmm0        # 184e8 <typeinfo name for std::thread::_State_impl<std::thread::_Invoker<std::tuple<int (*)(cubie const&, int, int*, stat_info&, heuris_info*, int, int), std::reference_wrapper<cubie>, int, int*, std::reference_wrapper<stat_info>, heuris_info*, int, int> > >+0xa8>
+    3284:	vdivsd %xmm1,%xmm3,%xmm1
+    3288:	call   23c0 <__printf_chk@plt>

@@ -1,0 +1,10 @@
+--- a/src/solvers/h48/solve.h
++++ b/src/solvers/h48/solve.h
+@@ -484,6 +484,7 @@
+ 
+ 	if (mtarg->nmoves == H48_STARTING_MOVES) {
+ 		tasks[*ntasks].cube = mtarg->cube;
++		tasks[*ntasks].rank = 0;
+ 		tasks[*ntasks].pval =
+ 		    h48_prune_lookup_nocoord(mtarg->cube, solve_arg);
+ 		memcpy(tasks[*ntasks].moves, mtarg->moves,

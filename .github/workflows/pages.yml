@@ -18,6 +18,9 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: actions/configure-pages@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
       - name: Install Rust WebAssembly targets
         run: |
           rustup update stable --no-self-update

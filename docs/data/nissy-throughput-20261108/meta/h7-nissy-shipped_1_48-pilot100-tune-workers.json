@@ -1,0 +1,40 @@
+{
+  "unrelated_cpu_cores_estimate": 0.012134289235826991,
+  "resource": {
+    "user": 561.1,
+    "system": 4.2,
+    "maxrss_kib": 11684
+  },
+  "utc_start": 1794154404.6560283,
+  "utc_end": 1794154422.7864697,
+  "id": "h7-nissy-shipped_1_48-pilot100-tune-workers",
+  "solver": "nissy",
+  "h": 7,
+  "config": "shipped_1_48",
+  "dataset": "pilot100",
+  "command": [
+    "/data/agents/nissy-throughput-20261108/bin/nissy-shipped",
+    "h48h7",
+    "/mnt/huge/nissy-h7",
+    "/data/agents/nissy-throughput-20261108/datasets/pilot100.txt",
+    "1",
+    "48"
+  ],
+  "returncode": 0,
+  "valid": true,
+  "process_wall_with_loading": 18.13044261932373,
+  "total": {
+    "type": "total",
+    "cubes": 100,
+    "wall": 15.671205665,
+    "wall_per_cube": 0.156712057,
+    "workers": 1,
+    "threads_per_cube": 48,
+    "child_cpu_seconds": 550.601511,
+    "failures": 0,
+    "table_bytes": 3793842344,
+    "page_bytes": 1073741824
+  },
+  "max_hugetlb_kib": 4194304,
+  "raw_sha256": "c22ac34df67f8def94560d27ee640784e6d136a6b284bb2882acbb1d719798f4"
+}

@@ -7,6 +7,7 @@ if [ -e "$output" ]; then
     echo "output already exists: $output (choose a new directory)" >&2
     exit 2
 fi
+bun scripts/render-docs.mjs
 wasm/build.sh
 mkdir -p "$output/dist"
 cp wasm/index.html wasm/demo-worker.mjs wasm/egg-solver.mjs wasm/egg-solver-thread.mjs "$output/"

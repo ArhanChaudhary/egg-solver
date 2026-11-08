@@ -1,0 +1,4035 @@
+{
+  "run": "egg-48t-first500-1groups",
+  "solver": "egg",
+  "threads": 48,
+  "count": 500,
+  "repeats": 1,
+  "command": [
+    "taskset",
+    "-c",
+    "0-47",
+    "/data/agents/nxopt32/bin/egg-solve",
+    "--table",
+    "/mnt/huge/h10",
+    "--load",
+    "map",
+    "-t",
+    "48",
+    "-c",
+    "1"
+  ],
+  "returncode": 0,
+  "process_wall_seconds": 1.297931432723999,
+  "input_sha256": "616810c31d090a78ea1357684750642ab017ff394bfa08ba131bb65cc6905de3",
+  "source_sha256": "616810c31d090a78ea1357684750642ab017ff394bfa08ba131bb65cc6905de3",
+  "raw_sha256": "5a8a3db8f75f828a4ffe135e0eb7751242a3c20f0c41327484f4a0aabade954a",
+  "cubes": [
+    {
+      "index": 0,
+      "length": 18,
+      "nodes": 4799670,
+      "seconds": 0.004574,
+      "moves": "D' B' L2 B2 L U' F2 B2 L B' U B' D F' B U2 F B'",
+      "ok": true
+    },
+    {
+      "index": 1,
+      "length": 17,
+      "nodes": 1029181,
+      "seconds": 0.000861,
+      "moves": "F U2 R B R D L' B2 U L F R F D2 R2 L2 F'",
+      "ok": true
+    },
+    {
+      "index": 2,
+      "length": 18,
+      "nodes": 8697252,
+      "seconds": 0.004639,
+      "moves": "D2 F' B2 L2 F2 D F B R L2 F2 U2 F' L' F' L2 B2 L",
+      "ok": true
+    },
+    {
+      "index": 3,
+      "length": 18,
+      "nodes": 2207442,
+      "seconds": 0.001594,
+      "moves": "F' R' D R' U F L' F' U R2 F2 D' F U R2 F' U' R",
+      "ok": true
+    },
+    {
+      "index": 4,
+      "length": 18,
+      "nodes": 3194375,
+      "seconds": 0.002184,
+      "moves": "R2 B' U' B' L D2 R2 U D' B2 R D' B' L2 B2 D' R F2",
+      "ok": true
+    },
+    {
+      "index": 5,
+      "length": 18,
+      "nodes": 3739450,
+      "seconds": 0.002301,
+      "moves": "L2 U2 D' F D L U2 F U D F U R U' D L2 B2 L2",
+      "ok": true
+    },
+    {
+      "index": 6,
+      "length": 18,
+      "nodes": 4040487,
+      "seconds": 0.002747,
+      "moves": "B D L' U L2 D' F B' L2 B U' D F' U R B' D2 L",
+      "ok": true
+    },
+    {
+      "index": 7,
+      "length": 18,
+      "nodes": 7940036,
+      "seconds": 0.00363,
+      "moves": "L2 B L2 F D' L U' F B D' B' D B2 R2 L' B L' B2",
+      "ok": true
+    },
+    {
+      "index": 8,
+      "length": 16,
+      "nodes": 164362,
+      "seconds": 0.000138,
+      "moves": "D' B' D' R' U' B2 R2 U L F2 B' R F2 L D L",
+      "ok": true
+    },
+    {
+      "index": 9,
+      "length": 17,
+      "nodes": 3162158,
+      "seconds": 0.001349,
+      "moves": "B L B U2 B L U L F2 R U' F L D B2 L U2",
+      "ok": true
+    },
+    {
+      "index": 10,
+      "length": 19,
+      "nodes": 42541509,
+      "seconds": 0.013269,
+      "moves": "B2 R L' F' U2 L' U' R' L2 U2 R F2 R L2 B D2 B D' L2",
+      "ok": true
+    },
+    {
+      "index": 11,
+      "length": 18,
+      "nodes": 4174732,
+      "seconds": 0.001799,
+      "moves": "R U R U2 R U' R U2 R' U2 F2 R2 F2 D2 B R F2 R2",
+      "ok": true
+    },
+    {
+      "index": 12,
+      "length": 18,
+      "nodes": 4339721,
+      "seconds": 0.002261,
+      "moves": "F2 U2 R B L' U' F' B' R2 F' U B D2 R2 L' D L2 D2",
+      "ok": true
+    },
+    {
+      "index": 13,
+      "length": 18,
+      "nodes": 12955713,
+      "seconds": 0.004834,
+      "moves": "B' D F U L2 F2 D B U F2 D2 R2 F2 U B U2 R L",
+      "ok": true
+    },
+    {
+      "index": 14,
+      "length": 18,
+      "nodes": 2363567,
+      "seconds": 0.001229,
+      "moves": "R2 U R F2 R' F U2 F2 R L' B2 L' F' L U' B D' F2",
+      "ok": true
+    },
+    {
+      "index": 15,
+      "length": 18,
+      "nodes": 6009726,
+      "seconds": 0.002291,
+      "moves": "R2 B' R' U B2 R2 F L F2 R' U D B' R U' R' F' B'",
+      "ok": true
+    },
+    {
+      "index": 16,
+      "length": 18,
+      "nodes": 9600850,
+      "seconds": 0.003424,
+      "moves": "U' D F' U' L' F' L F R2 U' F2 U2 F' B2 D' F' R L2",
+      "ok": true
+    },
+    {
+      "index": 17,
+      "length": 17,
+      "nodes": 2132878,
+      "seconds": 0.000952,
+      "moves": "R U' F L' D R2 D2 B2 U2 F B2 D' B' U' F B L2",
+      "ok": true
+    },
+    {
+      "index": 18,
+      "length": 17,
+      "nodes": 2222675,
+      "seconds": 0.001054,
+      "moves": "D2 L' U2 D' B' R2 F2 D' B' R F R D' F2 B' L' B2",
+      "ok": true
+    },
+    {
+      "index": 19,
+      "length": 18,
+      "nodes": 3177292,
+      "seconds": 0.001477,
+      "moves": "R U' D2 R U2 F' R U' B2 U2 F R F R B2 L2 U2 D2",
+      "ok": true
+    },
+    {
+      "index": 20,
+      "length": 16,
+      "nodes": 159994,
+      "seconds": 0.000114,
+      "moves": "U' R' B R B U' F D F' R' D L B' U2 B' L2",
+      "ok": true
+    },
+    {
+      "index": 21,
+      "length": 17,
+      "nodes": 546975,
+      "seconds": 0.000533,
+      "moves": "D' B2 L' D' B R U' R F' D F' L' U' F2 R' U L'",
+      "ok": true
+    },
+    {
+      "index": 22,
+      "length": 18,
+      "nodes": 4179554,
+      "seconds": 0.001727,
+      "moves": "D2 F2 U' R' D L2 U' R B2 U2 D' R' F U' F2 R L2 U",
+      "ok": true
+    },
+    {
+      "index": 23,
+      "length": 18,
+      "nodes": 5313506,
+      "seconds": 0.002146,
+      "moves": "R' F2 U R' L2 B2 R' F' U2 F D' R2 B' U D R' U2 D2",
+      "ok": true
+    },
+    {
+      "index": 24,
+      "length": 18,
+      "nodes": 3529850,
+      "seconds": 0.001553,
+      "moves": "F2 D' F' R D R' F2 R2 U B2 R2 F L' B R' U B F'",
+      "ok": true
+    },
+    {
+      "index": 25,
+      "length": 17,
+      "nodes": 813623,
+      "seconds": 0.000546,
+      "moves": "U' F' L F' R' U2 B2 L' U' B2 D2 F' R B L R' U'",
+      "ok": true
+    },
+    {
+      "index": 26,
+      "length": 17,
+      "nodes": 638582,
+      "seconds": 0.000505,
+      "moves": "B2 U B' R' D F2 U D2 L' B' D L2 F2 L B' F L",
+      "ok": true
+    },
+    {
+      "index": 27,
+      "length": 18,
+      "nodes": 3444031,
+      "seconds": 0.001556,
+      "moves": "L2 U' F D2 R U' D L F2 D' F' R2 F R L F2 U2 D2",
+      "ok": true
+    },
+    {
+      "index": 28,
+      "length": 18,
+      "nodes": 3573256,
+      "seconds": 0.001543,
+      "moves": "R B' R2 B2 U D' R' B2 U L2 B' R2 D' B2 L U' L D",
+      "ok": true
+    },
+    {
+      "index": 29,
+      "length": 18,
+      "nodes": 21525853,
+      "seconds": 0.006573,
+      "moves": "F R U2 F2 D F2 B' R2 U' R' B R L' D' R2 F' L U",
+      "ok": true
+    },
+    {
+      "index": 30,
+      "length": 18,
+      "nodes": 6678608,
+      "seconds": 0.00248,
+      "moves": "B2 R2 B' U2 R2 B2 L' F2 B D' B U' R2 U R F D2 L",
+      "ok": true
+    },
+    {
+      "index": 31,
+      "length": 18,
+      "nodes": 17561771,
+      "seconds": 0.005552,
+      "moves": "L' B U F2 U2 F' L2 U' F U2 D' F' B U F D' L' U'",
+      "ok": true
+    },
+    {
+      "index": 32,
+      "length": 16,
+      "nodes": 143952,
+      "seconds": 0.000155,
+      "moves": "L2 F2 R L D R' D2 R U' F' D' B' L U D' B2",
+      "ok": true
+    },
+    {
+      "index": 33,
+      "length": 18,
+      "nodes": 6354864,
+      "seconds": 0.002404,
+      "moves": "B R2 L2 F2 D R' B' U' R' U D2 B2 U L2 U2 L' B F",
+      "ok": true
+    },
+    {
+      "index": 34,
+      "length": 17,
+      "nodes": 669076,
+      "seconds": 0.000569,
+      "moves": "F2 R U R' B2 D2 F' U2 L2 D2 B2 L2 F U L' D' U",
+      "ok": true
+    },
+    {
+      "index": 35,
+      "length": 18,
+      "nodes": 14660326,
+      "seconds": 0.005029,
+      "moves": "R2 D R F' D2 L2 B2 D' R U' F R' U' F D' R2 U R2",
+      "ok": true
+    },
+    {
+      "index": 36,
+      "length": 17,
+      "nodes": 512679,
+      "seconds": 0.000472,
+      "moves": "R2 B U' R L U' B' U' L' F2 B U' L2 U' F' U F2",
+      "ok": true
+    },
+    {
+      "index": 37,
+      "length": 17,
+      "nodes": 2545262,
+      "seconds": 0.00114,
+      "moves": "R F2 B D2 B R' U F' U D' R D2 R2 U' F' L D'",
+      "ok": true
+    },
+    {
+      "index": 38,
+      "length": 18,
+      "nodes": 5454465,
+      "seconds": 0.00221,
+      "moves": "L2 F2 R U' D B2 L' U B U' D B2 R L D2 B2 R F",
+      "ok": true
+    },
+    {
+      "index": 39,
+      "length": 18,
+      "nodes": 3496600,
+      "seconds": 0.001525,
+      "moves": "D2 L2 D2 B2 R B' R2 D2 B R D B L2 F' B' U B U",
+      "ok": true
+    },
+    {
+      "index": 40,
+      "length": 19,
+      "nodes": 28185194,
+      "seconds": 0.008802,
+      "moves": "D2 R' L D L' D2 L2 F' B2 D' B D F2 U' R2 U' R B F",
+      "ok": true
+    },
+    {
+      "index": 41,
+      "length": 17,
+      "nodes": 1425928,
+      "seconds": 0.000786,
+      "moves": "B U B L D2 L B2 U' B U' F D2 B' U2 L U' L",
+      "ok": true
+    },
+    {
+      "index": 42,
+      "length": 17,
+      "nodes": 1691609,
+      "seconds": 0.000815,
+      "moves": "F2 U B L F U' B R' L D2 R2 D' F L U' R F'",
+      "ok": true
+    },
+    {
+      "index": 43,
+      "length": 18,
+      "nodes": 5002368,
+      "seconds": 0.002184,
+      "moves": "B R' B2 L' D' B U2 R B2 L2 U B2 R' U' R' U2 R2 B2",
+      "ok": true
+    },
+    {
+      "index": 44,
+      "length": 18,
+      "nodes": 3836175,
+      "seconds": 0.001646,
+      "moves": "U F2 D L2 U L' U2 D B2 L2 U' D' B' L D2 F2 D R'",
+      "ok": true
+    },
+    {
+      "index": 45,
+      "length": 18,
+      "nodes": 2457315,
+      "seconds": 0.001247,
+      "moves": "F' D2 B2 L F2 R B2 R B2 U R' F' D2 B D' B D2 B2",
+      "ok": true
+    },
+    {
+      "index": 46,
+      "length": 18,
+      "nodes": 3959766,
+      "seconds": 0.00171,
+      "moves": "U L' F U2 L2 B2 D2 R2 B' U' B L D R' U2 B U' D2",
+      "ok": true
+    },
+    {
+      "index": 47,
+      "length": 18,
+      "nodes": 4416139,
+      "seconds": 0.001986,
+      "moves": "R L' U' B2 U F D R' L' D' L2 B2 U2 D' L' B2 L' D",
+      "ok": true
+    },
+    {
+      "index": 48,
+      "length": 18,
+      "nodes": 4244309,
+      "seconds": 0.001787,
+      "moves": "L' U' F' R' U F2 D2 R2 L2 B2 D' L' B' L2 F D B2 U2",
+      "ok": true
+    },
+    {
+      "index": 49,
+      "length": 18,
+      "nodes": 8574726,
+      "seconds": 0.003022,
+      "moves": "F U' D' R' L2 D R' U' D L' B U' R D2 F D2 F U'",
+      "ok": true
+    },
+    {
+      "index": 50,
+      "length": 17,
+      "nodes": 2739975,
+      "seconds": 0.00122,
+      "moves": "R2 F' R2 D' L U2 L F2 U' F' B' D2 F B2 R' F' R'",
+      "ok": true
+    },
+    {
+      "index": 51,
+      "length": 18,
+      "nodes": 2336716,
+      "seconds": 0.001156,
+      "moves": "F' R2 B' U2 D' R' L' D B' L2 B D2 L' F' L' B U' F2",
+      "ok": true
+    },
+    {
+      "index": 52,
+      "length": 18,
+      "nodes": 13351914,
+      "seconds": 0.004241,
+      "moves": "R2 F R' U2 F2 B' D' F U B R2 F' D R' U' L' R2 D",
+      "ok": true
+    },
+    {
+      "index": 53,
+      "length": 16,
+      "nodes": 249055,
+      "seconds": 0.000155,
+      "moves": "B R2 L U F' B L F' U2 F' L' F R F' D2 B",
+      "ok": true
+    },
+    {
+      "index": 54,
+      "length": 18,
+      "nodes": 13100870,
+      "seconds": 0.004217,
+      "moves": "F' R D' B2 U R2 B' L2 B D' F' B' U R L2 U F R'",
+      "ok": true
+    },
+    {
+      "index": 55,
+      "length": 17,
+      "nodes": 861925,
+      "seconds": 0.000534,
+      "moves": "R L2 F' D F U' F' U' F' L' D R2 U2 F D2 L' D",
+      "ok": true
+    },
+    {
+      "index": 56,
+      "length": 18,
+      "nodes": 8836663,
+      "seconds": 0.003109,
+      "moves": "U2 F L U D' L' B2 L2 B L2 D' R2 F' R L2 F' R' D2",
+      "ok": true
+    },
+    {
+      "index": 57,
+      "length": 18,
+      "nodes": 12236172,
+      "seconds": 0.004051,
+      "moves": "R F B U' D2 F L' F' D R2 B L' U R' F D L2 D'",
+      "ok": true
+    },
+    {
+      "index": 58,
+      "length": 17,
+      "nodes": 3029920,
+      "seconds": 0.001347,
+      "moves": "B2 L F L2 D' R2 L2 U D' R' F U B2 R' F R' B2",
+      "ok": true
+    },
+    {
+      "index": 59,
+      "length": 18,
+      "nodes": 2846247,
+      "seconds": 0.001402,
+      "moves": "D2 B2 R D2 B' U2 D F' U D2 F D R' F2 L' D' B' D'",
+      "ok": true
+    },
+    {
+      "index": 60,
+      "length": 17,
+      "nodes": 282651,
+      "seconds": 0.00035,
+      "moves": "L2 F' R' D' F' R D2 U' L D2 L2 B' D' F' R2 D R'",
+      "ok": true
+    },
+    {
+      "index": 61,
+      "length": 18,
+      "nodes": 3026918,
+      "seconds": 0.001402,
+      "moves": "R L' D2 B U' F2 D2 R' U2 D B2 D' F' B' U D' R F2",
+      "ok": true
+    },
+    {
+      "index": 62,
+      "length": 18,
+      "nodes": 8760486,
+      "seconds": 0.003137,
+      "moves": "F D' R' B' D2 B' D' F R L' U D' F R B U2 B L2",
+      "ok": true
+    },
+    {
+      "index": 63,
+      "length": 17,
+      "nodes": 1004823,
+      "seconds": 0.000678,
+      "moves": "L' B' U' L2 F2 D' R' U2 R L2 U' L' D2 F2 B L2 B2",
+      "ok": true
+    },
+    {
+      "index": 64,
+      "length": 18,
+      "nodes": 16430302,
+      "seconds": 0.005114,
+      "moves": "B D2 L' U' R2 L2 B U B2 R' L' U' L2 F' U B D L",
+      "ok": true
+    },
+    {
+      "index": 65,
+      "length": 17,
+      "nodes": 769339,
+      "seconds": 0.000784,
+      "moves": "F2 R2 L2 D2 R' L B' U B U' R' D B' D B D2 B2",
+      "ok": true
+    },
+    {
+      "index": 66,
+      "length": 18,
+      "nodes": 6627604,
+      "seconds": 0.002691,
+      "moves": "R' L' B' R B' D2 L F2 R D2 F2 B2 L' B' D' B' U2 R2",
+      "ok": true
+    },
+    {
+      "index": 67,
+      "length": 17,
+      "nodes": 428674,
+      "seconds": 0.000497,
+      "moves": "D L' U2 B2 R2 U R F2 R' L U F2 L2 B D U' F'",
+      "ok": true
+    },
+    {
+      "index": 68,
+      "length": 18,
+      "nodes": 10320629,
+      "seconds": 0.003494,
+      "moves": "F L F' D' F' L B U F U F D' F' D' R2 L' U B2",
+      "ok": true
+    },
+    {
+      "index": 69,
+      "length": 19,
+      "nodes": 33110240,
+      "seconds": 0.010114,
+      "moves": "F' U R' U' F' U' F' R2 B L2 F D2 B' D L' U F2 B U",
+      "ok": true
+    },
+    {
+      "index": 70,
+      "length": 16,
+      "nodes": 207790,
+      "seconds": 0.000144,
+      "moves": "L' U2 D2 R' F' U D F2 R' U' F' B2 R2 F2 D2 L'",
+      "ok": true
+    },
+    {
+      "index": 71,
+      "length": 17,
+      "nodes": 2425075,
+      "seconds": 0.001068,
+      "moves": "U F2 D2 B U' D F' L F2 B' R2 B2 L' B' D' F2 B",
+      "ok": true
+    },
+    {
+      "index": 72,
+      "length": 18,
+      "nodes": 3495179,
+      "seconds": 0.00149,
+      "moves": "F' U2 B2 L' F R L F' D' L' B D B U F' U2 L2 B",
+      "ok": true
+    },
+    {
+      "index": 73,
+      "length": 18,
+      "nodes": 3957871,
+      "seconds": 0.001702,
+      "moves": "L F2 D' R L F2 U' R' F2 U' R F B' U' R2 U L R'",
+      "ok": true
+    },
+    {
+      "index": 74,
+      "length": 17,
+      "nodes": 841260,
+      "seconds": 0.000677,
+      "moves": "R B L D L2 B U' D R U2 F2 R' B2 L F2 R' B'",
+      "ok": true
+    },
+    {
+      "index": 75,
+      "length": 18,
+      "nodes": 14863435,
+      "seconds": 0.004667,
+      "moves": "D R2 B D' L2 U F' R F R' F' D' L F2 B U2 B2 D",
+      "ok": true
+    },
+    {
+      "index": 76,
+      "length": 18,
+      "nodes": 4266129,
+      "seconds": 0.001719,
+      "moves": "U2 B2 U R2 U R2 L' U F D' L B2 U F' U' D' F2 R'",
+      "ok": true
+    },
+    {
+      "index": 77,
+      "length": 18,
+      "nodes": 33431848,
+      "seconds": 0.009923,
+      "moves": "U2 D2 L' D L2 D B' L2 U' D2 B' L' R D B U' R B",
+      "ok": true
+    },
+    {
+      "index": 78,
+      "length": 16,
+      "nodes": 251695,
+      "seconds": 0.000164,
+      "moves": "D F2 B2 D B L D' L D2 B2 D B L2 U2 F2 U'",
+      "ok": true
+    },
+    {
+      "index": 79,
+      "length": 18,
+      "nodes": 4083151,
+      "seconds": 0.001704,
+      "moves": "F2 L F U2 F2 B2 L2 B2 U' B2 L D2 L' D' R' U2 B' U'",
+      "ok": true
+    },
+    {
+      "index": 80,
+      "length": 17,
+      "nodes": 2575936,
+      "seconds": 0.001043,
+      "moves": "F2 L2 U2 F' D2 R' B2 U' R L F2 U2 R' D' F' R' F2",
+      "ok": true
+    },
+    {
+      "index": 81,
+      "length": 18,
+      "nodes": 7571449,
+      "seconds": 0.002928,
+      "moves": "R' F U2 D R2 F2 L' F2 U F2 L U' D' F2 R D R L2",
+      "ok": true
+    },
+    {
+      "index": 82,
+      "length": 19,
+      "nodes": 32466689,
+      "seconds": 0.009933,
+      "moves": "F' D R' U2 D2 B' R2 L U L B' U' B2 D R L' F' U B2",
+      "ok": true
+    },
+    {
+      "index": 83,
+      "length": 18,
+      "nodes": 3044928,
+      "seconds": 0.001516,
+      "moves": "R2 D2 F2 B' R' U2 B2 U F' L D L U2 D2 B U' R2 L'",
+      "ok": true
+    },
+    {
+      "index": 84,
+      "length": 17,
+      "nodes": 842280,
+      "seconds": 0.000597,
+      "moves": "R2 F U2 D' R2 D2 R2 B L F L2 D2 R2 U F' L D2",
+      "ok": true
+    },
+    {
+      "index": 85,
+      "length": 18,
+      "nodes": 13010883,
+      "seconds": 0.00417,
+      "moves": "D' L U2 F B2 U F2 U' F2 B' R F' D' L' F' D F2 B",
+      "ok": true
+    },
+    {
+      "index": 86,
+      "length": 18,
+      "nodes": 6466673,
+      "seconds": 0.00275,
+      "moves": "R' B R2 U2 B2 U2 D' B' U2 D L2 D B' U R' U R2 B'",
+      "ok": true
+    },
+    {
+      "index": 87,
+      "length": 18,
+      "nodes": 4405697,
+      "seconds": 0.002181,
+      "moves": "B2 R2 U F D' R B2 R2 D' R' U2 L' U R2 F2 R B U",
+      "ok": true
+    },
+    {
+      "index": 88,
+      "length": 18,
+      "nodes": 3115559,
+      "seconds": 0.001426,
+      "moves": "R D2 F2 U F B L D' L2 B R U2 B2 D F' L' B' L'",
+      "ok": true
+    },
+    {
+      "index": 89,
+      "length": 17,
+      "nodes": 593787,
+      "seconds": 0.000528,
+      "moves": "F2 L2 F2 U2 D' F U' F2 B' D2 B' L' U2 D2 F2 U B",
+      "ok": true
+    },
+    {
+      "index": 90,
+      "length": 17,
+      "nodes": 1183132,
+      "seconds": 0.00063,
+      "moves": "D' R' D F2 B' U R2 U2 L B' R' F2 D' F' L' B' F'",
+      "ok": true
+    },
+    {
+      "index": 91,
+      "length": 18,
+      "nodes": 9474067,
+      "seconds": 0.003368,
+      "moves": "D' L' F B2 R2 L F R2 D' B2 U F2 B2 D R2 L B' D2",
+      "ok": true
+    },
+    {
+      "index": 92,
+      "length": 18,
+      "nodes": 14160308,
+      "seconds": 0.006254,
+      "moves": "F2 L D2 F' B' U' D R2 D2 F' U' F' D R' B2 D2 L' U'",
+      "ok": true
+    },
+    {
+      "index": 93,
+      "length": 18,
+      "nodes": 3218210,
+      "seconds": 0.001499,
+      "moves": "R L' B L2 U L2 F U2 B2 D' L2 B2 R2 B U2 F2 R2 L'",
+      "ok": true
+    },
+    {
+      "index": 94,
+      "length": 17,
+      "nodes": 837281,
+      "seconds": 0.000662,
+      "moves": "L U' L D2 L2 U F2 B2 D R U2 R F2 R D L2 F",
+      "ok": true
+    },
+    {
+      "index": 95,
+      "length": 17,
+      "nodes": 775294,
+      "seconds": 0.000555,
+      "moves": "D' R2 L' B L' F2 R2 F L' U R' B D L U' D R2",
+      "ok": true
+    },
+    {
+      "index": 96,
+      "length": 18,
+      "nodes": 14276343,
+      "seconds": 0.004555,
+      "moves": "U' R U2 R2 F R2 D R F U2 B2 L D' R D' R' F R'",
+      "ok": true
+    },
+    {
+      "index": 97,
+      "length": 18,
+      "nodes": 3489444,
+      "seconds": 0.001556,
+      "moves": "L D' L' B' U L' F B' R' L' B U2 R L D R' L2 B",
+      "ok": true
+    },
+    {
+      "index": 98,
+      "length": 18,
+      "nodes": 3800346,
+      "seconds": 0.001705,
+      "moves": "D2 L2 F' U2 B' R F2 L U2 R2 D L F2 L2 U' D2 F R",
+      "ok": true
+    },
+    {
+      "index": 99,
+      "length": 18,
+      "nodes": 2960205,
+      "seconds": 0.001376,
+      "moves": "F2 R' B D B D' L F2 B R2 F2 B2 U' D' R' F' L2 U'",
+      "ok": true
+    },
+    {
+      "index": 100,
+      "length": 18,
+      "nodes": 3975893,
+      "seconds": 0.001677,
+      "moves": "D2 B L U' D' B D' R2 U D' R' D L' F' R2 L' U D",
+      "ok": true
+    },
+    {
+      "index": 101,
+      "length": 18,
+      "nodes": 4410514,
+      "seconds": 0.002894,
+      "moves": "R2 B2 L2 F D R2 B2 U2 R2 F' L2 B' R2 L B U L B2",
+      "ok": true
+    },
+    {
+      "index": 102,
+      "length": 18,
+      "nodes": 3876258,
+      "seconds": 0.0017,
+      "moves": "U2 D' L U' B D R' L2 F2 R U R' L' U' F2 B' R2 L",
+      "ok": true
+    },
+    {
+      "index": 103,
+      "length": 18,
+      "nodes": 4271036,
+      "seconds": 0.001757,
+      "moves": "B' R2 F L F2 B U R2 D L' B2 R2 L B D L2 U' R2",
+      "ok": true
+    },
+    {
+      "index": 104,
+      "length": 17,
+      "nodes": 618640,
+      "seconds": 0.000503,
+      "moves": "U2 R2 L' D F2 D2 F U' D2 F2 L B L' B2 D' B R",
+      "ok": true
+    },
+    {
+      "index": 105,
+      "length": 17,
+      "nodes": 388943,
+      "seconds": 0.000397,
+      "moves": "D L2 B' R D2 L2 F' U2 F2 L U D2 L2 B2 U B F",
+      "ok": true
+    },
+    {
+      "index": 106,
+      "length": 18,
+      "nodes": 9701784,
+      "seconds": 0.003933,
+      "moves": "B' L2 U2 B' D' R' L F2 U2 B' L U2 F2 B' R2 U2 R2 L'",
+      "ok": true
+    },
+    {
+      "index": 107,
+      "length": 16,
+      "nodes": 224041,
+      "seconds": 0.000328,
+      "moves": "L F' L2 B R' U2 R U' D' L D B2 U2 D R' L",
+      "ok": true
+    },
+    {
+      "index": 108,
+      "length": 18,
+      "nodes": 14428943,
+      "seconds": 0.004608,
+      "moves": "F D' F2 L' U' D B R2 U2 L' F U2 D' R L2 F U2 F'",
+      "ok": true
+    },
+    {
+      "index": 109,
+      "length": 17,
+      "nodes": 839503,
+      "seconds": 0.000738,
+      "moves": "R2 L2 B2 L2 F' U L F2 D' R' U' D' R' F' U F B'",
+      "ok": true
+    },
+    {
+      "index": 110,
+      "length": 18,
+      "nodes": 4486056,
+      "seconds": 0.001917,
+      "moves": "L' U' F2 D F2 L2 F R2 F' U' D' B U L' U' B' R2 B2",
+      "ok": true
+    },
+    {
+      "index": 111,
+      "length": 18,
+      "nodes": 3925233,
+      "seconds": 0.001688,
+      "moves": "L B2 U R2 L B' R' F2 R L' U' D R' F' R2 B2 U' R2",
+      "ok": true
+    },
+    {
+      "index": 112,
+      "length": 18,
+      "nodes": 6706762,
+      "seconds": 0.002399,
+      "moves": "R L B2 U R' F2 B' R D B2 R' D' F L2 D2 F U L'",
+      "ok": true
+    },
+    {
+      "index": 113,
+      "length": 17,
+      "nodes": 787435,
+      "seconds": 0.000551,
+      "moves": "U' D B U2 R D B' L' F L B U F D L B L",
+      "ok": true
+    },
+    {
+      "index": 114,
+      "length": 18,
+      "nodes": 4978814,
+      "seconds": 0.002163,
+      "moves": "R2 L2 U2 D' F' R2 F2 R2 L' F U' R D' R2 U' R' U' F'",
+      "ok": true
+    },
+    {
+      "index": 115,
+      "length": 18,
+      "nodes": 5474077,
+      "seconds": 0.002167,
+      "moves": "R2 B' U' D2 B2 L2 F' R2 F' D' B2 U' R F' R2 F2 U2 B2",
+      "ok": true
+    },
+    {
+      "index": 116,
+      "length": 18,
+      "nodes": 2671711,
+      "seconds": 0.001283,
+      "moves": "R U F B D' R' L F2 L' D F' U D' R' B R L U'",
+      "ok": true
+    },
+    {
+      "index": 117,
+      "length": 18,
+      "nodes": 3749835,
+      "seconds": 0.001654,
+      "moves": "F D' F L U' L D2 F2 L2 U L' B2 R2 U R' U L' B",
+      "ok": true
+    },
+    {
+      "index": 118,
+      "length": 18,
+      "nodes": 5169464,
+      "seconds": 0.002046,
+      "moves": "L D' R2 F' R2 D' F' U2 B' D' R L' F' U L' B U' R2",
+      "ok": true
+    },
+    {
+      "index": 119,
+      "length": 18,
+      "nodes": 4393355,
+      "seconds": 0.001926,
+      "moves": "R' F2 D F U L' D' L' B' D2 R2 L2 B R D' F' L' R",
+      "ok": true
+    },
+    {
+      "index": 120,
+      "length": 17,
+      "nodes": 2396761,
+      "seconds": 0.001078,
+      "moves": "R F B' R' F R' U' F' B' D2 L' F B D2 F R D",
+      "ok": true
+    },
+    {
+      "index": 121,
+      "length": 17,
+      "nodes": 647541,
+      "seconds": 0.000576,
+      "moves": "R F' U' F2 R2 B U' D B' D F U L2 F' R' U' R2",
+      "ok": true
+    },
+    {
+      "index": 122,
+      "length": 17,
+      "nodes": 2384605,
+      "seconds": 0.001008,
+      "moves": "D' B2 R' U F L' B L' U F U' F U' D R' D' L",
+      "ok": true
+    },
+    {
+      "index": 123,
+      "length": 17,
+      "nodes": 835548,
+      "seconds": 0.00059,
+      "moves": "L' B D R' U F' U' D2 R2 F' L' U R F2 U' F2 R2",
+      "ok": true
+    },
+    {
+      "index": 124,
+      "length": 18,
+      "nodes": 6402254,
+      "seconds": 0.002469,
+      "moves": "F2 U R2 D F L2 D' R U2 B' L2 F2 R L2 F2 L U F",
+      "ok": true
+    },
+    {
+      "index": 125,
+      "length": 18,
+      "nodes": 10683948,
+      "seconds": 0.003648,
+      "moves": "F U' R2 L U' F R' D2 F2 B D B D2 F D L2 U2 F",
+      "ok": true
+    },
+    {
+      "index": 126,
+      "length": 18,
+      "nodes": 13937739,
+      "seconds": 0.004652,
+      "moves": "R' D2 L2 D L' F2 B' L' B' U2 L U R2 U' L F R2 D'",
+      "ok": true
+    },
+    {
+      "index": 127,
+      "length": 18,
+      "nodes": 10801501,
+      "seconds": 0.003617,
+      "moves": "D R' D2 B U2 R F' B R D L B2 U2 L2 F2 D R' L",
+      "ok": true
+    },
+    {
+      "index": 128,
+      "length": 17,
+      "nodes": 2578761,
+      "seconds": 0.001142,
+      "moves": "L2 D B R' D2 R' F2 L' U L' B' R2 L D' F R2 U2",
+      "ok": true
+    },
+    {
+      "index": 129,
+      "length": 18,
+      "nodes": 3280603,
+      "seconds": 0.001478,
+      "moves": "L2 U D2 R2 B' D' B2 U2 R2 L F B D' R' F2 L' U2 L'",
+      "ok": true
+    },
+    {
+      "index": 130,
+      "length": 17,
+      "nodes": 2711192,
+      "seconds": 0.001521,
+      "moves": "D B2 U' F R' D B2 U2 F2 L2 F2 U' R2 U2 D' L D2",
+      "ok": true
+    },
+    {
+      "index": 131,
+      "length": 18,
+      "nodes": 4326476,
+      "seconds": 0.001863,
+      "moves": "R2 B2 L2 B' U R2 U F D' L2 U F' L2 U2 F2 R2 L' U2",
+      "ok": true
+    },
+    {
+      "index": 132,
+      "length": 17,
+      "nodes": 1056839,
+      "seconds": 0.000683,
+      "moves": "F' L' D2 R L F D' F R2 F2 L F2 U' R2 D2 L2 B'",
+      "ok": true
+    },
+    {
+      "index": 133,
+      "length": 18,
+      "nodes": 6118822,
+      "seconds": 0.002386,
+      "moves": "U2 R2 L F' D F U' F2 R2 F B2 U D' F' B2 U2 F' U'",
+      "ok": true
+    },
+    {
+      "index": 134,
+      "length": 18,
+      "nodes": 6768066,
+      "seconds": 0.002462,
+      "moves": "F2 U F U' R2 B D2 F' R U' B U D2 F B L U2 L2",
+      "ok": true
+    },
+    {
+      "index": 135,
+      "length": 18,
+      "nodes": 3930736,
+      "seconds": 0.001707,
+      "moves": "R2 L2 U R2 F R' B D' R' L' F2 B2 L B D2 F L B",
+      "ok": true
+    },
+    {
+      "index": 136,
+      "length": 18,
+      "nodes": 6942371,
+      "seconds": 0.002583,
+      "moves": "U2 L2 F B2 D' F2 U' L' U L2 U' D L U B2 U' L' F'",
+      "ok": true
+    },
+    {
+      "index": 137,
+      "length": 18,
+      "nodes": 13036947,
+      "seconds": 0.004211,
+      "moves": "R' B R' B R2 L2 B' D' L' U' F D2 F U' L D B2 U",
+      "ok": true
+    },
+    {
+      "index": 138,
+      "length": 18,
+      "nodes": 4483917,
+      "seconds": 0.001826,
+      "moves": "R L2 D F D2 F' D F' R' D' R' F2 D2 L U' F' U2 B",
+      "ok": true
+    },
+    {
+      "index": 139,
+      "length": 18,
+      "nodes": 3975666,
+      "seconds": 0.001693,
+      "moves": "R L' F B U R' B' U F2 U D2 L' B2 D L2 U' D' R'",
+      "ok": true
+    },
+    {
+      "index": 140,
+      "length": 16,
+      "nodes": 270446,
+      "seconds": 0.000404,
+      "moves": "L' U D F' B2 D2 R' D2 B R F L B L' B F'",
+      "ok": true
+    },
+    {
+      "index": 141,
+      "length": 18,
+      "nodes": 6451031,
+      "seconds": 0.002472,
+      "moves": "B U2 D' L U2 D L' F2 L' U2 R' B' D' B2 U L' B D'",
+      "ok": true
+    },
+    {
+      "index": 142,
+      "length": 18,
+      "nodes": 3656888,
+      "seconds": 0.001602,
+      "moves": "U2 D2 R' L2 F B U R L F B U B' R F R B' R",
+      "ok": true
+    },
+    {
+      "index": 143,
+      "length": 17,
+      "nodes": 432365,
+      "seconds": 0.000471,
+      "moves": "L U' B' D L D2 F R L B2 R2 L U' L2 U2 F U'",
+      "ok": true
+    },
+    {
+      "index": 144,
+      "length": 18,
+      "nodes": 2908190,
+      "seconds": 0.00134,
+      "moves": "L U L D2 F R D' B L2 B' L B R' L' U2 R2 L' U2",
+      "ok": true
+    },
+    {
+      "index": 145,
+      "length": 18,
+      "nodes": 4496483,
+      "seconds": 0.003424,
+      "moves": "F U F B R L2 B' R L2 U' D2 B2 F2 L D' L2 D F",
+      "ok": true
+    },
+    {
+      "index": 146,
+      "length": 18,
+      "nodes": 3934920,
+      "seconds": 0.001689,
+      "moves": "F' R U L B2 R' D2 R2 F2 B' U2 F2 B' U' D' B R2 D'",
+      "ok": true
+    },
+    {
+      "index": 147,
+      "length": 18,
+      "nodes": 35941284,
+      "seconds": 0.010544,
+      "moves": "R2 L' B' R' B2 D' L F' D' B2 U' D L' U B2 L' B' R",
+      "ok": true
+    },
+    {
+      "index": 148,
+      "length": 18,
+      "nodes": 2700640,
+      "seconds": 0.00132,
+      "moves": "L' U D R L2 D2 R B L2 U2 D' F L B' L B2 L' F",
+      "ok": true
+    },
+    {
+      "index": 149,
+      "length": 17,
+      "nodes": 2420396,
+      "seconds": 0.001054,
+      "moves": "D2 F' B2 U' B2 L' U' F B' D2 R' F B2 U L B D'",
+      "ok": true
+    },
+    {
+      "index": 150,
+      "length": 18,
+      "nodes": 4897805,
+      "seconds": 0.002178,
+      "moves": "R' L2 F2 U' D2 F2 B' L2 F2 D R2 L' B2 R L2 U' L' R",
+      "ok": true
+    },
+    {
+      "index": 151,
+      "length": 18,
+      "nodes": 4114360,
+      "seconds": 0.001718,
+      "moves": "B' D F2 U' L2 B' D R' F2 L2 D' R U2 B2 R F' U B2",
+      "ok": true
+    },
+    {
+      "index": 152,
+      "length": 17,
+      "nodes": 2334493,
+      "seconds": 0.001132,
+      "moves": "R' D2 R2 D' B' R2 D B2 R' U' L2 U' B2 R2 B' R' F'",
+      "ok": true
+    },
+    {
+      "index": 153,
+      "length": 18,
+      "nodes": 4624483,
+      "seconds": 0.001851,
+      "moves": "B2 L2 F D R2 U' L2 U D L2 U B2 F' D' F U' L F'",
+      "ok": true
+    },
+    {
+      "index": 154,
+      "length": 18,
+      "nodes": 3145086,
+      "seconds": 0.001419,
+      "moves": "R2 F B L' U2 R F U' L2 D R' D L' D' B' D F2 L'",
+      "ok": true
+    },
+    {
+      "index": 155,
+      "length": 17,
+      "nodes": 558036,
+      "seconds": 0.000488,
+      "moves": "U' R' B2 D R2 B L2 B' U L2 U' B F2 D2 B D R",
+      "ok": true
+    },
+    {
+      "index": 156,
+      "length": 18,
+      "nodes": 4204296,
+      "seconds": 0.001776,
+      "moves": "U2 F' U' B' D F L2 U' R2 D' F2 D' R2 F2 R F' D F'",
+      "ok": true
+    },
+    {
+      "index": 157,
+      "length": 17,
+      "nodes": 1088317,
+      "seconds": 0.000652,
+      "moves": "B2 L U2 F2 R F2 R B' R B2 D L' F U2 L2 F R'",
+      "ok": true
+    },
+    {
+      "index": 158,
+      "length": 17,
+      "nodes": 3238629,
+      "seconds": 0.001353,
+      "moves": "U' F2 L' F B' R D' R' B2 L' U B2 L' F' D' F' D'",
+      "ok": true
+    },
+    {
+      "index": 159,
+      "length": 18,
+      "nodes": 3493224,
+      "seconds": 0.001527,
+      "moves": "D2 R F R2 F R' L' B2 U2 B2 U D2 R' U F R2 B' L",
+      "ok": true
+    },
+    {
+      "index": 160,
+      "length": 18,
+      "nodes": 4272579,
+      "seconds": 0.001821,
+      "moves": "F B U B' L2 D' B' L2 F2 D B' D F2 D2 L' B2 L2 D2",
+      "ok": true
+    },
+    {
+      "index": 161,
+      "length": 19,
+      "nodes": 46444336,
+      "seconds": 0.014255,
+      "moves": "U' F2 D2 R2 F' L' U D' L2 D2 L' D' B2 D2 R2 L2 F B2 U",
+      "ok": true
+    },
+    {
+      "index": 162,
+      "length": 18,
+      "nodes": 6257895,
+      "seconds": 0.002495,
+      "moves": "R U2 B2 D' L' D2 F2 L U' B' U B2 D2 B2 D2 R' F' L'",
+      "ok": true
+    },
+    {
+      "index": 163,
+      "length": 18,
+      "nodes": 3526927,
+      "seconds": 0.001549,
+      "moves": "L2 B' L' D' F' R D2 F2 U2 F2 L' F2 R D' U' B D' L",
+      "ok": true
+    },
+    {
+      "index": 164,
+      "length": 18,
+      "nodes": 13459061,
+      "seconds": 0.004406,
+      "moves": "B2 D B' U' B2 U2 R L U' R' B2 U' D' F2 D L' U D2",
+      "ok": true
+    },
+    {
+      "index": 165,
+      "length": 19,
+      "nodes": 37263877,
+      "seconds": 0.011229,
+      "moves": "R' U2 L' F' B U' D2 L B' D F2 B2 U2 F2 L B' D2 B2 L",
+      "ok": true
+    },
+    {
+      "index": 166,
+      "length": 18,
+      "nodes": 15084067,
+      "seconds": 0.00481,
+      "moves": "L' U2 L U B U2 R' L U' L U F B L' F B' U' D'",
+      "ok": true
+    },
+    {
+      "index": 167,
+      "length": 17,
+      "nodes": 1000613,
+      "seconds": 0.000778,
+      "moves": "R2 F2 U2 F2 R B' U2 L2 B2 R2 F L F' R2 F2 L' U'",
+      "ok": true
+    },
+    {
+      "index": 168,
+      "length": 18,
+      "nodes": 12633865,
+      "seconds": 0.004109,
+      "moves": "D2 R' F R2 U2 D F' L' D R2 L D2 L B L D' L2 D2",
+      "ok": true
+    },
+    {
+      "index": 169,
+      "length": 18,
+      "nodes": 4094664,
+      "seconds": 0.001789,
+      "moves": "R' F2 B D' B U R D R D2 F2 B L2 B' F' D B' F'",
+      "ok": true
+    },
+    {
+      "index": 170,
+      "length": 18,
+      "nodes": 3264471,
+      "seconds": 0.00151,
+      "moves": "B U' L2 U R' F' D2 R2 F' R2 D B2 R2 F L U2 R2 U'",
+      "ok": true
+    },
+    {
+      "index": 171,
+      "length": 18,
+      "nodes": 4671192,
+      "seconds": 0.001902,
+      "moves": "D2 L2 B L' U' F' D' F2 L' F' R2 U F2 L2 U L2 U2 B'",
+      "ok": true
+    },
+    {
+      "index": 172,
+      "length": 19,
+      "nodes": 35250048,
+      "seconds": 0.010667,
+      "moves": "F R2 U' B L2 U2 F' L' U D' R F L F2 R2 U2 D2 R L'",
+      "ok": true
+    },
+    {
+      "index": 173,
+      "length": 18,
+      "nodes": 6262353,
+      "seconds": 0.002344,
+      "moves": "F R' B' L2 U2 B D2 F U B' U B' R F D2 L' B R2",
+      "ok": true
+    },
+    {
+      "index": 174,
+      "length": 17,
+      "nodes": 2121542,
+      "seconds": 0.001058,
+      "moves": "L' F' L2 D' R2 B R' B' U D' R2 F R B' U' D' F",
+      "ok": true
+    },
+    {
+      "index": 175,
+      "length": 18,
+      "nodes": 6085409,
+      "seconds": 0.002763,
+      "moves": "U2 R' D' R2 L D2 L B2 R' U B' D B' U B2 D L2 D2",
+      "ok": true
+    },
+    {
+      "index": 176,
+      "length": 18,
+      "nodes": 15709981,
+      "seconds": 0.004941,
+      "moves": "B L2 F U D' B2 U L F' U F D R B2 U2 D2 R D2",
+      "ok": true
+    },
+    {
+      "index": 177,
+      "length": 18,
+      "nodes": 22329022,
+      "seconds": 0.007445,
+      "moves": "U' D R' F2 R F2 L' F B2 L' D2 F' U L U2 B2 D L'",
+      "ok": true
+    },
+    {
+      "index": 178,
+      "length": 18,
+      "nodes": 4898454,
+      "seconds": 0.001942,
+      "moves": "D2 R2 L2 F' D L' U2 F2 D F L' B2 U' R2 U' D2 B2 R'",
+      "ok": true
+    },
+    {
+      "index": 179,
+      "length": 17,
+      "nodes": 282584,
+      "seconds": 0.000405,
+      "moves": "U2 F2 L B' U R D2 F2 R' U' D L U R' B' U' B2",
+      "ok": true
+    },
+    {
+      "index": 180,
+      "length": 18,
+      "nodes": 12695013,
+      "seconds": 0.004272,
+      "moves": "U2 D F2 B2 L2 U' R' D' R2 L D' F' U' R2 B D F U'",
+      "ok": true
+    },
+    {
+      "index": 181,
+      "length": 18,
+      "nodes": 3187283,
+      "seconds": 0.001504,
+      "moves": "L B' R F' R' F' D F' B' L' U' F R2 U2 F' U' B D2",
+      "ok": true
+    },
+    {
+      "index": 182,
+      "length": 17,
+      "nodes": 1848705,
+      "seconds": 0.000928,
+      "moves": "D2 B' U2 R' F R' U2 R F U' B2 R U2 B2 R' F2 U2",
+      "ok": true
+    },
+    {
+      "index": 183,
+      "length": 18,
+      "nodes": 2357771,
+      "seconds": 0.00122,
+      "moves": "U R' F2 D R L' B2 L' D2 L' U B' L2 B D B' R2 L'",
+      "ok": true
+    },
+    {
+      "index": 184,
+      "length": 18,
+      "nodes": 4150615,
+      "seconds": 0.001833,
+      "moves": "F R U' R' L D L2 B' L2 B2 R U D2 F R2 U2 L2 F2",
+      "ok": true
+    },
+    {
+      "index": 185,
+      "length": 17,
+      "nodes": 667946,
+      "seconds": 0.000552,
+      "moves": "D R2 F2 B R' U2 L2 F2 B2 U2 B L' U B2 D' L' F",
+      "ok": true
+    },
+    {
+      "index": 186,
+      "length": 18,
+      "nodes": 4292635,
+      "seconds": 0.001962,
+      "moves": "L' B D F' U' F' R U2 B2 U' D' L' B' R2 U' F R B'",
+      "ok": true
+    },
+    {
+      "index": 187,
+      "length": 18,
+      "nodes": 19334079,
+      "seconds": 0.006173,
+      "moves": "R' D2 L U2 R' F D F' L' D B2 D2 F' B2 L U2 F B",
+      "ok": true
+    },
+    {
+      "index": 188,
+      "length": 17,
+      "nodes": 1284853,
+      "seconds": 0.000783,
+      "moves": "U2 F2 D2 L2 F L' D' B2 D B L' B D' R B R2 D2",
+      "ok": true
+    },
+    {
+      "index": 189,
+      "length": 18,
+      "nodes": 5379496,
+      "seconds": 0.002308,
+      "moves": "U R2 B' R U R' F2 B2 U F' B L2 F D F2 R L' U2",
+      "ok": true
+    },
+    {
+      "index": 190,
+      "length": 18,
+      "nodes": 6830880,
+      "seconds": 0.002824,
+      "moves": "R' U2 F B2 L U' L2 U2 L2 B' R2 F' L2 U' B D2 F2 B2",
+      "ok": true
+    },
+    {
+      "index": 191,
+      "length": 18,
+      "nodes": 6793794,
+      "seconds": 0.002654,
+      "moves": "B L2 U2 R' F' R' B2 U F2 L2 F' R' F' B2 D' R U2 R2",
+      "ok": true
+    },
+    {
+      "index": 192,
+      "length": 18,
+      "nodes": 3386226,
+      "seconds": 0.001558,
+      "moves": "F U' B2 D' F' B U2 D' R2 L U B D B' D2 L2 B' U2",
+      "ok": true
+    },
+    {
+      "index": 193,
+      "length": 18,
+      "nodes": 3574247,
+      "seconds": 0.001635,
+      "moves": "U' R2 D' F' D' B' U F2 R2 U D2 L' B2 R U2 B L2 D",
+      "ok": true
+    },
+    {
+      "index": 194,
+      "length": 18,
+      "nodes": 3355378,
+      "seconds": 0.001509,
+      "moves": "B2 R2 D B L' B2 U' D' F' R2 F L' B2 U2 D2 R' F D2",
+      "ok": true
+    },
+    {
+      "index": 195,
+      "length": 18,
+      "nodes": 1979335,
+      "seconds": 0.001221,
+      "moves": "F2 B R' L' F U D R' U2 D F2 B2 R' U2 R D L' B2",
+      "ok": true
+    },
+    {
+      "index": 196,
+      "length": 18,
+      "nodes": 5281601,
+      "seconds": 0.002105,
+      "moves": "B R L2 U2 R U L D R2 B R D R2 D R2 U' R2 L2",
+      "ok": true
+    },
+    {
+      "index": 197,
+      "length": 18,
+      "nodes": 3648448,
+      "seconds": 0.001642,
+      "moves": "R D F2 U2 R' B' R2 U F2 B2 U2 R' F L' D' F' U' D2",
+      "ok": true
+    },
+    {
+      "index": 198,
+      "length": 18,
+      "nodes": 7139284,
+      "seconds": 0.002687,
+      "moves": "R' F2 R2 F' R2 L' D' F' D' L2 U F' R2 U2 F' D' U' F'",
+      "ok": true
+    },
+    {
+      "index": 199,
+      "length": 18,
+      "nodes": 3506751,
+      "seconds": 0.001597,
+      "moves": "R2 U' L F' R' U R' L' D' B R2 B' R U' R D' B' R'",
+      "ok": true
+    },
+    {
+      "index": 200,
+      "length": 18,
+      "nodes": 2723525,
+      "seconds": 0.001298,
+      "moves": "B' L2 F' R' F U R2 F2 U D' F' B R' D F R' D R'",
+      "ok": true
+    },
+    {
+      "index": 201,
+      "length": 18,
+      "nodes": 2898740,
+      "seconds": 0.001363,
+      "moves": "R D2 F' L' U2 F2 U' B U' L' D L2 U R2 D' B2 R D'",
+      "ok": true
+    },
+    {
+      "index": 202,
+      "length": 16,
+      "nodes": 193837,
+      "seconds": 0.000143,
+      "moves": "R' U2 F D L B R B' R2 F' D2 F U2 R' F' R2",
+      "ok": true
+    },
+    {
+      "index": 203,
+      "length": 17,
+      "nodes": 4251722,
+      "seconds": 0.001656,
+      "moves": "F2 L2 D L F' R' F' L B2 U2 F2 U2 L2 B D B D2",
+      "ok": true
+    },
+    {
+      "index": 204,
+      "length": 19,
+      "nodes": 28265927,
+      "seconds": 0.008821,
+      "moves": "U R' D2 R2 L F U2 F' D R' B U2 F D' B R2 L' F D2",
+      "ok": true
+    },
+    {
+      "index": 205,
+      "length": 17,
+      "nodes": 719957,
+      "seconds": 0.000507,
+      "moves": "R' L2 F U2 D' R2 B R' F2 D2 F B L2 D2 B' L F",
+      "ok": true
+    },
+    {
+      "index": 206,
+      "length": 17,
+      "nodes": 556056,
+      "seconds": 0.000464,
+      "moves": "L2 F D L2 F' R L' F' B R F' U F2 D2 F2 D' R2",
+      "ok": true
+    },
+    {
+      "index": 207,
+      "length": 18,
+      "nodes": 9039218,
+      "seconds": 0.003139,
+      "moves": "U2 L U B' U F L' B' L2 D F R' U F U B2 F D",
+      "ok": true
+    },
+    {
+      "index": 208,
+      "length": 17,
+      "nodes": 1314543,
+      "seconds": 0.001582,
+      "moves": "L' B U D2 R2 F U' D B' D F' R2 F R2 D R2 D",
+      "ok": true
+    },
+    {
+      "index": 209,
+      "length": 17,
+      "nodes": 2691626,
+      "seconds": 0.001131,
+      "moves": "U2 R2 D' F D' B R2 D2 R' B2 L U' D B2 R F' L'",
+      "ok": true
+    },
+    {
+      "index": 210,
+      "length": 18,
+      "nodes": 6079662,
+      "seconds": 0.002397,
+      "moves": "B2 U2 D' L' B' L' D' R2 U2 R' D R F2 U' F2 R2 B' D2",
+      "ok": true
+    },
+    {
+      "index": 211,
+      "length": 19,
+      "nodes": 45224971,
+      "seconds": 0.013564,
+      "moves": "B L U F R' U2 F2 R' F U' R' D2 L2 U2 D' B2 U' F2 B'",
+      "ok": true
+    },
+    {
+      "index": 212,
+      "length": 18,
+      "nodes": 23580473,
+      "seconds": 0.007169,
+      "moves": "L' B U2 L U L2 D' F R' B2 R2 U B D B2 U L B'",
+      "ok": true
+    },
+    {
+      "index": 213,
+      "length": 18,
+      "nodes": 4903146,
+      "seconds": 0.002001,
+      "moves": "L B R' F L' U' R B L2 F B2 R2 F' U2 D' R' D L2",
+      "ok": true
+    },
+    {
+      "index": 214,
+      "length": 18,
+      "nodes": 4472543,
+      "seconds": 0.001891,
+      "moves": "D' R L B D' R' F R' F L' B U2 B U' B2 L' F' L",
+      "ok": true
+    },
+    {
+      "index": 215,
+      "length": 18,
+      "nodes": 4504404,
+      "seconds": 0.001944,
+      "moves": "U' D' R U' D' R2 U2 B2 L' D L D2 R2 L D' R F R2",
+      "ok": true
+    },
+    {
+      "index": 216,
+      "length": 17,
+      "nodes": 2905514,
+      "seconds": 0.001179,
+      "moves": "F2 B2 R' B D L D2 F' B D' F R F2 B2 U L U'",
+      "ok": true
+    },
+    {
+      "index": 217,
+      "length": 18,
+      "nodes": 3469553,
+      "seconds": 0.003078,
+      "moves": "R' F2 D2 F2 R' F2 R2 B D2 F' D' L2 D' R' B' L' D B",
+      "ok": true
+    },
+    {
+      "index": 218,
+      "length": 18,
+      "nodes": 2558639,
+      "seconds": 0.001248,
+      "moves": "F' B2 R2 D L2 U D2 B' L' U2 R F2 D F R B2 D2 F",
+      "ok": true
+    },
+    {
+      "index": 219,
+      "length": 17,
+      "nodes": 1931656,
+      "seconds": 0.000874,
+      "moves": "L D2 R2 B2 U R' B R' F2 R F2 U2 R F L' F' U'",
+      "ok": true
+    },
+    {
+      "index": 220,
+      "length": 17,
+      "nodes": 1159410,
+      "seconds": 0.000828,
+      "moves": "R2 D2 R' B R' U' R D2 R' B D B' U' D F' R2 B2",
+      "ok": true
+    },
+    {
+      "index": 221,
+      "length": 17,
+      "nodes": 288761,
+      "seconds": 0.000382,
+      "moves": "B' R2 L2 U2 D' L F' U L' D R L F' D2 B R2 D'",
+      "ok": true
+    },
+    {
+      "index": 222,
+      "length": 18,
+      "nodes": 2523347,
+      "seconds": 0.001235,
+      "moves": "R D' B' L F D2 L2 B U D2 L' F' L' F2 R2 D2 B L'",
+      "ok": true
+    },
+    {
+      "index": 223,
+      "length": 17,
+      "nodes": 678881,
+      "seconds": 0.000465,
+      "moves": "D' L' D B' U2 L B2 U' F D L2 D2 L2 D2 F2 L' U2",
+      "ok": true
+    },
+    {
+      "index": 224,
+      "length": 19,
+      "nodes": 31984246,
+      "seconds": 0.009879,
+      "moves": "L' U2 D' R' F2 B' L' B' R2 U F R2 L2 U D' F R2 D2 F2",
+      "ok": true
+    },
+    {
+      "index": 225,
+      "length": 17,
+      "nodes": 1414358,
+      "seconds": 0.000834,
+      "moves": "D2 B U L B R' F2 U' L' F' R2 F' D B R U2 L2",
+      "ok": true
+    },
+    {
+      "index": 226,
+      "length": 18,
+      "nodes": 3563907,
+      "seconds": 0.001704,
+      "moves": "R U L B R2 L U2 F2 D R2 F' L2 F2 R2 U' B' R F2",
+      "ok": true
+    },
+    {
+      "index": 227,
+      "length": 18,
+      "nodes": 2381324,
+      "seconds": 0.001221,
+      "moves": "F2 R' B L2 D' F2 L2 B U2 L' B2 D2 R F U B' R2 B",
+      "ok": true
+    },
+    {
+      "index": 228,
+      "length": 18,
+      "nodes": 5329603,
+      "seconds": 0.00204,
+      "moves": "F L' F2 L' U2 B U' F2 R F' B' R D' L' U' D2 R B'",
+      "ok": true
+    },
+    {
+      "index": 229,
+      "length": 18,
+      "nodes": 2899006,
+      "seconds": 0.001406,
+      "moves": "F D F B2 L D2 B R B2 R2 U2 L2 B' R2 D' R' L D2",
+      "ok": true
+    },
+    {
+      "index": 230,
+      "length": 18,
+      "nodes": 7914199,
+      "seconds": 0.002881,
+      "moves": "R2 D2 R U R2 L' D F R L2 F U F R' D' F2 U B2",
+      "ok": true
+    },
+    {
+      "index": 231,
+      "length": 18,
+      "nodes": 3265048,
+      "seconds": 0.001496,
+      "moves": "B2 R' D2 F D2 L' B D2 F2 L2 F D F D' L2 B2 D R",
+      "ok": true
+    },
+    {
+      "index": 232,
+      "length": 18,
+      "nodes": 4405328,
+      "seconds": 0.001877,
+      "moves": "D B R B2 D F' D L U2 B R2 F L' U2 D2 R2 F L2",
+      "ok": true
+    },
+    {
+      "index": 233,
+      "length": 18,
+      "nodes": 4454508,
+      "seconds": 0.001846,
+      "moves": "R2 D R F L' D2 B2 U2 F2 B' L' U F' R D2 R' L F'",
+      "ok": true
+    },
+    {
+      "index": 234,
+      "length": 18,
+      "nodes": 3868699,
+      "seconds": 0.001673,
+      "moves": "R L2 U' R' D R F R D2 R' U D R2 U F D2 F2 R2",
+      "ok": true
+    },
+    {
+      "index": 235,
+      "length": 17,
+      "nodes": 441581,
+      "seconds": 0.000472,
+      "moves": "B L2 F U2 D' B U2 B2 D F R' B D F' B2 U2 D'",
+      "ok": true
+    },
+    {
+      "index": 236,
+      "length": 17,
+      "nodes": 1469342,
+      "seconds": 0.000915,
+      "moves": "D2 B U F L' U2 F2 D F' U B2 R U' F2 D2 F2 R",
+      "ok": true
+    },
+    {
+      "index": 237,
+      "length": 18,
+      "nodes": 3197137,
+      "seconds": 0.001745,
+      "moves": "R B2 U2 B R' D2 L2 F' U2 R' B' U' F2 D2 L F' L2 U2",
+      "ok": true
+    },
+    {
+      "index": 238,
+      "length": 18,
+      "nodes": 6167311,
+      "seconds": 0.002349,
+      "moves": "U' B' D2 F U' L U L U' R2 B' U B' D2 B2 L' B U'",
+      "ok": true
+    },
+    {
+      "index": 239,
+      "length": 18,
+      "nodes": 5899675,
+      "seconds": 0.002325,
+      "moves": "B2 D R' L D' R2 D2 F B2 U2 L B2 D2 F2 L2 B R' D'",
+      "ok": true
+    },
+    {
+      "index": 240,
+      "length": 18,
+      "nodes": 6043200,
+      "seconds": 0.002363,
+      "moves": "L2 U R2 B' U2 B2 U2 D' B' R D B' L B2 D2 B2 D R",
+      "ok": true
+    },
+    {
+      "index": 241,
+      "length": 16,
+      "nodes": 273109,
+      "seconds": 0.000224,
+      "moves": "D' R2 F L D B' U L' U B U R' B' U D' L",
+      "ok": true
+    },
+    {
+      "index": 242,
+      "length": 18,
+      "nodes": 5303127,
+      "seconds": 0.002168,
+      "moves": "U' D2 L' B' D R' B' D2 L' U' L2 D R B' R2 B U' F2",
+      "ok": true
+    },
+    {
+      "index": 243,
+      "length": 18,
+      "nodes": 3763978,
+      "seconds": 0.001628,
+      "moves": "D2 F' U' F U2 R2 L D2 R' F D2 F R2 L' B2 D' R2 L2",
+      "ok": true
+    },
+    {
+      "index": 244,
+      "length": 18,
+      "nodes": 19220807,
+      "seconds": 0.00595,
+      "moves": "D2 F L' D2 L2 F D2 R' U2 B D R' B2 R D2 L2 F' L",
+      "ok": true
+    },
+    {
+      "index": 245,
+      "length": 18,
+      "nodes": 3516019,
+      "seconds": 0.001551,
+      "moves": "B U B2 L F2 U F R2 D2 L' U2 D' B2 R' U2 F2 R' B2",
+      "ok": true
+    },
+    {
+      "index": 246,
+      "length": 18,
+      "nodes": 4018643,
+      "seconds": 0.002158,
+      "moves": "R F2 U2 L F2 R U F2 U2 L B2 D F2 L2 R B' L' U'",
+      "ok": true
+    },
+    {
+      "index": 247,
+      "length": 16,
+      "nodes": 240874,
+      "seconds": 0.000141,
+      "moves": "F D2 R2 U2 F U2 R2 D' L' D' L D B2 L' U B'",
+      "ok": true
+    },
+    {
+      "index": 248,
+      "length": 18,
+      "nodes": 10426499,
+      "seconds": 0.003535,
+      "moves": "U' B' L' B2 R2 F' D' F' R2 U' D' R' B' U' L' R' B U",
+      "ok": true
+    },
+    {
+      "index": 249,
+      "length": 18,
+      "nodes": 4747515,
+      "seconds": 0.002134,
+      "moves": "F' B2 L U' R D2 R U' F D F' R F' R F R F' R",
+      "ok": true
+    },
+    {
+      "index": 250,
+      "length": 18,
+      "nodes": 18858031,
+      "seconds": 0.005846,
+      "moves": "R' L U' L' D F L D B2 L' U' R F' U' R' B L' F'",
+      "ok": true
+    },
+    {
+      "index": 251,
+      "length": 18,
+      "nodes": 2624177,
+      "seconds": 0.001277,
+      "moves": "B2 U' B' L2 D F L2 F2 D2 F2 B' R' F U2 R2 L' F2 U'",
+      "ok": true
+    },
+    {
+      "index": 252,
+      "length": 18,
+      "nodes": 2885463,
+      "seconds": 0.001357,
+      "moves": "R B2 D2 L F D2 R' L' D' B2 L U' D F2 R' L D' B",
+      "ok": true
+    },
+    {
+      "index": 253,
+      "length": 18,
+      "nodes": 4559006,
+      "seconds": 0.001951,
+      "moves": "U2 L' D R U2 B R D' R2 U2 D' R' L2 D2 L' F' B L2",
+      "ok": true
+    },
+    {
+      "index": 254,
+      "length": 18,
+      "nodes": 9113539,
+      "seconds": 0.003188,
+      "moves": "B2 L' D' F' U2 L U2 D' F D' B' D2 F2 L B L B L'",
+      "ok": true
+    },
+    {
+      "index": 255,
+      "length": 19,
+      "nodes": 49317307,
+      "seconds": 0.014784,
+      "moves": "R' F' D2 R2 D R F2 R2 U F' U F2 B2 D' B U' F2 B' U",
+      "ok": true
+    },
+    {
+      "index": 256,
+      "length": 17,
+      "nodes": 910470,
+      "seconds": 0.000668,
+      "moves": "U2 L2 B L U' F' U' L2 F' L' F' L2 U D2 R L' B2",
+      "ok": true
+    },
+    {
+      "index": 257,
+      "length": 18,
+      "nodes": 11181361,
+      "seconds": 0.003713,
+      "moves": "R D2 B R' D F2 D R2 U' F' U' R' B R' U2 F D F'",
+      "ok": true
+    },
+    {
+      "index": 258,
+      "length": 18,
+      "nodes": 4290606,
+      "seconds": 0.001731,
+      "moves": "D B L U D2 B L' U R' L B D' B2 U F' L D' R2",
+      "ok": true
+    },
+    {
+      "index": 259,
+      "length": 18,
+      "nodes": 3552248,
+      "seconds": 0.001547,
+      "moves": "F2 R' F2 B' D2 F U' D2 R' D2 B R2 B' R2 D' B' U L'",
+      "ok": true
+    },
+    {
+      "index": 260,
+      "length": 18,
+      "nodes": 17542583,
+      "seconds": 0.005535,
+      "moves": "F U' B' R' U2 B' D2 R' U L D B2 L B2 R D2 F' U2",
+      "ok": true
+    },
+    {
+      "index": 261,
+      "length": 19,
+      "nodes": 35240449,
+      "seconds": 0.010861,
+      "moves": "R2 D2 L2 F' L U' B2 L U' D2 B2 R' D2 F R2 B2 D' F' D2",
+      "ok": true
+    },
+    {
+      "index": 262,
+      "length": 18,
+      "nodes": 5930409,
+      "seconds": 0.002231,
+      "moves": "F2 D' B R U D F2 R' B' L' F R B' L2 U' L2 U' F'",
+      "ok": true
+    },
+    {
+      "index": 263,
+      "length": 19,
+      "nodes": 42334014,
+      "seconds": 0.012627,
+      "moves": "R' F U' R B' U2 D L F' R L' D F2 B2 U2 R' L2 F2 B'",
+      "ok": true
+    },
+    {
+      "index": 264,
+      "length": 17,
+      "nodes": 442250,
+      "seconds": 0.000454,
+      "moves": "U' L D F2 R' B' R L' U' B U' R B D2 R B2 D'",
+      "ok": true
+    },
+    {
+      "index": 265,
+      "length": 18,
+      "nodes": 8213700,
+      "seconds": 0.002836,
+      "moves": "D' R' D L2 B2 D' F2 R' L D' F L2 U2 B2 L2 D F' U'",
+      "ok": true
+    },
+    {
+      "index": 266,
+      "length": 18,
+      "nodes": 4874892,
+      "seconds": 0.002434,
+      "moves": "D' R2 U R D2 L2 D' B' U D2 R2 L U' D F' U D2 F2",
+      "ok": true
+    },
+    {
+      "index": 267,
+      "length": 18,
+      "nodes": 4303184,
+      "seconds": 0.001776,
+      "moves": "D' F' U R' D' L2 B U B' L' U L2 F' D' F' U R F2",
+      "ok": true
+    },
+    {
+      "index": 268,
+      "length": 18,
+      "nodes": 9532574,
+      "seconds": 0.003398,
+      "moves": "D B2 L B R' B' R' B2 D' F L' B2 U2 L D' F2 D' L2",
+      "ok": true
+    },
+    {
+      "index": 269,
+      "length": 17,
+      "nodes": 708300,
+      "seconds": 0.000496,
+      "moves": "D' F2 R' F R2 B' L' F' U R2 F2 U' L2 B2 D2 R B",
+      "ok": true
+    },
+    {
+      "index": 270,
+      "length": 17,
+      "nodes": 750050,
+      "seconds": 0.000556,
+      "moves": "U2 B R' B2 R' B U B2 R D' L2 F' D' L' F2 B2 U2",
+      "ok": true
+    },
+    {
+      "index": 271,
+      "length": 18,
+      "nodes": 4579405,
+      "seconds": 0.002015,
+      "moves": "F' D2 F2 D B L' D2 F L B R2 F B' D B' D' L2 F2",
+      "ok": true
+    },
+    {
+      "index": 272,
+      "length": 17,
+      "nodes": 593277,
+      "seconds": 0.000503,
+      "moves": "F2 U2 R2 F' R B' U D' L2 B R U F R2 U R2 L",
+      "ok": true
+    },
+    {
+      "index": 273,
+      "length": 18,
+      "nodes": 4870045,
+      "seconds": 0.001968,
+      "moves": "D L2 D' F2 D2 F B2 U2 B2 D' R F2 L' F2 B' R B R'",
+      "ok": true
+    },
+    {
+      "index": 274,
+      "length": 18,
+      "nodes": 4845983,
+      "seconds": 0.001888,
+      "moves": "R D2 F U F2 B' R2 F L U F2 R2 F' L' D2 R' B' L",
+      "ok": true
+    },
+    {
+      "index": 275,
+      "length": 18,
+      "nodes": 5250584,
+      "seconds": 0.002081,
+      "moves": "F2 L' U' R2 B U B2 R' D2 R L B L2 F' D2 B F2 D'",
+      "ok": true
+    },
+    {
+      "index": 276,
+      "length": 18,
+      "nodes": 2749251,
+      "seconds": 0.001261,
+      "moves": "L B D R2 D2 R2 L2 F R2 B' F2 L' U L' U2 B' D B'",
+      "ok": true
+    },
+    {
+      "index": 277,
+      "length": 18,
+      "nodes": 2872838,
+      "seconds": 0.001347,
+      "moves": "F2 R2 F' U2 R2 B' L F2 U B F2 L U' R' D F D' L'",
+      "ok": true
+    },
+    {
+      "index": 278,
+      "length": 18,
+      "nodes": 13319761,
+      "seconds": 0.004229,
+      "moves": "L' U' L2 U2 B' L B R' D' B' U2 L' U L' D' F L U'",
+      "ok": true
+    },
+    {
+      "index": 279,
+      "length": 18,
+      "nodes": 6850329,
+      "seconds": 0.002439,
+      "moves": "U2 L' F' D L2 B2 L2 B2 U F L F L' R D2 B' D B",
+      "ok": true
+    },
+    {
+      "index": 280,
+      "length": 17,
+      "nodes": 2155212,
+      "seconds": 0.000982,
+      "moves": "D' F2 D2 L' F' R' D2 F' D B2 D' F L B2 R2 F2 D2",
+      "ok": true
+    },
+    {
+      "index": 281,
+      "length": 18,
+      "nodes": 6856186,
+      "seconds": 0.002533,
+      "moves": "F2 B D R' F' U2 R' B' D2 R2 U L' F R' U' R2 F2 U2",
+      "ok": true
+    },
+    {
+      "index": 282,
+      "length": 18,
+      "nodes": 3834566,
+      "seconds": 0.001621,
+      "moves": "B' D' L F' L D B D B' L B' L F U' F R2 D2 F",
+      "ok": true
+    },
+    {
+      "index": 283,
+      "length": 19,
+      "nodes": 24927305,
+      "seconds": 0.007851,
+      "moves": "D2 R D B D R2 L U D B2 D2 L2 F D' F L D' F D'",
+      "ok": true
+    },
+    {
+      "index": 284,
+      "length": 18,
+      "nodes": 7489116,
+      "seconds": 0.002787,
+      "moves": "U L' U F' U2 D2 L B' U D2 R' B' U2 F' U' F2 R2 B2",
+      "ok": true
+    },
+    {
+      "index": 285,
+      "length": 18,
+      "nodes": 3459211,
+      "seconds": 0.001525,
+      "moves": "D2 F' U' L2 F' L' D F D R2 F2 U' D B' U' F' L2 D2",
+      "ok": true
+    },
+    {
+      "index": 286,
+      "length": 18,
+      "nodes": 14856594,
+      "seconds": 0.004687,
+      "moves": "L' F2 B2 L F U R' F' R F' D L' F2 U' F' D2 B' D",
+      "ok": true
+    },
+    {
+      "index": 287,
+      "length": 18,
+      "nodes": 4882184,
+      "seconds": 0.001868,
+      "moves": "R' L D F2 L F R2 D2 B' L2 F2 R2 F' D' L' U' F' L'",
+      "ok": true
+    },
+    {
+      "index": 288,
+      "length": 18,
+      "nodes": 3341233,
+      "seconds": 0.00155,
+      "moves": "F' L' F2 U' R B2 R2 D' R2 L U B2 U' D2 F2 B R2 L'",
+      "ok": true
+    },
+    {
+      "index": 289,
+      "length": 18,
+      "nodes": 14472068,
+      "seconds": 0.004558,
+      "moves": "R2 U2 L2 D' R2 L B R U' B' U2 L' D F L' R F D'",
+      "ok": true
+    },
+    {
+      "index": 290,
+      "length": 18,
+      "nodes": 4585025,
+      "seconds": 0.001885,
+      "moves": "F R U R U R D' L F2 B' U' D' L' D' B2 D' F B",
+      "ok": true
+    },
+    {
+      "index": 291,
+      "length": 18,
+      "nodes": 4656695,
+      "seconds": 0.001961,
+      "moves": "F' D' F2 B R' F' D B R D2 L' U2 L' D L D2 L2 U2",
+      "ok": true
+    },
+    {
+      "index": 292,
+      "length": 18,
+      "nodes": 2850869,
+      "seconds": 0.001383,
+      "moves": "L' F D B U R' U2 L2 D2 R2 U B2 R D R B L' F'",
+      "ok": true
+    },
+    {
+      "index": 293,
+      "length": 18,
+      "nodes": 7233496,
+      "seconds": 0.002619,
+      "moves": "F2 U' R L D F' R' B' L2 U' D2 R U R' U F' L2 F'",
+      "ok": true
+    },
+    {
+      "index": 294,
+      "length": 18,
+      "nodes": 3398736,
+      "seconds": 0.001505,
+      "moves": "R F L D2 R U L2 D2 F B R L2 U F2 D' F2 B U'",
+      "ok": true
+    },
+    {
+      "index": 295,
+      "length": 18,
+      "nodes": 5293983,
+      "seconds": 0.001995,
+      "moves": "F D L' B' U D' L2 B U L' B' L U B2 U' L F2 L'",
+      "ok": true
+    },
+    {
+      "index": 296,
+      "length": 18,
+      "nodes": 2506439,
+      "seconds": 0.001309,
+      "moves": "R' B' R' B2 R D2 R' B2 D B' U2 D R U' L' B' L2 U",
+      "ok": true
+    },
+    {
+      "index": 297,
+      "length": 18,
+      "nodes": 2434833,
+      "seconds": 0.00116,
+      "moves": "R2 U R U B' R B2 U2 R' L D B D F L U R' B2",
+      "ok": true
+    },
+    {
+      "index": 298,
+      "length": 17,
+      "nodes": 516370,
+      "seconds": 0.000473,
+      "moves": "L2 F R2 D' R' L' U B D' F D2 L' F' D F' D L2",
+      "ok": true
+    },
+    {
+      "index": 299,
+      "length": 18,
+      "nodes": 8792309,
+      "seconds": 0.004377,
+      "moves": "L2 B' U2 B' U2 D' B' R2 F R' F' L F U D F' L2 F'",
+      "ok": true
+    },
+    {
+      "index": 300,
+      "length": 18,
+      "nodes": 3997865,
+      "seconds": 0.001649,
+      "moves": "D' R2 U' D' B2 L' B2 L D R F' B' D' F2 U2 L' D' U'",
+      "ok": true
+    },
+    {
+      "index": 301,
+      "length": 18,
+      "nodes": 2722024,
+      "seconds": 0.0013,
+      "moves": "B L2 D' F2 U2 R' D F U2 B U' D' F2 B L2 D2 F2 R'",
+      "ok": true
+    },
+    {
+      "index": 302,
+      "length": 19,
+      "nodes": 41643059,
+      "seconds": 0.012463,
+      "moves": "R2 U R2 D F R' D2 R2 B2 L' U' B2 D R B' L2 U2 D R",
+      "ok": true
+    },
+    {
+      "index": 303,
+      "length": 18,
+      "nodes": 2577455,
+      "seconds": 0.001267,
+      "moves": "L' B' L' B' R L2 D B2 U' D2 F U L' U' D' F2 U' F",
+      "ok": true
+    },
+    {
+      "index": 304,
+      "length": 18,
+      "nodes": 5160140,
+      "seconds": 0.002065,
+      "moves": "B2 U2 L U F2 L' B D' R2 B2 L2 F2 L R' B R' D2 B",
+      "ok": true
+    },
+    {
+      "index": 305,
+      "length": 18,
+      "nodes": 3477668,
+      "seconds": 0.001572,
+      "moves": "U' B' D' R' B L2 U' D' B2 U' F R B U F' B2 L B2",
+      "ok": true
+    },
+    {
+      "index": 306,
+      "length": 18,
+      "nodes": 2483013,
+      "seconds": 0.001222,
+      "moves": "B R' F2 D' L' U2 L' F U F L' U2 F U' R2 F2 D F'",
+      "ok": true
+    },
+    {
+      "index": 307,
+      "length": 18,
+      "nodes": 8159612,
+      "seconds": 0.002961,
+      "moves": "L U' D' R L' D R2 L' B' R' B R2 B D R F' D' B",
+      "ok": true
+    },
+    {
+      "index": 308,
+      "length": 18,
+      "nodes": 2953667,
+      "seconds": 0.001419,
+      "moves": "F2 D B R' D' B L' D2 L2 U2 F' U2 F2 L D' B' R2 L",
+      "ok": true
+    },
+    {
+      "index": 309,
+      "length": 18,
+      "nodes": 5635642,
+      "seconds": 0.002203,
+      "moves": "R' F D L' F R' L B2 L U R' F' B L' D' F L2 B'",
+      "ok": true
+    },
+    {
+      "index": 310,
+      "length": 18,
+      "nodes": 3948067,
+      "seconds": 0.001664,
+      "moves": "L2 B D B2 U' L' D2 L B R' U' R2 L B2 R2 B2 U D2",
+      "ok": true
+    },
+    {
+      "index": 311,
+      "length": 18,
+      "nodes": 4124421,
+      "seconds": 0.001798,
+      "moves": "R2 U2 B' R' F2 L' D2 B2 D' B2 L2 D2 R' B U2 R' B2 D2",
+      "ok": true
+    },
+    {
+      "index": 312,
+      "length": 18,
+      "nodes": 2605308,
+      "seconds": 0.00132,
+      "moves": "B' L2 B2 L U2 F' D2 L2 B' D' L B2 R' D2 B' R' D' B'",
+      "ok": true
+    },
+    {
+      "index": 313,
+      "length": 18,
+      "nodes": 4072789,
+      "seconds": 0.001769,
+      "moves": "F D2 B2 U' L2 U F' D' R2 F R2 U D2 L B2 U2 L2 F2",
+      "ok": true
+    },
+    {
+      "index": 314,
+      "length": 19,
+      "nodes": 30367780,
+      "seconds": 0.009377,
+      "moves": "D' F R2 F2 U2 L U R' D' L2 B' D' F U2 L' F2 U' D2 R",
+      "ok": true
+    },
+    {
+      "index": 315,
+      "length": 17,
+      "nodes": 1051039,
+      "seconds": 0.000728,
+      "moves": "U R F B R' U' F' L' F R' D2 B2 D2 F' D2 R L'",
+      "ok": true
+    },
+    {
+      "index": 316,
+      "length": 18,
+      "nodes": 23507121,
+      "seconds": 0.007179,
+      "moves": "R2 F' D L2 B2 L U' F2 B D' R' D R U2 D' R' U B2",
+      "ok": true
+    },
+    {
+      "index": 317,
+      "length": 18,
+      "nodes": 5897431,
+      "seconds": 0.002233,
+      "moves": "R' D' F L2 F2 L2 U2 F' R2 B' D L F2 B2 R F' U F'",
+      "ok": true
+    },
+    {
+      "index": 318,
+      "length": 18,
+      "nodes": 13429230,
+      "seconds": 0.004417,
+      "moves": "R L2 U D2 B2 D2 R' B U B' U' R' F' U F2 U R' F2",
+      "ok": true
+    },
+    {
+      "index": 319,
+      "length": 18,
+      "nodes": 13472832,
+      "seconds": 0.004336,
+      "moves": "L' U' B2 D' B2 R' F' B' D' L U2 F' D' F B2 D' L2 F",
+      "ok": true
+    },
+    {
+      "index": 320,
+      "length": 18,
+      "nodes": 8356526,
+      "seconds": 0.002823,
+      "moves": "F' U R U' L' D B' R2 D2 F2 D' L2 B U2 L' B2 L B'",
+      "ok": true
+    },
+    {
+      "index": 321,
+      "length": 17,
+      "nodes": 768971,
+      "seconds": 0.00059,
+      "moves": "R F U' L F' B2 D' R L U2 L' F B R F L' B2",
+      "ok": true
+    },
+    {
+      "index": 322,
+      "length": 17,
+      "nodes": 704028,
+      "seconds": 0.000671,
+      "moves": "L' F' D2 L D' F L2 B2 F2 D U2 B D' L2 B' L' R'",
+      "ok": true
+    },
+    {
+      "index": 323,
+      "length": 17,
+      "nodes": 950260,
+      "seconds": 0.000676,
+      "moves": "U2 L2 F D2 F' U L F2 D' F D2 B L' D B L2 F",
+      "ok": true
+    },
+    {
+      "index": 324,
+      "length": 17,
+      "nodes": 546623,
+      "seconds": 0.000442,
+      "moves": "L' U' F' D B2 U' D' L D' R B' D' L' U' F B L",
+      "ok": true
+    },
+    {
+      "index": 325,
+      "length": 17,
+      "nodes": 1337936,
+      "seconds": 0.000759,
+      "moves": "F2 U R2 D R U' R2 D2 F L' U' R D F L D2 L",
+      "ok": true
+    },
+    {
+      "index": 326,
+      "length": 17,
+      "nodes": 1621904,
+      "seconds": 0.000877,
+      "moves": "U' L2 B' U' L B2 D B2 U' R' F B2 L B2 L2 D F2",
+      "ok": true
+    },
+    {
+      "index": 327,
+      "length": 17,
+      "nodes": 2860575,
+      "seconds": 0.001143,
+      "moves": "F' R2 F2 U L' U R' F B2 U R B2 D' L' F D2 B",
+      "ok": true
+    },
+    {
+      "index": 328,
+      "length": 17,
+      "nodes": 1167133,
+      "seconds": 0.00095,
+      "moves": "F2 B U' D2 F' L2 F' B' L F2 D2 B' L B2 L' U R'",
+      "ok": true
+    },
+    {
+      "index": 329,
+      "length": 18,
+      "nodes": 3941640,
+      "seconds": 0.001761,
+      "moves": "B' R2 B' D' F' L2 D' L D2 F D2 L D2 F U' B2 U D2",
+      "ok": true
+    },
+    {
+      "index": 330,
+      "length": 18,
+      "nodes": 3894951,
+      "seconds": 0.001639,
+      "moves": "F2 R B U R L B U D2 B2 L' R2 D2 B D' L U B",
+      "ok": true
+    },
+    {
+      "index": 331,
+      "length": 18,
+      "nodes": 4243618,
+      "seconds": 0.001738,
+      "moves": "F2 R' U' R2 B2 D2 R' U' B' R U' F U2 L' F2 U2 R2 F'",
+      "ok": true
+    },
+    {
+      "index": 332,
+      "length": 18,
+      "nodes": 2607490,
+      "seconds": 0.00131,
+      "moves": "F' L' U B R F U L2 B' L' U R2 L2 B2 L' B2 U' R2",
+      "ok": true
+    },
+    {
+      "index": 333,
+      "length": 18,
+      "nodes": 32533357,
+      "seconds": 0.009641,
+      "moves": "D' F2 L2 U2 B2 U2 F2 R' B' L' U2 D' F U L' B F' R",
+      "ok": true
+    },
+    {
+      "index": 334,
+      "length": 18,
+      "nodes": 13404795,
+      "seconds": 0.004528,
+      "moves": "L2 D F' L' F2 B2 D B D2 F' R2 B R2 F R' F L' U2",
+      "ok": true
+    },
+    {
+      "index": 335,
+      "length": 18,
+      "nodes": 11710011,
+      "seconds": 0.003975,
+      "moves": "L U' L' F U' F B2 U2 F2 D' B' R F2 D2 L' D2 B D2",
+      "ok": true
+    },
+    {
+      "index": 336,
+      "length": 18,
+      "nodes": 6520225,
+      "seconds": 0.002442,
+      "moves": "D2 F U' D F L U' F2 U B R2 B' R U2 L B' U F",
+      "ok": true
+    },
+    {
+      "index": 337,
+      "length": 18,
+      "nodes": 8704098,
+      "seconds": 0.003023,
+      "moves": "D' L' F2 R2 D B2 R F2 B' L' D L' B' D' L' F D U'",
+      "ok": true
+    },
+    {
+      "index": 338,
+      "length": 17,
+      "nodes": 833863,
+      "seconds": 0.00057,
+      "moves": "D B R L' B' U F' U' B2 L B U D2 R2 F' R F'",
+      "ok": true
+    },
+    {
+      "index": 339,
+      "length": 18,
+      "nodes": 13934030,
+      "seconds": 0.004614,
+      "moves": "B2 R F' R2 U2 R2 F2 R' B2 D' R2 B U2 L' F2 D B' R",
+      "ok": true
+    },
+    {
+      "index": 340,
+      "length": 17,
+      "nodes": 628875,
+      "seconds": 0.000531,
+      "moves": "D' B2 R F2 U2 R D' R2 F2 D L2 B L' U2 L2 U2 R2",
+      "ok": true
+    },
+    {
+      "index": 341,
+      "length": 19,
+      "nodes": 47184536,
+      "seconds": 0.014044,
+      "moves": "F L F' U2 B R D2 L2 B' U' R B2 R L D L' D' R2 D2",
+      "ok": true
+    },
+    {
+      "index": 342,
+      "length": 17,
+      "nodes": 1233011,
+      "seconds": 0.000664,
+      "moves": "L U L U B U' R2 F D R' F D' R L D2 B2 U2",
+      "ok": true
+    },
+    {
+      "index": 343,
+      "length": 18,
+      "nodes": 2429610,
+      "seconds": 0.001191,
+      "moves": "L2 F' R D2 F' D' F B2 R D R2 F B L U2 F R L",
+      "ok": true
+    },
+    {
+      "index": 344,
+      "length": 17,
+      "nodes": 880451,
+      "seconds": 0.000643,
+      "moves": "R2 F R2 U R2 D R B2 R B U2 D2 F2 U F U' R2",
+      "ok": true
+    },
+    {
+      "index": 345,
+      "length": 18,
+      "nodes": 11136620,
+      "seconds": 0.003714,
+      "moves": "R2 U B2 L' B' D' F' D R' F2 R' D2 L2 D' B L2 U2 L'",
+      "ok": true
+    },
+    {
+      "index": 346,
+      "length": 17,
+      "nodes": 1577409,
+      "seconds": 0.000843,
+      "moves": "U2 L' B' R2 F' L B' D2 L2 D2 B2 U' F B U2 L F2",
+      "ok": true
+    },
+    {
+      "index": 347,
+      "length": 18,
+      "nodes": 5436696,
+      "seconds": 0.002109,
+      "moves": "F' D' F U R B' U2 F2 U2 L' B2 D L B2 D2 R U B'",
+      "ok": true
+    },
+    {
+      "index": 348,
+      "length": 18,
+      "nodes": 5193128,
+      "seconds": 0.002611,
+      "moves": "F2 B2 R' F2 R B' R L D2 L' D2 F B R L2 U D2 B2",
+      "ok": true
+    },
+    {
+      "index": 349,
+      "length": 18,
+      "nodes": 7449371,
+      "seconds": 0.002686,
+      "moves": "F' U' L D R' F2 L2 U2 L F' L' U' L2 D' B' U2 L' B'",
+      "ok": true
+    },
+    {
+      "index": 350,
+      "length": 17,
+      "nodes": 3613056,
+      "seconds": 0.001447,
+      "moves": "U2 L B R F' R U' B' L U' F L' F R2 B D2 F",
+      "ok": true
+    },
+    {
+      "index": 351,
+      "length": 18,
+      "nodes": 4013929,
+      "seconds": 0.001684,
+      "moves": "F' U2 F R' D' L' U2 B D2 R D2 F L' B R L F B2",
+      "ok": true
+    },
+    {
+      "index": 352,
+      "length": 18,
+      "nodes": 7152398,
+      "seconds": 0.002545,
+      "moves": "U2 F' R' F' U R2 D B' R2 L D B2 D F' U' B R' B'",
+      "ok": true
+    },
+    {
+      "index": 353,
+      "length": 17,
+      "nodes": 1168871,
+      "seconds": 0.000646,
+      "moves": "B' L U' R2 F' R' L D2 R' F' B U' B2 R U R B2",
+      "ok": true
+    },
+    {
+      "index": 354,
+      "length": 18,
+      "nodes": 9120795,
+      "seconds": 0.003238,
+      "moves": "F2 B L U2 D2 F2 L' B2 D F2 R B2 R D2 R2 F L' F",
+      "ok": true
+    },
+    {
+      "index": 355,
+      "length": 18,
+      "nodes": 2691917,
+      "seconds": 0.001273,
+      "moves": "L2 D2 L U' B2 L D R2 F2 D' U2 B D U' F2 L' F' D'",
+      "ok": true
+    },
+    {
+      "index": 356,
+      "length": 18,
+      "nodes": 4797280,
+      "seconds": 0.002015,
+      "moves": "F' U L' D2 F U2 B' D2 R2 L B' R' U' D2 B2 R2 D R",
+      "ok": true
+    },
+    {
+      "index": 357,
+      "length": 18,
+      "nodes": 4351587,
+      "seconds": 0.002025,
+      "moves": "F' L B D' R D L B' U2 D2 R2 F U' R2 U L B2 L'",
+      "ok": true
+    },
+    {
+      "index": 358,
+      "length": 18,
+      "nodes": 5476273,
+      "seconds": 0.002104,
+      "moves": "B2 U2 L' F' U' L2 U D2 R U2 L' D2 L' B F' D F' D",
+      "ok": true
+    },
+    {
+      "index": 359,
+      "length": 18,
+      "nodes": 6453319,
+      "seconds": 0.003145,
+      "moves": "L' D L' F2 L' F U2 R' L' U' D B2 D2 F L' F' U2 R'",
+      "ok": true
+    },
+    {
+      "index": 360,
+      "length": 19,
+      "nodes": 36631207,
+      "seconds": 0.011111,
+      "moves": "L' D' R' F2 R2 D2 B' R' U D2 B R' L2 F2 R' L D' F2 U2",
+      "ok": true
+    },
+    {
+      "index": 361,
+      "length": 17,
+      "nodes": 1359875,
+      "seconds": 0.000697,
+      "moves": "F2 U2 F R L U B2 D2 B' R F R' D' U' B' L' U",
+      "ok": true
+    },
+    {
+      "index": 362,
+      "length": 17,
+      "nodes": 1155893,
+      "seconds": 0.000716,
+      "moves": "R' U2 R F' R' L F' R' B' L2 U' F2 L' F2 D2 R2 B",
+      "ok": true
+    },
+    {
+      "index": 363,
+      "length": 18,
+      "nodes": 6702983,
+      "seconds": 0.002507,
+      "moves": "R D2 L D B2 U D2 F U2 L' U' L2 B2 L F2 D B U2",
+      "ok": true
+    },
+    {
+      "index": 364,
+      "length": 18,
+      "nodes": 4540405,
+      "seconds": 0.001933,
+      "moves": "L2 D B U' L2 D2 B2 U2 F L2 U' F U2 L D2 R2 D2 F",
+      "ok": true
+    },
+    {
+      "index": 365,
+      "length": 18,
+      "nodes": 5618221,
+      "seconds": 0.002173,
+      "moves": "F2 D R U L2 F2 R2 B' R' L' F2 U2 L2 B2 U B F' D",
+      "ok": true
+    },
+    {
+      "index": 366,
+      "length": 18,
+      "nodes": 3519125,
+      "seconds": 0.001683,
+      "moves": "B D F L' B U R L2 D B U2 R2 B2 L' F U2 D2 L2",
+      "ok": true
+    },
+    {
+      "index": 367,
+      "length": 18,
+      "nodes": 2852903,
+      "seconds": 0.001354,
+      "moves": "R2 U' L B U D' R U D F2 B' D L' D2 L2 U' B' U2",
+      "ok": true
+    },
+    {
+      "index": 368,
+      "length": 18,
+      "nodes": 4287825,
+      "seconds": 0.001868,
+      "moves": "L' D' R D2 R B' L' F2 R B2 L D R2 D2 L D2 F2 R'",
+      "ok": true
+    },
+    {
+      "index": 369,
+      "length": 18,
+      "nodes": 3055229,
+      "seconds": 0.001489,
+      "moves": "F R2 L2 F2 U' L D F B' R D' F' R2 U2 R2 F2 D L'",
+      "ok": true
+    },
+    {
+      "index": 370,
+      "length": 17,
+      "nodes": 2072536,
+      "seconds": 0.000917,
+      "moves": "U' F2 L B R' U' L U2 B2 D L2 F L' B' R2 U F2",
+      "ok": true
+    },
+    {
+      "index": 371,
+      "length": 18,
+      "nodes": 3667940,
+      "seconds": 0.001654,
+      "moves": "U B U2 L2 U' L2 U R U D L U' D' R2 D2 L' B' L2",
+      "ok": true
+    },
+    {
+      "index": 372,
+      "length": 18,
+      "nodes": 5036466,
+      "seconds": 0.002054,
+      "moves": "F2 R U' F D R L F2 D' R' D R' U2 R' F2 U2 F' U",
+      "ok": true
+    },
+    {
+      "index": 373,
+      "length": 18,
+      "nodes": 4836577,
+      "seconds": 0.002018,
+      "moves": "B D2 R' D2 F2 D L2 D2 B' L2 U' B2 U L R D2 L2 D",
+      "ok": true
+    },
+    {
+      "index": 374,
+      "length": 17,
+      "nodes": 3240093,
+      "seconds": 0.001303,
+      "moves": "U' F' L F' B2 R L2 U' B2 D F U' R' D2 B' D2 B",
+      "ok": true
+    },
+    {
+      "index": 375,
+      "length": 18,
+      "nodes": 2723169,
+      "seconds": 0.001284,
+      "moves": "B' R F' D B R' U2 F2 B2 D B2 R2 F U2 R F' D' U'",
+      "ok": true
+    },
+    {
+      "index": 376,
+      "length": 18,
+      "nodes": 21381416,
+      "seconds": 0.006622,
+      "moves": "D B' L' B' U' B' U L2 U2 D' L2 R B U' L F D2 B'",
+      "ok": true
+    },
+    {
+      "index": 377,
+      "length": 18,
+      "nodes": 10437923,
+      "seconds": 0.003488,
+      "moves": "D' B D2 R F' D2 R2 L' U' L' F2 L' B2 R' F U' R D",
+      "ok": true
+    },
+    {
+      "index": 378,
+      "length": 18,
+      "nodes": 3988132,
+      "seconds": 0.001721,
+      "moves": "U' R2 B' R2 D2 B R2 B2 R L2 F B R U' L F' U2 F2",
+      "ok": true
+    },
+    {
+      "index": 379,
+      "length": 18,
+      "nodes": 5009008,
+      "seconds": 0.001989,
+      "moves": "F2 D2 F' D' L' U' F U' R2 D' F2 B' L2 U2 B' R2 D2 L2",
+      "ok": true
+    },
+    {
+      "index": 380,
+      "length": 18,
+      "nodes": 2409921,
+      "seconds": 0.001217,
+      "moves": "F L2 B R F2 U D2 L' F B' R F L' B2 D' R' B2 L",
+      "ok": true
+    },
+    {
+      "index": 381,
+      "length": 17,
+      "nodes": 1510825,
+      "seconds": 0.000845,
+      "moves": "L D' F B' R F B2 D L' B' L B' D B L2 D F2",
+      "ok": true
+    },
+    {
+      "index": 382,
+      "length": 17,
+      "nodes": 1724650,
+      "seconds": 0.000837,
+      "moves": "U' L2 B R U2 R2 L' B' R' F U' F D R2 B' L F",
+      "ok": true
+    },
+    {
+      "index": 383,
+      "length": 18,
+      "nodes": 7523001,
+      "seconds": 0.002687,
+      "moves": "F' U' D R U B U' F2 B L F' D R' F2 D L2 U' L'",
+      "ok": true
+    },
+    {
+      "index": 384,
+      "length": 17,
+      "nodes": 575019,
+      "seconds": 0.000496,
+      "moves": "F2 B' R2 B U2 R2 L D2 F' U' R2 U' L2 B' U' R' D2",
+      "ok": true
+    },
+    {
+      "index": 386,
+      "length": 16,
+      "nodes": 164060,
+      "seconds": 0.000122,
+      "moves": "D' F D' R U2 D R U L B' D' B R2 D' U2 B",
+      "ok": true
+    },
+    {
+      "index": 385,
+      "length": 18,
+      "nodes": 8461947,
+      "seconds": 0.006087,
+      "moves": "U' F D' F2 D B R F' D' F U2 R D2 L2 U2 D F U'",
+      "ok": true
+    },
+    {
+      "index": 387,
+      "length": 17,
+      "nodes": 571234,
+      "seconds": 0.000553,
+      "moves": "B' R' U F D2 R' B R' F' U' R2 D2 L2 R' D B D",
+      "ok": true
+    },
+    {
+      "index": 388,
+      "length": 18,
+      "nodes": 3163227,
+      "seconds": 0.001487,
+      "moves": "U' L2 U2 B U' R2 L' U D2 R D R' F2 U F U2 F2 U2",
+      "ok": true
+    },
+    {
+      "index": 389,
+      "length": 18,
+      "nodes": 10183965,
+      "seconds": 0.003493,
+      "moves": "R2 D' B2 U L F R2 L' B R D2 F' D' L2 F U' F L'",
+      "ok": true
+    },
+    {
+      "index": 390,
+      "length": 18,
+      "nodes": 4290825,
+      "seconds": 0.001783,
+      "moves": "F2 U2 R' U' D2 F2 L B2 U2 B L' F L U' R2 B2 U D'",
+      "ok": true
+    },
+    {
+      "index": 391,
+      "length": 17,
+      "nodes": 632948,
+      "seconds": 0.000471,
+      "moves": "U' B' R L' D2 B D' F2 B U R L D' F' U' R L",
+      "ok": true
+    },
+    {
+      "index": 392,
+      "length": 18,
+      "nodes": 5920918,
+      "seconds": 0.002212,
+      "moves": "U2 B' D L2 F B D' L B D' F' L2 B2 L' R2 D' F D'",
+      "ok": true
+    },
+    {
+      "index": 393,
+      "length": 17,
+      "nodes": 856306,
+      "seconds": 0.000601,
+      "moves": "D B2 U F' R F D' B' R U B U R' F U' F2 D",
+      "ok": true
+    },
+    {
+      "index": 394,
+      "length": 18,
+      "nodes": 5148153,
+      "seconds": 0.002128,
+      "moves": "R U2 R2 B2 U F' R' D' B2 U' L F2 D' L' U' R2 F2 U2",
+      "ok": true
+    },
+    {
+      "index": 395,
+      "length": 18,
+      "nodes": 4113151,
+      "seconds": 0.001687,
+      "moves": "F2 D' B L U' R2 B2 L2 F U' L F D2 B2 L D2 F' L'",
+      "ok": true
+    },
+    {
+      "index": 396,
+      "length": 18,
+      "nodes": 2676168,
+      "seconds": 0.001276,
+      "moves": "L' B' U' R D R2 D2 L2 F2 U F' L' F2 B U2 L B2 L",
+      "ok": true
+    },
+    {
+      "index": 397,
+      "length": 18,
+      "nodes": 7095959,
+      "seconds": 0.002642,
+      "moves": "F2 R' L2 B' U D F U' L' U2 F2 U B U' R' F L' B2",
+      "ok": true
+    },
+    {
+      "index": 398,
+      "length": 17,
+      "nodes": 1331972,
+      "seconds": 0.000739,
+      "moves": "R' F2 D2 B L' U' F L2 D2 F' L2 B2 L2 F L D' F",
+      "ok": true
+    },
+    {
+      "index": 399,
+      "length": 18,
+      "nodes": 4374154,
+      "seconds": 0.001817,
+      "moves": "D F2 B' R' F2 U R2 L U R2 L' F R' F2 U D R2 U",
+      "ok": true
+    },
+    {
+      "index": 400,
+      "length": 18,
+      "nodes": 14480207,
+      "seconds": 0.004708,
+      "moves": "F B2 R' L F D' L2 D2 L' U D' L U2 L F' R L' D'",
+      "ok": true
+    },
+    {
+      "index": 401,
+      "length": 18,
+      "nodes": 4130375,
+      "seconds": 0.001712,
+      "moves": "R D F R' L F B U R2 D B2 D2 B2 L2 D2 B' R B",
+      "ok": true
+    },
+    {
+      "index": 402,
+      "length": 18,
+      "nodes": 5103882,
+      "seconds": 0.002011,
+      "moves": "B D B' L2 F2 L2 F U D2 R2 D' R U2 B2 U F' U' B",
+      "ok": true
+    },
+    {
+      "index": 403,
+      "length": 17,
+      "nodes": 2259121,
+      "seconds": 0.001034,
+      "moves": "D2 F' L2 F D2 L' U' B U' D' F' R' B' F2 L F D",
+      "ok": true
+    },
+    {
+      "index": 404,
+      "length": 18,
+      "nodes": 5129469,
+      "seconds": 0.002014,
+      "moves": "R' F B U' F U2 R2 F' U2 F U' F L' D' R2 D2 F D'",
+      "ok": true
+    },
+    {
+      "index": 405,
+      "length": 18,
+      "nodes": 2698505,
+      "seconds": 0.001316,
+      "moves": "L U R D F U B' U' L B L2 D' R' D R U' B2 R2",
+      "ok": true
+    },
+    {
+      "index": 406,
+      "length": 18,
+      "nodes": 3664404,
+      "seconds": 0.001788,
+      "moves": "B' L D2 F2 L2 D F' B2 U2 B L' F R L' U2 F2 U2 D'",
+      "ok": true
+    },
+    {
+      "index": 407,
+      "length": 17,
+      "nodes": 1370967,
+      "seconds": 0.000707,
+      "moves": "F2 D2 B R' F2 L B' D' B2 U2 L B' D' U' R' B' F",
+      "ok": true
+    },
+    {
+      "index": 408,
+      "length": 18,
+      "nodes": 4098478,
+      "seconds": 0.00171,
+      "moves": "R2 U2 D' B2 R' B R F2 R2 D2 F' L F' R D' R2 D F2",
+      "ok": true
+    },
+    {
+      "index": 409,
+      "length": 18,
+      "nodes": 2986321,
+      "seconds": 0.001411,
+      "moves": "F2 L2 F2 D L' U2 D L2 F U' D' F2 U2 F' L' D2 L B",
+      "ok": true
+    },
+    {
+      "index": 410,
+      "length": 18,
+      "nodes": 3931438,
+      "seconds": 0.001625,
+      "moves": "F2 D F' R2 F2 R' U D' L' B' D2 L D' L B' U' B' R",
+      "ok": true
+    },
+    {
+      "index": 411,
+      "length": 17,
+      "nodes": 1219521,
+      "seconds": 0.000646,
+      "moves": "L B2 R F' L B' U' F' L' F2 R' B2 U L D L D'",
+      "ok": true
+    },
+    {
+      "index": 412,
+      "length": 16,
+      "nodes": 189751,
+      "seconds": 0.000145,
+      "moves": "D F2 U2 R2 L2 U B' L' F' U2 L' F L2 B R' B",
+      "ok": true
+    },
+    {
+      "index": 413,
+      "length": 18,
+      "nodes": 5050632,
+      "seconds": 0.002026,
+      "moves": "F' U2 L D2 R' U' D' F2 B R' U2 L2 R2 B' D' F2 L2 B",
+      "ok": true
+    },
+    {
+      "index": 414,
+      "length": 17,
+      "nodes": 812950,
+      "seconds": 0.000587,
+      "moves": "U' R2 F U' D2 B2 R' D' B' U2 L2 D' R' U B2 U D2",
+      "ok": true
+    },
+    {
+      "index": 415,
+      "length": 17,
+      "nodes": 1004994,
+      "seconds": 0.000548,
+      "moves": "B' U' F2 L' U D' L D L' F2 R' F' D B L2 F R'",
+      "ok": true
+    },
+    {
+      "index": 416,
+      "length": 18,
+      "nodes": 2444846,
+      "seconds": 0.001232,
+      "moves": "U' B' D L B R F L2 U2 F2 U' B2 R' L2 B2 D2 F' B",
+      "ok": true
+    },
+    {
+      "index": 417,
+      "length": 18,
+      "nodes": 3851994,
+      "seconds": 0.001617,
+      "moves": "D2 B' R U2 D R2 U2 L2 B2 L U2 B' L' U' B U2 L F'",
+      "ok": true
+    },
+    {
+      "index": 418,
+      "length": 18,
+      "nodes": 8572928,
+      "seconds": 0.002942,
+      "moves": "U2 R' F B' L B2 R D' R2 F2 D B U D' L U L2 B2",
+      "ok": true
+    },
+    {
+      "index": 419,
+      "length": 18,
+      "nodes": 2838533,
+      "seconds": 0.001312,
+      "moves": "D' L' U R' D2 B' D F2 R' B D F L2 B2 U2 F' R2 F",
+      "ok": true
+    },
+    {
+      "index": 420,
+      "length": 18,
+      "nodes": 6567026,
+      "seconds": 0.002428,
+      "moves": "U' L F' L B D' F' B L' F2 L F2 D L' U' F U2 B'",
+      "ok": true
+    },
+    {
+      "index": 421,
+      "length": 18,
+      "nodes": 4621874,
+      "seconds": 0.002125,
+      "moves": "F L2 B' D' R2 U D2 R' U' F L2 D' F' R' U' F2 U2 R",
+      "ok": true
+    },
+    {
+      "index": 422,
+      "length": 18,
+      "nodes": 3327154,
+      "seconds": 0.001547,
+      "moves": "B U' R' F2 R U' F2 D' F' B L2 U2 B' R D' F' L U2",
+      "ok": true
+    },
+    {
+      "index": 423,
+      "length": 18,
+      "nodes": 2920008,
+      "seconds": 0.001439,
+      "moves": "L F L' B R2 U' L B U L2 F B L U' B2 F D' R'",
+      "ok": true
+    },
+    {
+      "index": 424,
+      "length": 18,
+      "nodes": 4802264,
+      "seconds": 0.00219,
+      "moves": "B' U' R2 B2 D R U2 D2 F R2 U R2 D2 U2 B' U' L2 B'",
+      "ok": true
+    },
+    {
+      "index": 425,
+      "length": 18,
+      "nodes": 3811189,
+      "seconds": 0.001688,
+      "moves": "R' F' R2 F' L D' F U2 R' B2 L' B' U2 F2 L2 U2 F R",
+      "ok": true
+    },
+    {
+      "index": 426,
+      "length": 18,
+      "nodes": 11744691,
+      "seconds": 0.003918,
+      "moves": "B2 L U' R2 U' D F2 D' B R2 L U' L' U' R' B2 U' F'",
+      "ok": true
+    },
+    {
+      "index": 427,
+      "length": 18,
+      "nodes": 4092969,
+      "seconds": 0.001733,
+      "moves": "D2 B2 U' L' F' U2 R2 U D2 B2 L' B D R2 F D2 B U2",
+      "ok": true
+    },
+    {
+      "index": 428,
+      "length": 18,
+      "nodes": 15095324,
+      "seconds": 0.005223,
+      "moves": "U2 D2 F' U' R2 B' D F' U2 F D R D B F D' F2 D'",
+      "ok": true
+    },
+    {
+      "index": 429,
+      "length": 17,
+      "nodes": 3921099,
+      "seconds": 0.001499,
+      "moves": "U L F2 L' U R' F2 U' R' D' F' B U L2 B D2 R'",
+      "ok": true
+    },
+    {
+      "index": 430,
+      "length": 18,
+      "nodes": 6329795,
+      "seconds": 0.002415,
+      "moves": "F' D F2 B2 D' R' U2 F' R' L2 D2 R B R' D2 B L D2",
+      "ok": true
+    },
+    {
+      "index": 431,
+      "length": 17,
+      "nodes": 1086526,
+      "seconds": 0.000639,
+      "moves": "L' D B R2 B U L U' D2 F L2 B2 R' L2 B' L2 D",
+      "ok": true
+    },
+    {
+      "index": 432,
+      "length": 18,
+      "nodes": 5069896,
+      "seconds": 0.001993,
+      "moves": "D F D R2 F B' U2 B' D2 L' B' D B' F D F R U",
+      "ok": true
+    },
+    {
+      "index": 433,
+      "length": 18,
+      "nodes": 6589936,
+      "seconds": 0.002565,
+      "moves": "F R' U2 L2 U' D2 B2 D B' R' U F2 U' F U2 B2 D2 L2",
+      "ok": true
+    },
+    {
+      "index": 434,
+      "length": 18,
+      "nodes": 3342026,
+      "seconds": 0.001448,
+      "moves": "F2 U' B R' F' B2 D' F U2 D2 F' R' D2 R2 F B L F'",
+      "ok": true
+    },
+    {
+      "index": 435,
+      "length": 18,
+      "nodes": 5737075,
+      "seconds": 0.003087,
+      "moves": "U2 F U L2 U' L2 F D B2 U' R D2 F' L' D B' L R",
+      "ok": true
+    },
+    {
+      "index": 436,
+      "length": 18,
+      "nodes": 7029998,
+      "seconds": 0.002523,
+      "moves": "U2 R F B2 D2 F2 D F L2 F' B2 R' L2 B2 U' R' D2 L",
+      "ok": true
+    },
+    {
+      "index": 437,
+      "length": 18,
+      "nodes": 3043075,
+      "seconds": 0.001507,
+      "moves": "R D2 B L' D R' U' B' U L F D R U' L F2 L2 F2",
+      "ok": true
+    },
+    {
+      "index": 438,
+      "length": 17,
+      "nodes": 529773,
+      "seconds": 0.000454,
+      "moves": "U2 B' D F' B2 R' U D' B' U' D' B L' D B U' F2",
+      "ok": true
+    },
+    {
+      "index": 439,
+      "length": 18,
+      "nodes": 5194890,
+      "seconds": 0.002065,
+      "moves": "B R' L' U' D2 B' L2 U2 L F' R2 D B U' D B' U' R2",
+      "ok": true
+    },
+    {
+      "index": 440,
+      "length": 17,
+      "nodes": 2979677,
+      "seconds": 0.001306,
+      "moves": "U F B2 R D2 R U' R2 F' D R' D2 F' R B2 R2 L2",
+      "ok": true
+    },
+    {
+      "index": 441,
+      "length": 17,
+      "nodes": 1713293,
+      "seconds": 0.000784,
+      "moves": "R2 F' U2 D' R U' B' U2 L D B' R F2 L2 F' R' B'",
+      "ok": true
+    },
+    {
+      "index": 442,
+      "length": 17,
+      "nodes": 967643,
+      "seconds": 0.000667,
+      "moves": "D2 B D' F2 R2 U L2 B U D2 L2 B' L' U R D' F2",
+      "ok": true
+    },
+    {
+      "index": 443,
+      "length": 18,
+      "nodes": 12315069,
+      "seconds": 0.00406,
+      "moves": "L B' D2 L' B L' U' B' D2 F2 D' L U R2 U2 F U2 F'",
+      "ok": true
+    },
+    {
+      "index": 444,
+      "length": 18,
+      "nodes": 7760805,
+      "seconds": 0.002815,
+      "moves": "F2 B2 U L2 U2 B2 U2 B2 R' U' F D R2 U L U2 B2 D",
+      "ok": true
+    },
+    {
+      "index": 445,
+      "length": 18,
+      "nodes": 16183176,
+      "seconds": 0.005238,
+      "moves": "F2 D2 R2 L D2 F2 B' L2 B D F' R' D F U L2 F' L",
+      "ok": true
+    },
+    {
+      "index": 446,
+      "length": 18,
+      "nodes": 4059116,
+      "seconds": 0.002131,
+      "moves": "D R2 F2 B' L U D2 B2 L U' F2 U2 D2 L' U' D' R2 D'",
+      "ok": true
+    },
+    {
+      "index": 447,
+      "length": 18,
+      "nodes": 3963139,
+      "seconds": 0.001663,
+      "moves": "U L F R2 U2 F2 L2 B' R B' D' L2 B' R2 L D2 B' L2",
+      "ok": true
+    },
+    {
+      "index": 448,
+      "length": 18,
+      "nodes": 8326233,
+      "seconds": 0.002873,
+      "moves": "B' D B2 U2 L F' L2 B' R2 B' R2 D R' F2 B2 D' R2 B2",
+      "ok": true
+    },
+    {
+      "index": 449,
+      "length": 18,
+      "nodes": 6824824,
+      "seconds": 0.002554,
+      "moves": "R2 B2 D L' F2 D R' F' L' U B D L D B' L B2 U'",
+      "ok": true
+    },
+    {
+      "index": 450,
+      "length": 18,
+      "nodes": 3556933,
+      "seconds": 0.001568,
+      "moves": "R' F B2 U2 D F' D F' D' L2 U' R U' F2 L' U2 D' R2",
+      "ok": true
+    },
+    {
+      "index": 451,
+      "length": 18,
+      "nodes": 13735347,
+      "seconds": 0.004351,
+      "moves": "R2 D' R D2 F U' R2 U L B' U D' R2 F B2 R' L' F2",
+      "ok": true
+    },
+    {
+      "index": 452,
+      "length": 17,
+      "nodes": 1011220,
+      "seconds": 0.00058,
+      "moves": "B' L2 B2 U' F' U' B L2 B R2 L F' R' B' D' R2 U",
+      "ok": true
+    },
+    {
+      "index": 453,
+      "length": 17,
+      "nodes": 1791695,
+      "seconds": 0.001046,
+      "moves": "R2 L2 B R F U2 B' U' L' D' L2 U F2 B' R' L' D",
+      "ok": true
+    },
+    {
+      "index": 454,
+      "length": 17,
+      "nodes": 2184993,
+      "seconds": 0.000895,
+      "moves": "B U' L' D' F' L D2 B' D2 L B U L2 U2 R' B2 D",
+      "ok": true
+    },
+    {
+      "index": 455,
+      "length": 17,
+      "nodes": 1495503,
+      "seconds": 0.000836,
+      "moves": "U2 F' R' B D2 B U2 L U2 F2 D L U' D2 R2 L' U2",
+      "ok": true
+    },
+    {
+      "index": 456,
+      "length": 17,
+      "nodes": 936590,
+      "seconds": 0.000714,
+      "moves": "F R2 B' U' R' F2 R' D' F R2 U L' D2 L D' U R'",
+      "ok": true
+    },
+    {
+      "index": 457,
+      "length": 17,
+      "nodes": 1521937,
+      "seconds": 0.000819,
+      "moves": "R2 D2 B' U' R2 D2 L B U2 R2 B2 D2 F2 R F2 L2 U",
+      "ok": true
+    },
+    {
+      "index": 458,
+      "length": 18,
+      "nodes": 2779253,
+      "seconds": 0.001294,
+      "moves": "U' L D B' U2 R B2 U B U' L2 D F' R2 D U' L B",
+      "ok": true
+    },
+    {
+      "index": 459,
+      "length": 18,
+      "nodes": 7441486,
+      "seconds": 0.002726,
+      "moves": "D2 R U' R2 B' D L2 F' R' L2 D2 F D B F' L' R2 D'",
+      "ok": true
+    },
+    {
+      "index": 460,
+      "length": 18,
+      "nodes": 3824521,
+      "seconds": 0.001675,
+      "moves": "R2 F2 B' D' B U' B2 L D R D' R' U2 F2 R2 D' R' F'",
+      "ok": true
+    },
+    {
+      "index": 461,
+      "length": 18,
+      "nodes": 3642690,
+      "seconds": 0.001602,
+      "moves": "F' U2 B D B' R F2 L2 F' L2 D' F D B' U' R2 F' L2",
+      "ok": true
+    },
+    {
+      "index": 462,
+      "length": 18,
+      "nodes": 9255238,
+      "seconds": 0.00315,
+      "moves": "R L F U' F2 R L U L B' L' D2 R2 L B U' R2 B2",
+      "ok": true
+    },
+    {
+      "index": 463,
+      "length": 17,
+      "nodes": 740857,
+      "seconds": 0.000493,
+      "moves": "B' U F2 B L B D' F2 B' U D' L F U2 R F B2",
+      "ok": true
+    },
+    {
+      "index": 464,
+      "length": 18,
+      "nodes": 3319366,
+      "seconds": 0.001514,
+      "moves": "B L U' F' D2 R' U2 R2 F' U' R2 F' R2 D' F' B2 U L",
+      "ok": true
+    },
+    {
+      "index": 465,
+      "length": 18,
+      "nodes": 5568624,
+      "seconds": 0.002296,
+      "moves": "B2 L B2 L' U2 B2 R U2 D L' B L' B2 U2 L2 U' D2 F'",
+      "ok": true
+    },
+    {
+      "index": 466,
+      "length": 16,
+      "nodes": 149039,
+      "seconds": 0.000124,
+      "moves": "D2 L2 F' D' R2 L D' B' R D' R2 D F' D2 B R",
+      "ok": true
+    },
+    {
+      "index": 467,
+      "length": 19,
+      "nodes": 35673755,
+      "seconds": 0.01077,
+      "moves": "F' R D' L B L2 F2 B D F' D2 B' R2 L U2 B2 D' R' D",
+      "ok": true
+    },
+    {
+      "index": 468,
+      "length": 18,
+      "nodes": 9130169,
+      "seconds": 0.003119,
+      "moves": "F R U2 D' F' U B2 R2 B L B L D2 R' F' D B' L2",
+      "ok": true
+    },
+    {
+      "index": 469,
+      "length": 18,
+      "nodes": 7960542,
+      "seconds": 0.002929,
+      "moves": "F2 U' D F' L2 F' D2 L B2 D B2 D' B U2 D2 L2 B2 L2",
+      "ok": true
+    },
+    {
+      "index": 470,
+      "length": 18,
+      "nodes": 15934944,
+      "seconds": 0.005172,
+      "moves": "R2 B2 U' L U' L2 F' R' U' F' L2 U2 B2 U' L2 D2 U' L'",
+      "ok": true
+    },
+    {
+      "index": 471,
+      "length": 17,
+      "nodes": 3216081,
+      "seconds": 0.00183,
+      "moves": "L2 B R L B2 U D' L B2 L2 D L2 U' R2 U F2 B2",
+      "ok": true
+    },
+    {
+      "index": 472,
+      "length": 17,
+      "nodes": 604278,
+      "seconds": 0.000524,
+      "moves": "F' D' L2 B2 D L2 F' U B U' R L F' U2 L2 D2 F",
+      "ok": true
+    },
+    {
+      "index": 473,
+      "length": 17,
+      "nodes": 1402483,
+      "seconds": 0.00071,
+      "moves": "R2 U2 R U' B' R2 U' L' F B2 U' D' B2 U L2 R' B",
+      "ok": true
+    },
+    {
+      "index": 474,
+      "length": 18,
+      "nodes": 4648107,
+      "seconds": 0.002086,
+      "moves": "F' U2 L' D2 R2 U' F2 B' L U2 R' B' L F2 R L F R",
+      "ok": true
+    },
+    {
+      "index": 475,
+      "length": 18,
+      "nodes": 5460440,
+      "seconds": 0.002038,
+      "moves": "U2 D' L F2 R' F R2 U D' R2 U L' R F' R B R2 B",
+      "ok": true
+    },
+    {
+      "index": 476,
+      "length": 17,
+      "nodes": 2105377,
+      "seconds": 0.001006,
+      "moves": "U2 F B2 D' B R' L2 B' L F' R' F R B2 L B2 D'",
+      "ok": true
+    },
+    {
+      "index": 477,
+      "length": 18,
+      "nodes": 8803547,
+      "seconds": 0.003015,
+      "moves": "F' B' D2 B U' L U2 R2 B D R2 F B R F2 R F2 U2",
+      "ok": true
+    },
+    {
+      "index": 478,
+      "length": 17,
+      "nodes": 555812,
+      "seconds": 0.000569,
+      "moves": "L2 D' R' F' D R' F2 L' F' U' B' D2 B2 D2 R' L' D'",
+      "ok": true
+    },
+    {
+      "index": 479,
+      "length": 18,
+      "nodes": 3047158,
+      "seconds": 0.001366,
+      "moves": "F2 L' B2 U2 B D' B2 U' F' U F' L' U R2 D2 B' U2 L2",
+      "ok": true
+    },
+    {
+      "index": 480,
+      "length": 18,
+      "nodes": 9890835,
+      "seconds": 0.003518,
+      "moves": "U2 F R2 U' L' U' F' L2 B' U B2 U' D' F' U' F U2 R2",
+      "ok": true
+    },
+    {
+      "index": 481,
+      "length": 19,
+      "nodes": 38835253,
+      "seconds": 0.01176,
+      "moves": "R B' U B' U D F2 B2 R' F' D' R2 B2 U' B' U' D2 R2 B2",
+      "ok": true
+    },
+    {
+      "index": 482,
+      "length": 18,
+      "nodes": 5832092,
+      "seconds": 0.002185,
+      "moves": "F2 U2 F2 R B2 R2 F2 D F' L' U2 B' D2 F' R2 L2 F' L'",
+      "ok": true
+    },
+    {
+      "index": 483,
+      "length": 18,
+      "nodes": 3957477,
+      "seconds": 0.001752,
+      "moves": "B' D2 R D2 L F2 R U F' L D L2 F R' B2 L' D2 R2",
+      "ok": true
+    },
+    {
+      "index": 484,
+      "length": 18,
+      "nodes": 4738334,
+      "seconds": 0.001868,
+      "moves": "F' L2 F2 D2 L' F R2 D F B2 L2 U2 R2 D R2 U B' F",
+      "ok": true
+    },
+    {
+      "index": 485,
+      "length": 16,
+      "nodes": 151837,
+      "seconds": 0.000118,
+      "moves": "R2 D' L' D2 R' L2 B U2 L' F L' D F2 U2 R B2",
+      "ok": true
+    },
+    {
+      "index": 486,
+      "length": 17,
+      "nodes": 1676467,
+      "seconds": 0.00093,
+      "moves": "B R' B L B D' R L2 B' L2 D B2 R' U2 L2 U B",
+      "ok": true
+    },
+    {
+      "index": 487,
+      "length": 17,
+      "nodes": 1319493,
+      "seconds": 0.000697,
+      "moves": "D' F B' D' R2 F2 R B' U2 L' F2 D' F' D B R2 L'",
+      "ok": true
+    },
+    {
+      "index": 488,
+      "length": 17,
+      "nodes": 1395037,
+      "seconds": 0.000704,
+      "moves": "U R' B' L F2 L' F L' U' L2 D F' L' U2 R D2 R'",
+      "ok": true
+    },
+    {
+      "index": 489,
+      "length": 18,
+      "nodes": 3631880,
+      "seconds": 0.001577,
+      "moves": "U B' U' F R F R' B2 L2 F2 D' B2 R B D2 L F2 L2",
+      "ok": true
+    },
+    {
+      "index": 490,
+      "length": 17,
+      "nodes": 777203,
+      "seconds": 0.000579,
+      "moves": "D2 L' U' F' R' D L2 U2 L2 F L' F U2 L U' F2 D",
+      "ok": true
+    },
+    {
+      "index": 491,
+      "length": 18,
+      "nodes": 4648683,
+      "seconds": 0.001822,
+      "moves": "R' U2 F B U2 R B' D B2 L' D' R U' D L' D L D2",
+      "ok": true
+    },
+    {
+      "index": 492,
+      "length": 18,
+      "nodes": 5609857,
+      "seconds": 0.002147,
+      "moves": "R2 F' L F2 B2 D' B' U2 R' L' D' R' U L2 D2 R2 U B",
+      "ok": true
+    },
+    {
+      "index": 493,
+      "length": 17,
+      "nodes": 1813762,
+      "seconds": 0.000963,
+      "moves": "B2 D' L2 D F B D' L F2 D' L' B U2 R2 F2 R D2",
+      "ok": true
+    },
+    {
+      "index": 494,
+      "length": 18,
+      "nodes": 2895133,
+      "seconds": 0.001357,
+      "moves": "R B R U B' R D2 R' L F L' F L' B U' D2 F2 R",
+      "ok": true
+    },
+    {
+      "index": 495,
+      "length": 18,
+      "nodes": 18139035,
+      "seconds": 0.005686,
+      "moves": "L' U F D2 R2 F2 B' D2 R2 F R U2 B L2 F D R D'",
+      "ok": true
+    },
+    {
+      "index": 496,
+      "length": 18,
+      "nodes": 2831076,
+      "seconds": 0.001312,
+      "moves": "U F' D2 R2 U' D F D2 B' D' B' D2 R' L' B2 L2 F' L",
+      "ok": true
+    },
+    {
+      "index": 497,
+      "length": 17,
+      "nodes": 373541,
+      "seconds": 0.000398,
+      "moves": "F2 D R2 D R U2 F' R2 U' R D' B L' U' F' R2 U2",
+      "ok": true
+    },
+    {
+      "index": 498,
+      "length": 18,
+      "nodes": 10045822,
+      "seconds": 0.003334,
+      "moves": "F2 D F R2 L' D R L' F' D2 F' L D2 L2 D L' U' L2",
+      "ok": true
+    },
+    {
+      "index": 499,
+      "length": 18,
+      "nodes": 3927507,
+      "seconds": 0.001798,
+      "moves": "L U' F' L2 U D2 R D R2 L' B2 L' F' R' B U' R U",
+      "ok": true
+    }
+  ],
+  "total": {
+    "cubes": 500,
+    "wall": 1.185386,
+    "wall_per_cube": 0.002371,
+    "raw": "total 500 cubes wall 1.185386 wall/cube 0.002371 nodes/cube 6293507 threads 48 lanes 32 concurrency 1"
+  },
+  "max_hugetlb_kib": 30408704
+}

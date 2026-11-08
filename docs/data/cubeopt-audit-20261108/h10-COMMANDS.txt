@@ -1,0 +1,15 @@
+Input: /home/super/egg-solver/testdata/random_state.txt (all 500 lines once)
+Host: AMD EPYC 9V45 VM, 48 cores
+Both runs were serialized under /tmp/cube-turn.lock and /tmp/cube-bench.lock,
+with a quiet-machine gate, taskset -c 0-47, and a 10G normal-memory cgroup cap.
+Table loading is excluded from the per-cube timers.
+
+cubeopt48 command, cwd /data2/competitors/cube48opt10:
+  env LD_PRELOAD=/data/agents/f1/hugeshim/hugeshim.so HUGESHIM_MODE=hugetlb HUGESHIM_ARENA=39728447488 HUGESHIM_ARENA_MIN=1073741824 HUGESHIM_ONLY=cube48opt10 HUGESHIM_VERBOSE=1 /home/super/cube48opt10 -t 48 -m 21 - < /home/super/egg-solver/testdata/random_state.txt
+
+Egg command:
+  /data/agents/nxopt32/bin/egg-solve --table /mnt/huge/h10 --load map -t 48 -c 1 < /home/super/egg-solver/testdata/random_state.txt
+
+The stdout.txt and stderr.txt files are byte-for-byte copies of process output.
+summary.json contains derived statistics, not additional solver output.
+The full orchestration script and page samples are in /data/agents/cubeopt-audit.

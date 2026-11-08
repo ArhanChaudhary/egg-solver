@@ -1,0 +1,154 @@
+{
+  "status": "PASS",
+  "tables": [
+    {
+      "h": 6,
+      "source": "/data/agents/nissy-throughput-20261108/tables/egg-h6",
+      "path": "/mnt/huge/h6",
+      "source_bytes": 1945686016,
+      "mapped_bytes": 2147483648,
+      "logical_data_bytes": 1945681920,
+      "page_bytes": 1073741824,
+      "check": {
+        "path": "/mnt/huge/h6",
+        "k": 6,
+        "base": 9,
+        "distribution": [
+          85941105,
+          804753057,
+          4077248291,
+          2556374347
+        ],
+        "checksum": "04d778d3807c8aa5",
+        "trailer_distribution": [
+          85941105,
+          804753057,
+          4077248291,
+          2556374347
+        ],
+        "trailer_checksum": "04d778d3807c8aa5",
+        "ok": true
+      }
+    },
+    {
+      "h": 7,
+      "source": "/data/tables/h7.mnt",
+      "path": "/mnt/huge/h7",
+      "source_bytes": 4294967296,
+      "mapped_bytes": 4294967296,
+      "logical_data_bytes": 3891363840,
+      "page_bytes": 1073741824,
+      "check": {
+        "path": "/mnt/huge/h7",
+        "k": 7,
+        "base": 9,
+        "distribution": [
+          88529771,
+          897323586,
+          6126261227,
+          7936519016
+        ],
+        "checksum": "a8f0d2657a36a775",
+        "trailer_distribution": [
+          88529771,
+          897323586,
+          6126261227,
+          7936519016
+        ],
+        "trailer_checksum": "a8f0d2657a36a775",
+        "ok": true
+      }
+    },
+    {
+      "h": 8,
+      "source": "/data/tables/h8.mnt",
+      "path": "/mnt/huge/h8",
+      "source_bytes": 8589934592,
+      "mapped_bytes": 8589934592,
+      "logical_data_bytes": 7782727680,
+      "page_bytes": 1073741824,
+      "check": {
+        "path": "/mnt/huge/h8",
+        "k": 8,
+        "base": 10,
+        "distribution": [
+          1051580076,
+          8136022157,
+          19024479157,
+          1885185810
+        ],
+        "checksum": "5ccf85bb476cf2e3",
+        "trailer_distribution": [
+          1051580076,
+          8136022157,
+          19024479157,
+          1885185810
+        ],
+        "trailer_checksum": "5ccf85bb476cf2e3",
+        "ok": true
+      }
+    },
+    {
+      "h": 9,
+      "source": "/data2/tables/h9",
+      "path": "/mnt/huge/h9",
+      "source_bytes": 15565459456,
+      "mapped_bytes": 16106127360,
+      "logical_data_bytes": 15565455360,
+      "page_bytes": 1073741824,
+      "check": {
+        "path": "/mnt/huge/h9",
+        "k": 9,
+        "base": 10,
+        "distribution": [
+          1102038343,
+          9888266493,
+          38299376032,
+          10904853532
+        ],
+        "checksum": "8baec2379dc9b5a6",
+        "trailer_distribution": [
+          1102038343,
+          9888266493,
+          38299376032,
+          10904853532
+        ],
+        "trailer_checksum": "8baec2379dc9b5a6",
+        "ok": true
+      }
+    },
+    {
+      "h": 10,
+      "source": "/data2/tables/h10",
+      "path": "/mnt/huge/h10",
+      "source_bytes": 31130914816,
+      "mapped_bytes": 31138512896,
+      "logical_data_bytes": 31130910720,
+      "page_bytes": 1073741824,
+      "check": {
+        "path": "/mnt/huge/h10",
+        "k": 10,
+        "base": 10,
+        "distribution": [
+          1133240200,
+          11196287163,
+          64164706157,
+          43894835280
+        ],
+        "checksum": "f2c101eb651ea2c9",
+        "trailer_distribution": [
+          1133240200,
+          11196287163,
+          64164706157,
+          43894835280
+        ],
+        "trailer_checksum": "f2c101eb651ea2c9",
+        "ok": true
+      }
+    }
+  ],
+  "pool_pages": 62,
+  "free_pages": 4,
+  "two_mib_pages": 0,
+  "note": "All requested egg h6-h10 working copies are resident on 1-GiB pages. H11 persistent source and reconstruction certificate remain on disk; h11 is not simultaneously resident."
+}

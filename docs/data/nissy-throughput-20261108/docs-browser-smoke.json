@@ -1,0 +1,43 @@
+{
+  "status": "PASS",
+  "rows": [
+    {
+      "route": "docs/index.html",
+      "title": "egg-solver documentation — egg-solver",
+      "h1": 1,
+      "nav": 7
+    },
+    {
+      "route": "docs/comparisons/index.html",
+      "title": "Comparing egg-solver with other solvers — egg-solver",
+      "h1": 1,
+      "nav": 7
+    },
+    {
+      "route": "docs/comparisons/RESULTS.html",
+      "title": "CUBEOPT comparison: all currently known results — egg-solver",
+      "h1": 1,
+      "nav": 7,
+      "hiddenRows": 1362
+    },
+    {
+      "route": "docs/performance/HARDWARE_COUNTERS.html",
+      "title": "phack hardware-counter analysis — egg-solver",
+      "h1": 1,
+      "nav": 7
+    },
+    {
+      "route": "docs/comparisons/NISSY_THROUGHPUT.html",
+      "title": "Nissy versus egg-solver: 500-state throughput, h6–h10 — egg-solver",
+      "h1": 1,
+      "nav": 7
+    },
+    {
+      "route": "docs/performance/PARALLELISM.html",
+      "title": "Threads, lanes, empty slots, and available search parallelism — egg-solver",
+      "h1": 1,
+      "nav": 7
+    }
+  ],
+  "errors": []
+}

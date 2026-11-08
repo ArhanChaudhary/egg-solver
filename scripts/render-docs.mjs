@@ -4,7 +4,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../docs');
 const files=[];
-async function walk(dir){for(const e of await readdir(dir,{withFileTypes:true})){const p=path.join(dir,e.name);if(e.isDirectory())await walk(p);else if(e.name.endsWith('.md'))files.push(p);}}
+async function walk(dir){for(const e of await readdir(dir,{withFileTypes:true})){const p=path.join(dir,e.name);if(e.isDirectory())await walk(p);else if(e.name.endsWith('.md')&&!path.relative(root,p).startsWith(path.join('data','comparison','reports')+path.sep))files.push(p);}}
 await walk(root);
 const htmlPath=p=>p.endsWith('/README.md')?p.slice(0,-9)+'index.html':p.slice(0,-3)+'.html';
 const targets=new Map(files.map(p=>[p,htmlPath(p)]));

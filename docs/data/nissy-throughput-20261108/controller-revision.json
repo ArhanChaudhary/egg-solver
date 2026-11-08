@@ -1,0 +1,13 @@
+{
+  "controller": 16315,
+  "run": "h6-egg-48_40_stream-all500-tune-lanes",
+  "target": 17170,
+  "command": [
+    "/data2/build/egg-solver-target/release/examples/throughput",
+    "/mnt/huge/egg-h6",
+    "/data/agents/nissy-throughput-20261108/datasets/all500.txt",
+    "48",
+    "40",
+    "stream"
+  ]
+}

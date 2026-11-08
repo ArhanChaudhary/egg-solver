@@ -1,0 +1,419 @@
+{
+  "status": "COMPLETE",
+  "accepted_measurements": 305,
+  "finals": {
+    "6": {
+      "egg": {
+        "config": "48_24_0",
+        "runs": [
+          "h6-egg-48_24_0-all500-final-r1",
+          "h6-egg-48_24_0-all500-final-r2",
+          "h6-egg-48_24_0-all500-final-r3"
+        ],
+        "wall_seconds": [
+          14.405751919,
+          14.429995963,
+          14.391931563
+        ],
+        "median_wall_seconds": 14.405751919,
+        "solves_per_second": 34.708358356535435,
+        "ms_per_cube": 28.811503838,
+        "range_seconds": [
+          14.391931563,
+          14.429995963
+        ]
+      },
+      "nissy": {
+        "config": "pgo_6_8",
+        "runs": [
+          "h6-nissy-pgo_6_8-all500-final-r1",
+          "h6-nissy-pgo_6_8-all500-final-r2",
+          "h6-nissy-pgo_6_8-all500-final-r3"
+        ],
+        "wall_seconds": [
+          102.445444972,
+          102.252591182,
+          102.10180642
+        ],
+        "median_wall_seconds": 102.252591182,
+        "solves_per_second": 4.889851633295502,
+        "ms_per_cube": 204.505182364,
+        "range_seconds": [
+          102.10180642,
+          102.445444972
+        ]
+      },
+      "speedup_egg_over_nissy": 7.098039155258342
+    },
+    "7": {
+      "egg": {
+        "config": "48_24_0",
+        "runs": [
+          "h7-egg-48_24_0-all500-final-r1",
+          "h7-egg-48_24_0-all500-final-r2",
+          "h7-egg-48_24_0-all500-final-r3"
+        ],
+        "wall_seconds": [
+          7.3690674,
+          7.165320625,
+          7.187604711
+        ],
+        "median_wall_seconds": 7.187604711,
+        "solves_per_second": 69.56420394610652,
+        "ms_per_cube": 14.375209422,
+        "range_seconds": [
+          7.165320625,
+          7.3690674
+        ]
+      },
+      "nissy": {
+        "config": "shipped_6_8",
+        "runs": [
+          "h7-nissy-shipped_6_8-all500-final-r1",
+          "h7-nissy-shipped_6_8-all500-final-r2",
+          "h7-nissy-shipped_6_8-all500-final-r3"
+        ],
+        "wall_seconds": [
+          51.221875536,
+          51.486320916,
+          51.545883987
+        ],
+        "median_wall_seconds": 51.486320916,
+        "solves_per_second": 9.71131731893896,
+        "ms_per_cube": 102.972641832,
+        "range_seconds": [
+          51.221875536,
+          51.545883987
+        ]
+      },
+      "speedup_egg_over_nissy": 7.163209857270627
+    },
+    "8": {
+      "egg": {
+        "config": "48_24_0",
+        "runs": [
+          "h8-egg-48_24_0-all500-final-r1",
+          "h8-egg-48_24_0-all500-final-r2",
+          "h8-egg-48_24_0-all500-final-r3"
+        ],
+        "wall_seconds": [
+          3.4026208479999998,
+          3.454722068,
+          3.407541722
+        ],
+        "median_wall_seconds": 3.407541722,
+        "solves_per_second": 146.73334643912543,
+        "ms_per_cube": 6.815083444,
+        "range_seconds": [
+          3.4026208479999998,
+          3.454722068
+        ]
+      },
+      "nissy": {
+        "config": "pgo_6_8",
+        "runs": [
+          "h8-nissy-pgo_6_8-all500-final-r1",
+          "h8-nissy-pgo_6_8-all500-final-r2",
+          "h8-nissy-pgo_6_8-all500-final-r3"
+        ],
+        "wall_seconds": [
+          34.33883365,
+          34.367007481,
+          34.396046823
+        ],
+        "median_wall_seconds": 34.367007481,
+        "solves_per_second": 14.548837290428265,
+        "ms_per_cube": 68.734014962,
+        "range_seconds": [
+          34.33883365,
+          34.396046823
+        ]
+      },
+      "speedup_egg_over_nissy": 10.085572029571177
+    },
+    "9": {
+      "egg": {
+        "config": "48_24_0",
+        "runs": [
+          "h9-egg-48_24_0-all500-final-r1",
+          "h9-egg-48_24_0-all500-final-r2",
+          "h9-egg-48_24_0-all500-final-r3"
+        ],
+        "wall_seconds": [
+          1.735110983,
+          1.707409881,
+          1.722188139
+        ],
+        "median_wall_seconds": 1.722188139,
+        "solves_per_second": 290.3283263176626,
+        "ms_per_cube": 3.444376278,
+        "range_seconds": [
+          1.707409881,
+          1.735110983
+        ]
+      },
+      "nissy": {
+        "config": "pgo_12_4",
+        "runs": [
+          "h9-nissy-pgo_12_4-all500-final-r1",
+          "h9-nissy-pgo_12_4-all500-final-r2",
+          "h9-nissy-pgo_12_4-all500-final-r3"
+        ],
+        "wall_seconds": [
+          15.984476809,
+          15.977747455,
+          15.91972081
+        ],
+        "median_wall_seconds": 15.977747455,
+        "solves_per_second": 31.293522532397546,
+        "ms_per_cube": 31.95549491,
+        "range_seconds": [
+          15.91972081,
+          15.984476809
+        ]
+      },
+      "speedup_egg_over_nissy": 9.277585353872885
+    },
+    "10": {
+      "egg": {
+        "config": "48_24_0",
+        "runs": [
+          "h10-egg-48_24_0-all500-final-r1",
+          "h10-egg-48_24_0-all500-final-r2",
+          "h10-egg-48_24_0-all500-final-r3"
+        ],
+        "wall_seconds": [
+          0.898266926,
+          0.891859069,
+          0.887208175
+        ],
+        "median_wall_seconds": 0.891859069,
+        "solves_per_second": 560.6266924668117,
+        "ms_per_cube": 1.783718138,
+        "range_seconds": [
+          0.887208175,
+          0.898266926
+        ]
+      },
+      "nissy": {
+        "config": "pgo_12_4",
+        "runs": [
+          "h10-nissy-pgo_12_4-all500-final-r1",
+          "h10-nissy-pgo_12_4-all500-final-r2",
+          "h10-nissy-pgo_12_4-all500-final-r3"
+        ],
+        "wall_seconds": [
+          8.551037397,
+          8.560984671,
+          8.56139289
+        ],
+        "median_wall_seconds": 8.560984671,
+        "solves_per_second": 58.404496587142646,
+        "ms_per_cube": 17.121969342,
+        "range_seconds": [
+          8.551037397,
+          8.56139289
+        ]
+      },
+      "speedup_egg_over_nissy": 9.599033040723612
+    }
+  },
+  "scaling": {
+    "6": [
+      {
+        "threads": 1,
+        "lanes": 24,
+        "wall_seconds": 76.430847805,
+        "ms_per_cube": 2547.6949268333333,
+        "speedup": 1.0,
+        "efficiency": 1.0,
+        "node_ratio_to_1_thread": 1.0,
+        "nodes_per_cube": 227112562.33333334,
+        "counters": null,
+        "run": "h6-egg-1_24_1-single30-parallelism"
+      },
+      {
+        "threads": 2,
+        "lanes": 24,
+        "wall_seconds": 38.485265277,
+        "ms_per_cube": 1282.8421759000003,
+        "speedup": 1.9859768993375617,
+        "efficiency": 0.9929884496687809,
+        "node_ratio_to_1_thread": 1.007047427276689,
+        "nodes_per_cube": 228713121.6,
+        "counters": null,
+        "run": "h6-egg-2_24_1-single30-parallelism"
+      },
+      {
+        "threads": 4,
+        "lanes": 24,
+        "wall_seconds": 19.419106705,
+        "ms_per_cube": 647.3035568333333,
+        "speedup": 3.9358580683487725,
+        "efficiency": 0.9839645170871931,
+        "node_ratio_to_1_thread": 1.0024908901010199,
+        "nodes_per_cube": 227678274.76666668,
+        "counters": null,
+        "run": "h6-egg-4_24_1-single30-parallelism"
+      },
+      {
+        "threads": 8,
+        "lanes": 24,
+        "wall_seconds": 9.867502908,
+        "ms_per_cube": 328.9167636,
+        "speedup": 7.745713228321858,
+        "efficiency": 0.9682141535402322,
+        "node_ratio_to_1_thread": 1.0206130605542154,
+        "nodes_per_cube": 231794047.33333334,
+        "counters": null,
+        "run": "h6-egg-8_24_1-single30-parallelism"
+      },
+      {
+        "threads": 16,
+        "lanes": 24,
+        "wall_seconds": 5.167986251,
+        "ms_per_cube": 172.2662083666667,
+        "speedup": 14.78929008184004,
+        "efficiency": 0.9243306301150025,
+        "node_ratio_to_1_thread": 1.057238665267022,
+        "nodes_per_cube": 240112182.26666668,
+        "counters": null,
+        "run": "h6-egg-16_24_1-single30-parallelism"
+      },
+      {
+        "threads": 24,
+        "lanes": 24,
+        "wall_seconds": 3.619940004,
+        "ms_per_cube": 120.6646668,
+        "speedup": 21.113843798666448,
+        "efficiency": 0.879743491611102,
+        "node_ratio_to_1_thread": 1.0917929194191192,
+        "nodes_per_cube": 247959887.46666667,
+        "counters": null,
+        "run": "h6-egg-24_24_1-single30-parallelism"
+      },
+      {
+        "threads": 32,
+        "lanes": 24,
+        "wall_seconds": 2.950988677,
+        "ms_per_cube": 98.36628923333333,
+        "speedup": 25.90008169150288,
+        "efficiency": 0.809377552859465,
+        "node_ratio_to_1_thread": 1.122160272487613,
+        "nodes_per_cube": 254856694.83333334,
+        "counters": null,
+        "run": "h6-egg-32_24_1-single30-parallelism"
+      },
+      {
+        "threads": 48,
+        "lanes": 24,
+        "wall_seconds": 2.296633043,
+        "ms_per_cube": 76.55443476666666,
+        "speedup": 33.27952109630951,
+        "efficiency": 0.6933233561731148,
+        "node_ratio_to_1_thread": 1.1919618029290078,
+        "nodes_per_cube": 270709499.26666665,
+        "counters": null,
+        "run": "h6-egg-48_24_1-single30-parallelism"
+      }
+    ],
+    "10": [
+      {
+        "threads": 1,
+        "lanes": 24,
+        "wall_seconds": 4.940151129,
+        "ms_per_cube": 164.6717043,
+        "speedup": 1.0,
+        "efficiency": 1.0,
+        "node_ratio_to_1_thread": 1.0,
+        "nodes_per_cube": 14500537.333333334,
+        "counters": null,
+        "run": "h10-egg-1_24_1-single30-parallelism"
+      },
+      {
+        "threads": 2,
+        "lanes": 24,
+        "wall_seconds": 2.514156967,
+        "ms_per_cube": 83.80523223333333,
+        "speedup": 1.9649334523829673,
+        "efficiency": 0.9824667261914837,
+        "node_ratio_to_1_thread": 0.9998871811922739,
+        "nodes_per_cube": 14498901.4,
+        "counters": null,
+        "run": "h10-egg-2_24_1-single30-parallelism"
+      },
+      {
+        "threads": 4,
+        "lanes": 24,
+        "wall_seconds": 1.268267502,
+        "ms_per_cube": 42.2755834,
+        "speedup": 3.8951964953841416,
+        "efficiency": 0.9737991238460354,
+        "node_ratio_to_1_thread": 1.0025429747293042,
+        "nodes_per_cube": 14537411.833333334,
+        "counters": null,
+        "run": "h10-egg-4_24_1-single30-parallelism"
+      },
+      {
+        "threads": 8,
+        "lanes": 24,
+        "wall_seconds": 0.646095019,
+        "ms_per_cube": 21.536500633333333,
+        "speedup": 7.646168107976081,
+        "efficiency": 0.9557710134970101,
+        "node_ratio_to_1_thread": 1.0078722462054968,
+        "nodes_per_cube": 14614689.133333333,
+        "counters": null,
+        "run": "h10-egg-8_24_1-single30-parallelism"
+      },
+      {
+        "threads": 16,
+        "lanes": 24,
+        "wall_seconds": 0.334388048,
+        "ms_per_cube": 11.146268266666665,
+        "speedup": 14.77370724984764,
+        "efficiency": 0.9233567031154775,
+        "node_ratio_to_1_thread": 1.0197818554402076,
+        "nodes_per_cube": 14787384.866666667,
+        "counters": null,
+        "run": "h10-egg-16_24_1-single30-parallelism"
+      },
+      {
+        "threads": 24,
+        "lanes": 24,
+        "wall_seconds": 0.231200522,
+        "ms_per_cube": 7.706684066666666,
+        "speedup": 21.367387436088922,
+        "efficiency": 0.8903078098370384,
+        "node_ratio_to_1_thread": 1.0309017353196015,
+        "nodes_per_cube": 14948629.1,
+        "counters": null,
+        "run": "h10-egg-24_24_1-single30-parallelism"
+      },
+      {
+        "threads": 32,
+        "lanes": 24,
+        "wall_seconds": 0.19633276,
+        "ms_per_cube": 6.544425333333334,
+        "speedup": 25.162133558352668,
+        "efficiency": 0.7863166736985209,
+        "node_ratio_to_1_thread": 1.0430441313301217,
+        "nodes_per_cube": 15124700.366666667,
+        "counters": null,
+        "run": "h10-egg-32_24_1-single30-parallelism"
+      },
+      {
+        "threads": 48,
+        "lanes": 24,
+        "wall_seconds": 0.162692161,
+        "ms_per_cube": 5.423072033333333,
+        "speedup": 30.36502249791863,
+        "efficiency": 0.6326046353733048,
+        "node_ratio_to_1_thread": 1.0673786985181146,
+        "nodes_per_cube": 15477564.666666666,
+        "counters": null,
+        "run": "h10-egg-48_24_1-single30-parallelism"
+      }
+    ]
+  }
+}

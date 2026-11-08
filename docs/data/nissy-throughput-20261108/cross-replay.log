@@ -1,0 +1,14 @@
+{
+  "egg_model": {
+    "status": "PASS",
+    "batches": 30,
+    "verified": 15000
+  },
+  "nissy_model": {
+    "status": "PASS",
+    "batches": 30,
+    "verified": 15000,
+    "library_sha256": "cb79e5b2dce9be1b8c4154b2a174ad887d7639b15a7cde9dc016f75375b84d30"
+  },
+  "note": "Thirty final batches: fifteen per solver, 500 states each. Both independent cube models replay every final solution. This checks the observed solutions, not universal optimality or absence of UB."
+}

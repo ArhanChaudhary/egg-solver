@@ -1,0 +1,17 @@
+ 0           53
+ 1           32
+ 2          131
+ 3         1056
+ 4         9221
+ 5        77062
+ 6       629021
+ 7      4736982
+ 8     25682471
+ 9     46188524
+10    544276614
+11   1140236792
+12    119241241
+Avg: 10.672, 1881079200 entry, checksum=0xe03723c6 ok
+use wasm
+uniq_sym_states = 3393
+[{"assigned":0,"rc":0,"counter0":"8","counter8":"0","counter16":"0"},{"assigned":1,"rc":0,"counter0":"7","counter8":"1","counter16":"1"},{"assigned":4,"rc":0,"counter0":"4","counter8":"4","counter16":"4"},{"assigned":8,"rc":0,"counter0":"0","counter8":"8","counter16":"8"}]

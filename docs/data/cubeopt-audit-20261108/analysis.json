@@ -1,0 +1,164 @@
+{
+  "web_vs_egg8": {
+    "roots500": {
+      "equal": 628,
+      "left_higher": 217,
+      "right_higher": 155,
+      "mean_difference": 0.06,
+      "witnesses": {
+        "left_higher": {
+          "index": 3,
+          "direction": "normal",
+          "left": 12,
+          "right": 11,
+          "scramble": "B2 U2 B2 F2 D1 R2 D2 B2 U1 R2 B3 D3 L1 R3 U1 L3 U2 F3 D3 F3 U2"
+        },
+        "right_higher": {
+          "index": 4,
+          "direction": "inverse",
+          "left": 8,
+          "right": 11,
+          "scramble": "L2 R2 B2 U2 L2 D3 F2 L2 F2 U2 L2 F1 R3 F3 D3 F3 D1 U3 B3"
+        }
+      }
+    },
+    "all10568": {
+      "equal": 16765,
+      "left_higher": 1984,
+      "right_higher": 2387,
+      "mean_difference": -0.043527630582891746,
+      "witnesses": {
+        "left_higher": {
+          "index": 3,
+          "direction": "normal",
+          "left": 12,
+          "right": 11,
+          "scramble": "B2 U2 B2 F2 D1 R2 D2 B2 U1 R2 B3 D3 L1 R3 U1 L3 U2 F3 D3 F3 U2"
+        },
+        "right_higher": {
+          "index": 4,
+          "direction": "inverse",
+          "left": 8,
+          "right": 11,
+          "scramble": "L2 R2 B2 U2 L2 D3 F2 L2 F2 U2 L2 F1 R3 F3 D3 F3 D1 U3 B3"
+        }
+      }
+    }
+  },
+  "web_vs_egg9": {
+    "roots500": {
+      "equal": 607,
+      "left_higher": 200,
+      "right_higher": 193,
+      "mean_difference": 0.012,
+      "witnesses": {
+        "left_higher": {
+          "index": 3,
+          "direction": "normal",
+          "left": 12,
+          "right": 11,
+          "scramble": "B2 U2 B2 F2 D1 R2 D2 B2 U1 R2 B3 D3 L1 R3 U1 L3 U2 F3 D3 F3 U2"
+        },
+        "right_higher": {
+          "index": 4,
+          "direction": "inverse",
+          "left": 8,
+          "right": 11,
+          "scramble": "L2 R2 B2 U2 L2 D3 F2 L2 F2 U2 L2 F1 R3 F3 D3 F3 D1 U3 B3"
+        }
+      }
+    },
+    "all10568": {
+      "equal": 16657,
+      "left_higher": 2205,
+      "right_higher": 2274,
+      "mean_difference": -0.009225965177895534,
+      "witnesses": {
+        "left_higher": {
+          "index": 3,
+          "direction": "normal",
+          "left": 12,
+          "right": 11,
+          "scramble": "B2 U2 B2 F2 D1 R2 D2 B2 U1 R2 B3 D3 L1 R3 U1 L3 U2 F3 D3 F3 U2"
+        },
+        "right_higher": {
+          "index": 4,
+          "direction": "inverse",
+          "left": 8,
+          "right": 11,
+          "scramble": "L2 R2 B2 U2 L2 D3 F2 L2 F2 U2 L2 F1 R3 F3 D3 F3 D1 U3 B3"
+        }
+      }
+    }
+  },
+  "egg9_vs_egg8": {
+    "roots500": {
+      "equal": 915,
+      "left_higher": 69,
+      "right_higher": 16,
+      "mean_difference": 0.048,
+      "witnesses": {
+        "left_higher": {
+          "index": 11,
+          "direction": "normal",
+          "left": 12,
+          "right": 11,
+          "scramble": "R1 B3 U3 R1 F2 L1 D3 F2 R2 D2 B2 U2 R3 B2 L3 F2 L3 D1 L3"
+        },
+        "right_higher": {
+          "index": 21,
+          "direction": "inverse",
+          "left": 8,
+          "right": 9,
+          "scramble": "R3 U1 D1 F1 L2 B3 D1 R3 B3 R2 L2 U3 L2 D1 F2 U2 D3 B2 L2 F2"
+        }
+      }
+    },
+    "all10568": {
+      "equal": 20087,
+      "left_higher": 263,
+      "right_higher": 786,
+      "mean_difference": -0.03430166540499621,
+      "witnesses": {
+        "left_higher": {
+          "index": 11,
+          "direction": "normal",
+          "left": 12,
+          "right": 11,
+          "scramble": "R1 B3 U3 R1 F2 L1 D3 F2 R2 D2 B2 U2 R3 B2 L3 F2 L3 D1 L3"
+        },
+        "right_higher": {
+          "index": 21,
+          "direction": "inverse",
+          "left": 8,
+          "right": 9,
+          "scramble": "R3 U1 D1 F1 L2 B3 D1 R3 B3 R2 L2 U3 L2 D1 F2 U2 D3 B2 L2 F2"
+        }
+      }
+    }
+  },
+  "egg8": {
+    "cubes": 500,
+    "wall": 78.210631488,
+    "wall_per_cube": 0.156421262976,
+    "nodes": 531782489.04,
+    "lookups": 451294981.68
+  },
+  "egg9": {
+    "cubes": 500,
+    "wall": 64.917145507,
+    "wall_per_cube": 0.12983429101400001,
+    "nodes": 424622380.116,
+    "lookups": 367776430.08
+  },
+  "web_first100": {
+    "cubes": 100,
+    "mean_nodes": 429578004.26,
+    "mean_ms": 3273.75884,
+    "lengths_match": true,
+    "replays_pass": true,
+    "note": "First 100 completed records of deliberately stopped 500-input run; no process wall-time rate claimed. WASM, 14 threads, latency mode. Not paired with native throughput timings."
+  },
+  "egg9_vs_egg8_wall_speedup": 1.2047761939804726,
+  "egg9_node_reduction": 0.20151116505820033
+}

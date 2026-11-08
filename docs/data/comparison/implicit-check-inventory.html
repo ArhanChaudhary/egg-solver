@@ -1,0 +1,44 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Remaining implicit-check inventory — egg-solver</title><style>:root{color-scheme:light;--ink:#172c40;--muted:#506477;--line:#dce4eb;--accent:#075b86}*{box-sizing:border-box}body{margin:0;color:var(--ink);background:#f8fafb;font:16px/1.65 system-ui,-apple-system,sans-serif}header{padding:1.2rem max(1rem,calc((100vw - 1160px)/2));background:#132c40;color:white}header a{color:#d9f0ff;margin-right:1rem}header strong{display:block;font-size:1.15rem;margin-bottom:.4rem}main{max-width:1160px;margin:2rem auto;padding:1.4rem 2rem;background:white;border:1px solid var(--line);border-radius:10px}h1{font-size:2rem;line-height:1.25}h2{margin-top:2.3rem;border-bottom:1px solid var(--line);padding-bottom:.3rem}h3{margin-top:1.6rem}a{color:var(--accent);overflow-wrap:anywhere}p,li{max-width:95ch}code{background:#eff3f6;border-radius:3px;padding:.1em .25em;overflow-wrap:anywhere;font-size:.9em}pre{padding:1rem;background:#eef3f6;overflow:auto;line-height:1.45}pre code{background:none;padding:0;overflow-wrap:normal}.table-wrap{overflow:auto;margin:1rem 0}table{width:100%;border-collapse:collapse;font-size:.9rem}th,td{padding:.55rem .65rem;border:1px solid var(--line);vertical-align:top}th{background:#eaf1f6;text-align:left;position:sticky;top:0}tr:nth-child(even){background:#f8fafb}details{border:1px solid var(--line);padding:.6rem 1rem;border-radius:6px;margin:1rem 0}summary{cursor:pointer;font-weight:600}.tools{display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin:1rem 0}.tools input{font:inherit;border:1px solid #afc0ce;border-radius:5px;padding:.4rem .6rem;min-width:240px}.note,footer{color:var(--muted);font-size:.85rem}footer{max-width:1160px;margin:1rem auto 3rem;padding:0 1rem}blockquote{border-left:3px solid #aac5d8;padding-left:1rem;margin-left:0;color:#40576b}svg{max-width:100%;height:auto}.line:target,:target{scroll-margin-top:1rem}@media(max-width:700px){main{margin:.7rem;padding:1rem;border-radius:0}h1{font-size:1.65rem}th,td{padding:.4rem}header{padding:1rem}}</style></head><body><header><strong>egg-solver · documentation and benchmark evidence</strong><nav><a href="../../index.html">Home</a><a href="../../guide/OVERVIEW.html">Learn</a><a href="../../comparisons/index.html">Compare</a><a href="../../performance/index.html">Performance</a><a href="../../safety/index.html">Safety</a><a href="../../history/index.html">History</a><a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header><main><p class="note"><a href="implicit-check-inventory.md">Markdown source</a> · Offline document</p><div class="tools"><label for="table-filter">Filter table rows</label><input id="table-filter" type="search" placeholder="Solver, table, topic…"><span id="matches" class="note">All rows</span></div><h1 id="remaining-implicit-check-inventory">Remaining implicit-check inventory</h1>
+<p>Before: 0b5b5a6. After: 935cb7f (no-panic integration plus the stream follow-up). Rust Clippy diagnostics from release library and binaries,
+union of native and scalar configurations, deduplicated by file, line, column and lint.
+These are source-level diagnostics, not a count of reachable panic branches: the optimizer
+can prove bounds or nonzero divisors, and arithmetic warnings also include non-panicking
+operations. No unchecked access was added merely to silence these diagnostics.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr><th>file</th><th align="right">indexing/slicing before</th><th align="right">after</th><th align="right">arithmetic before</th><th align="right">after</th></tr>
+</thead>
+<tbody>
+<tr><td>src/bin/bench.rs</td><td align="right">2</td><td align="right">2</td><td align="right">4</td><td align="right">4</td></tr>
+<tr><td>src/bin/gen.rs</td><td align="right">3</td><td align="right">4</td><td align="right">13</td><td align="right">14</td></tr>
+<tr><td>src/bin/solve.rs</td><td align="right">4</td><td align="right">2</td><td align="right">2</td><td align="right">1</td></tr>
+<tr><td>src/cli.rs</td><td align="right">0</td><td align="right">0</td><td align="right">2</td><td align="right">2</td></tr>
+<tr><td>src/cli/preflight.rs</td><td align="right">0</td><td align="right">0</td><td align="right">0</td><td align="right">2</td></tr>
+<tr><td>src/coord.rs</td><td align="right">15</td><td align="right">15</td><td align="right">34</td><td align="right">34</td></tr>
+<tr><td>src/cubie.rs</td><td align="right">83</td><td align="right">44</td><td align="right">45</td><td align="right">31</td></tr>
+<tr><td>src/gen.rs</td><td align="right">17</td><td align="right">16</td><td align="right">15</td><td align="right">14</td></tr>
+<tr><td>src/gen/collapse.rs</td><td align="right">6</td><td align="right">6</td><td align="right">13</td><td align="right">12</td></tr>
+<tr><td>src/gen/dfs.rs</td><td align="right">11</td><td align="right">6</td><td align="right">24</td><td align="right">21</td></tr>
+<tr><td>src/hot.rs</td><td align="right">2</td><td align="right">0</td><td align="right">2</td><td align="right">1</td></tr>
+<tr><td>src/lanes.rs</td><td align="right">53</td><td align="right">52</td><td align="right">72</td><td align="right">72</td></tr>
+<tr><td>src/lanes/share.rs</td><td align="right">67</td><td align="right">63</td><td align="right">150</td><td align="right">150</td></tr>
+<tr><td>src/lib.rs</td><td align="right">0</td><td align="right">0</td><td align="right">2</td><td align="right">1</td></tr>
+<tr><td>src/parallel.rs</td><td align="right">1</td><td align="right">0</td><td align="right">0</td><td align="right">0</td></tr>
+<tr><td>src/portable/coord.rs</td><td align="right">0</td><td align="right">0</td><td align="right">1</td><td align="right">1</td></tr>
+<tr><td>src/portable/mod.rs</td><td align="right">40</td><td align="right">40</td><td align="right">11</td><td align="right">11</td></tr>
+<tr><td>src/portable/v16_scalar.rs</td><td align="right">3</td><td align="right">3</td><td align="right">0</td><td align="right">0</td></tr>
+<tr><td>src/simd.rs</td><td align="right">27</td><td align="right">27</td><td align="right">5</td><td align="right">5</td></tr>
+<tr><td>src/solver.rs</td><td align="right">42</td><td align="right">39</td><td align="right">40</td><td align="right">40</td></tr>
+<tr><td>src/symstart.rs</td><td align="right">11</td><td align="right">10</td><td align="right">4</td><td align="right">4</td></tr>
+<tr><td>src/tables.rs</td><td align="right">31</td><td align="right">22</td><td align="right">32</td><td align="right">31</td></tr>
+<tr><td>src/tables/file.rs</td><td align="right">3</td><td align="right">1</td><td align="right">13</td><td align="right">8</td></tr>
+<tr><td>src/tables/shm.rs</td><td align="right">0</td><td align="right">5</td><td align="right">0</td><td align="right">13</td></tr>
+</tbody>
+</table></div>
+<p>Explicit runtime panic macros and unwrap/expect calls are enforced separately by crate
+restriction lints and tests/no_runtime_panics.rs, across all supported backends in check.sh.
+Tests and compile-time assertions are allowed; existing debug_assert checks remain per the
+standing policy. See np1-panic-inventory.md for the site-by-site explicit-call remediation.</p>
+<h3 id="rename-validation">Rename validation</h3>
+<p>Final renamed source <code>cd963dc26b08</code> also passed the enforced explicit-call scan and full native/scalar/ARM/WASM checks on2026-11-06. The benchmark and compiler-diagnostic inventories above keep their recorded935cb7f provenance. The rename preserves the checked hot instructions, required page offsets and stack frames.</p>
+</main><footer>Benchmarks retain their recorded source, hardware and measurement conditions. See the comparison and provenance guides before reusing a number.</footer><script>const f=document.querySelector('#table-filter');if(f){f.addEventListener('input',()=>{const q=f.value.toLowerCase().trim();let shown=0,total=0;for(const row of document.querySelectorAll('table tbody tr')){total++;const keep=!q||row.textContent.toLowerCase().includes(q);row.hidden=!keep;if(keep)shown++;}document.querySelector('#matches').textContent=q?shown+' of '+total+' rows':'All rows';});}</script></body></html>

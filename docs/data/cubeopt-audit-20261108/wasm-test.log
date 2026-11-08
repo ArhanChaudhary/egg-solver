@@ -1,0 +1,24 @@
+[gen h0] depth 0: 1 entries
+[gen h0] depth 1: 1 entries (forward, 0.0s step, 0.0s total)
+[gen h0] depth 2: 4 entries (forward, 0.0s step, 0.0s total)
+[gen h0] depth 3: 34 entries (forward, 0.0s step, 0.0s total)
+[gen h0] depth 4: 331 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 5: 3612 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 6: 41605 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 7: 474128 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 8: 4953846 entries (forward, 0.2s step, 0.3s total)
+[gen h0] depth 9: 34776317 entries (forward, 1.7s step, 2.0s total)
+[gen h0] >= 10: 77317571 entries
+wasm test: egg-solver.wasm (1 thread(s)) ok in 2.0 s
+[gen h0] depth 0: 1 entries
+[gen h0] depth 1: 1 entries (forward, 0.0s step, 0.0s total)
+[gen h0] depth 2: 4 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 3: 34 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 4: 331 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 5: 3612 entries (forward, 0.0s step, 0.1s total)
+[gen h0] depth 6: 41605 entries (forward, 0.0s step, 0.2s total)
+[gen h0] depth 7: 474128 entries (forward, 0.0s step, 0.2s total)
+[gen h0] depth 8: 4953846 entries (forward, 0.1s step, 0.3s total)
+[gen h0] depth 9: 34776317 entries (forward, 0.7s step, 1.0s total)
+[gen h0] >= 10: 77317571 entries
+wasm test: egg-solver-threads.wasm (3 thread(s)) ok in 1.0 s

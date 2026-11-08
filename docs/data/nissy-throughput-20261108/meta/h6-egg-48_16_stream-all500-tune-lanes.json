@@ -1,0 +1,34 @@
+{
+  "id": "h6-egg-48_16_stream-all500-tune-lanes",
+  "solver": "egg",
+  "h": 6,
+  "config": "48_16_stream",
+  "dataset": "all500",
+  "command": [
+    "/data2/build/egg-solver-target/release/examples/throughput",
+    "/mnt/huge/egg-h6",
+    "/data/agents/nissy-throughput-20261108/datasets/all500.txt",
+    "48",
+    "16",
+    "stream"
+  ],
+  "returncode": 0,
+  "valid": true,
+  "process_wall_with_loading": null,
+  "total": {
+    "counters": null,
+    "cubes": 500,
+    "failures": 0,
+    "lanes": 16,
+    "lookups_per_cube": 76103000.536,
+    "mode": "stream",
+    "nodes_per_cube": 89711408.414,
+    "threads": 48,
+    "type": "total",
+    "wall": 236.493415715,
+    "wall_per_cube": 0.47298683143
+  },
+  "max_hugetlb_kib": 2097152,
+  "raw_sha256": "f6db333be18522e7e24859d82650fce544a0b99d09ad741a87a3459f4f5b3582",
+  "checkpoint_note": "Completed child measurement preserved while controller was paused to revise the search grid. Batch wall and all500 raw records are unchanged; parent process wall is not reported."
+}

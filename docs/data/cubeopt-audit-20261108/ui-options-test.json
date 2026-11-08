@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "scope": "UI selection and message routing only; actual WASM generation tested separately",
+  "messages": [
+    {
+      "id": 0,
+      "cmd": "init",
+      "threads": 1
+    },
+    {
+      "id": 1,
+      "cmd": "generate",
+      "k": 4,
+      "base": 0
+    },
+    {
+      "id": 2,
+      "cmd": "generate",
+      "k": 4,
+      "base": 8
+    }
+  ],
+  "errors": []
+}

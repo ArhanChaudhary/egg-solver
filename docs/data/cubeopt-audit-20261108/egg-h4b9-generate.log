@@ -1,0 +1,16 @@
+[gen] h4 base 9: 0.45 GiB, 48 threads
+[gen] prefix depth 1: 1 h11 entries
+[gen] prefix depth 2: 4 h11 entries
+[gen] prefix depth 3: 34 h11 entries
+[gen] prefix depth 4: 333 h11 entries
+[gen] prefix depth 5: 3815 h11 entries
+[gen] prefix depth 6: 45382 h11 entries
+[gen] prefix depth 7: 548562 h11 entries
+[gen] prefix depth 8: 6839723 h11 entries
+[gen h4] prefix in 0.6s
+[gen h4] rows 0..3800160: depth 9 in 0.2s (0.3s for these rows)
+[gen h4] rows 0..3800160: depth 10 in 0.5s (0.8s for these rows)
+[gen h4] rows 0..3800160: depth 11 in 5.6s (6.4s for these rows)
+[gen h4] rows 0..3800160 written in 0.6s
+generated in 7.6s, peak memory 0.77 GiB
+h4 base 9 distribution [77147216, 543379445, 1139570223, 120982316]

@@ -19,6 +19,15 @@ The comparison covers nxopt, vcube, nissy-core H48, cubeopt30, cube48opt10 and c
 
 The host was an AMD EPYC 9V45 VM with 48 cores and about 94 GiB of RAM. It has no hardware PMU counters. The physical Xeon counter study is a separate experiment and should not be used as a direct speed comparison with this VM.
 
+## November 8 follow-up
+
+- [Nissy versus egg: all 500 states, h6–h10](NISSY_THROUGHPUT.md): complete batch walls, throughput tuning, all final raw outputs, and explicit PGO/source limits.
+- [Lanes and parallelism](../performance/PARALLELISM.md): why 48 is a tuning candidate, exact cubeopt empty-slot counters, and measured scaling within one cube.
+- [Cubeopt comparison audit](CUBEOPT_AUDIT.html): exact old binary identity, historical arithmetic, fresh 14-thread and full 500-state h10 runs.
+- [Exact cstimer Opt4 table study](TABLE_ANALYSIS.html): 486 MB versus 464 MiB, semantic pruning queries, and the browser base-selection fix.
+- [Large nxopt PS=16 table](NXOPT32.html): the requested 62.474 GB experiment and its measurement limits.
+- [Raw evidence](../data/cubeopt-audit-20261108/README.md).
+
 ## Selected results
 
 Selected results on this VM using **1 GiB pages**, with matching latency or throughput semantics. Speedups below are from the immutable comparison build **229b99f**, not newly attributed to current main. Table sizes are decimal GB; cubeopt30 uses a smaller table than egg-solver h7. The full report includes all tested sizes, both page modes for small/medium tables, build selection, sample sizes and variation.
@@ -65,8 +74,10 @@ All 230 required matrix cells are complete. The [raw run index](../data/comparis
 
 ## Larger nxopt tables
 
-The matrix measured nxopt31 (2.60 GB) and nxopt22 (7.81 GB). It did not
-measure EO3/EP2 (62.3 GB), EO3/EP3 (182 GB), or EO2/EP4 (546 GB).
+The historical matrix measured nxopt31 (2.60 GB) and nxopt22 (7.81 GB).
+The later [EO3/EP2 follow-up](NXOPT32.md) measured the requested 62.474 GB
+table and records its source, raw timings and limits. EO3/EP3 (182 GB) and
+EO2/EP4 (546 GB) remain unmeasured.
 The larger configurations were considered in the [source inventory](../reference/inventories/x-nxopt-inventory.md),
 which is not a timing comparison. The 182 GB and 546 GB tables exceed this
 VM's RAM. Results for the measured configurations do not establish that

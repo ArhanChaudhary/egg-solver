@@ -1,0 +1,200 @@
+{
+  "run": "train-1t-train_pgo-1groups",
+  "solver": "train",
+  "threads": 1,
+  "dataset": "train_pgo",
+  "repeated_groups": 1,
+  "cubes_per_group": 24,
+  "returncode": 0,
+  "process_wall_seconds": 506.18335700035095,
+  "command": [
+    "taskset",
+    "-c",
+    "8",
+    "/data/agents/nxopt32/bin/nxopt32-pgogen",
+    "-t",
+    "1",
+    "-"
+  ],
+  "raw_sha256": "f452768c72b58d68b59cfb3e0d2ae24cd1e417f43a8b3af553d893af86a7e811",
+  "table_pages": "1 GiB",
+  "group_note": "Repeated datasets in one process; group repetitions are not independent process restarts.",
+  "cubes": [
+    {
+      "index": 0,
+      "length": 18,
+      "lookups": 17353102,
+      "nodes": 5423663,
+      "seconds": 1.26417
+    },
+    {
+      "index": 1,
+      "length": 18,
+      "lookups": 18843320,
+      "nodes": 5859893,
+      "seconds": 1.38037
+    },
+    {
+      "index": 2,
+      "length": 19,
+      "lookups": 60011945,
+      "nodes": 18607410,
+      "seconds": 4.39655
+    },
+    {
+      "index": 3,
+      "length": 18,
+      "lookups": 10011349,
+      "nodes": 3133197,
+      "seconds": 0.727578
+    },
+    {
+      "index": 4,
+      "length": 18,
+      "lookups": 8509813,
+      "nodes": 2663011,
+      "seconds": 0.613472
+    },
+    {
+      "index": 5,
+      "length": 18,
+      "lookups": 5048188,
+      "nodes": 1577440,
+      "seconds": 0.364906
+    },
+    {
+      "index": 6,
+      "length": 18,
+      "lookups": 5951998,
+      "nodes": 1866282,
+      "seconds": 0.428447
+    },
+    {
+      "index": 7,
+      "length": 18,
+      "lookups": 6818574,
+      "nodes": 2093456,
+      "seconds": 0.488624
+    },
+    {
+      "index": 8,
+      "length": 18,
+      "lookups": 17821474,
+      "nodes": 5518394,
+      "seconds": 1.28881
+    },
+    {
+      "index": 9,
+      "length": 18,
+      "lookups": 6109697,
+      "nodes": 1908730,
+      "seconds": 0.439708
+    },
+    {
+      "index": 10,
+      "length": 18,
+      "lookups": 4784959,
+      "nodes": 1468209,
+      "seconds": 0.352112
+    },
+    {
+      "index": 11,
+      "length": 18,
+      "lookups": 13344055,
+      "nodes": 4131224,
+      "seconds": 0.96245
+    },
+    {
+      "index": 12,
+      "length": 18,
+      "lookups": 4076085,
+      "nodes": 1272013,
+      "seconds": 0.296934
+    },
+    {
+      "index": 13,
+      "length": 18,
+      "lookups": 5661771,
+      "nodes": 1759746,
+      "seconds": 0.411518
+    },
+    {
+      "index": 14,
+      "length": 19,
+      "lookups": 49618137,
+      "nodes": 15433214,
+      "seconds": 3.64848
+    },
+    {
+      "index": 15,
+      "length": 17,
+      "lookups": 785455,
+      "nodes": 235905,
+      "seconds": 0.057339
+    },
+    {
+      "index": 16,
+      "length": 18,
+      "lookups": 25565540,
+      "nodes": 8023302,
+      "seconds": 1.86395
+    },
+    {
+      "index": 17,
+      "length": 18,
+      "lookups": 4996613,
+      "nodes": 1548434,
+      "seconds": 0.362336
+    },
+    {
+      "index": 18,
+      "length": 18,
+      "lookups": 5537265,
+      "nodes": 1741203,
+      "seconds": 0.399393
+    },
+    {
+      "index": 19,
+      "length": 18,
+      "lookups": 23597206,
+      "nodes": 7435815,
+      "seconds": 1.7078
+    },
+    {
+      "index": 20,
+      "length": 18,
+      "lookups": 3766986,
+      "nodes": 1167108,
+      "seconds": 0.273745
+    },
+    {
+      "index": 21,
+      "length": 17,
+      "lookups": 575011,
+      "nodes": 175781,
+      "seconds": 0.04267
+    },
+    {
+      "index": 22,
+      "length": 17,
+      "lookups": 924744,
+      "nodes": 286998,
+      "seconds": 0.0670431
+    },
+    {
+      "index": 23,
+      "length": 17,
+      "lookups": 651246,
+      "nodes": 199778,
+      "seconds": 0.0460191
+    }
+  ],
+  "groups": [
+    {
+      "group": 0,
+      "seconds_per_cube": 0.9118510083333334
+    }
+  ],
+  "seconds_per_cube": 0.9118510083333334,
+  "max_hugetlb_kib": 61865984
+}

@@ -1,0 +1,1090 @@
+{
+  "run": "pgo-1t-random_state_50-3groups",
+  "solver": "pgo",
+  "threads": 1,
+  "dataset": "random_state_50",
+  "repeated_groups": 3,
+  "cubes_per_group": 50,
+  "returncode": 0,
+  "process_wall_seconds": 592.1710765361786,
+  "command": [
+    "taskset",
+    "-c",
+    "8",
+    "/data/agents/nxopt32/bin/nxopt32-pgo",
+    "-t",
+    "1",
+    "-"
+  ],
+  "raw_sha256": "e69b0104a6a5a4a75b3d7dad23032cb8aa13630cdf08f8371967c20ed105eb60",
+  "table_pages": "1 GiB",
+  "group_note": "Repeated datasets in one process; group repetitions are not independent process restarts.",
+  "cubes": [
+    {
+      "index": 0,
+      "length": 18,
+      "lookups": 6212707,
+      "nodes": 1915690,
+      "seconds": 0.425411
+    },
+    {
+      "index": 1,
+      "length": 17,
+      "lookups": 647110,
+      "nodes": 200299,
+      "seconds": 0.0435688
+    },
+    {
+      "index": 2,
+      "length": 18,
+      "lookups": 6928079,
+      "nodes": 2165666,
+      "seconds": 0.465847
+    },
+    {
+      "index": 3,
+      "length": 18,
+      "lookups": 3135218,
+      "nodes": 965701,
+      "seconds": 0.210263
+    },
+    {
+      "index": 4,
+      "length": 18,
+      "lookups": 49908069,
+      "nodes": 15592363,
+      "seconds": 3.39504
+    },
+    {
+      "index": 5,
+      "length": 18,
+      "lookups": 10130990,
+      "nodes": 3166717,
+      "seconds": 0.6788
+    },
+    {
+      "index": 6,
+      "length": 18,
+      "lookups": 13499149,
+      "nodes": 4005214,
+      "seconds": 0.900243
+    },
+    {
+      "index": 7,
+      "length": 18,
+      "lookups": 4749702,
+      "nodes": 1470079,
+      "seconds": 0.319626
+    },
+    {
+      "index": 8,
+      "length": 16,
+      "lookups": 328632,
+      "nodes": 101645,
+      "seconds": 0.0219321
+    },
+    {
+      "index": 9,
+      "length": 17,
+      "lookups": 5194511,
+      "nodes": 1598867,
+      "seconds": 0.35036
+    },
+    {
+      "index": 10,
+      "length": 19,
+      "lookups": 65848248,
+      "nodes": 20678692,
+      "seconds": 4.43569
+    },
+    {
+      "index": 11,
+      "length": 18,
+      "lookups": 9529583,
+      "nodes": 2983854,
+      "seconds": 0.640987
+    },
+    {
+      "index": 12,
+      "length": 18,
+      "lookups": 10011311,
+      "nodes": 3117649,
+      "seconds": 0.670557
+    },
+    {
+      "index": 13,
+      "length": 18,
+      "lookups": 24726322,
+      "nodes": 7604273,
+      "seconds": 1.62755
+    },
+    {
+      "index": 14,
+      "length": 18,
+      "lookups": 4029520,
+      "nodes": 1254282,
+      "seconds": 0.272588
+    },
+    {
+      "index": 15,
+      "length": 18,
+      "lookups": 6081458,
+      "nodes": 1866801,
+      "seconds": 0.411152
+    },
+    {
+      "index": 16,
+      "length": 18,
+      "lookups": 47044960,
+      "nodes": 14496436,
+      "seconds": 3.1545
+    },
+    {
+      "index": 17,
+      "length": 17,
+      "lookups": 386707,
+      "nodes": 119591,
+      "seconds": 0.0238309
+    },
+    {
+      "index": 18,
+      "length": 17,
+      "lookups": 2382136,
+      "nodes": 736912,
+      "seconds": 0.158076
+    },
+    {
+      "index": 19,
+      "length": 18,
+      "lookups": 8552769,
+      "nodes": 2656538,
+      "seconds": 0.572139
+    },
+    {
+      "index": 20,
+      "length": 16,
+      "lookups": 638360,
+      "nodes": 196709,
+      "seconds": 0.0418091
+    },
+    {
+      "index": 21,
+      "length": 17,
+      "lookups": 4286644,
+      "nodes": 1336779,
+      "seconds": 0.280575
+    },
+    {
+      "index": 22,
+      "length": 18,
+      "lookups": 7468512,
+      "nodes": 2311757,
+      "seconds": 0.500171
+    },
+    {
+      "index": 23,
+      "length": 18,
+      "lookups": 10399855,
+      "nodes": 3219108,
+      "seconds": 0.69236
+    },
+    {
+      "index": 24,
+      "length": 18,
+      "lookups": 7744693,
+      "nodes": 2419694,
+      "seconds": 0.518307
+    },
+    {
+      "index": 25,
+      "length": 17,
+      "lookups": 4933996,
+      "nodes": 1507533,
+      "seconds": 0.330066
+    },
+    {
+      "index": 26,
+      "length": 17,
+      "lookups": 1378691,
+      "nodes": 425094,
+      "seconds": 0.092483
+    },
+    {
+      "index": 27,
+      "length": 18,
+      "lookups": 6252825,
+      "nodes": 1960371,
+      "seconds": 0.422592
+    },
+    {
+      "index": 28,
+      "length": 18,
+      "lookups": 7586603,
+      "nodes": 2363430,
+      "seconds": 0.50765
+    },
+    {
+      "index": 29,
+      "length": 18,
+      "lookups": 22070212,
+      "nodes": 6824538,
+      "seconds": 1.48344
+    },
+    {
+      "index": 30,
+      "length": 18,
+      "lookups": 8254031,
+      "nodes": 2572108,
+      "seconds": 0.554074
+    },
+    {
+      "index": 31,
+      "length": 18,
+      "lookups": 17622007,
+      "nodes": 5475611,
+      "seconds": 1.18504
+    },
+    {
+      "index": 32,
+      "length": 16,
+      "lookups": 171951,
+      "nodes": 56005,
+      "seconds": 0.0120802
+    },
+    {
+      "index": 33,
+      "length": 18,
+      "lookups": 6235110,
+      "nodes": 1933530,
+      "seconds": 0.419189
+    },
+    {
+      "index": 34,
+      "length": 17,
+      "lookups": 903082,
+      "nodes": 281310,
+      "seconds": 0.0595992
+    },
+    {
+      "index": 35,
+      "length": 18,
+      "lookups": 9581768,
+      "nodes": 2975220,
+      "seconds": 0.64278
+    },
+    {
+      "index": 36,
+      "length": 17,
+      "lookups": 658891,
+      "nodes": 202190,
+      "seconds": 0.043442
+    },
+    {
+      "index": 37,
+      "length": 17,
+      "lookups": 2995829,
+      "nodes": 906194,
+      "seconds": 0.195449
+    },
+    {
+      "index": 38,
+      "length": 18,
+      "lookups": 12410883,
+      "nodes": 3847754,
+      "seconds": 0.837981
+    },
+    {
+      "index": 39,
+      "length": 18,
+      "lookups": 4787202,
+      "nodes": 1505239,
+      "seconds": 0.32423
+    },
+    {
+      "index": 40,
+      "length": 19,
+      "lookups": 54846739,
+      "nodes": 17053424,
+      "seconds": 3.69881
+    },
+    {
+      "index": 41,
+      "length": 17,
+      "lookups": 3037277,
+      "nodes": 931791,
+      "seconds": 0.201016
+    },
+    {
+      "index": 42,
+      "length": 17,
+      "lookups": 541724,
+      "nodes": 167782,
+      "seconds": 0.037611
+    },
+    {
+      "index": 43,
+      "length": 18,
+      "lookups": 5908044,
+      "nodes": 1851151,
+      "seconds": 0.4042
+    },
+    {
+      "index": 44,
+      "length": 18,
+      "lookups": 11892677,
+      "nodes": 3725056,
+      "seconds": 0.800061
+    },
+    {
+      "index": 45,
+      "length": 18,
+      "lookups": 5114679,
+      "nodes": 1573597,
+      "seconds": 0.344548
+    },
+    {
+      "index": 46,
+      "length": 18,
+      "lookups": 4153203,
+      "nodes": 1280729,
+      "seconds": 0.281638
+    },
+    {
+      "index": 47,
+      "length": 18,
+      "lookups": 6375526,
+      "nodes": 1979138,
+      "seconds": 0.428871
+    },
+    {
+      "index": 48,
+      "length": 18,
+      "lookups": 12160993,
+      "nodes": 3808659,
+      "seconds": 0.815079
+    },
+    {
+      "index": 49,
+      "length": 18,
+      "lookups": 14213530,
+      "nodes": 4477399,
+      "seconds": 0.951235
+    },
+    {
+      "index": 50,
+      "length": 18,
+      "lookups": 6212707,
+      "nodes": 1915690,
+      "seconds": 0.423245
+    },
+    {
+      "index": 51,
+      "length": 17,
+      "lookups": 647110,
+      "nodes": 200299,
+      "seconds": 0.0437069
+    },
+    {
+      "index": 52,
+      "length": 18,
+      "lookups": 6928079,
+      "nodes": 2165666,
+      "seconds": 0.466283
+    },
+    {
+      "index": 53,
+      "length": 18,
+      "lookups": 3135218,
+      "nodes": 965701,
+      "seconds": 0.209105
+    },
+    {
+      "index": 54,
+      "length": 18,
+      "lookups": 49908069,
+      "nodes": 15592363,
+      "seconds": 3.39446
+    },
+    {
+      "index": 55,
+      "length": 18,
+      "lookups": 10130990,
+      "nodes": 3166717,
+      "seconds": 0.679981
+    },
+    {
+      "index": 56,
+      "length": 18,
+      "lookups": 13499149,
+      "nodes": 4005214,
+      "seconds": 0.900948
+    },
+    {
+      "index": 57,
+      "length": 18,
+      "lookups": 4749702,
+      "nodes": 1470079,
+      "seconds": 0.318848
+    },
+    {
+      "index": 58,
+      "length": 16,
+      "lookups": 328632,
+      "nodes": 101645,
+      "seconds": 0.0218551
+    },
+    {
+      "index": 59,
+      "length": 17,
+      "lookups": 5194511,
+      "nodes": 1598867,
+      "seconds": 0.349717
+    },
+    {
+      "index": 60,
+      "length": 19,
+      "lookups": 65848248,
+      "nodes": 20678692,
+      "seconds": 4.44058
+    },
+    {
+      "index": 61,
+      "length": 18,
+      "lookups": 9529583,
+      "nodes": 2983854,
+      "seconds": 0.641779
+    },
+    {
+      "index": 62,
+      "length": 18,
+      "lookups": 10011311,
+      "nodes": 3117649,
+      "seconds": 0.669844
+    },
+    {
+      "index": 63,
+      "length": 18,
+      "lookups": 24726322,
+      "nodes": 7604273,
+      "seconds": 1.62558
+    },
+    {
+      "index": 64,
+      "length": 18,
+      "lookups": 4029520,
+      "nodes": 1254282,
+      "seconds": 0.272937
+    },
+    {
+      "index": 65,
+      "length": 18,
+      "lookups": 6081458,
+      "nodes": 1866801,
+      "seconds": 0.410666
+    },
+    {
+      "index": 66,
+      "length": 18,
+      "lookups": 47044960,
+      "nodes": 14496436,
+      "seconds": 3.15741
+    },
+    {
+      "index": 67,
+      "length": 17,
+      "lookups": 386707,
+      "nodes": 119591,
+      "seconds": 0.0239201
+    },
+    {
+      "index": 68,
+      "length": 17,
+      "lookups": 2382136,
+      "nodes": 736912,
+      "seconds": 0.157998
+    },
+    {
+      "index": 69,
+      "length": 18,
+      "lookups": 8552769,
+      "nodes": 2656538,
+      "seconds": 0.573017
+    },
+    {
+      "index": 70,
+      "length": 16,
+      "lookups": 638360,
+      "nodes": 196709,
+      "seconds": 0.041713
+    },
+    {
+      "index": 71,
+      "length": 17,
+      "lookups": 4286644,
+      "nodes": 1336779,
+      "seconds": 0.281338
+    },
+    {
+      "index": 72,
+      "length": 18,
+      "lookups": 7468512,
+      "nodes": 2311757,
+      "seconds": 0.501118
+    },
+    {
+      "index": 73,
+      "length": 18,
+      "lookups": 10399855,
+      "nodes": 3219108,
+      "seconds": 0.691776
+    },
+    {
+      "index": 74,
+      "length": 18,
+      "lookups": 7744693,
+      "nodes": 2419694,
+      "seconds": 0.519932
+    },
+    {
+      "index": 75,
+      "length": 17,
+      "lookups": 4933996,
+      "nodes": 1507533,
+      "seconds": 0.330248
+    },
+    {
+      "index": 76,
+      "length": 17,
+      "lookups": 1378691,
+      "nodes": 425094,
+      "seconds": 0.0925729
+    },
+    {
+      "index": 77,
+      "length": 18,
+      "lookups": 6252825,
+      "nodes": 1960371,
+      "seconds": 0.423783
+    },
+    {
+      "index": 78,
+      "length": 18,
+      "lookups": 7586603,
+      "nodes": 2363430,
+      "seconds": 0.509037
+    },
+    {
+      "index": 79,
+      "length": 18,
+      "lookups": 22070212,
+      "nodes": 6824538,
+      "seconds": 1.48536
+    },
+    {
+      "index": 80,
+      "length": 18,
+      "lookups": 8254031,
+      "nodes": 2572108,
+      "seconds": 0.554682
+    },
+    {
+      "index": 81,
+      "length": 18,
+      "lookups": 17622007,
+      "nodes": 5475611,
+      "seconds": 1.18389
+    },
+    {
+      "index": 82,
+      "length": 16,
+      "lookups": 171951,
+      "nodes": 56005,
+      "seconds": 0.0119491
+    },
+    {
+      "index": 83,
+      "length": 18,
+      "lookups": 6235110,
+      "nodes": 1933530,
+      "seconds": 0.419674
+    },
+    {
+      "index": 84,
+      "length": 17,
+      "lookups": 903082,
+      "nodes": 281310,
+      "seconds": 0.0597181
+    },
+    {
+      "index": 85,
+      "length": 18,
+      "lookups": 9581768,
+      "nodes": 2975220,
+      "seconds": 0.64346
+    },
+    {
+      "index": 86,
+      "length": 17,
+      "lookups": 658891,
+      "nodes": 202190,
+      "seconds": 0.04357
+    },
+    {
+      "index": 87,
+      "length": 17,
+      "lookups": 2995829,
+      "nodes": 906194,
+      "seconds": 0.195244
+    },
+    {
+      "index": 88,
+      "length": 18,
+      "lookups": 12410883,
+      "nodes": 3847754,
+      "seconds": 0.837805
+    },
+    {
+      "index": 89,
+      "length": 18,
+      "lookups": 4787202,
+      "nodes": 1505239,
+      "seconds": 0.323594
+    },
+    {
+      "index": 90,
+      "length": 19,
+      "lookups": 54846739,
+      "nodes": 17053424,
+      "seconds": 3.69802
+    },
+    {
+      "index": 91,
+      "length": 17,
+      "lookups": 3037277,
+      "nodes": 931791,
+      "seconds": 0.200645
+    },
+    {
+      "index": 92,
+      "length": 17,
+      "lookups": 541724,
+      "nodes": 167782,
+      "seconds": 0.0376539
+    },
+    {
+      "index": 93,
+      "length": 18,
+      "lookups": 5908044,
+      "nodes": 1851151,
+      "seconds": 0.404355
+    },
+    {
+      "index": 94,
+      "length": 18,
+      "lookups": 11892677,
+      "nodes": 3725056,
+      "seconds": 0.800751
+    },
+    {
+      "index": 95,
+      "length": 18,
+      "lookups": 5114679,
+      "nodes": 1573597,
+      "seconds": 0.34611
+    },
+    {
+      "index": 96,
+      "length": 18,
+      "lookups": 4153203,
+      "nodes": 1280729,
+      "seconds": 0.28162
+    },
+    {
+      "index": 97,
+      "length": 18,
+      "lookups": 6375526,
+      "nodes": 1979138,
+      "seconds": 0.428068
+    },
+    {
+      "index": 98,
+      "length": 18,
+      "lookups": 12160993,
+      "nodes": 3808659,
+      "seconds": 0.813952
+    },
+    {
+      "index": 99,
+      "length": 18,
+      "lookups": 14213530,
+      "nodes": 4477399,
+      "seconds": 0.951037
+    },
+    {
+      "index": 100,
+      "length": 18,
+      "lookups": 6212707,
+      "nodes": 1915690,
+      "seconds": 0.422479
+    },
+    {
+      "index": 101,
+      "length": 17,
+      "lookups": 647110,
+      "nodes": 200299,
+      "seconds": 0.044265
+    },
+    {
+      "index": 102,
+      "length": 18,
+      "lookups": 6928079,
+      "nodes": 2165666,
+      "seconds": 0.466217
+    },
+    {
+      "index": 103,
+      "length": 18,
+      "lookups": 3135218,
+      "nodes": 965701,
+      "seconds": 0.20959
+    },
+    {
+      "index": 104,
+      "length": 18,
+      "lookups": 49908069,
+      "nodes": 15592363,
+      "seconds": 3.39587
+    },
+    {
+      "index": 105,
+      "length": 18,
+      "lookups": 10130990,
+      "nodes": 3166717,
+      "seconds": 0.678983
+    },
+    {
+      "index": 106,
+      "length": 18,
+      "lookups": 13499149,
+      "nodes": 4005214,
+      "seconds": 0.900857
+    },
+    {
+      "index": 107,
+      "length": 18,
+      "lookups": 4749702,
+      "nodes": 1470079,
+      "seconds": 0.320181
+    },
+    {
+      "index": 108,
+      "length": 16,
+      "lookups": 328632,
+      "nodes": 101645,
+      "seconds": 0.0218878
+    },
+    {
+      "index": 109,
+      "length": 17,
+      "lookups": 5194511,
+      "nodes": 1598867,
+      "seconds": 0.350111
+    },
+    {
+      "index": 110,
+      "length": 19,
+      "lookups": 65848248,
+      "nodes": 20678692,
+      "seconds": 4.4419
+    },
+    {
+      "index": 111,
+      "length": 18,
+      "lookups": 9529583,
+      "nodes": 2983854,
+      "seconds": 0.640036
+    },
+    {
+      "index": 112,
+      "length": 18,
+      "lookups": 10011311,
+      "nodes": 3117649,
+      "seconds": 0.671812
+    },
+    {
+      "index": 113,
+      "length": 18,
+      "lookups": 24726322,
+      "nodes": 7604273,
+      "seconds": 1.62515
+    },
+    {
+      "index": 114,
+      "length": 18,
+      "lookups": 4029520,
+      "nodes": 1254282,
+      "seconds": 0.272827
+    },
+    {
+      "index": 115,
+      "length": 18,
+      "lookups": 6081458,
+      "nodes": 1866801,
+      "seconds": 0.41056
+    },
+    {
+      "index": 116,
+      "length": 18,
+      "lookups": 47044960,
+      "nodes": 14496436,
+      "seconds": 3.15754
+    },
+    {
+      "index": 117,
+      "length": 17,
+      "lookups": 386707,
+      "nodes": 119591,
+      "seconds": 0.0266891
+    },
+    {
+      "index": 118,
+      "length": 17,
+      "lookups": 2382136,
+      "nodes": 736912,
+      "seconds": 0.158644
+    },
+    {
+      "index": 119,
+      "length": 18,
+      "lookups": 8552769,
+      "nodes": 2656538,
+      "seconds": 0.572518
+    },
+    {
+      "index": 120,
+      "length": 16,
+      "lookups": 638360,
+      "nodes": 196709,
+      "seconds": 0.0416849
+    },
+    {
+      "index": 121,
+      "length": 17,
+      "lookups": 4286644,
+      "nodes": 1336779,
+      "seconds": 0.281499
+    },
+    {
+      "index": 122,
+      "length": 18,
+      "lookups": 7468512,
+      "nodes": 2311757,
+      "seconds": 0.501531
+    },
+    {
+      "index": 123,
+      "length": 18,
+      "lookups": 10399855,
+      "nodes": 3219108,
+      "seconds": 0.691082
+    },
+    {
+      "index": 124,
+      "length": 18,
+      "lookups": 7744693,
+      "nodes": 2419694,
+      "seconds": 0.518119
+    },
+    {
+      "index": 125,
+      "length": 17,
+      "lookups": 4933996,
+      "nodes": 1507533,
+      "seconds": 0.328804
+    },
+    {
+      "index": 126,
+      "length": 17,
+      "lookups": 1378691,
+      "nodes": 425094,
+      "seconds": 0.0924089
+    },
+    {
+      "index": 127,
+      "length": 18,
+      "lookups": 6252825,
+      "nodes": 1960371,
+      "seconds": 0.422203
+    },
+    {
+      "index": 128,
+      "length": 18,
+      "lookups": 7586603,
+      "nodes": 2363430,
+      "seconds": 0.508579
+    },
+    {
+      "index": 129,
+      "length": 18,
+      "lookups": 22070212,
+      "nodes": 6824538,
+      "seconds": 1.48431
+    },
+    {
+      "index": 130,
+      "length": 18,
+      "lookups": 8254031,
+      "nodes": 2572108,
+      "seconds": 0.555576
+    },
+    {
+      "index": 131,
+      "length": 18,
+      "lookups": 17622007,
+      "nodes": 5475611,
+      "seconds": 1.18407
+    },
+    {
+      "index": 132,
+      "length": 16,
+      "lookups": 171951,
+      "nodes": 56005,
+      "seconds": 0.0118659
+    },
+    {
+      "index": 133,
+      "length": 18,
+      "lookups": 6235110,
+      "nodes": 1933530,
+      "seconds": 0.418703
+    },
+    {
+      "index": 134,
+      "length": 17,
+      "lookups": 903082,
+      "nodes": 281310,
+      "seconds": 0.059731
+    },
+    {
+      "index": 135,
+      "length": 18,
+      "lookups": 9581768,
+      "nodes": 2975220,
+      "seconds": 0.642896
+    },
+    {
+      "index": 136,
+      "length": 17,
+      "lookups": 658891,
+      "nodes": 202190,
+      "seconds": 0.0435061
+    },
+    {
+      "index": 137,
+      "length": 17,
+      "lookups": 2995829,
+      "nodes": 906194,
+      "seconds": 0.19574
+    },
+    {
+      "index": 138,
+      "length": 18,
+      "lookups": 12410883,
+      "nodes": 3847754,
+      "seconds": 0.837774
+    },
+    {
+      "index": 139,
+      "length": 18,
+      "lookups": 4787202,
+      "nodes": 1505239,
+      "seconds": 0.323392
+    },
+    {
+      "index": 140,
+      "length": 19,
+      "lookups": 54846739,
+      "nodes": 17053424,
+      "seconds": 3.70047
+    },
+    {
+      "index": 141,
+      "length": 17,
+      "lookups": 3037277,
+      "nodes": 931791,
+      "seconds": 0.20073
+    },
+    {
+      "index": 142,
+      "length": 17,
+      "lookups": 541724,
+      "nodes": 167782,
+      "seconds": 0.0377331
+    },
+    {
+      "index": 143,
+      "length": 18,
+      "lookups": 5908044,
+      "nodes": 1851151,
+      "seconds": 0.404417
+    },
+    {
+      "index": 144,
+      "length": 18,
+      "lookups": 11892677,
+      "nodes": 3725056,
+      "seconds": 0.800621
+    },
+    {
+      "index": 145,
+      "length": 18,
+      "lookups": 5114679,
+      "nodes": 1573597,
+      "seconds": 0.346566
+    },
+    {
+      "index": 146,
+      "length": 18,
+      "lookups": 4153203,
+      "nodes": 1280729,
+      "seconds": 0.281218
+    },
+    {
+      "index": 147,
+      "length": 18,
+      "lookups": 6375526,
+      "nodes": 1979138,
+      "seconds": 0.428258
+    },
+    {
+      "index": 148,
+      "length": 18,
+      "lookups": 12160993,
+      "nodes": 3808659,
+      "seconds": 0.817013
+    },
+    {
+      "index": 149,
+      "length": 18,
+      "lookups": 14213530,
+      "nodes": 4477399,
+      "seconds": 0.948997
+    }
+  ],
+  "groups": [
+    {
+      "group": 0,
+      "seconds_per_cube": 0.717690946
+    },
+    {
+      "group": 1,
+      "seconds_per_cube": 0.717891122
+    },
+    {
+      "group": 2,
+      "seconds_per_cube": 0.717952296
+    }
+  ],
+  "seconds_per_cube": 0.717844788,
+  "max_hugetlb_kib": 61865984
+}

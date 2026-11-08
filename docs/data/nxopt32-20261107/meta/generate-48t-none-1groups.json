@@ -1,0 +1,27 @@
+{
+  "run": "generate-48t-none-1groups",
+  "solver": "generate",
+  "threads": 48,
+  "dataset": "none",
+  "repeated_groups": 1,
+  "cubes_per_group": 0,
+  "returncode": 0,
+  "process_wall_seconds": 684.2766108512878,
+  "command": [
+    "taskset",
+    "-c",
+    "0-47",
+    "/data/agents/nxopt32/bin/nxopt32",
+    "-t",
+    "48",
+    "-c",
+    "0"
+  ],
+  "raw_sha256": "be9e24acbc1105caaafe1b2d0156eb43a2b4e4ead5ca38537a351a71c97fe15e",
+  "table_pages": "1 GiB",
+  "group_note": "Repeated datasets in one process; group repetitions are not independent process restarts.",
+  "cubes": [],
+  "groups": [],
+  "seconds_per_cube": null,
+  "max_hugetlb_kib": 61865984
+}

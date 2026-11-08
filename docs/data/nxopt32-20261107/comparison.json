@@ -1,0 +1,95 @@
+{
+  "status": "COMPLETE",
+  "table_bytes": 62474158084,
+  "rows": [
+    {
+      "threads": 1,
+      "build": "native",
+      "egg_seconds_per_cube": 0.04180269118,
+      "nxopt_seconds_per_cube": 0.7153415519999999,
+      "egg_speedup": 17.11233252710406,
+      "nxopt_group_min": 0.714942294,
+      "nxopt_group_max": 0.7156246679999999,
+      "nxopt_group_median": 0.7154576939999999,
+      "solves": 150,
+      "unique_states": 50,
+      "nxopt_mean_nodes": 3317323.38,
+      "hugetlb_gib": 59.0
+    },
+    {
+      "threads": 1,
+      "build": "pgo",
+      "egg_seconds_per_cube": 0.04180269118,
+      "nxopt_seconds_per_cube": 0.717844788,
+      "egg_speedup": 17.172214700460344,
+      "nxopt_group_min": 0.717690946,
+      "nxopt_group_max": 0.717952296,
+      "nxopt_group_median": 0.717891122,
+      "solves": 150,
+      "unique_states": 50,
+      "nxopt_mean_nodes": 3317323.38,
+      "hugetlb_gib": 59.0
+    },
+    {
+      "threads": 48,
+      "build": "native",
+      "egg_seconds_per_cube": 0.0011584026633333334,
+      "nxopt_seconds_per_cube": 0.01590144532986111,
+      "egg_speedup": 13.727044863747373,
+      "nxopt_group_min": 0.015823547125,
+      "nxopt_group_max": 0.015944549802083333,
+      "nxopt_group_median": 0.0159362390625,
+      "solves": 600,
+      "unique_states": 200,
+      "nxopt_mean_nodes": 3291609.78,
+      "hugetlb_gib": 59.0
+    },
+    {
+      "threads": 48,
+      "build": "pgo",
+      "egg_seconds_per_cube": 0.0011584026633333334,
+      "nxopt_seconds_per_cube": 0.01594598329513889,
+      "egg_speedup": 13.765492604492046,
+      "nxopt_group_min": 0.015884223979166667,
+      "nxopt_group_max": 0.015981258489583334,
+      "nxopt_group_median": 0.015972467416666667,
+      "solves": 600,
+      "unique_states": 200,
+      "nxopt_mean_nodes": 3291609.78,
+      "hugetlb_gib": 59.0
+    }
+  ],
+  "solution_length_checks": [
+    {
+      "build": "native",
+      "threads": 1,
+      "matched": 150,
+      "mismatches": 0
+    },
+    {
+      "build": "pgo",
+      "threads": 1,
+      "matched": 150,
+      "mismatches": 0
+    },
+    {
+      "build": "native",
+      "threads": 48,
+      "matched": 600,
+      "mismatches": 0
+    },
+    {
+      "build": "pgo",
+      "threads": 48,
+      "matched": 600,
+      "mismatches": 0
+    }
+  ],
+  "notes": [
+    "nxopt uses sum of per-cube durations divided by cubes and threads; egg uses measured batch wall time per cube, potentially favoring nxopt with uneven worker completion.",
+    "Three repeated input groups per process are not independent process restarts.",
+    "Table loading and generation are excluded from solve metrics.",
+    "Both solvers use resident 1 GiB pages.",
+    "No conclusions about 182 GB or 546 GB nxopt tables."
+  ]
+}

@@ -1,0 +1,5 @@
+default_h4 {"k":4,"base":9,"bytes":486420480} generation_seconds 149.036265166
+{"input":"R U R' U'","result":{"index":0,"moves":"U R U' R'","length":4,"nodes":14,"lookups":7,"seconds":0.000177}}
+{"input":"F2 D L2 B' U","result":{"index":0,"moves":"U' B L2 D' F2","length":5,"nodes":48,"lookups":12,"seconds":0.0002}}
+{"input":"R U2 F' D L2 B R'","result":{"index":0,"moves":"R B' L2 D' F U2 R'","length":7,"nodes":37,"lookups":18,"seconds":0.00017}}
+PASS h4 automatic base 9; all solutions replayed

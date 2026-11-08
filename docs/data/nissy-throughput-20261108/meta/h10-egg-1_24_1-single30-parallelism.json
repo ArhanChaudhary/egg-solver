@@ -1,0 +1,44 @@
+{
+  "unrelated_cpu_cores_estimate": 0.013140816878804421,
+  "resource": {
+    "user": 4.95,
+    "system": 0.0,
+    "maxrss_kib": 12376
+  },
+  "utc_start": 1794159738.8625274,
+  "utc_end": 1794159744.9504304,
+  "id": "h10-egg-1_24_1-single30-parallelism",
+  "solver": "egg",
+  "h": 10,
+  "config": "1_24_1",
+  "dataset": "single30",
+  "command": [
+    "/data/agents/nxopt32/bin/egg-solve",
+    "--table",
+    "/mnt/huge/egg-h10",
+    "--load",
+    "map",
+    "-t",
+    "1",
+    "-l",
+    "24",
+    "-c",
+    "1",
+    "--json"
+  ],
+  "returncode": 0,
+  "valid": true,
+  "process_wall_with_loading": 6.087904930114746,
+  "total": {
+    "type": "total",
+    "cubes": 30,
+    "wall": 4.940151129,
+    "wall_per_cube": 0.1646717043,
+    "nodes_per_cube": 14500537.333333334,
+    "threads": 1,
+    "lanes": 24,
+    "concurrency": 1
+  },
+  "max_hugetlb_kib": 30408704,
+  "raw_sha256": "ec4b48e9efd1b5f994747d6b71bfce94bfe9495e314b4e17f3f2d65c081877db"
+}
