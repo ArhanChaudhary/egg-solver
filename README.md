@@ -59,10 +59,31 @@ arguments or stdin. Empty input is an error. `--warmup SCRAMBLE` is optional.
 `--load map` or shared memory, keep the backing storage unchanged while
 running. See `solve --help` and the [user guide](docs/reference/USER_GUIDE.md).
 
-## Historical measured comparison
+## Benchmarks
 
-Recorded speedup over each competitor in the earlier matrix; higher is better. AMD EPYC 9V45,
-1 GiB pages, matched solve modes. GB below are decimal table sizes.
+All measured on a 48-core AMD EPYC 9V45 VM with resident 1 GiB table pages; loading is excluded. Each competitor used its own table. [Solver benchmarks](docs/comparisons/README.md) has the methods, raw outputs and limits.
+
+**Batch throughput against nissy-core H48** (November 8, 2026): all 500 repository random states per batch, median of three fresh-process batches, same table size for both solvers. Higher solves/s is faster. [Full study](docs/comparisons/NISSY_THROUGHPUT.md)
+
+| Table | RAM each (GiB) | egg-solver (solves/s) | nissy (solves/s) | egg-solver advantage |
+|---|---:|---:|---:|---:|
+| h6 | 2 | 34.71 | 4.89 | 7.10× |
+| h7 | 4 | 69.56 | 9.71 | 7.16× |
+| h8 | 8 | 146.73 | 14.55 | 10.09× |
+| h9 | 15 | 290.33 | 31.29 | 9.28× |
+| h10 | 29 | 560.63 | 58.40 | 9.60× |
+
+**Other recent comparisons** (November 7–8, 2026); lower time is faster:
+
+| Competitor | Setup | egg-solver | Competitor | Ratio |
+|---|---|---:|---:|---:|
+| cube48opt10 (supplied Linux binary) | h10 tables, 48 threads, 500 states one at a time, mean latency | 2.36 ms | 47.65 ms | 20.2× |
+| nxopt EO3/EP2, 62.474 GB table | egg h11; 1 worker, 50 states | 41.8 ms | 715.3 ms | 17.1× |
+| nxopt EO3/EP2, 62.474 GB table | egg h11; 48 workers, 200 states | 1.158 ms | 15.90 ms | 13.7×* |
+
+\*nxopt reports summed cube durations ÷ workers ÷ cubes, while egg-solver's figure is batch wall time ÷ cubes, so this ratio compares two timing formulas. Details: [cubeopt audit](docs/comparisons/CUBEOPT_AUDIT.md), [nxopt study](docs/comparisons/NXOPT32.md).
+
+**Earlier matrix** (November 7, 2026, egg-solver `979dcf6`): speedup over each competitor, higher is better; GB are decimal table sizes. [Full matrix](docs/comparisons/RESULTS.md)
 
 | Competitor | egg table | GB: competitor / egg | Mode | 1 thread | 48 threads |
 |---|---|---:|---|---:|---:|
@@ -72,11 +93,6 @@ Recorded speedup over each competitor in the earlier matrix; higher is better. A
 | nxopt22 | h8 | 7.81 / 7.78 | throughput | 21.3× | 18.0× |
 | vcube208 | h8 | 7.81 / 7.78 | throughput | 14.2× | 12.3× |
 | cube48opt-rust Opt8 | h8 | 7.78 / 7.78 | throughput | 3.9× | 3.2× |
-
-These measurements used egg-solver `979dcf6`. Later build differences,
-samples, variation and limitations are in the [full comparison](docs/comparisons/README.md).
-The newer [500-state nissy throughput study](docs/comparisons/NISSY_THROUGHPUT.md) and
-[62.474 GB nxopt study](docs/comparisons/NXOPT32.md) have separate configurations and timing definitions.
 
 ## Browser and documentation
 

@@ -29,8 +29,7 @@
 <h1>egg-solver</h1>
 <p class="note">Optimal Rubik's cube solutions (fewest moves, half-turn metric), computed in your browser. Enter one scramble or 54-sticker facelet string (URFDLB order) per line.</p>
 
-<textarea id="cubes" rows="4" aria-label="Scrambles, one per line" placeholder="One scramble (R U2 F' ...) or facelet string per line">R U R' U' F2 D L2 B'
-UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB</textarea>
+<textarea id="cubes" rows="4" aria-label="Scrambles, one per line" placeholder="R U R' U' F2 D L2 B'  (one scramble or facelet string per line)"></textarea>
 <div class="row">
   <button id="solve" class="primary" disabled>Solve</button>
   <button id="random" disabled>Random cube</button>
@@ -41,19 +40,19 @@ UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB</textarea>
 
 <details id="settings">
   <summary>Settings</summary>
-  <p class="note">The page starts with every available core and the smallest table (h0). Larger tables solve faster but take longer to build; for hard cubes, load a table made by the native <code>gen</code> (h6 = 1.8 GiB suits a browser).</p>
+  <p class="note">The page starts with every available core and builds the h4 table (464 MiB) on desktops, or h3 (232 MiB) on phones, tablets and devices with 4 GB of memory or less; both take about as long to build. Smaller tables make hard cubes much slower. For faster solves, load a larger table made by the native <code>gen</code> (h6 = 1.8 GiB suits a desktop browser).</p>
   <div class="row">
     <label>Threads <input id="threads" type="number" min="1" value="1" style="width:4rem"></label>
     <span id="isolation" class="note"></span>
   </div>
   <div class="row">
     <label>Table <select id="k">
-      <option value="0" selected>h0 (29 MiB, seconds)</option>
+      <option value="0">h0 (29 MiB; hard cubes take minutes)</option>
       <option value="1">h1 (58 MiB)</option>
       <option value="2">h2 (116 MiB)</option>
       <option value="3">h3 (232 MiB)</option>
-      <option value="4">h4 (464 MiB, recommended base)</option>
-      <option value="4:8">h4 base 8 (464 MiB, faster to build)</option>
+      <option value="4:8" selected>h4, quick build (464 MiB)</option>
+      <option value="4">h4, slow build, ~1.4× faster solves (464 MiB)</option>
     </select></label>
     <button id="apply" disabled>Apply</button>
   </div>
@@ -135,8 +134,8 @@ const init = async (threads) => {
   }
   moduleThreads = threads;
 };
-// Generate the selected table (h0 by default), with the recommended base
-// unless the faster-to-build option requests base 8.
+// Generate the selected table: base 8 for the quick-build h4 option, else the
+// recommended base.
 const generate = async () => {
   const [k, base] = $('k').value.split(':').map(Number);
   tableReady = false;
@@ -164,18 +163,37 @@ $('random').onclick = () => busy('Random cube', async () => {
   $('cubes').value = ($('cubes').value.trim() + '\n' + cube).trim();
 });
 $('solve').onclick = () => busy('Solve', async () => {
-  for (const cube of $('cubes').value.split('\n').map((l) => l.trim()).filter(Boolean)) {
+  const cubes = $('cubes').value.split('\n').map((l) => l.trim()).filter(Boolean);
+  if (!cubes.length) {
+    status('Enter a scramble, or press Random cube.');
+    return;
+  }
+  for (const cube of cubes) {
     const r = await call('solve', { cube, lanes: Number($('lanes').value) });
     log(`${cube}\n  ${r.length} moves in ${r.wall.toFixed(3)} s (${(r.nodes / 1e6).toFixed(1)}M nodes): ${r.moves}`);
   }
 });
 
-// The happy default: all cores and h0, with no clicks. (Set h0 explicitly:
-// browsers may restore an earlier choice of table on reload.)
-$('k').value = '0';
+// The default, with no clicks: all cores, and the table by device. h4 built
+// with base 8 (464 MiB) builds about as fast as h2/h3 but solves 18-move cubes
+// several times faster than h2; phones, tablets and devices reporting 4 GB of
+// memory or less get h3 (232 MiB). If a table cannot be allocated, the next
+// smaller one is tried. (Set the table explicitly: browsers may restore an
+// earlier choice on reload.)
+const lowEnd = matchMedia('(pointer: coarse)').matches || (navigator.deviceMemory ?? 8) <= 4;
+const candidates = lowEnd ? ['3', '2', '0'] : ['4:8', '3', '0'];
 busy('Start', async () => {
   await init(cores);
-  await generate();
+  for (const [i, table] of candidates.entries()) {
+    $('k').value = table;
+    try {
+      await generate();
+      return;
+    } catch (e) {
+      if (i === candidates.length - 1) throw e;
+      log(`h${table.split(':')[0]} unavailable (${e.message}); trying a smaller table`);
+    }
+  }
 });
 </script>
 </body>

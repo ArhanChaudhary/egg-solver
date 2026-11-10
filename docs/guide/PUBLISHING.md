@@ -15,7 +15,7 @@ or site base path is hardcoded. See GitHub's [custom workflow documentation](htt
 
 The public site is <https://egg-solver.arhan.sh/>. It runs the solver in your
 browser: on load the demo starts with every core the browser reports and
-generates h0, the smallest table, so **Solve** works without further setup.
+builds the h4 table (464 MiB) on desktops or h3 (232 MiB) on phones, tablets and low-memory devices, so **Solve** works without further setup.
 Generate a larger table there or select your own table file; large pruning
 tables are not uploaded to Pages.
 

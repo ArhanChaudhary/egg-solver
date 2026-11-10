@@ -122,6 +122,10 @@ def main():
                          f"{result['speedup_egg_over_nissy']:.2f}×"])
     if table[1:] != expected:
         ERRORS.append('Nissy headline table differs from recorded analysis')
+    readme = (ROOT.parent / 'README.md').read_text()
+    for row in expected:
+        if '| ' + ' | '.join(row) + ' |' not in readme:
+            ERRORS.append(f'README.md: nissy row {row[0]} differs from recorded analysis')
     if ERRORS:
         raise SystemExit('FAIL:\n' + '\n'.join(ERRORS))
     print(f'PASS: {len(pages)} HTML pages, {checked} local links, curated table/heading structure, benchmark headline values')
