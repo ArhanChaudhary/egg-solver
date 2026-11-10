@@ -78,5 +78,5 @@ The newer [500-state nissy throughput study](docs/comparisons/NISSY_THROUGHPUT.m
 
 ## Browser and documentation
 
-[Documentation](docs/README.md) · [Browser setup](docs/reference/USER_GUIDE.md#webassembly)
+[Live demo](https://egg-solver.arhan.sh/) · [Documentation](docs/README.md) · [Browser setup](docs/reference/USER_GUIDE.md#webassembly)
 · [GitHub Pages deployment](docs/guide/PUBLISHING.md) · [Development scripts](scripts/README.md)

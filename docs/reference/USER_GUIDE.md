@@ -141,7 +141,7 @@ bun wasm/demo.mjs --table tables/h6 --threads 8 --batch < scrambles.txt
 bun wasm/serve.mjs --tables tables
 ```
 
-Open the local URL printed by the server. The page can generate h0–h4 or load a compatible table. Its recommended h4 option uses base 9; the explicit base-8 option trades weaker search pruning for faster generation. [The h4 study](../comparisons/TABLE_ANALYSIS.md) records that tradeoff.
+Open the local URL printed by the server, or the public site, <https://egg-solver.arhan.sh/>. On load the page starts with every core the browser reports and generates h0, the smallest table, so **Solve** works immediately. **Restart** applies a different thread count and rebuilds the selected table. The page can also generate h1–h4 or load a compatible table. Its recommended h4 option uses base 9; the explicit base-8 option trades weaker search pruning for faster generation. [The h4 study](../comparisons/TABLE_ANALYSIS.md) records that tradeoff.
 
 ### Tables
 
@@ -149,7 +149,7 @@ The wasm32 build supports h0–h6. Each Rust allocation must fit below `isize::M
 
 ### Threads
 
-Browser threads need `SharedArrayBuffer` and cross-origin isolation. The local server supplies the required COOP/COEP headers. The solver runs in a Web Worker because its thread waits cannot run on a browser's main thread. Without isolation, the page uses one thread; this includes standard GitHub Pages hosting. Bun supports the threaded wrapper without those HTTP headers.
+Browser threads need `SharedArrayBuffer` and cross-origin isolation. The local server supplies the required COOP/COEP headers, and the public site, egg-solver.arhan.sh, receives them from Cloudflare because GitHub Pages cannot set headers. The solver runs in a Web Worker because its thread waits cannot run on a browser's main thread. Without isolation, such as on a plain `github.io` deployment, the page uses one thread. Bun supports the threaded wrapper without those HTTP headers.
 
 The wrapper initializes the module and worker pool. Other hosts must perform the module's required initialization before calling its C ABI. See `wasm/src/lib.rs` and the JavaScript wrapper when embedding it directly.
 

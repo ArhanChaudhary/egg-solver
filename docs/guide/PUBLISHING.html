@@ -61,11 +61,18 @@ solver and publishes the documentation at <code>docs/</code> on the same site.</
 <p>The workflow deploys only the default branch. The deployment URL appears in
 the Actions run and the <code>github-pages</code> environment. No account, repository name,
 or site base path is hardcoded. See GitHub's <a href="https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages">custom workflow documentation</a>.</p>
-<p>The site runs the solver in your browser. Generate a small table there or
-select your own table file; large pruning tables are not uploaded to Pages.
-The demo uses one thread when cross-origin isolation is unavailable, including
-standard GitHub Pages hosting. Local <code>wasm/serve.mjs</code> enables multiple threads
-by serving the required isolation headers.</p>
+<p>The public site is <a href="https://egg-solver.arhan.sh/">https://egg-solver.arhan.sh/</a>. It runs the solver in your
+browser: on load the demo starts with every core the browser reports and
+generates h0, the smallest table, so <strong>Solve</strong> works without further setup.
+Generate a larger table there or select your own table file; large pruning
+tables are not uploaded to Pages.</p>
+<p>Browser threads need cross-origin isolation: every response must carry
+<code>Cross-Origin-Opener-Policy: same-origin</code> and
+<code>Cross-Origin-Embedder-Policy: require-corp</code>. GitHub Pages cannot set response
+headers, so egg-solver.arhan.sh is served through Cloudflare, which adds both
+headers; the public demo therefore uses multiple threads. A deployment without
+those headers, such as a plain <code>github.io</code> address, is not isolated and the
+demo falls back to one thread. Local <code>wasm/serve.mjs</code> sends the same headers.</p>
 <p>To build the same site locally, install Bun 1.4.4 and the Rust targets:</p>
 <pre><code class="language-sh">rustup target add wasm32-wasip1 wasm32-wasip1-threads
 scripts/build-pages.sh /tmp/egg-solver-pages

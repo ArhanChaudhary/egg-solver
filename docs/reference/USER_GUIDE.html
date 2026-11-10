@@ -149,11 +149,11 @@ bun wasm/demo.mjs --table tables/h6 --threads 8 --batch &lt; scrambles.txt
 <h3 id="browser">Browser</h3>
 <pre><code class="language-sh">bun wasm/serve.mjs --tables tables
 </code></pre>
-<p>Open the local URL printed by the server. The page can generate h0–h4 or load a compatible table. Its recommended h4 option uses base 9; the explicit base-8 option trades weaker search pruning for faster generation. <a href="../comparisons/TABLE_ANALYSIS.html">The h4 study</a> records that tradeoff.</p>
+<p>Open the local URL printed by the server, or the public site, <a href="https://egg-solver.arhan.sh/">https://egg-solver.arhan.sh/</a>. On load the page starts with every core the browser reports and generates h0, the smallest table, so <strong>Solve</strong> works immediately. <strong>Restart</strong> applies a different thread count and rebuilds the selected table. The page can also generate h1–h4 or load a compatible table. Its recommended h4 option uses base 9; the explicit base-8 option trades weaker search pruning for faster generation. <a href="../comparisons/TABLE_ANALYSIS.html">The h4 study</a> records that tradeoff.</p>
 <h3 id="tables">Tables</h3>
 <p>The wasm32 build supports h0–h6. Each Rust allocation must fit below <code>isize::MAX</code> (2 GiB), so h7 is rejected even though wasm32 has a larger overall address space. The table and the module's other allocations must also fit the host's memory limits. Large tables are normally generated with native <code>gen</code> and then loaded.</p>
 <h3 id="threads">Threads</h3>
-<p>Browser threads need <code>SharedArrayBuffer</code> and cross-origin isolation. The local server supplies the required COOP/COEP headers. The solver runs in a Web Worker because its thread waits cannot run on a browser's main thread. Without isolation, the page uses one thread; this includes standard GitHub Pages hosting. Bun supports the threaded wrapper without those HTTP headers.</p>
+<p>Browser threads need <code>SharedArrayBuffer</code> and cross-origin isolation. The local server supplies the required COOP/COEP headers, and the public site, egg-solver.arhan.sh, receives them from Cloudflare because GitHub Pages cannot set headers. The solver runs in a Web Worker because its thread waits cannot run on a browser's main thread. Without isolation, such as on a plain <code>github.io</code> deployment, the page uses one thread. Bun supports the threaded wrapper without those HTTP headers.</p>
 <p>The wrapper initializes the module and worker pool. Other hosts must perform the module's required initialization before calling its C ABI. See <code>wasm/src/lib.rs</code> and the JavaScript wrapper when embedding it directly.</p>
 <p><a id="speed"></a></p>
 <h3 id="performance-records">Performance records</h3>

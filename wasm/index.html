@@ -25,13 +25,13 @@
 </head>
 <body>
 <h1>egg-solver: optimal Rubik's cube solver in WebAssembly</h1>
-<p class="note">Optimal (fewest moves, half-turn metric) solutions with an H48 pruning table, in your browser. Larger tables solve faster: generate a small one here, or load a table file made by the native <code>gen</code> (h6 = 1.8 GiB is a good size for a browser).</p>
+<p class="note">Optimal (fewest moves, half-turn metric) solutions with an H48 pruning table, in your browser. The page starts on its own with every available core and the smallest table (h0), so you can solve right away. Larger tables solve faster: generate one below, or load a table file made by the native <code>gen</code> (h6 = 1.8 GiB is a good size for a browser).</p>
 
 <fieldset>
   <legend>1. Module</legend>
   <div class="row">
-    <label>Threads <input id="threads" type="number" min="1" max="64" value="1" style="width:4rem"></label>
-    <button id="init">Start</button>
+    <label>Threads <input id="threads" type="number" min="1" value="1" style="width:4rem"></label>
+    <button id="init" disabled>Restart</button>
     <span id="isolation" class="note"></span>
   </div>
 </fieldset>
@@ -40,7 +40,7 @@
   <legend>2. Table</legend>
   <div class="row">
     <label>Generate <select id="k">
-      <option value="0">h0 (29 MiB, seconds)</option>
+      <option value="0" selected>h0 (29 MiB, seconds; generated on start)</option>
       <option value="1">h1 (58 MiB)</option>
       <option value="2">h2 (116 MiB)</option>
       <option value="3">h3 (232 MiB)</option>
@@ -110,25 +110,45 @@ const tableLoaded = (t) => {
   log(`table h${t.k} base ${t.base} (${(t.bytes / 2 ** 20).toFixed(0)} MiB) ready`);
 };
 
+// Default: every core the host offers (one thread without cross-origin isolation).
+const cores = crossOriginIsolated ? Math.max(1, navigator.hardwareConcurrency || 1) : 1;
 $('isolation').textContent = crossOriginIsolated
-  ? `threads available (${navigator.hardwareConcurrency} cores)`
+  ? `threads available (${cores} cores)`
   : 'one thread available on this host';
-if (crossOriginIsolated) $('threads').value = navigator.hardwareConcurrency;
-else $('threads').disabled = true;
+$('threads').value = $('threads').max = cores;
+$('threads').disabled = !crossOriginIsolated;
 
-$('init').onclick = () => busy('start', async () => {
+// Start the module; if the threads build cannot start (for example, the host
+// refuses its 4 GiB shared memory), fall back to one thread.
+const init = async (threads) => {
   tableReady = false;
-  const { threads } = await call('init', { threads: Number($('threads').value) });
+  try {
+    ({ threads } = await call('init', { threads }));
+  } catch (e) {
+    if (threads <= 1) throw e;
+    log(`${threads} threads unavailable (${e.message}); using 1`);
+    $('threads').value = 1;
+    ({ threads } = await call('init', { threads: 1 }));
+  }
   log(`module ready, ${threads} thread(s)`);
-});
-$('generate').onclick = () => busy('generate', async () => {
-  // Use the recommended base unless a faster-generation option requests base 8.
+};
+// Generate the table selected under "Generate" (h0 by default), with the
+// recommended base unless a faster-generation option requests base 8.
+const generate = async () => {
   const [k, base] = $('k').value.split(':').map(Number);
   log(`generating h${k} ...`);
   const start = performance.now();
   tableLoaded(await call('generate', { k, base: base || 0 }));
   log(`  in ${((performance.now() - start) / 1000).toFixed(1)} s`);
+};
+
+// Restart with the thread count above, then rebuild the selected table so
+// Solve stays one click away.
+$('init').onclick = () => busy('start', async () => {
+  await init(Number($('threads').value));
+  await generate();
 });
+$('generate').onclick = () => busy('generate', generate);
 const load = (source) => busy('load', async () => {
   const start = performance.now();
   tableLoaded(await call('load', { source, verify: $('verify').checked }));
@@ -145,6 +165,14 @@ $('solve').onclick = () => busy('solve', async () => {
     const r = await call('solve', { cube, lanes: Number($('lanes').value) });
     log(`${cube}\n  ${r.length} moves in ${r.wall.toFixed(3)} s (${(r.nodes / 1e6).toFixed(1)}M nodes): ${r.moves}`);
   }
+});
+
+// The happy default: all cores and h0, with no clicks. (Set h0 explicitly:
+// browsers may restore an earlier choice of table on reload.)
+$('k').value = '0';
+busy('start', async () => {
+  await init(cores);
+  await generate();
 });
 </script>
 </body>
