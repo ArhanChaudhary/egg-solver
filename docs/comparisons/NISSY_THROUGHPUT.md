@@ -70,7 +70,7 @@ Runs hold exclusive benchmark locks, check unrelated CPU use, verify table integ
 
 ## Tuning and source limits
 
-Egg's measured CLI inputs match published source `947c20d` except a generator help-text edit that is not linked into `solve`. Binary and source hashes are in the [manifest](../data/nissy-throughput-20261108/manifest.json). The native release uses `target-cpu=native`.
+Egg's measured CLI inputs match published source `1b243c0` except a generator help-text edit that is not linked into `solve`. The raw records cite that source as `947c20d`, its ID before the repository history was rebuilt. Binary and source hashes are in the [manifest](../data/nissy-throughput-20261108/manifest.json). The native release uses `target-cpu=native`.
 
 Production egg screens used the shipped CLI at 8, 16, 24, 32, 40, 48, 64, 96 and 128 lanes, then tested 8–48 worker threads at the winning lane count. **Lanes 12 and 20 were not tested.** An ordinary `Pool::run` research caller had different timings and lane rankings from the CLI's fixed-stack-placement path. Its raw results are preserved as exploratory evidence and excluded from final configuration selection.
 

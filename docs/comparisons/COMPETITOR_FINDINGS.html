@@ -4,12 +4,24 @@
 :root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
 * { box-sizing:border-box; }
 body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
-header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header { padding:1rem max(1rem,calc((100vw - 1400px)/2)); background:#132c40; color:white; }
 header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
 header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
 header a { color:#d9f0ff; }
 header a[aria-current] { color:white; text-decoration-thickness:3px; }
-main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+.layout { max-width:1400px; margin:1.5rem auto; padding:0 1rem; display:grid; grid-template-columns:15rem minmax(0,1fr); gap:1.5rem; align-items:start; }
+.site-nav { position:sticky; top:1rem; max-height:calc(100vh - 2rem); overflow:auto; font-size:.9rem; }
+.site-menu { margin:0; padding:.4rem .8rem .8rem; background:white; }
+.site-menu summary { padding:.3rem 0; }
+.nav-group { margin:.9rem 0 .25rem; font-size:.75rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+.site-nav ul { list-style:none; margin:0; padding:0; }
+.site-nav li { margin:0; }
+.site-nav li a { display:block; padding:.2rem .45rem; border-radius:4px; text-decoration:none; line-height:1.35; }
+.site-nav li a:hover { background:#eef3f6; }
+.site-nav a[aria-current] { background:#e2edf5; font-weight:650; color:var(--ink); }
+@media(min-width:901px) { .site-menu > summary { display:none; } }
+@media(max-width:900px) { .layout { display:block; margin:.75rem auto; } .site-nav { position:static; max-height:none; margin-bottom:.75rem; } }
+main { margin:0; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
 h1 { margin-top:0; font-size:2rem; line-height:1.25; }
 h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
 h3 { margin-top:1.5rem; }
@@ -32,13 +44,13 @@ summary { cursor:pointer; font-weight:600; }
 .note,.source-link,footer { color:var(--muted); font-size:.85rem; }
 .source-link { margin-top:2rem; }
 .archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
-footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+footer { max-width:1400px; margin:1rem auto 2rem; padding:0 1rem; }
 blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
 svg { max-width:100%; height:auto; }
 :target { scroll-margin-top:1rem; }
 .skip-link { position:absolute; left:-10000px; }
 .skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
-@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+@media(max-width:700px) { .layout { padding:0 .5rem; } main { padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
 </style></head>
 <body>
 <a class="skip-link" href="#docs-content">Skip to content</a>
@@ -47,12 +59,15 @@ svg { max-width:100%; height:auto; }
 <a href="index.html">Benchmarks</a>
 <a href="../performance/index.html">Performance</a>
 <a href="../safety/index.html">Safety</a>
-<a href="../history/index.html">History</a>
-<a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<a href="../history/DELETED_EXPERIMENTS.html">Experiments</a>
+<a href="../BENCHMARK_CATALOG.html">Catalog</a>
+<a href="https://egg-solver.arhan.sh/">Solver demo ↗</a></nav></header>
+<div class="layout"><nav class="site-nav" aria-label="All documentation pages"><details class="site-menu" open><summary>All pages</summary><p class="nav-group">Start</p><ul><li><a href="../index.html">Overview</a></li><li><a href="../guide/QUICKSTART.html">Quick start</a></li><li><a href="../guide/OVERVIEW.html">Tables and memory</a></li><li><a href="../guide/HOW_IT_WORKS.html">How the search works</a></li><li><a href="../guide/GLOSSARY.html">Glossary</a></li></ul><p class="nav-group">Reference</p><ul><li><a href="../reference/USER_GUIDE.html">User guide</a></li><li><a href="../guide/DEVELOPMENT.html">Development checks</a></li><li><a href="../guide/PUBLISHING.html">Publishing the site</a></li><li><a href="../reference/inventories/index.html">Technique inventories</a></li></ul><p class="nav-group">Benchmarks</p><ul><li><a href="index.html">Solver benchmarks</a></li><li><a href="METHODS.html">Reading the tables</a></li><li><a href="NISSY_THROUGHPUT.html">nissy throughput</a></li><li><a href="NXOPT32.html">nxopt, 62 GB table</a></li><li><a href="CUBEOPT_AUDIT.html">cubeopt audit</a></li><li><a href="TABLE_ANALYSIS.html">h4 table analysis</a></li><li><a href="RESULTS.html">Multi-solver matrix</a></li><li><a href="COMPETITOR_FINDINGS.html" aria-current="page">Competitor findings</a></li></ul><p class="nav-group">Performance</p><ul><li><a href="../performance/index.html">Performance studies</a></li><li><a href="../performance/PARALLELISM.html">Parallelism</a></li><li><a href="../performance/HARDWARE_COUNTERS.html">Hardware counters</a></li><li><a href="../performance/OPTIMIZATION_REVIEW.html">Optimization review</a></li></ul><p class="nav-group">Safety</p><ul><li><a href="../safety/index.html">Correctness and safety</a></li><li><a href="../safety/NO_UB.html">Undefined behavior</a></li><li><a href="../safety/MORDANT.html">Mordant audit</a></li></ul><p class="nav-group">Evidence and history</p><ul><li><a href="../BENCHMARK_CATALOG.html">Benchmark catalog</a></li><li><a href="../reproduce/index.html">Reproduce results</a></li><li><a href="../PROVENANCE.html">Sources and IDs</a></li><li><a href="../history/DELETED_EXPERIMENTS.html">Deleted experiments</a></li></ul></details></nav>
 <main id="docs-content"><h1 id="recorded-competitor-and-harness-findings">Recorded competitor and harness findings</h1>
+<p><a href="index.html">Benchmarks</a> · <a href="RESULTS.html">Historical matrix</a></p>
 <p>These are findings against pinned historical source and supplied binaries, not claims about every later upstream release. They were not automatically reported upstream.</p>
-<p>Source commits read: nissy-core 1f7e8e9 (2026-09-17), vcube 9f5bc2c (2024-04-18), cube20src/nxopt f430921 (2025-07-18), cube_solver_test b9cca71 (2026-02-01); cubeopt30/cube48opt10 = the prebuilt binaries in ~/ (no source).</p>
-<p>Each entry: project, file:line at the commit we read, what is wrong, a repro or proof, impact, and a suggested fix.</p>
+<p>Source commits read: nissy-core 1f7e8e9 (2026-09-17), vcube 9f5bc2c (2024-04-18), cube20src/nxopt f430921 (2025-07-18), cube_solver_test b9cca71 (2026-02-01); cubeopt30/cube48opt10 = supplied prebuilt binaries (no source).</p>
+<p>Each entry: project, file:line at the pinned commit, what is wrong, a repro or proof, impact, and a suggested fix.</p>
 <div class="table-wrap" role="region" aria-label="Recorded competitor and harness findings" tabindex="0"><table id="docs-table-1"><caption>Recorded competitor and harness findings</caption>
 <thead>
 <tr><th>#</th><th>project</th><th>severity</th><th>summary</th></tr>
@@ -66,7 +81,7 @@ svg { max-width:100%; height:auto; }
 <tr><td>6</td><td>nxopt</td><td>performance</td><td>the table is one malloc per corner row with no MADV_HUGEPAGE: 4K pages on THP=madvise systems, ~11% slower</td></tr>
 </tbody>
 </table></div>
-<details class="contents"><summary>On this page</summary><ul><li><a href="#1-nissy-core-h11-table-slightly-inadmissible-generator-skips-the-last-hash-slot">1. nissy-core: h11 table slightly inadmissible (generator skips the last hash slot)</a></li><li><a href="#2-4-cube-solver-test-harness-issues-found-by-f1-while-extending-it">2–4. cube_solver_test harness issues (found by f1 while extending it)</a></li><li><a href="#5-6-huge-page-handling-performance-not-correctness">5–6. Huge-page handling (performance, not correctness)</a></li><li><a href="#f1-exact-locations-for-2-6-and-new-findings-7-10-f1-2026-11-04">f1: exact locations for #2-#6, and new findings #7-#10 (f1, 2026-11-04)</a></li><li><a href="#shm1-vcube-shared-memory-found-while-porting-shm-2026-11-05">shm1: vcube shared memory (found while porting --shm, 2026-11-05)</a></li><li><a href="#continuation-review-2026-11-05">Continuation review (2026-11-05)</a></li><li><a href="#pinned-source-links">Pinned source links</a></li></ul></details>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#1-nissy-core-h11-table-slightly-inadmissible-generator-skips-the-last-hash-slot">1. nissy-core: h11 table slightly inadmissible (generator skips the last hash slot)</a></li><li><a href="#2-4-cube-solver-test-harness-issues-found-while-extending-the-harness">2–4. cube_solver_test harness issues (found while extending the harness)</a></li><li><a href="#5-6-huge-page-handling-performance-not-correctness">5–6. Huge-page handling (performance, not correctness)</a></li><li><a href="#exact-locations-for-2-6-and-findings-7-10-2026-11-04">Exact locations for #2–#6, and findings #7–#10 (2026-11-04)</a></li><li><a href="#vcube-shared-memory-found-while-porting-shm-2026-11-05">vcube shared memory (found while porting --shm, 2026-11-05)</a></li><li><a href="#source-recheck-2026-11-05">Source recheck (2026-11-05)</a></li><li><a href="#pinned-source-links">Pinned source links</a></li></ul></details>
 <h2 id="1-nissy-core-h11-table-slightly-inadmissible-generator-skips-the-last-hash-slot">1. nissy-core: h11 table slightly inadmissible (generator skips the last hash slot)</h2>
 <ul>
 <li><strong>Where:</strong> h48/gendata_h48.h:307-316 (<code>gendata_h48_runthread</code>) with h48/map.h:68-87 (<code>h48map_nextkvpair</code> post-increments the slot index).
@@ -82,19 +97,19 @@ svg { max-width:100%; height:auto; }
 </li>
 <li><strong>Proof:</strong>
 <ul>
-<li>nissy's own depth-≤8 BFS equals ours per depth (1/1/4/34/333/3815/45382/548562/6839723).</li>
-<li>Modelling nissy's values in the 49,206 entries within 4 moves of the skipped root gives ours − nissy = [+159, +1689, +7691, −9539] per 2-bit code. That exactly matches the difference between our exact h11 distribution [1150763320, 12045847349, 91163441021, 136418085910] and nissy's checkdata.h.</li>
-<li>Scripts: /data/agents/x-h48/drv/{short,lastslot,skipped}.c.</li>
+<li>nissy's own depth-≤8 BFS equals egg-solver's per depth (1/1/4/34/333/3815/45382/548562/6839723).</li>
+<li>Modelling nissy's values in the 49,206 entries within 4 moves of the skipped root gives egg-solver − nissy = [+159, +1689, +7691, −9539] per 2-bit code. That exactly matches the difference between egg-solver's exact h11 distribution [1150763320, 12045847349, 91163441021, 136418085910] and nissy's checkdata.h.</li>
+<li>The three small C programs used for this check (<code>short.c</code>, <code>lastslot.c</code>, <code>skipped.c</code>) are not included in this repository.</li>
 </ul>
 </li>
 <li><strong>Impact:</strong> 11,546 entries are over-estimated by one level (159 true ≤10 coded 1, 1848 true 11 coded 2, 9539 true 12 coded 3). The table is therefore not admissible: a solve whose optimal path passes through one of these positions near the end could return a non-optimal solution. The probability is tiny on random cubes but nonzero.</li>
 <li><strong>Fix:</strong> after <code>h48map_nextkvpair</code>, test <code>kv.key == MAP_KEYMASK</code> while holding the mutex. That sentinel means the iterator is exhausted; every non-sentinel entry, including the last occupied slot, must be processed. Regenerate h11 and update checkdata.h.</li>
-<li><strong>To check in the final comparison:</strong> whether h9/h10 (other k) are affected; the length cross-check on h48h11 runs.</li>
+<li><strong>Follow-up:</strong> in the final comparison, every h48h11 solution length matched egg-solver's, including all distance-20 positions (see <a href="archive/MATRIX_20261107.html#solution-lengths-optimality-cross-check">solution lengths</a>). No separate check of the h9/h10 tables is recorded.</li>
 </ul>
-<h2 id="2-4-cube-solver-test-harness-issues-found-by-f1-while-extending-it">2–4. cube_solver_test harness issues (found by f1 while extending it)</h2>
+<h2 id="2-4-cube-solver-test-harness-issues-found-while-extending-the-harness">2–4. cube_solver_test harness issues (found while extending the harness)</h2>
 <ul>
-<li><strong>2. h48cmd.py output pairing.</strong> Python's stdout is block-buffered, while nissy prints its stats to stderr, so runtest.sh's awk pairs &quot;Nodes visited&quot; and &quot;Time&quot; lines from different cubes. Per-cube lines are wrong; totals and Avg are right. Fix: <code>flush=True</code> / <code>sys.stdout.flush()</code> after each solve. Patch in /data/agents/f1/cube_solver_test-cubeoptrs.patch.</li>
-<li><strong>3. h48cmd.py double table copy.</strong> <code>bytearray(f.read())</code> keeps the bytes object and the bytearray (2x the table) alive, so h48h8+ needs twice the RAM. Fix: <code>buf = bytearray(size); f.readinto(buf)</code>. Patch: same file.</li>
+<li><strong>2. h48cmd.py output pairing.</strong> Python's stdout is block-buffered, while nissy prints its stats to stderr, so runtest.sh's awk pairs &quot;Nodes visited&quot; and &quot;Time&quot; lines from different cubes. Per-cube lines are wrong; totals and Avg are right. Fix: <code>flush=True</code> / <code>sys.stdout.flush()</code> after each solve. The comparison's patched harness copy applies it.</li>
+<li><strong>3. h48cmd.py double table copy.</strong> <code>bytearray(f.read())</code> keeps the bytes object and the bytearray (2x the table) alive, so h48h8+ needs twice the RAM. Fix: <code>buf = bytearray(size); f.readinto(buf)</code>. The same patched harness copy applies it.</li>
 <li><strong>4. runtest.sh <code>-g</code>.</strong> cubeopt()/cube48opt() pass <code>-g $ngroup</code>, but the published cubeopt30/cube48opt10 binaries parse only <code>-l -m -n -t -v</code> (from their disassembly), so ngroup has no effect. Either the binaries or the script are out of date.</li>
 </ul>
 <h2 id="5-6-huge-page-handling-performance-not-correctness">5–6. Huge-page handling (performance, not correctness)</h2>
@@ -110,13 +125,13 @@ svg { max-width:100%; height:auto; }
 </ul>
 </li>
 </ul>
-<h2 id="f1-exact-locations-for-2-6-and-new-findings-7-10-f1-2026-11-04">f1: exact locations for #2-#6, and new findings #7-#10 (f1, 2026-11-04)</h2>
-<p>Exact locations for the entries above (code as read; harness = ~/ref/cube_solver_test b9cca71):</p>
+<h2 id="exact-locations-for-2-6-and-findings-7-10-2026-11-04">Exact locations for #2–#6, and findings #7–#10 (2026-11-04)</h2>
+<p>Exact locations for the entries above (code as read; harness = cube_solver_test b9cca71):</p>
 <ul>
 <li><strong>#2:</strong> h48cmd.py:31 <code>print (scramble)</code> and :34 <code>print('Time: ...')</code> go to Python's stdout, which is block-buffered when piped. nissy's stats go to stderr: python/nissy_module.c:447-449 <code>log_stdout()</code> (misnamed) does <code>fprintf(stderr, ...)</code> and is installed at :455. runtest.sh:85 merges them with <code>2&gt;&amp;1</code>.
 <ul>
 <li>Mechanism, reproduced: <code>python3 -c 'import sys; [ (sys.stderr.write(&quot;Nodes visited: %d\n&quot; % i), print(&quot;Time: %d&quot; % i)) for i in range(2)]' 2&gt;&amp;1 | cat</code> prints both &quot;Nodes&quot; lines before both &quot;Time&quot; lines. runtest.sh's awk (h48(), runtest.sh:86-97) then pairs every Time with the last cube's nodes.</li>
-<li>Fix in our copy: <code>sys.stdout.flush()</code> after each cube.</li>
+<li>Fix in the patched harness copy: <code>sys.stdout.flush()</code> after each cube.</li>
 </ul>
 </li>
 <li><strong>#3:</strong> h48cmd.py:17 <code>solver_data = bytearray(f.read())</code>.</li>
@@ -129,7 +144,6 @@ svg { max-width:100%; height:auto; }
 <li><strong>#5:</strong> vcube src/alloc.cpp:45-57 (<code>alloc::huge_impl</code>: <code>map_huge(n, 30)</code> -&gt; <code>map_huge(n, 21)</code> -&gt; <code>map_huge(n, 0)</code>; <code>map_huge</code> at :36-43 adds no madvise). The SysV-shm path is at :77-89 (the <code>-S</code> option).
 <ul>
 <li>strace: <code>mmap(3072 MiB, MAP_HUGETLB) = -1</code>, <code>mmap(2484 MiB, MAP_HUGETLB) = -1</code>, then a plain 2482 MiB mmap.</li>
-<li>200-cube numbers: /data/agents/f1/final/results.md (phase A).</li>
 </ul>
 </li>
 <li><strong>#6:</strong> cube20src nxopt.w:749 <code>firstlevs[j].p = (unsigned int *)malloc(MEMSIZE * (size_t)siz);</code> (nxopt.cpp:837 after ctangle). It allocates one block per distinct corner row.
@@ -140,7 +154,7 @@ svg { max-width:100%; height:auto; }
 </ul>
 </li>
 </ul>
-<div class="table-wrap" role="region" aria-label="f1: exact locations for #2-#6, and new findings #7-#10 (f1, 2026-11-04)" tabindex="0"><table id="docs-table-2"><caption>f1: exact locations for #2-#6, and new findings #7-#10 (f1, 2026-11-04)</caption>
+<div class="table-wrap" role="region" aria-label="Exact locations for #2–#6, and findings #7–#10 (2026-11-04)" tabindex="0"><table id="docs-table-2"><caption>Exact locations for #2–#6, and findings #7–#10 (2026-11-04)</caption>
 <thead>
 <tr><th>#</th><th>project</th><th>severity</th><th>summary</th></tr>
 </thead>
@@ -176,7 +190,7 @@ svg { max-width:100%; height:auto; }
 </ul>
 </li>
 <li><strong>Fix:</strong> allocate the bytearray first (<code>PyByteArray_FromStringAndSize(NULL, size)</code>) and generate into <code>PyByteArray_AS_STRING</code>. Or free <code>buf</code> after the copy.</li>
-<li><strong>Workaround used here:</strong> /data/agents/f1/tools/src/h48gen.c (one malloc, fwrite).</li>
+<li><strong>Workaround used here:</strong> a small standalone generator, <code>h48gen.c</code> (one malloc, fwrite).</li>
 </ul>
 <h3 id="9-nissy-core-build-sh-thread-maximum-taken-from-the-affinity-mask">9. nissy-core build.sh: thread maximum taken from the affinity mask</h3>
 <ul>
@@ -188,7 +202,7 @@ svg { max-width:100%; height:auto; }
 </li>
 <li><strong>Repro:</strong> <code>taskset -c 0-7 ./build.sh python</code> gives THREADS=8. Then <code>nissy.solve(..., threads=48)</code> logs &quot;[solve] Selected number of threads (48) is above the maximum value (8), using 8 threads instead&quot;.
 <ul>
-<li>With runtest.sh's <code>2&gt;&amp;1 | awk</code> that line is never seen. Our 48T smoke runs of h48h7 ran on 8 threads.</li>
+<li>With runtest.sh's <code>2&gt;&amp;1 | awk</code> that line is never seen. The comparison's early 48T smoke runs of h48h7 ran on 8 threads.</li>
 <li>The final runs were rebuilt with THREADS=48, and init_h48.sh now passes <code>THREADS=$(nproc --all)</code>.</li>
 </ul>
 </li>
@@ -207,24 +221,24 @@ svg { max-width:100%; height:auto; }
 </ul>
 <h3 id="watch-list-no-bug-confirmed">Watch list (no bug confirmed)</h3>
 <ul>
-<li><strong>cubeopt30:</strong> its table-generating run solved its one cube (random_state #1, 18 moves, 33.3M nodes) in 10.36 s at <code>-t 48</code>, which is 311 ns/node. That is far slower than its README class. It may be first-touch or compaction right after generation; the 200-cube phase-A run will tell.
+<li><strong>cubeopt30:</strong> its table-generating run solved its one cube (random_state #1, 18 moves, 33.3M nodes) in 10.36 s at <code>-t 48</code>, which is 311 ns/node. That is far slower than its README class. It may be first-touch or compaction right after generation; see the update below.
 <ul>
 <li>Note: its cube numbers start at 1 (&quot;Cube1&quot;).</li>
 </ul>
 </li>
 <li><strong>nissy h48h8 generation:</strong> at 48 threads it reached only ~15% after 5 min (3.5 CPU-h; ~21-24 CPU-h projected, ~30 min). h48h7 took 2.3 CPU-h. Base 10 (h8..h11) makes the depth-8 DFS ~10x more work.
 <ul>
-<li>Not a bug, but h48h9/h10/h11 generation will take &gt;= 30 min each at 48 threads.</li>
+<li>Not a bug. Generating the final h48h8–h11 tables took 1642, 1784, 1720 and 1332 s at 48 threads (see <a href="archive/MATRIX_20261107.html#tables">tables</a>).</li>
 </ul>
 </li>
 </ul>
-<h3 id="f1-update-2026-11-05-cubeopt30-watch-item-resolved">f1 update (2026-11-05): cubeopt30 watch item resolved</h3>
+<h3 id="update-2026-11-05-cubeopt30-watch-item-resolved">Update (2026-11-05): cubeopt30 watch item resolved</h3>
 <ul>
 <li>The 10.36 s for one cube came from the run that had just generated the table. In the 200-cube 48T run (table loaded from file), the same cube (Cube1) took 166.7 ms, and the mean was 0.250 s/cube on 1 GiB pages.</li>
 <li>No bug. It looks like a one-off cost right after generation (THP compaction / first touch).</li>
 </ul>
-<h2 id="shm1-vcube-shared-memory-found-while-porting-shm-2026-11-05">shm1: vcube shared memory (found while porting <code>--shm</code>, 2026-11-05)</h2>
-<div class="table-wrap" role="region" aria-label="shm1: vcube shared memory (found while porting --shm, 2026-11-05)" tabindex="0"><table id="docs-table-3"><caption>shm1: vcube shared memory (found while porting --shm, 2026-11-05)</caption>
+<h2 id="vcube-shared-memory-found-while-porting-shm-2026-11-05">vcube shared memory (found while porting <code>--shm</code>, 2026-11-05)</h2>
+<div class="table-wrap" role="region" aria-label="vcube shared memory (found while porting --shm, 2026-11-05)" tabindex="0"><table id="docs-table-3"><caption>vcube shared memory (found while porting --shm, 2026-11-05)</caption>
 <thead>
 <tr><th>#</th><th>project</th><th>severity</th><th>summary</th></tr>
 </thead>
@@ -244,15 +258,15 @@ svg { max-width:100%; height:auto; }
 </li>
 <li><strong>Impact:</strong> in a zero-filled segment every entry reads 0, so <code>fetch()</code> (nxprune.h:357-362) returns the stripe minimum 0 for every position. The bounds are still admissible, so solutions stay optimal, but the search is unpruned: in practice a hang for 17-20 move positions. A partly filled segment gives weaker bounds for the rest. Neither is reported.
 <ul>
-<li>vcube's README (&quot;Shared memory&quot;) mentions removing a segment &quot;which is corrupt because it was interrupted while loading&quot;, but nothing detects it. The user has to know to run <code>ipcrm</code>.</li>
+<li>vcube's README (&quot;Shared memory&quot;) mentions removing a segment &quot;which is corrupt because it was interrupted while loading&quot;, but nothing detects it. Users have to know to run <code>ipcrm</code>.</li>
 </ul>
 </li>
-<li><strong>Fix:</strong> write a small header after the data, last (the table's size and a checksum or generator version), and check it on every attach; remove the segment (IPC_RMID) when the load fails. egg-solver's <code>--shm</code> (shm1) writes the file's trailer last and compares it on every attach, and removes a segment whose loader died.</li>
+<li><strong>Fix:</strong> write a small header after the data, last (the table's size and a checksum or generator version), and check it on every attach; remove the segment (IPC_RMID) when the load fails. egg-solver's <code>--shm</code> writes the file's trailer last and compares it on every attach, and removes a segment whose loader died.</li>
 </ul>
-<h2 id="continuation-review-2026-11-05">Continuation review (2026-11-05)</h2>
-<p>The source mechanisms for #1–#3 and #5–#11 were checked again against the exact commits named above, using <code>git show</code> rather than the harness's modified working files. Source excerpts with full commit IDs are retained in <code>/data/agents/codex-resume/competitor-source-evidence.txt</code>. The performance numbers and the large-table numerical proof remain the original recorded measurements; this source review does not claim to have rerun those experiments. #4's harness invocation was rechecked; the binary option-switch evidence remains the original disassembly.</p>
+<h2 id="source-recheck-2026-11-05">Source recheck (2026-11-05)</h2>
+<p>The source mechanisms for #1–#3 and #5–#11 were checked again against the exact commits named above, using <code>git show</code> rather than the harness's modified working files. Source excerpts with full commit IDs are retained in <a href="../reference/competitor-source-evidence.txt">competitor-source-evidence.txt</a>. The performance numbers and the large-table numerical proof remain the original recorded measurements; this source review does not claim to have rerun those experiments. #4's harness invocation was rechecked; the binary option-switch evidence remains the original disassembly.</p>
 <p><strong>Correction to #1's suggested fix:</strong> changing <code>*next == capacity</code> to <code>*next &gt; capacity</code> is insufficient and can loop forever: <code>h48map_nextkvpair</code> stops advancing at <code>capacity</code>. In this source the exhausted iterator returns <code>kv.key == MAP_KEYMASK</code>; check that sentinel under the mutex, and process every non-sentinel entry, including the last occupied slot. Regenerate the table after fixing the loop.</p>
-<p>The distance-20 interference validation also requires serial nissy timings: h48h7 took 210.867 s/cube alone and 217.062 s/cube in the parallel block (+2.94%, above the agreed 2% limit). Parallel distance-20 timings are excluded from the final comparison and preserved as rejected evidence.</p>
+<p>The distance-20 interference validation also requires serial nissy timings: h48h7 took 210.867 s/cube alone and 217.062 s/cube in the parallel block (+2.94%, above the 2% interference limit). Parallel distance-20 timings are excluded from the final comparison and preserved as rejected evidence.</p>
 <h2 id="pinned-source-links">Pinned source links</h2>
 <ul>
 <li><a href="https://github.com/sebastianotronto/nissy-core/tree/1f7e8e937d0e71e7eb3b5deab38b34d0a0159d88">nissy-core source snapshot</a></li>
@@ -261,7 +275,7 @@ svg { max-width:100%; height:auto; }
 <li><a href="https://github.com/cs0x7f/cube_solver_test/tree/b9cca71cdf3f6e57bd3c7bfdc2491e5b806dda31">cube_solver_test source snapshot</a></li>
 </ul>
 
-<p class="source-link"><a href="COMPETITOR_FINDINGS.md">Markdown source</a></p></main>
+<p class="source-link"><a href="COMPETITOR_FINDINGS.md">Markdown source</a></p></main></div>
 <footer><a href="../PROVENANCE.html">Sources and evidence scope</a></footer>
 <script>
 for (const wrapper of document.querySelectorAll('.table-wrap')) {
@@ -288,5 +302,8 @@ function revealTarget(){
   for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
 }
 revealTarget(); window.addEventListener('hashchange',revealTarget);
+const menu=document.querySelector('.site-menu');
+if(menu){const wide=matchMedia('(min-width:901px)');const sync=()=>{menu.open=wide.matches;};sync();wide.addEventListener('change',sync);
+const current=menu.querySelector('[aria-current]');if(current&&wide.matches)current.scrollIntoView({block:'nearest'});}
 </script>
 </body></html>

@@ -1,10 +1,12 @@
 # Recorded competitor and harness findings
 
+[Benchmarks](README.md) · [Historical matrix](RESULTS.md)
+
 These are findings against pinned historical source and supplied binaries, not claims about every later upstream release. They were not automatically reported upstream.
 
-Source commits read: nissy-core 1f7e8e9 (2026-09-17), vcube 9f5bc2c (2024-04-18), cube20src/nxopt f430921 (2025-07-18), cube_solver_test b9cca71 (2026-02-01); cubeopt30/cube48opt10 = the prebuilt binaries in ~/ (no source).
+Source commits read: nissy-core 1f7e8e9 (2026-09-17), vcube 9f5bc2c (2024-04-18), cube20src/nxopt f430921 (2025-07-18), cube_solver_test b9cca71 (2026-02-01); cubeopt30/cube48opt10 = supplied prebuilt binaries (no source).
 
-Each entry: project, file:line at the commit we read, what is wrong, a repro or proof, impact, and a suggested fix.
+Each entry: project, file:line at the pinned commit, what is wrong, a repro or proof, impact, and a suggested fix.
 
 | # | project | severity | summary |
 |---|---|---|---|
@@ -23,17 +25,17 @@ Each entry: project, file:line at the commit we read, what is wrong, a repro or 
   - With the fixed capacity 10000019 and nissy's hash, that slot holds the depth-8 h11 entry 189880194105 (class 2675, no self-symmetry). Its 4-level DFS never runs: the loop visits 7,437,854 of 7,437,855 short entries.
   - The same loop shape in `gendata_h48short` (gendata_h48.h:62-65) is harmless, because that entry's value is 8 (the last BFS level).
 - **Proof:**
-  - nissy's own depth-≤8 BFS equals ours per depth (1/1/4/34/333/3815/45382/548562/6839723).
-  - Modelling nissy's values in the 49,206 entries within 4 moves of the skipped root gives ours − nissy = [+159, +1689, +7691, −9539] per 2-bit code. That exactly matches the difference between our exact h11 distribution [1150763320, 12045847349, 91163441021, 136418085910] and nissy's checkdata.h.
-  - Scripts: /data/agents/x-h48/drv/{short,lastslot,skipped}.c.
+  - nissy's own depth-≤8 BFS equals egg-solver's per depth (1/1/4/34/333/3815/45382/548562/6839723).
+  - Modelling nissy's values in the 49,206 entries within 4 moves of the skipped root gives egg-solver − nissy = [+159, +1689, +7691, −9539] per 2-bit code. That exactly matches the difference between egg-solver's exact h11 distribution [1150763320, 12045847349, 91163441021, 136418085910] and nissy's checkdata.h.
+  - The three small C programs used for this check (`short.c`, `lastslot.c`, `skipped.c`) are not included in this repository.
 - **Impact:** 11,546 entries are over-estimated by one level (159 true ≤10 coded 1, 1848 true 11 coded 2, 9539 true 12 coded 3). The table is therefore not admissible: a solve whose optimal path passes through one of these positions near the end could return a non-optimal solution. The probability is tiny on random cubes but nonzero.
 - **Fix:** after `h48map_nextkvpair`, test `kv.key == MAP_KEYMASK` while holding the mutex. That sentinel means the iterator is exhausted; every non-sentinel entry, including the last occupied slot, must be processed. Regenerate h11 and update checkdata.h.
-- **To check in the final comparison:** whether h9/h10 (other k) are affected; the length cross-check on h48h11 runs.
+- **Follow-up:** in the final comparison, every h48h11 solution length matched egg-solver's, including all distance-20 positions (see [solution lengths](archive/MATRIX_20261107.md#solution-lengths-optimality-cross-check)). No separate check of the h9/h10 tables is recorded.
 
-## 2–4. cube_solver_test harness issues (found by f1 while extending it)
+## 2–4. cube_solver_test harness issues (found while extending the harness)
 
-- **2. h48cmd.py output pairing.** Python's stdout is block-buffered, while nissy prints its stats to stderr, so runtest.sh's awk pairs "Nodes visited" and "Time" lines from different cubes. Per-cube lines are wrong; totals and Avg are right. Fix: `flush=True` / `sys.stdout.flush()` after each solve. Patch in /data/agents/f1/cube_solver_test-cubeoptrs.patch.
-- **3. h48cmd.py double table copy.** `bytearray(f.read())` keeps the bytes object and the bytearray (2x the table) alive, so h48h8+ needs twice the RAM. Fix: `buf = bytearray(size); f.readinto(buf)`. Patch: same file.
+- **2. h48cmd.py output pairing.** Python's stdout is block-buffered, while nissy prints its stats to stderr, so runtest.sh's awk pairs "Nodes visited" and "Time" lines from different cubes. Per-cube lines are wrong; totals and Avg are right. Fix: `flush=True` / `sys.stdout.flush()` after each solve. The comparison's patched harness copy applies it.
+- **3. h48cmd.py double table copy.** `bytearray(f.read())` keeps the bytes object and the bytearray (2x the table) alive, so h48h8+ needs twice the RAM. Fix: `buf = bytearray(size); f.readinto(buf)`. The same patched harness copy applies it.
 - **4. runtest.sh `-g`.** cubeopt()/cube48opt() pass `-g $ngroup`, but the published cubeopt30/cube48opt10 binaries parse only `-l -m -n -t -v` (from their disassembly), so ngroup has no effect. Either the binaries or the script are out of date.
 
 ## 5–6. Huge-page handling (performance, not correctness)
@@ -43,19 +45,18 @@ Each entry: project, file:line at the commit we read, what is wrong, a repro or 
 - **6. nxopt** (cube20src nxopt.w): one malloc per corner row (114 × 17.5 MiB + smaller), no madvise, so 4K pages on THP=madvise. With glibc.malloc.hugetlb=1 + mmap_threshold=32 MiB: 1T −11%, 48T −11%.
   - Fix: one aligned allocation for the whole table + MADV_HUGEPAGE.
 
-## f1: exact locations for #2-#6, and new findings #7-#10 (f1, 2026-11-04)
+## Exact locations for #2–#6, and findings #7–#10 (2026-11-04)
 
-Exact locations for the entries above (code as read; harness = ~/ref/cube_solver_test b9cca71):
+Exact locations for the entries above (code as read; harness = cube_solver_test b9cca71):
 - **#2:** h48cmd.py:31 `print (scramble)` and :34 `print('Time: ...')` go to Python's stdout, which is block-buffered when piped. nissy's stats go to stderr: python/nissy_module.c:447-449 `log_stdout()` (misnamed) does `fprintf(stderr, ...)` and is installed at :455. runtest.sh:85 merges them with `2>&1`.
   - Mechanism, reproduced: `python3 -c 'import sys; [ (sys.stderr.write("Nodes visited: %d\n" % i), print("Time: %d" % i)) for i in range(2)]' 2>&1 | cat` prints both "Nodes" lines before both "Time" lines. runtest.sh's awk (h48(), runtest.sh:86-97) then pairs every Time with the last cube's nodes.
-  - Fix in our copy: `sys.stdout.flush()` after each cube.
+  - Fix in the patched harness copy: `sys.stdout.flush()` after each cube.
 - **#3:** h48cmd.py:17 `solver_data = bytearray(f.read())`.
 - **#4:** runtest.sh:124 `./cube$3$2 -t $nthread -g $ngroup -m $maxl -`.
   - Binaries: the option switch in main does `sub $0x6c,%eax; cmp $0xa,%al` (cube48opt10 at 0x2a79, cubeopt30 at 0x2a99), then a jump table (0x183f4 / 0x193f4). That table has cases only for l, m, n, t and v: `-l` scramble length (default 15), `-m` max depth (20), `-n` count (100), `-t` threads, `-v` debug.
   - `-g` is skipped; its value "1" briefly becomes the mode character, and the final "-" sets the stdin mode again. So `-g` is harmless but has no effect.
 - **#5:** vcube src/alloc.cpp:45-57 (`alloc::huge_impl`: `map_huge(n, 30)` -> `map_huge(n, 21)` -> `map_huge(n, 0)`; `map_huge` at :36-43 adds no madvise). The SysV-shm path is at :77-89 (the `-S` option).
   - strace: `mmap(3072 MiB, MAP_HUGETLB) = -1`, `mmap(2484 MiB, MAP_HUGETLB) = -1`, then a plain 2482 MiB mmap.
-  - 200-cube numbers: /data/agents/f1/final/results.md (phase A).
 - **#6:** cube20src nxopt.w:749 `firstlevs[j].p = (unsigned int *)malloc(MEMSIZE * (size_t)siz);` (nxopt.cpp:837 after ctangle). It allocates one block per distinct corner row.
   - glibc serves each block with its own mmap: strace shows 114 mmaps of 17.5 MiB plus smaller ones, and no madvise.
   - `glibc.malloc.hugetlb=1` alone does not help: blocks under 2 MiB are separate small mmaps, and with 700 KiB blocks the test showed 0% THP.
@@ -82,14 +83,14 @@ Exact locations for the entries above (code as read; harness = ~/ref/cube_solver
 - **Impact:** 2x the table during generation, and the original copy stays leaked: about 15 GB for h48h8 and 121 GB for h48h11.
   - The harness's h48cmd.py generates through this path when the table file is missing.
 - **Fix:** allocate the bytearray first (`PyByteArray_FromStringAndSize(NULL, size)`) and generate into `PyByteArray_AS_STRING`. Or free `buf` after the copy.
-- **Workaround used here:** /data/agents/f1/tools/src/h48gen.c (one malloc, fwrite).
+- **Workaround used here:** a small standalone generator, `h48gen.c` (one malloc, fwrite).
 
 ### 9. nissy-core build.sh: thread maximum taken from the affinity mask
 - **Where:** build.sh:44 `THREADS=${THREADS-...}`, :61-65 `detectthreads` -> `portable_nproc` -> `nproc` (:50). `nproc` honours `sched_getaffinity`.
   - The value becomes the compile-time `-DTHREADS`.
   - At solve time, src/nissy.c:349-353 clamps any larger request to it with only a LOG line.
 - **Repro:** `taskset -c 0-7 ./build.sh python` gives THREADS=8. Then `nissy.solve(..., threads=48)` logs "[solve] Selected number of threads (48) is above the maximum value (8), using 8 threads instead".
-  - With runtest.sh's `2>&1 | awk` that line is never seen. Our 48T smoke runs of h48h7 ran on 8 threads.
+  - With runtest.sh's `2>&1 | awk` that line is never seen. The comparison's early 48T smoke runs of h48h7 ran on 8 threads.
   - The final runs were rebuilt with THREADS=48, and init_h48.sh now passes `THREADS=$(nproc --all)`.
 - **Fix:** `nproc --all` (or `getconf _NPROCESSORS_ONLN`), or a much larger default maximum: THREADS only sizes arrays.
 
@@ -101,16 +102,16 @@ Exact locations for the entries above (code as read; harness = ~/ref/cube_solver
 - **Fix:** wait on the workers with a timed join or a condition variable, instead of a fixed sleep.
 
 ### Watch list (no bug confirmed)
-- **cubeopt30:** its table-generating run solved its one cube (random_state #1, 18 moves, 33.3M nodes) in 10.36 s at `-t 48`, which is 311 ns/node. That is far slower than its README class. It may be first-touch or compaction right after generation; the 200-cube phase-A run will tell.
+- **cubeopt30:** its table-generating run solved its one cube (random_state #1, 18 moves, 33.3M nodes) in 10.36 s at `-t 48`, which is 311 ns/node. That is far slower than its README class. It may be first-touch or compaction right after generation; see the update below.
   - Note: its cube numbers start at 1 ("Cube1").
 - **nissy h48h8 generation:** at 48 threads it reached only ~15% after 5 min (3.5 CPU-h; ~21-24 CPU-h projected, ~30 min). h48h7 took 2.3 CPU-h. Base 10 (h8..h11) makes the depth-8 DFS ~10x more work.
-  - Not a bug, but h48h9/h10/h11 generation will take >= 30 min each at 48 threads.
+  - Not a bug. Generating the final h48h8–h11 tables took 1642, 1784, 1720 and 1332 s at 48 threads (see [tables](archive/MATRIX_20261107.md#tables)).
 
-### f1 update (2026-11-05): cubeopt30 watch item resolved
+### Update (2026-11-05): cubeopt30 watch item resolved
 - The 10.36 s for one cube came from the run that had just generated the table. In the 200-cube 48T run (table loaded from file), the same cube (Cube1) took 166.7 ms, and the mean was 0.250 s/cube on 1 GiB pages.
 - No bug. It looks like a one-off cost right after generation (THP compaction / first touch).
 
-## shm1: vcube shared memory (found while porting `--shm`, 2026-11-05)
+## vcube shared memory (found while porting `--shm`, 2026-11-05)
 
 | # | project | severity | summary |
 |---|---|---|---|
@@ -123,16 +124,16 @@ Exact locations for the entries above (code as read; harness = ~/ref/cube_solver
   - src/vc-optimal.cpp:84-87 (`S()`): the key is `0x76630000 | Base << 8 | (EP + 1) << 4 | (EO + 1) * 4`. It names the coordinate and base, not the table, so a table regenerated after a generator fix (same file name) is shadowed by the old segment until `ipcrm` or reboot.
   - src/alloc.cpp:77-89 `shared_impl`: the creating run keeps its read-write attachment for the search (no `SHM_RDONLY` re-attach).
 - **Impact:** in a zero-filled segment every entry reads 0, so `fetch()` (nxprune.h:357-362) returns the stripe minimum 0 for every position. The bounds are still admissible, so solutions stay optimal, but the search is unpruned: in practice a hang for 17-20 move positions. A partly filled segment gives weaker bounds for the rest. Neither is reported.
-  - vcube's README ("Shared memory") mentions removing a segment "which is corrupt because it was interrupted while loading", but nothing detects it. The user has to know to run `ipcrm`.
-- **Fix:** write a small header after the data, last (the table's size and a checksum or generator version), and check it on every attach; remove the segment (IPC_RMID) when the load fails. egg-solver's `--shm` (shm1) writes the file's trailer last and compares it on every attach, and removes a segment whose loader died.
+  - vcube's README ("Shared memory") mentions removing a segment "which is corrupt because it was interrupted while loading", but nothing detects it. Users have to know to run `ipcrm`.
+- **Fix:** write a small header after the data, last (the table's size and a checksum or generator version), and check it on every attach; remove the segment (IPC_RMID) when the load fails. egg-solver's `--shm` writes the file's trailer last and compares it on every attach, and removes a segment whose loader died.
 
-## Continuation review (2026-11-05)
+## Source recheck (2026-11-05)
 
-The source mechanisms for #1–#3 and #5–#11 were checked again against the exact commits named above, using `git show` rather than the harness's modified working files. Source excerpts with full commit IDs are retained in `/data/agents/codex-resume/competitor-source-evidence.txt`. The performance numbers and the large-table numerical proof remain the original recorded measurements; this source review does not claim to have rerun those experiments. #4's harness invocation was rechecked; the binary option-switch evidence remains the original disassembly.
+The source mechanisms for #1–#3 and #5–#11 were checked again against the exact commits named above, using `git show` rather than the harness's modified working files. Source excerpts with full commit IDs are retained in [competitor-source-evidence.txt](../reference/competitor-source-evidence.txt). The performance numbers and the large-table numerical proof remain the original recorded measurements; this source review does not claim to have rerun those experiments. #4's harness invocation was rechecked; the binary option-switch evidence remains the original disassembly.
 
 **Correction to #1's suggested fix:** changing `*next == capacity` to `*next > capacity` is insufficient and can loop forever: `h48map_nextkvpair` stops advancing at `capacity`. In this source the exhausted iterator returns `kv.key == MAP_KEYMASK`; check that sentinel under the mutex, and process every non-sentinel entry, including the last occupied slot. Regenerate the table after fixing the loop.
 
-The distance-20 interference validation also requires serial nissy timings: h48h7 took 210.867 s/cube alone and 217.062 s/cube in the parallel block (+2.94%, above the agreed 2% limit). Parallel distance-20 timings are excluded from the final comparison and preserved as rejected evidence.
+The distance-20 interference validation also requires serial nissy timings: h48h7 took 210.867 s/cube alone and 217.062 s/cube in the parallel block (+2.94%, above the 2% interference limit). Parallel distance-20 timings are excluded from the final comparison and preserved as rejected evidence.
 
 ## Pinned source links
 

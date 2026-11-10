@@ -71,7 +71,7 @@ Recorded speedup over each competitor in the earlier matrix; higher is better. A
 | vcube208 | h8 | 7.81 / 7.78 | throughput | 14.2× | 12.3× |
 | cube48opt-rust Opt8 | h8 | 7.78 / 7.78 | throughput | 3.9× | 3.2× |
 
-These measurements used egg-solver `229b99f`. Later build differences,
+These measurements used egg-solver `979dcf6`. Later build differences,
 samples, variation and limitations are in the [full comparison](docs/comparisons/README.md).
 The newer [500-state nissy throughput study](docs/comparisons/NISSY_THROUGHPUT.md) and
 [62.474 GB nxopt study](docs/comparisons/NXOPT32.md) have separate configurations and timing definitions.

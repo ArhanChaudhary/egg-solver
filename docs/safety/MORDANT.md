@@ -1,8 +1,12 @@
 # Mordant audit of egg-solver
 
+[Safety overview](README.md) · [UB evidence summary](NO_UB.md)
+
+Mordant is a third-party Rust lint tool, run as `cargo mordant` ([pinned upstream source](https://github.com/scarletindustries/mordant/tree/564c8da5cb0d4fc9b1717b4b42e6e60dbeef237b)). Its diagnostics flag code patterns for review; they are compile-time lints, not runtime tests.
+
 **Safety candidate audit recorded — 2026-11-07 09:30 UTC**
 
-Mordant was rerun on candidate `316597f64a9bd749e8a01b67f96c108c03611e68`, source SHA-256 `93478bc5c45ba267255574f8cb466f02f006f1c7bf558fb8f9d088ec4307a4c9`, after the additional safety changes. Both supported-target commands completed successfully with no compiler errors. This is a completed lint audit, not a claim of zero warnings or a memory-safety certificate.
+Mordant was rerun on candidate `13307bad3150bd7eaeb138f9e0af5d75ae040640`, source SHA-256 `93478bc5c45ba267255574f8cb466f02f006f1c7bf558fb8f9d088ec4307a4c9`, after the additional safety changes. Both supported-target commands completed successfully with no compiler errors. This is a completed lint audit, not a claim of zero warnings or a memory-safety certificate.
 
 | Target | Distinct lint diagnostics | Compiler errors | Command result |
 |---|---:|---:|---|
@@ -11,9 +15,9 @@ Mordant was rerun on candidate `316597f64a9bd749e8a01b67f96c108c03611e68`, sourc
 
 The native findings cover the shared-search `Sync` implementation, internal constructors, enum catch-all branches, tuple return types and conditional fields. The WASI count includes 51 target-scoped unused-public-API findings and seven error-to-string conversions at the JavaScript-facing boundary. Findings overlap across targets and should not be added as distinct defects.
 
-Review of the candidate constructor warnings found the checks at their producers: generation validates k/base before allocating; the DFS generator validates its settings; collapse derives k from a validated source with a checked shape; shared-memory attachment validates its size before constructing `Memory`. The table constructors are now internal. The preflight metadata failure still reaches the validating loader rather than accepting a bad table. The `CubeCtx` warning remains an appropriate reminder that its `UnsafeCell` ownership protocol depends on the publication and completion rules described in `NO_UB.md`; the new tracing/publication correction addresses the reproduced overlap. Tuple and enum suggestions alone do not establish an incorrect access. No source edits were made merely to silence these diagnostics.
+Review of the candidate constructor warnings found the checks at their producers: generation validates k/base before allocating; the DFS generator validates its settings; collapse derives k from a validated source with a checked shape; shared-memory attachment validates its size before constructing `Memory`. The table constructors are now internal. The preflight metadata failure still reaches the validating loader rather than accepting a bad table. The `CubeCtx` warning remains an appropriate reminder that its `UnsafeCell` ownership protocol depends on the publication and completion rules described in the [UB assessment](NO_UB.md); the new tracing/publication correction addresses the reproduced overlap. Tuple and enum suggestions alone do not establish an incorrect access. No source edits were made merely to silence these diagnostics.
 
-The first WASI invocation compiled successfully but Mordant itself returned 101 because a cached build lacked its `over-baseline.txt` count. The cache was preserved under `target-safety-native/mordant-before-final-wasm-retry`, and a fresh-cache WASI retry completed with exit 0. The failed tool attempt remains recorded and is not counted as a passing run.
+The first WASI invocation compiled successfully but Mordant itself returned 101 because a cached build lacked its `over-baseline.txt` count. The cache was preserved, and a fresh-cache WASI retry completed with exit 0. The failed tool attempt remains recorded and is not counted as a passing run.
 
 Evidence: [source-bound validation](../evidence/validation/mordant/final-candidate-validation.json), [recorded structured findings](../evidence/validation/mordant/final-candidate-findings.json), [preserved first attempt](../evidence/validation/mordant/final-candidate-first-attempt.json), [UB assessment](NO_UB.md).
 
@@ -23,13 +27,13 @@ Completed 2026-11-07 03:52 UTC.
 
 All six supported-target runs completed with exit status **0**. They emitted warnings; this is not a warning-free or memory-safety certification. No automatic fixes or production-source changes were made.
 
-Tool: mordant 0.1.0 (564c8da5cb0d4fc9b1717b4b42e6e60dbeef237b, rustc 1.100.0-nightly (0dfb098f3 2026-08-31)). [Pinned upstream source](https://github.com/scarletindustries/mordant/tree/564c8da5cb0d4fc9b1717b4b42e6e60dbeef237b). Default Mordant configuration, no baseline or added suppressions. The tool lists 49 registered lints; configuration-dependent/opt-in rules were not separately enabled.
+Tool: mordant 0.1.0 (564c8da5cb0d4fc9b1717b4b42e6e60dbeef237b, rustc 1.100.0-nightly (0dfb098f3 2026-08-31)), from the pinned upstream source linked above. Default Mordant configuration, no baseline or added suppressions. The tool lists 49 registered lints; configuration-dependent/opt-in rules were not separately enabled.
 
 | Source snapshot | Native findings | WASI findings | Compiler errors |
 |---|---:|---:|---:|
-| Earlier main `56ace9c` | 14 | 58 | 0 |
-| Pending safety fixes `988f289` | 14 | 58 | 0 |
-| SSSE3 candidate on `93867a4` plus staged changes | 12 | 58 | 0 |
+| Earlier main `c551a06` | 14 | 58 | 0 |
+| Safety-fix candidate `e18e971` (not yet merged at the time) | 14 | 58 | 0 |
+| SSSE3 candidate on `da134bc` plus staged changes | 12 | 58 | 0 |
 
 Findings are deduplicated within each run by lint, message and source location. Rows and targets overlap: do not add these counts as distinct defects. Native SSSE3 uses `-C target-cpu=westmere`; the other native runs use the workspace native CPU configuration. This table is a lint comparison, with no performance measurements.
 
@@ -45,11 +49,11 @@ WASI command (with `RUSTFLAGS="-C target-feature=+simd128"`):
 cargo mordant -p egg-solver-wasm --lib --target wasm32-wasip1 --locked --keep-going --message-format=json
 ```
 
-The initial whole-workspace Linux commands returned101 because the WASM wrapper references `Memory::try_anonymous`, which exists on its supported WebAssembly target but not the Unix memory implementation. Those logs remain preserved. The corrected commands above completed successfully without changing source.
+The initial whole-workspace Linux commands returned 101 because the WASM wrapper references `Memory::try_anonymous`, which exists on its supported WebAssembly target but not the Unix memory implementation. Those logs remain preserved. The corrected commands above completed successfully without changing source.
 
-These are compiler/lint runs, not runtime tests. The WASI pass covers the non-threaded WASI library. ARM/NEON and the WASI threads target were not separately scanned by Mordant in this audit. Existing backend tests and the incomplete full Miri work are separate evidence.
+These are compiler/lint runs, not runtime tests. The WASI pass covers the non-threaded WASI library. ARM/NEON and the WASI threads target were not separately scanned by Mordant in this audit. Existing backend tests and the full Miri work (incomplete at that time; both full catalogues later passed, see the [UB assessment](NO_UB.md)) are separate evidence.
 
-**Review of the current native findings**
+**Review of the native findings on these snapshots**
 
 | Lint | Count | Assessment |
 |---|---:|---|
@@ -60,11 +64,11 @@ These are compiler/lint runs, not runtime tests. The WASI pass covers the non-th
 | `unsafe_send_covers_more_than_pointers` | 1 | Manual concurrency proof required |
 | `wildcard_over_own_enum` | 2 | Future exhaustiveness protection |
 
-The highest-priority manual review is the `unsafe impl Sync for CubeCtx`: its `UnsafeCell<Inner>` relies on the shared-search synchronization protocol. Mordant did not demonstrate a race. All16 shared-search seed harnesses previously passed, but the full x86 Miri run hit its90-minute time limit in the checksum test; the complete Miri validation remains unfinished.
+The highest-priority manual review is the `unsafe impl Sync for CubeCtx`: its `UnsafeCell<Inner>` relies on the shared-search synchronization protocol. Mordant did not demonstrate a race. All 16 shared-search seed harnesses had passed, but the full x86 Miri run had hit its 90-minute time limit in the checksum test; the complete Miri validation was unfinished at that time.
 
 **`defaulted_failure`:** LoadArgs::open_reported calls preflight, then open_logged. The preflight metadata failure is deliberately deferred; H48Table::open_reporting calls read_meta(path)? before using the table. Propagating the first error directly could make this clearer.
 
-**`unsafe_send_covers_more_than_pointers`:** CubeCtx contains UnsafeCell<Inner>, so its unsafe Sync implementation depends on the builder/worker synchronization protocol, not just ownership of raw pointers. The lint does not demonstrate a race. This remains a high-priority safety-review area; completed scheduling-seed tests are evidence, and the complete Miri run remains incomplete.
+**`unsafe_send_covers_more_than_pointers`:** CubeCtx contains UnsafeCell<Inner>, so its unsafe Sync implementation depends on the builder/worker synchronization protocol, not just ownership of raw pointers. The lint does not demonstrate a race. This remains a high-priority safety-review area; completed scheduling-seed tests are evidence, and the complete Miri run was incomplete at that time.
 
 **`unchecked_construction`:** Generated and derived H48 tables construct fresh memory sized from k; from_file_memory additionally validates a serialized file trailer, which those fresh buffers do not have. The shared-memory path wraps an existing kernel attachment instead of allocating anonymous memory. These are distinct construction paths, so replacing every literal with the suggested constructor would be incorrect. Encapsulating their separate invariants in named constructors would improve auditability.
 
@@ -76,7 +80,7 @@ The highest-priority manual review is the `unsafe impl Sync for CubeCtx`: its `U
 
 **`stringified_error`:** The wrapper uses string errors for its exported last-error interface. Converting typed errors here loses programmatic classification, but the current ABI already communicates failure through a status and error text. Keep typed errors longer if structured JavaScript error handling is added; these warnings do not demonstrate a failed solve.
 
-**`unused_pub`:** These41 findings came from the WASI library-only build, with native CLI targets, tests, and external Rust clients absent. Several named items are used by native binaries or tests. Do not remove or restrict public APIs solely from these results.
+**`unused_pub`:** These 41 findings came from the WASI library-only build, with native CLI targets, tests, and external Rust clients absent. Several named items are used by native binaries or tests. Do not remove or restrict public APIs solely from these results.
 
 ### Earlier main: native locations
 
@@ -99,7 +103,7 @@ The highest-priority manual review is the `unsafe impl Sync for CubeCtx`: its `U
 
 ### Earlier main: additional WASI diagnostics
 
-The WASI build has10 overlapping core findings, seven typed-error-to-string findings in the wrapper, and41 public-API usage warnings. The usage warnings apply to this library-only target selection; they are not a basis for deleting APIs used by native binaries, tests or external callers.
+The WASI build has 10 overlapping core findings, seven typed-error-to-string findings in the wrapper, and 41 public-API usage warnings. The usage warnings apply to this library-only target selection; they are not a basis for deleting APIs used by native binaries, tests or external callers.
 
 | Lint | Location | Diagnostic |
 |---|---|---|
@@ -152,6 +156,6 @@ The WASI build has10 overlapping core findings, seven typed-error-to-string find
 | `unused_pub` | [src/tables/shm.rs:188](../evidence/validation/mordant/sources/main/src/tables/shm.rs.html#L188) | function `egg_solver::tables::shm::new_segment_page` is public, but nothing in the workspace uses it |
 | `unused_pub` | [src/tables/shm.rs:197](../evidence/validation/mordant/sources/main/src/tables/shm.rs.html#L197) | function `egg_solver::tables::shm::remove` is public, but nothing in the workspace uses it |
 
-Raw evidence: [all structured findings](../evidence/validation/mordant/findings.json), [commands and exit statuses](../evidence/validation/mordant/results.json), [source hashes](../evidence/validation/mordant/sources.json), and each run’s `.stdout`, `.stderr`, and `.diagnostics.txt` under `/data/agents/mordant-audit/`.
+Raw evidence: [all structured findings](../evidence/validation/mordant/findings.json), [commands and exit statuses](../evidence/validation/mordant/results.json), [source hashes](../evidence/validation/mordant/sources.json). Each run’s `.stdout`, `.stderr` and `.diagnostics.txt` were kept with the original audit records and are not included in this documentation set.
 
 The recorded main and then-pending safety-candidate diagnostics have the same warning categories and counts. The SSSE3 candidate produces no new warning category; it compiles a different coordinate implementation, which accounts for two fewer tuple warnings. No inference about runtime safety or speed follows from that count.

@@ -4,12 +4,24 @@
 :root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
 * { box-sizing:border-box; }
 body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
-header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header { padding:1rem max(1rem,calc((100vw - 1400px)/2)); background:#132c40; color:white; }
 header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
 header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
 header a { color:#d9f0ff; }
 header a[aria-current] { color:white; text-decoration-thickness:3px; }
-main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+.layout { max-width:1400px; margin:1.5rem auto; padding:0 1rem; display:grid; grid-template-columns:15rem minmax(0,1fr); gap:1.5rem; align-items:start; }
+.site-nav { position:sticky; top:1rem; max-height:calc(100vh - 2rem); overflow:auto; font-size:.9rem; }
+.site-menu { margin:0; padding:.4rem .8rem .8rem; background:white; }
+.site-menu summary { padding:.3rem 0; }
+.nav-group { margin:.9rem 0 .25rem; font-size:.75rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+.site-nav ul { list-style:none; margin:0; padding:0; }
+.site-nav li { margin:0; }
+.site-nav li a { display:block; padding:.2rem .45rem; border-radius:4px; text-decoration:none; line-height:1.35; }
+.site-nav li a:hover { background:#eef3f6; }
+.site-nav a[aria-current] { background:#e2edf5; font-weight:650; color:var(--ink); }
+@media(min-width:901px) { .site-menu > summary { display:none; } }
+@media(max-width:900px) { .layout { display:block; margin:.75rem auto; } .site-nav { position:static; max-height:none; margin-bottom:.75rem; } }
+main { margin:0; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
 h1 { margin-top:0; font-size:2rem; line-height:1.25; }
 h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
 h3 { margin-top:1.5rem; }
@@ -32,13 +44,13 @@ summary { cursor:pointer; font-weight:600; }
 .note,.source-link,footer { color:var(--muted); font-size:.85rem; }
 .source-link { margin-top:2rem; }
 .archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
-footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+footer { max-width:1400px; margin:1rem auto 2rem; padding:0 1rem; }
 blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
 svg { max-width:100%; height:auto; }
 :target { scroll-margin-top:1rem; }
 .skip-link { position:absolute; left:-10000px; }
 .skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
-@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+@media(max-width:700px) { .layout { padding:0 .5rem; } main { padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
 </style></head>
 <body>
 <a class="skip-link" href="#docs-content">Skip to content</a>
@@ -47,8 +59,10 @@ svg { max-width:100%; height:auto; }
 <a href="../comparisons/index.html">Benchmarks</a>
 <a href="../performance/index.html">Performance</a>
 <a href="../safety/index.html">Safety</a>
-<a href="../history/index.html">History</a>
-<a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<a href="../history/DELETED_EXPERIMENTS.html">Experiments</a>
+<a href="../BENCHMARK_CATALOG.html">Catalog</a>
+<a href="https://egg-solver.arhan.sh/">Solver demo ↗</a></nav></header>
+<div class="layout"><nav class="site-nav" aria-label="All documentation pages"><details class="site-menu" open><summary>All pages</summary><p class="nav-group">Start</p><ul><li><a href="../index.html">Overview</a></li><li><a href="QUICKSTART.html">Quick start</a></li><li><a href="OVERVIEW.html">Tables and memory</a></li><li><a href="HOW_IT_WORKS.html" aria-current="page">How the search works</a></li><li><a href="GLOSSARY.html">Glossary</a></li></ul><p class="nav-group">Reference</p><ul><li><a href="../reference/USER_GUIDE.html">User guide</a></li><li><a href="DEVELOPMENT.html">Development checks</a></li><li><a href="PUBLISHING.html">Publishing the site</a></li><li><a href="../reference/inventories/index.html">Technique inventories</a></li></ul><p class="nav-group">Benchmarks</p><ul><li><a href="../comparisons/index.html">Solver benchmarks</a></li><li><a href="../comparisons/METHODS.html">Reading the tables</a></li><li><a href="../comparisons/NISSY_THROUGHPUT.html">nissy throughput</a></li><li><a href="../comparisons/NXOPT32.html">nxopt, 62 GB table</a></li><li><a href="../comparisons/CUBEOPT_AUDIT.html">cubeopt audit</a></li><li><a href="../comparisons/TABLE_ANALYSIS.html">h4 table analysis</a></li><li><a href="../comparisons/RESULTS.html">Multi-solver matrix</a></li><li><a href="../comparisons/COMPETITOR_FINDINGS.html">Competitor findings</a></li></ul><p class="nav-group">Performance</p><ul><li><a href="../performance/index.html">Performance studies</a></li><li><a href="../performance/PARALLELISM.html">Parallelism</a></li><li><a href="../performance/HARDWARE_COUNTERS.html">Hardware counters</a></li><li><a href="../performance/OPTIMIZATION_REVIEW.html">Optimization review</a></li></ul><p class="nav-group">Safety</p><ul><li><a href="../safety/index.html">Correctness and safety</a></li><li><a href="../safety/NO_UB.html">Undefined behavior</a></li><li><a href="../safety/MORDANT.html">Mordant audit</a></li></ul><p class="nav-group">Evidence and history</p><ul><li><a href="../BENCHMARK_CATALOG.html">Benchmark catalog</a></li><li><a href="../reproduce/index.html">Reproduce results</a></li><li><a href="../PROVENANCE.html">Sources and IDs</a></li><li><a href="../history/DELETED_EXPERIMENTS.html">Deleted experiments</a></li></ul></details></nav>
 <main id="docs-content"><h1 id="how-the-search-works">How the search works</h1>
 <p><a href="../index.html">Documentation home</a> · <a href="../performance/index.html">Performance studies</a></p>
 <p>The easiest starting point in the source is the recursive reference search in <a href="../reference/source/src/solver.rs.html"><code>src/solver.rs</code></a>. The fast implementations preserve its core search problem while scheduling work differently.</p>
@@ -79,10 +93,10 @@ svg { max-width:100%; height:auto; }
 <tr><td><a href="../reference/source/tests/correctness.rs.html"><code>tests/correctness.rs</code></a></td><td>Independent search and optimal-length cross-checks</td></tr>
 </tbody>
 </table></div>
-<p>The linked source views are snapshots from release <code>842a504</code>. Historical performance records name their own source commits; line numbers and mechanisms can differ in those older versions.</p>
+<p>The linked source views are snapshots from release <code>a247321</code>. Historical performance records name their own source commits; line numbers and mechanisms can differ in those older versions.</p>
 <p>See <a href="../performance/PARALLELISM.html">parallelism measurements</a> for the distinction between CPU workers, software lanes, query-slot occupancy and measured speedup.</p>
 
-<p class="source-link"><a href="HOW_IT_WORKS.md">Markdown source</a></p></main>
+<p class="source-link"><a href="HOW_IT_WORKS.md">Markdown source</a></p></main></div>
 <footer><a href="../PROVENANCE.html">Sources and evidence scope</a></footer>
 <script>
 for (const wrapper of document.querySelectorAll('.table-wrap')) {
@@ -109,5 +123,8 @@ function revealTarget(){
   for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
 }
 revealTarget(); window.addEventListener('hashchange',revealTarget);
+const menu=document.querySelector('.site-menu');
+if(menu){const wide=matchMedia('(min-width:901px)');const sync=()=>{menu.open=wide.matches;};sync();wide.addEventListener('change',sync);
+const current=menu.querySelector('[aria-current]');if(current&&wide.matches)current.scrollIntoView({block:'nearest'});}
 </script>
 </body></html>

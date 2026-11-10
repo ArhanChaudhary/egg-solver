@@ -2435,7 +2435,7 @@ impl Worker<'_, '_> {
             // index cost a multiply (by the lane's size) at the start of
             // every visit's value chain. (With m8's unsafe pass, whose loop
             // alone was -1.3% in share mode at 1T, and share pad 16, on
-            // def2cd0: share +2.5% at 1T; -c 1 -2.1%, -c 0 -2.5%, bench share
+            // f2cf828: share +2.5% at 1T; -c 1 -2.1%, -c 0 -2.5%, bench share
             // +2.5% at 48T.) The pointers are made again after `on_end`,
             // which may swap lanes.
             let mut lanes = self.lanes.as_mut_ptr();

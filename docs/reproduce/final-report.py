@@ -615,7 +615,7 @@ out.append("Cells: seconds per cube (sec/solv); at 48T the median over repeats [
 
 if os.path.exists(os.path.join(OUT, "no-panic-inventory.md")):
     out.append("No-panic integration: in first-party sources (dependencies excluded), the same source scanner found 127 forbidden explicit calls at "
-               "`0b5b5a6` and zero at `935cb7f` (including shipped backends, binaries and build scripts; "
+               "`1f5eb70` and zero at `01e7683` (including shipped backends, binaries and build scripts; "
                "tests and compile-time contexts excluded). The full backend checks enforce the policy. "
                "[Source inventory and remaining implicit-check diagnostics](no-panic-inventory.md).\n")
 

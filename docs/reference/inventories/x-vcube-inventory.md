@@ -1,14 +1,14 @@
-# vcube technique inventory (x-vc)
+# vcube technique inventory
 
-Source read in full: `~/ref/vcube/src/*` (avx2_cube.h, sse_cube.h, types.h, cube.h/.cpp,
+Source read in full: [vcube](https://github.com/Voltara/vcube) `src/*` (avx2_cube.h, sse_cube.h, types.h, cube.h/.cpp,
 cube6.h, nxprune.h/.cpp, nxprune_generator.h, nxsolve.h/.cpp, vc-optimal.cpp, alloc.h/.cpp,
 util.h/.cpp, const-cubes.h, gen-const-cubes.cpp), README.md, doc/speffz.md, CMakeLists.txt, tests/.
-Ours = main 55e048e (`~/cube-opt`; the file:line references and names are from 55e048e, before s8's renames). vcube paths are relative to `~/ref/vcube/src/`.
+Ours = egg-solver (then named cube-opt) main e7b094e; the file:line references and names are from e7b094e, before the s8 series' renames. vcube paths are relative to vcube's `src/`.
 
 Verdicts: **done** (we have it, or a stronger form), **n/a** (does not apply to an H48 h11
 48-symmetric single-coset table, or not on a throughput path), **gap** (applies, we lack it).
 
-STATUS: complete (main f8a4919). No patch delivered: the cocsep compaction is neutral (gain within code/data placement effects). Negatives and diagnostics with numbers: $P/x-vc/neg-*.patch.
+Status: complete (main 387034c). No change was merged: the cocsep compaction is neutral (gain within code/data placement effects). The negative experiments and diagnostics with numbers are the `neg/xvc-*` branches in the [negative-experiment index](../../history/DELETED_EXPERIMENTS.md).
 
 **Summary.** About 50 vcube techniques. Nearly all are done in our solver (often in a stronger form)
 or do not apply to a 48-symmetric single-coset H48 table (the cube6 axis lookups and their
@@ -17,9 +17,9 @@ Per-op costs are equal (move, premove) or lower (child cubes 12.5 vs 53.8 Ir, in
 Gaps: C12 (15 duplicate depth-4 jobs, 0.035%) and C13 (prefix-cube table, <= 0.4% Ir) are too small
 to pay. B6 (vcube's compact corner sym table) does not carry over as such, but its point does: the
 cocsep table's L2 footprint costs ~1.6% per +33% (s4); 18-bit packed entries (p18) gained +1.6% at 1T
-layout-averaged on 55e048e but nothing in its dense form on later code; the row-padded form read 4 bits
+layout-averaged on e7b094e but nothing in its dense form on later code; the row-padded form read 4 bits
 up (p18d) gained +1.2% at 1T on m7's WIP placement but -0.7% (stream) and -1.5% (share) at 1T on main
-f8a4919 with the same stream-loop code at the same pinned offset, and is neutral at 48T: not merged
+387034c with the same stream-loop code at the same pinned offset, and is neutral at 48T: not merged
 (section F). Mechanism: ~-30% cocsep L2 misses (cache model) = ~+1%, paid back in 1-2 µops and ~1 cycle.
 Calibrations: ~0.15-0.2% per cycle of index-chain latency; ~12 cycles (1% per 140K
 per cube) per extra cocsep L2 miss. Working-set audit (section G): the table lines insert 78% of the L2
@@ -61,7 +61,7 @@ lines and the cocsep entries are their victim; all other structures together ins
 | B9 | Prefetch hint T0 | nxprune.h:370 | `_mm_prefetch(stripe, _MM_HINT_T0)` | solver.rs:139-147 (NTA) | yes | T0 measured -1.0% 1T (neg/m6-prefetch-t0-t1) | done (NTA better) |
 | B10 | All of a node's lookups prefetched before the first is read (MLP 5-6 per node) | nxprune.h:382-390 | 6 index computations + prefetches, then reads in order | lanes.rs:1-30, 1408-1500 (24 lanes, one miss each, round robin) | yes | ours has 24 misses in flight per thread | done (better) |
 | B11 | Lookups of the 3 axis conjugates (cube6) on each side | cube6.h:327-390, nxprune.h:382-464 | A 16-symmetric (U/D axis) table looked up after conjugating by URF3 and URF3^2 | — | H48's coset is 48-symmetric: the conjugates have the same value | none | n/a |
-| B12 | "+1 when all three axis values are equal" (`prune_cmp |= blsi << 1`, then highest bit) | nxprune.h:420-425, 448-453 | The last move lies in one axis' subgroup, so length >= min over axes + 1 | solver.rs:256-262, lanes.rs:1243-1248 (single-coset analog: half turns are in H, so a tight bound on one side removes the other side's half turns) | the multi-axis form needs >= 2 different cosets; H48 has one | none beyond the NO_HALF masks we have | n/a (analog done) |
+| B12 | "+1 when all three axis values are equal" (`prune_cmp \|= blsi << 1`, then highest bit) | nxprune.h:420-425, 448-453 | The last move lies in one axis' subgroup, so length >= min over axes + 1 | solver.rs:256-262, lanes.rs:1243-1248 (single-coset analog: half turns are in H, so a tight bound on one side removes the other side's half turns) | the multi-axis form needs >= 2 different cosets; H48 has one | none beyond the NO_HALF masks we have | n/a (analog done) |
 | B13 | Inherited value of the unchanged axis (`skip`/`val`) | nxprune.h:382-394, nxsolve.h:142-144, 168-170 | A move on axis a leaves the other side's axis-a coset unchanged: reuse its value | lanes.rs:1040-1053, 1116-1131 (X2 keeps the other side's value; X' reuses its X sibling's `tw`) | yes | — | done (ours covers X2 and X') |
 | B14 | Tight axis -> drop all that axis' moves on the other side (`axis_mask_expand`) | nxsolve.h:60-63, 119-120, nxprune.h:455-461 | The nxopt subgroup contains the axis' quarter turns too | lanes.rs:1243-1248, solver.rs:256-262 (`NO_HALF` when the other side's bound is tight) | H contains only half turns for H48 | — | done (H48 form) |
 | B15 | Early exit per value, ordered: forward axes first | nxprune.h:396-444 | Stop reading values once one prunes | lanes.rs:1040-1053 (other side first: inverse-first; prunes 87% at tight bounds) | yes | — | done (better order) |
@@ -79,7 +79,7 @@ lines and the cocsep entries are their victim; all other structures together ins
 | C7 | Leaf: solved test without a lookup at depth 0 | nxsolve.h:105-107 | `c6 != cube()` | lanes.rs:1006-1017 (r1 == 0: move and test, no lookup; r == 1 nodes use the moves allowed on both sides) | yes | — | done (better) |
 | C8 | Lookups at every depth | nxsolve.h:109-114 | Also when the limit exceeds BASE+3 | lanes.rs:1006-1031 (no lookup when r1 > base+3: no value can prune) | — | — | done (better) |
 | C9 | Depth-4 job queue for deep iterations | nxsolve.h:190-257, nxsolve.cpp:23-46 | Above BASE+4, search each depth-4 position as a job | solver.rs:155-163, lanes.rs:478-551 (jobs extended to 4 moves above base+3) | yes | — | done |
-| C10 | Jobs ordered by the previous iteration's cost, face-weighted by sqrt(3):sqrt(2) (58206:47525) | nxsolve.h:229-239 | Densest subtrees first in the next iteration | lanes.rs:93-106 (same weights) + per-child statistic (c7/c8) | yes | ours: steeper lookup statistic (aa43192) and child-level order (-6..-8% nodes) | done (better) |
+| C10 | Jobs ordered by the previous iteration's cost, face-weighted by sqrt(3):sqrt(2) (58206:47525) | nxsolve.h:229-239 | Densest subtrees first in the next iteration | lanes.rs:93-106 (same weights) + per-child statistic (c7/c8) | yes | ours: steeper lookup statistic (fd48890) and child-level order (-6..-8% nodes) | done (better) |
 | C11 | 2-pass LSD radix sort on a 16-bit float key | nxsolve.h:211-253 | Sort 43K jobs cheaply | lanes.rs:108-145 (3-pass 32-bit radix, skips constant digits); runs counting sort | yes | one 43K sort per cube (~0.3% of cycles); a 16-bit key would change ties (search) | done |
 | C12 | Depth-4 jobs deduplicated by position (43,239 unique) | nxsolve.cpp:301-320 | std::set of cubes: the 15 duplicate canonical 4-move sequences (all half turns, e.g. R2 F2 D2 U2 = U2 F2 D2 R2) are searched once | lanes.rs:478-551 (43,254 canonical sequences) | yes | measured: 15 of 43,254 jobs (0.035%); half-turn-only prefixes keep the root's H48 coset, so their subtrees are mostly pruned early: < 0.035% nodes | gap (negligible; not worth code) |
 | C13 | Job roots by composing precomputed depth-4 cube6 with the input (one compose per cube) | nxsolve.h:190-195, cube6.h:348-357 | `c6 * q.c6` instead of replaying moves | lanes.rs:438-449 (`job_cubes`: 4 moves + 4 premoves per job setup) | yes | measured: 50,140 `job_cubes` calls per cube (random:1000:2026) x ~53 Ir = 2.7M Ir vs ~450M Ir per cube (0.6%); a shared 2.8 MB prefix table would save at most ~0.4% Ir and adds L3 traffic. A per-lane cache variant was negative (neg/c7-jobcache). | n/a (bounded below noise) |
@@ -102,9 +102,9 @@ lines and the cocsep entries are their victim; all other structures together ins
 
 ## E. Per-operation cost: vcube vs ours (microbenchmark)
 
-`/data/agents/x-vc/vcube/opbench.cpp` (vcube's own headers, clang 18 -O3, coord 308 = EP3/EO8 index)
-vs `/data/agents/x-vc/cube-opt/examples/opbench.rs` (branch x-vc-diag). 4096 random cubes, 1 thread on a
-bench slot. Ir from callgrind on x86-64-v3 builds (`/data/agents/x-vc/bin/fnsum.py`), ns native.
+A C++ microbenchmark built on vcube's own headers (clang 18 -O3, coord 308 = EP3/EO8 index)
+vs a Rust microbenchmark example on our code (diagnostic branch, not retained). 4096 random cubes, 1 thread on a
+bench slot. Ir from callgrind on x86-64-v3 builds (summed per function), ns native. The microbenchmark sources are not published.
 
 | operation | vcube Ir | ours Ir | vcube ns (native / Haswell flags) | ours ns (native) |
 |---|---|---|---|---|
@@ -124,20 +124,20 @@ Layout-averaged 1T A/B (`abl1t.sh 2 A B 24`: 4 lld-shuffled layouts x 2 paired r
 | experiment | what changes | result |
 |---|---|---|
 | s4 (diagnostic) | packed cocsep entries at a 4-byte stride (612 KB), same data, same code | **-1.6% median, 8/8 pairs negative** (-1.95 -2.14 -0.82 -0.20 -2.96 -2.11 -1.48 -1.34) |
-| dlat vs dnolat (diagnostic) | 3 dependent `imul x,x,1` (+9 cycles) on the packed entry (delays ttrep, class, corner depth) vs the same imuls off the chain | -1.70% median over 4 pairs (-2.41 +0.69 -1.41 -1.70): about **0.15-0.2% per cycle** of index-chain latency (m7's value chain: 0.35%/cycle). $P/x-vc/neg-diag-index-chain-latency.patch |
+| dlat vs dnolat (diagnostic) | 3 dependent `imul x,x,1` (+9 cycles) on the packed entry (delays ttrep, class, corner depth) vs the same imuls off the chain | -1.70% median over 4 pairs (-2.41 +0.69 -1.41 -1.70): about **0.15-0.2% per cycle** of index-chain latency (m7's value chain: 0.35%/cycle). `neg/xvc-diag-index-chain-latency` |
 | access histogram (diag) | per-coordinate counts of indexed cocsep coordinates, random:400:2026 | flat: top 45% of coordinates = 50% of accesses, 88% = 90%; frequency-sorted layout needs 393 KB of lines for 90% vs 398 KB now -> reordering is useless, only compaction helps |
-| ck2 (idea 7.4: half-split tables) | `3*cocsep` = `lo[key & 0xFFF] + hi[key >> 12]` with key = one `pext` of the corners (tetrad bit + 2 co bits per corner): colex rank is additive over the halves because the low half's popcount is 4 minus the high half's | index 45 -> 43 Ir (v3), microbench throughput 2.75 -> 2.6 ns; +10.5 KB of L1 tables. **-0.27% median, -1.21% mean** over 8 pairs (min -6.78%): the L1 tables cost more than the 2 µops. NEGATIVE ($P/x-vc/neg-ck2-halfsplit.patch) |
-| p18 | 18-bit entries `class << 6 \| ttrep` at bit 18i (336 KB), corner depth from a 3.4 KB per-class table (depth is a class invariant: checked for all 153090 coordinates) | asm: +4 µops (`mov; shr; and; shrx mem`, `and; shl` for ttrep*64, depth load), ~+3 cycles. **+1.59% median, +1.76% mean** over 8 pairs on 55e048e, 7/8 positive (min -0.13%, max +4.00%; stream_thread start offset equal to main's in every layout). Ported to 735dd25 (s8 sweep): **-1.51% median, -1.46% mean** (min -6.31%, max +2.74%), offsets matched in 2 of 4 layouts; on m7's stack with pinned pads: best pad ~+0.2%. NEGATIVE in this form ($P/x-vc/neg-p18-dense.patch); see p18d |
+| ck2 (idea 7.4: half-split tables) | `3*cocsep` = `lo[key & 0xFFF] + hi[key >> 12]` with key = one `pext` of the corners (tetrad bit + 2 co bits per corner): colex rank is additive over the halves because the low half's popcount is 4 minus the high half's | index 45 -> 43 Ir (v3), microbench throughput 2.75 -> 2.6 ns; +10.5 KB of L1 tables. **-0.27% median, -1.21% mean** over 8 pairs (min -6.78%): the L1 tables cost more than the 2 µops. NEGATIVE (`neg/xvc-ck2-halfsplit`) |
+| p18 | 18-bit entries `class << 6 \| ttrep` at bit 18i (336 KB), corner depth from a 3.4 KB per-class table (depth is a class invariant: checked for all 153090 coordinates) | asm: +4 µops (`mov; shr; and; shrx mem`, `and; shl` for ttrep*64, depth load), ~+3 cycles. **+1.59% median, +1.76% mean** over 8 pairs on e7b094e, 7/8 positive (min -0.13%, max +4.00%; stream_thread start offset equal to main's in every layout). Ported to b3f0bfb (s8 sweep): **-1.51% median, -1.46% mean** (min -6.31%, max +2.74%), offsets matched in 2 of 4 layouts; on m7's stack with pinned pads: best pad ~+0.2%. NEGATIVE in this form (`neg/xvc-p18-dense`); see p18d |
 | p18b | p18 with rows of 70 separations padded to 72 entries (162 bytes, 354 KB): the entry's byte in the row and its bit shift come from the tetrad mask alone (parallel loads), no `shr`/`and` on the chain | ~+3 µops, ~+2 cycles; but register allocation in the stream loop lost the TABS base register (4 `lea rip` rematerializations in the index path). **+0.47% median, +0.58% mean** over 8 pairs (min -0.79%) |
 | p18c | p18b, entry read from the byte before it and shifted 3 bits less: `v & 0x1F8` = ttrep * 8, a scaled index of the 64-byte `sym_edge` rows (no `shl`) | asm: index path +1 µop vs main (shift-table load, `shrx` with memory source, depth load; no `and`/`shl`), ~+1 cycle; register allocation elsewhere in the stream loop got worse (25 TABS `lea` rematerializations vs 17 in p18). **-0.07% median, -0.20% mean** over 8 pairs: neutral |
 | p18 on m7's WIP stack (48d9d27, pinned pads) | p18 at stream pads 0/16/32/48 vs that stack at its pad 16, 2 paired runs each | pad 0 +0.73 -0.26, pad 16 -0.59 -1.39, pad 32 -1.13 -2.40, pad 48 -1.39 -0.82: best pad ~+0.2%, i.e. no gain |
-| **p18d** (on m7's stack 48d9d27, then main f8a4919; pinned pads) | 18-bit entries in rows of 72 (354 KB), read from the byte before and 4 bits up: class and symmetry where the 3-byte entries had them (`bextr 0xc0a`, `and 0x3f0` scale 8 unchanged); shift from a tetrad-mask table; depth by class | index path ~1-2 µops above main's. 1T pad screen vs base pad 16: pad 0 +0.54 +0.78, **16 +0.56 +1.66**, 32 -0.07 -0.27, 48 -0.61 +0.07; pad 16 vs 16, 6 pairs: **+1.20%** (medians 25.067 -> 25.367, 6/6 positive). 48T pad 16 vs 16, 5 runs: medians 1070.97 -> 1070.57 (-0.04%; pairs +0.20 +0.44 +1.34 -2.17 -0.04): neutral. Rebased on main f8a4919 (stream loop byte-identical to the WIP's, same pad; other code and HOT_TABLES placed differently): stream 1T pad 16 vs 16, 4 pairs: 0.00 +0.07 -1.12 -1.06 (medians -0.73%); share 1T 3 pairs: -1.29 -1.82 -1.46. NEUTRAL, not merged: $P/x-vc/neg-cocsep-18bit-p18d.patch |
-| move with both mod-3 candidates in parallel (derived from vcube's compose) | `apply_move`: `min(shuffle + ori, shuffle + (ori - carry))` with a second precomputed table (`MOVES_ORI - CARRY`) instead of `min(t, t - carry)`: same µops, one step less latency | move-chain microbench 1.50 vs 1.96 ns per move (3 pairs, consistent); only on the X2/X' moved-side index chain. Forwarded to m7 (owner of that code); branch x-vc-lat |
+| **p18d** (on m7's stack 48d9d27, then main 387034c; pinned pads) | 18-bit entries in rows of 72 (354 KB), read from the byte before and 4 bits up: class and symmetry where the 3-byte entries had them (`bextr 0xc0a`, `and 0x3f0` scale 8 unchanged); shift from a tetrad-mask table; depth by class | index path ~1-2 µops above main's. 1T pad screen vs base pad 16: pad 0 +0.54 +0.78, **16 +0.56 +1.66**, 32 -0.07 -0.27, 48 -0.61 +0.07; pad 16 vs 16, 6 pairs: **+1.20%** (medians 25.067 -> 25.367, 6/6 positive). 48T pad 16 vs 16, 5 runs: medians 1070.97 -> 1070.57 (-0.04%; pairs +0.20 +0.44 +1.34 -2.17 -0.04): neutral. Rebased on main 387034c (stream loop byte-identical to the WIP's, same pad; other code and HOT_TABLES placed differently): stream 1T pad 16 vs 16, 4 pairs: 0.00 +0.07 -1.12 -1.06 (medians -0.73%); share 1T 3 pairs: -1.29 -1.82 -1.46. NEUTRAL, not merged: `neg/xvc-cocsep-18bit-p18d` |
+| move with both mod-3 candidates in parallel (derived from vcube's compose) | `apply_move`: `min(shuffle + ori, shuffle + (ori - carry))` with a second precomputed table (`MOVES_ORI - CARRY`) instead of `min(t, t - carry)`: same µops, one step less latency | move-chain microbench 1.50 vs 1.96 ns per move (3 pairs, consistent); only on the X2/X' moved-side index chain. Passed on to the m7 series, which was changing that code (branch not retained) |
 
 Placement note: with the stream loop pinned (m7), p18d's stream-loop code was byte-identical (addresses
-aside) on the WIP stack and on f8a4919, at the same pad, for both sides; yet 1T went from +1.2% (6/6 pairs)
+aside) on the WIP stack and on 387034c, at the same pad, for both sides; yet 1T went from +1.2% (6/6 pairs)
 to -0.7%. What differs is the placement of the other code and of the static tables (HOT_TABLES at 3584/3584
-mod 4 KiB on the WIP builds, 896 vs 768 on f8a4919: different L1 set mapping). Pinning HOT_TABLES to a
+mod 4 KiB on the WIP builds, 896 vs 768 on 387034c: different L1 set mapping). Pinning HOT_TABLES to a
 4 KiB boundary (and the cold functions' order) might remove another +-1% confounder from kernel A/Bs.
 
 Idea 7.4 mapped onto our index: the h11 index has no permutation ranks (only base-3 co digits, C(8,4)
@@ -149,9 +149,9 @@ cocsep (ck2). The eslot C(12,4) rank cannot be half-split cheaply: the fixed slo
 ## G. Hot working-set audit (L1/L2 by structure)
 
 Method: cachegrind with a cache model of one Zen 5 core (`--D1=49152,12,64 --LL=1048576,16,64`: the
-"LL" is the 1 MB L2), main 735dd25 built for x86-64-v3 with scalar stand-ins for the AVX-512 helpers
-(branch x-vc-cg), `bench random:40:2026 40 1 24` (1 thread, 24 lanes). Misses are attributed to source
-lines (`/data/agents/x-vc/bin/cgsim.py`). Cachegrind ignores prefetches, so a prefetched line is
+"LL" is the 1 MB L2), main b3f0bfb built for x86-64-v3 with scalar stand-ins for the AVX-512 helpers
+(a diagnostic branch, not retained), `bench random:40:2026 40 1 24` (1 thread, 24 lanes). Misses are attributed to source
+lines by a script that is not published. Cachegrind ignores prefetches, so a prefetched line is
 counted at its first load; the lines brought into L2 (= L2 misses) are the same. No L3 is modelled.
 
 L2 misses per cube (each one also inserts a line, i.e. may evict another):
@@ -172,7 +172,7 @@ L2 misses per cube (each one also inserts a line, i.e. may evict another):
 Ranking and what shrinking each could give:
 1. **The h11 table lines** are the dominant inserter (one dead line per lookup; inherent). They are what
    evicts the cocsep entries. Keeping them out of L2 would help most, but the only tool, CLFLUSHOPT after
-   use, costs -30% (neg-clflushopt-table-lines). NTA is already the hint (T0/T1 measured worse, m6).
+   use, costs -30% (`neg/xvc-clflushopt-table-lines`). NTA is already the hint (T0/T1 measured worse, m6).
 2. **The cocsep entries** are the victim: 20% of their reads miss the modelled L2 (84% miss L1).
    Measured: +33% footprint (s4) = -1.6% at 1T; 18-bit entries in rows of 72 (p18d, -21%): +1.2% / -0.7%
    at 1T depending on placement, share -1.5%, 48T neutral: the ~+1% footprint gain is paid back in µops.

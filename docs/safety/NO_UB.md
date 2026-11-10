@@ -1,18 +1,18 @@
 # Undefined-behavior evidence
 
-[Safety overview](README.md) · [Complete dated assessment](NO_UB_20261107.md) · [Validation records](../evidence/validation/ub-audit/REPORT.md)
+[Safety overview](README.md) · [Complete assessment record (November 7, 2026)](NO_UB_20261107.md) · [Validation records](../evidence/validation/ub-audit/REPORT.md)
 
 **Assessment recorded November 7, 2026.** The identified defects below were fixed and the stated checks passed on the audited source. **This is not a proof that every possible execution is free of undefined behavior.** Checksums, solution replay and finite Miri runs answer different questions.
 
 ## Source covered by the audit
 
-The tested candidate was `316597f64a9bd749e8a01b67f96c108c03611e68`, integrated as `842a5043abfd550313a86a3d9bb5254f4b457540`. The recorded source fingerprint is:
+The tested candidate was `13307bad3150bd7eaeb138f9e0af5d75ae040640`, integrated as `a247321cffefb4683ff73206d1b6f17863589cb4`. The recorded source fingerprint is:
 
 ```text
 93478bc5c45ba267255574f8cb466f02f006f1c7bf558fb8f9d088ec4307a4c9
 ```
 
-These identifiers state what was audited; they do not name today's repository `main`. Later source changes need applicable validation. The current documentation cleanup does not change the Rust search implementation or create a new Miri certificate.
+These identifiers state what was audited; they do not identify later releases. Source changes after the audited commit need their own applicable validation, and documentation changes do not create a new Miri certificate.
 
 ## Reproduced defects and fixes
 
@@ -39,7 +39,7 @@ Review also ended staged-sort mutable argument borrows before publication. Mappi
 | ThreadSanitizer | Passed | Instrumented shared-search and boundary paths |
 | Native/backend checks | Passed with documented harness exclusions | Native, ARM/QEMU, WASI/wasmtime and Bun checks |
 
-[Native validation](../evidence/validation/ub-audit/native-validation.json), [focused Miri](../evidence/validation/ub-audit/focused-miri-validation.json), [ASan](../evidence/validation/ub-audit/asan-validation.json) and [TSan](../evidence/validation/ub-audit/tsan-validation.json) bind the results to source and tool settings. The [full dated assessment](NO_UB_20261107.md) retains test names, compiler versions, all six exclusions, earlier failed attempts and the detailed invariant review.
+[Native validation](../evidence/validation/ub-audit/native-validation.json), [focused Miri](../evidence/validation/ub-audit/focused-miri-validation.json), [ASan](../evidence/validation/ub-audit/asan-validation.json) and [TSan](../evidence/validation/ub-audit/tsan-validation.json) bind the results to source and tool settings. The [complete November 7 assessment record](NO_UB_20261107.md) retains test names, compiler versions, all six exclusions, earlier failed attempts and the detailed invariant review.
 
 ## Limits and caller obligations
 

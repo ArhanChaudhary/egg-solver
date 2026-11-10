@@ -4,12 +4,24 @@
 :root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
 * { box-sizing:border-box; }
 body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
-header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header { padding:1rem max(1rem,calc((100vw - 1400px)/2)); background:#132c40; color:white; }
 header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
 header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
 header a { color:#d9f0ff; }
 header a[aria-current] { color:white; text-decoration-thickness:3px; }
-main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+.layout { max-width:1400px; margin:1.5rem auto; padding:0 1rem; display:grid; grid-template-columns:15rem minmax(0,1fr); gap:1.5rem; align-items:start; }
+.site-nav { position:sticky; top:1rem; max-height:calc(100vh - 2rem); overflow:auto; font-size:.9rem; }
+.site-menu { margin:0; padding:.4rem .8rem .8rem; background:white; }
+.site-menu summary { padding:.3rem 0; }
+.nav-group { margin:.9rem 0 .25rem; font-size:.75rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+.site-nav ul { list-style:none; margin:0; padding:0; }
+.site-nav li { margin:0; }
+.site-nav li a { display:block; padding:.2rem .45rem; border-radius:4px; text-decoration:none; line-height:1.35; }
+.site-nav li a:hover { background:#eef3f6; }
+.site-nav a[aria-current] { background:#e2edf5; font-weight:650; color:var(--ink); }
+@media(min-width:901px) { .site-menu > summary { display:none; } }
+@media(max-width:900px) { .layout { display:block; margin:.75rem auto; } .site-nav { position:static; max-height:none; margin-bottom:.75rem; } }
+main { margin:0; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
 h1 { margin-top:0; font-size:2rem; line-height:1.25; }
 h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
 h3 { margin-top:1.5rem; }
@@ -32,13 +44,13 @@ summary { cursor:pointer; font-weight:600; }
 .note,.source-link,footer { color:var(--muted); font-size:.85rem; }
 .source-link { margin-top:2rem; }
 .archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
-footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+footer { max-width:1400px; margin:1rem auto 2rem; padding:0 1rem; }
 blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
 svg { max-width:100%; height:auto; }
 :target { scroll-margin-top:1rem; }
 .skip-link { position:absolute; left:-10000px; }
 .skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
-@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+@media(max-width:700px) { .layout { padding:0 .5rem; } main { padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
 </style></head>
 <body>
 <a class="skip-link" href="#docs-content">Skip to content</a>
@@ -47,12 +59,14 @@ svg { max-width:100%; height:auto; }
 <a href="../comparisons/index.html">Benchmarks</a>
 <a href="../performance/index.html">Performance</a>
 <a href="../safety/index.html">Safety</a>
-<a href="../history/index.html">History</a>
-<a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<a href="../history/DELETED_EXPERIMENTS.html">Experiments</a>
+<a href="../BENCHMARK_CATALOG.html">Catalog</a>
+<a href="https://egg-solver.arhan.sh/">Solver demo ↗</a></nav></header>
+<div class="layout"><nav class="site-nav" aria-label="All documentation pages"><details class="site-menu" open><summary>All pages</summary><p class="nav-group">Start</p><ul><li><a href="../index.html">Overview</a></li><li><a href="../guide/QUICKSTART.html">Quick start</a></li><li><a href="../guide/OVERVIEW.html">Tables and memory</a></li><li><a href="../guide/HOW_IT_WORKS.html">How the search works</a></li><li><a href="../guide/GLOSSARY.html">Glossary</a></li></ul><p class="nav-group">Reference</p><ul><li><a href="USER_GUIDE.html" aria-current="page">User guide</a></li><li><a href="../guide/DEVELOPMENT.html">Development checks</a></li><li><a href="../guide/PUBLISHING.html">Publishing the site</a></li><li><a href="inventories/index.html">Technique inventories</a></li></ul><p class="nav-group">Benchmarks</p><ul><li><a href="../comparisons/index.html">Solver benchmarks</a></li><li><a href="../comparisons/METHODS.html">Reading the tables</a></li><li><a href="../comparisons/NISSY_THROUGHPUT.html">nissy throughput</a></li><li><a href="../comparisons/NXOPT32.html">nxopt, 62 GB table</a></li><li><a href="../comparisons/CUBEOPT_AUDIT.html">cubeopt audit</a></li><li><a href="../comparisons/TABLE_ANALYSIS.html">h4 table analysis</a></li><li><a href="../comparisons/RESULTS.html">Multi-solver matrix</a></li><li><a href="../comparisons/COMPETITOR_FINDINGS.html">Competitor findings</a></li></ul><p class="nav-group">Performance</p><ul><li><a href="../performance/index.html">Performance studies</a></li><li><a href="../performance/PARALLELISM.html">Parallelism</a></li><li><a href="../performance/HARDWARE_COUNTERS.html">Hardware counters</a></li><li><a href="../performance/OPTIMIZATION_REVIEW.html">Optimization review</a></li></ul><p class="nav-group">Safety</p><ul><li><a href="../safety/index.html">Correctness and safety</a></li><li><a href="../safety/NO_UB.html">Undefined behavior</a></li><li><a href="../safety/MORDANT.html">Mordant audit</a></li></ul><p class="nav-group">Evidence and history</p><ul><li><a href="../BENCHMARK_CATALOG.html">Benchmark catalog</a></li><li><a href="../reproduce/index.html">Reproduce results</a></li><li><a href="../PROVENANCE.html">Sources and IDs</a></li><li><a href="../history/DELETED_EXPERIMENTS.html">Deleted experiments</a></li></ul></details></nav>
 <main id="docs-content"><h1 id="user-guide">User guide</h1>
 <p><a href="../index.html">Documentation</a> · <a href="../guide/QUICKSTART.html">Quick start</a> · <a href="../comparisons/index.html">Benchmarks</a></p>
 <p>Commands below run from the project root. The examples use the executables under <code>target/release/</code>. Every binary has <code>--help</code>; use it for the complete option list.</p>
-<details class="contents"><summary>On this page</summary><ul><li><a href="#build">Build</a></li><li><a href="#choose-and-generate-a-table">Choose and generate a table</a></li><li><a href="#solve-scrambles">Solve scrambles</a></li><li><a href="#tune-and-benchmark">Tune and benchmark</a></li><li><a href="#table-files">Table files</a></li><li><a href="#shared-memory-on-linux">Shared memory on Linux</a></li><li><a href="#portable-builds">Portable builds</a></li><li><a href="#webassembly">WebAssembly</a></li><li><a href="#development-and-publishing">Development and publishing</a></li></ul></details>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#build">Build</a></li><li><a href="#choose-and-generate-a-table">Choose and generate a table</a></li><li><a href="#solve-scrambles">Solve scrambles</a></li><li><a href="#tune-and-benchmark">Tune and benchmark</a></li><li><a href="#table-files">Table files</a></li><li><a href="#shared-memory-on-linux">Shared memory on Linux</a></li><li><a href="#portable-builds">Portable builds</a></li><li><a href="#webassembly">WebAssembly</a></li><li><a href="#library-use">Library use</a></li><li><a href="#historical-measurements">Historical measurements</a></li><li><a href="#development-and-publishing">Development and publishing</a></li></ul></details>
 <h2 id="build">Build</h2>
 <pre><code class="language-sh">cargo build --release --locked
 </code></pre>
@@ -64,7 +78,7 @@ svg { max-width:100%; height:auto; }
 target/release/gen 7 auto tables/h7
 target/release/gen check tables/h7
 </code></pre>
-<p><code>auto</code> chooses the program's recommended compression base. The base changes pruning bounds, not data capacity. Generate once and reuse the file. The <code>--parts N</code> option generates row ranges sequentially to reduce peak memory in depth-first generation; it does not apply to h11's BFS generation. Memory and disk preflight checks run before generation.</p>
+<p><code>auto</code> chooses the program's recommended compression base. The base changes pruning bounds, not data capacity. Generate once and reuse the file. The <code>--parts N</code> option generates row ranges sequentially to reduce peak memory in depth-first generation; it does not apply to h11's BFS generation. Memory and disk preflight checks run before generation; on hugetlbfs the disk check counts free huge pages, and <code>--force</code> skips the checks.</p>
 <h2 id="solve-scrambles">Solve scrambles</h2>
 <pre><code class="language-sh"># One cube, using all selected threads:
 target/release/solve --fast --table tables/h7 &quot;R U R' U' F2&quot;
@@ -90,7 +104,7 @@ target/release/solve --table tables/h7 -c 1 &lt; testdata/random_state.txt
 <tr><td><code>-v</code></td><td>Loading and configuration diagnostics on stderr</td></tr>
 </tbody>
 </table></div>
-<p>Batch mode also accepts a positional table path. <code>EGG_SOLVER_TABLE</code> can supply it in batch mode, and <code>EGG_SOLVER_THREADS</code> can supply the thread count. <code>--fast</code> still requires a command-line <code>--table</code>.</p>
+<p>Batch mode also accepts a positional table path. <code>EGG_SOLVER_TABLE</code> can supply it in batch mode, and <code>EGG_SOLVER_THREADS</code> can supply the thread count. <code>--fast</code> still requires a command-line <code>--table</code>. Each <code>EGG_SOLVER_*</code> setting also accepts the matching <code>CUBEOPT_*</code> name from the project's earlier name as a fallback; an explicitly set <code>EGG_SOLVER_*</code> name takes precedence.</p>
 <p>Search timing excludes table loading. The batch total measures completion of the whole batch; individual cube durations can overlap. See <a href="../comparisons/METHODS.html">timing definitions</a> before interpreting them as throughput.</p>
 <h2 id="tune-and-benchmark">Tune and benchmark</h2>
 <pre><code class="language-sh">target/release/bench tables/h7 tune
@@ -113,13 +127,23 @@ target/release/bench --help
 </table></div>
 <p><code>EGG_SOLVER_LOAD</code> sets the mode. Mapping and shared-memory storage must remain unchanged while the solver uses it. Prefaulting touches mapped/shared pages at startup; <code>--prefault 0</code> defers that work until first use. Prefaulting is not a guarantee that an ordinary mapping can never be paged out.</p>
 <p>The 1 GiB-page benchmark policy describes those recorded experiments. It is not a requirement to reserve huge pages for the small quick-start example.</p>
+<p>Table files and shared-memory segments created before the project was renamed remain usable; the pruning data does not need to be regenerated.</p>
 <h2 id="shared-memory-on-linux">Shared memory on Linux</h2>
 <pre><code class="language-sh">target/release/solve --shm-load tables/h7
 target/release/solve --shm --table tables/h7 &lt; testdata/random_state.txt
 target/release/solve --shm-remove tables/h7
 </code></pre>
 <p>A segment persists until removal or reboot. An existing matching segment avoids reloading the table into a fresh private allocation. Metadata is checked on attachment; a mismatched segment is rejected by explicit shared mode. Keep the segment and table immutable during use.</p>
-<p><code>--shm-pages 1g</code> requests only 1 GiB pages and fails if unavailable. The default page preference is <code>1g,2m,4k</code>; <code>-v</code> reports the selected size and fallback reasons. Huge-page allocation needs both permission (the configured huge-page group or <code>CAP_IPC_LOCK</code>) and enough free reserved pages. The program's preflight reports relevant limits. <code>--shm-key</code> selects another segment key when needed.</p>
+<p>A segment holds the table file's bytes, with the file's trailer (k, base, size, distribution and checksum) in its last 4 KiB. The trailer is written last, after the copied data's checksum is checked, so a segment without one is still loading or was interrupted. <code>--load auto</code> passes over a segment that does not match the table file and loads the file instead. A loaded segment is read-only: <code>ipcs -m</code> shows perms <code>400</code> (<code>600</code> while loading).</p>
+<p>The segment key is the ASCII bytes &quot;co&quot; (<code>0x636f</code>, a legacy prefix kept for compatibility), then the table's k and base, one byte each: <code>ipcs -m</code> shows h7 base 9 as <code>0x636f0709</code> and h11 base 10 as <code>0x636f0b0a</code>. <code>--shm-key</code> (or <code>EGG_SOLVER_SHM_KEY</code>) selects another key, for example for two tables with the same k and base.</p>
+<p><code>--shm-pages 1g</code> requests only 1 GiB pages and fails if unavailable. The default page preference is <code>1g,2m,4k</code>; <code>-v</code> reports the selected size and fallback reasons. Huge-page allocation needs both permission (the configured huge-page group or <code>CAP_IPC_LOCK</code>) and enough free reserved pages. The program's preflight reports relevant limits: <code>kernel.shmmax</code>, <code>kernel.shmall</code> and <code>kernel.shmmni</code>, then the huge-page permission and free pool pages, or free memory for 4 KiB pages. Attaching an existing segment needs no free memory.</p>
+<p>On a typical Linux host, the one-time root setup for huge-page segments looks like this; adapt it to the host and the loader's diagnostic:</p>
+<pre><code class="language-sh"># Permission: a group of yours as the huge-page shared-memory group
+sudo sysctl vm.hugetlb_shm_group=$(id -g)
+# Free pages: reserve N 1 GiB pages (or use hugepages-2048kB for 2 MiB pages)
+echo N | sudo tee /sys/kernel/mm/hugepages/hugepages-1048576kB/nr_hugepages
+</code></pre>
+<p>A file in <code>/etc/sysctl.d</code> keeps the group setting after reboot. 1 GiB pages are most reliably reserved at boot with the kernel parameters <code>hugepagesz=1G hugepages=N</code>.</p>
 <p><code>ipcs -m</code> lists segments. Removal releases memory after the last process detaches. These system settings depend on the host; read the loader's diagnostic before changing them.</p>
 <h2 id="portable-builds">Portable builds</h2>
 <p>On x86, replace the native target flags to build for another CPU:</p>
@@ -141,11 +165,13 @@ await solver.loadTable('h6');
 // await solver.generateTable(4);
 solver.solve(&quot;R U R' U' F2&quot;);
 </code></pre>
-<p><code>solve</code> puts the selected workers on one cube; <code>solveMany</code> uses independent cube lanes. Inputs can be scrambles or 54-sticker facelet strings in U R F D L B face order, each face viewed from outside. The wrapper's facelet parser checks the representation.</p>
+<p><code>solve</code> puts the selected workers on one cube and returns <code>{ moves, length, nodes, lookups, seconds }</code>; <code>solveMany</code> uses independent cube lanes. <code>loadTable</code> accepts a path (Bun), a URL, a <code>File</code> or <code>Blob</code>, or the file's bytes. Inputs can be scrambles or 54-sticker facelet strings in U R F D L B face order, each face viewed from outside and read row by row (U with B at the top, D with F at the top, the side faces with U at the top); any six symbols can stand for the colors. The wrapper's facelet parser checks the representation.</p>
 <h3 id="bun">Bun</h3>
 <pre><code class="language-sh">bun wasm/demo.mjs --table tables/h6 &lt; testdata/random_state.txt
+bun wasm/demo.mjs --gen 4:8 --random 5:1
 bun wasm/demo.mjs --table tables/h6 --threads 8 --batch &lt; scrambles.txt
 </code></pre>
+<p>The second command generates h4 with base 8 in memory and solves five random states.</p>
 <h3 id="browser">Browser</h3>
 <pre><code class="language-sh">bun wasm/serve.mjs --tables tables
 </code></pre>
@@ -155,13 +181,84 @@ bun wasm/demo.mjs --table tables/h6 --threads 8 --batch &lt; scrambles.txt
 <h3 id="threads">Threads</h3>
 <p>Browser threads need <code>SharedArrayBuffer</code> and cross-origin isolation. The local server supplies the required COOP/COEP headers, and the public site, egg-solver.arhan.sh, receives them from Cloudflare because GitHub Pages cannot set headers. The solver runs in a Web Worker because its thread waits cannot run on a browser's main thread. Without isolation, such as on a plain <code>github.io</code> deployment, the page uses one thread. Bun supports the threaded wrapper without those HTTP headers.</p>
 <p>The wrapper initializes the module and worker pool. Other hosts must perform the module's required initialization before calling its C ABI. See <code>wasm/src/lib.rs</code> and the JavaScript wrapper when embedding it directly.</p>
-<p><a id="speed"></a></p>
+<h3 id="tests">Tests</h3>
+<p><code>scripts/check.sh</code> runs the library tests in WebAssembly under wasmtime and <code>wasm/test.mjs</code> (both modules in Bun) when those tools are installed. The wasmtime runner needs wasi-threads support (wasmtime 44 or older; set <code>WASMTIME=path</code> to choose a binary). Missing tools are reported, not counted as passing.</p>
 <h3 id="performance-records">Performance records</h3>
-<p>Historical V8/Bun timings, generation times and engine warm-up experiments are preserved in the <a href="USER_GUIDE_20261107.html#speed">dated reference</a>. They are not predictions for a current browser or laptop. <a href="../performance/index.html">Performance studies</a> indexes the measured native and WebAssembly evidence.</p>
+<p>Historical V8/Bun timings, generation times and engine warm-up experiments are kept under <a href="#speed">Historical measurements</a>. They are not predictions for a current browser or laptop. <a href="../performance/index.html">Performance studies</a> indexes the measured native and WebAssembly evidence.</p>
+<h2 id="library-use">Library use</h2>
+<p><code>Cube::from_bytes</code>, symmetry-coordinate lookups and <code>cube_from_edge_key</code> return <code>Option</code> for invalid input. Table and solver internals are exposed through read-only accessors. <code>H48Table::from_memory</code> checks the metadata and allocation size; <code>get</code> returns <code>None</code> for an invalid index.</p>
+<p><code>H48Table::open_copy</code> loads the table into private RAM and is safe. APIs that map files or attach shared segments are <code>unsafe</code>: the backing storage must remain unchanged and untruncated while the table exists, including changes by other processes. The command-line mapped and shared modes require the same condition; <code>--load copy</code> avoids that dependence after loading. File-backed generation requires exclusive access to its output paths. <a href="../safety/index.html">Safety</a> describes the undefined-behavior evidence and its scope.</p>
+<p>The packed-coordinate and table encodings require a little-endian target; big-endian builds are rejected at compile time.</p>
+<h2 id="historical-measurements">Historical measurements</h2>
+<p>These records were measured during development on the project's Zen 5 server and were previously kept in an earlier edition of this guide (dated 2026-11-07). Each block links the record of the commit that introduced the figures. Later source changes, lane defaults and engines can give different results; they are not predictions for another machine.</p>
+<details>
+<summary>Native table sizes, generation times and solve rates (recorded 2026-11-04)</summary>
+<div class="table-wrap" role="region" aria-label="Historical measurements" tabindex="0"><table id="docs-table-3"><caption>Historical measurements</caption>
+<thead>
+<tr><th>RAM</th><th>table</th><th align="right">size</th><th align="right">generation</th><th align="right">cubes/s, 1 core</th><th align="right">cubes/s, 8 cores</th></tr>
+</thead>
+<tbody>
+<tr><td>4 GB</td><td>h6</td><td align="right">1.8 GiB</td><td align="right">40 s</td><td align="right">1.2</td><td align="right">9.3</td></tr>
+<tr><td>8 GB</td><td>h7</td><td align="right">3.6 GiB</td><td align="right">1 min</td><td align="right">2.2</td><td align="right">17</td></tr>
+<tr><td>16 GB</td><td>h8</td><td align="right">7.3 GiB</td><td align="right">5.5 min</td><td align="right">4.0</td><td align="right">29</td></tr>
+<tr><td>32 GB</td><td>h9</td><td align="right">14.5 GiB</td><td align="right">~7 min</td><td align="right">~7.5 (est.)</td><td align="right">~55 (est.)</td></tr>
+<tr><td>64 GB</td><td>h10</td><td align="right">29 GiB</td><td align="right">~9 min</td><td align="right">~14 (est.)</td><td align="right">~105 (est.)</td></tr>
+<tr><td>96+ GB</td><td>h11</td><td align="right">58 GiB</td><td align="right">~25 min</td><td align="right">25.6</td><td align="right">197</td></tr>
+</tbody>
+</table></div>
+<p>Measured on 8 cores of a Zen 5 server (one L3 domain): generation including writing the file to a slow disk (~140 MB/s), and solves of random positions per second (an average: the hardest positions take several times longer than typical ones). h9 and h10 are estimates: their speeds follow the measured h8 -&gt; h11 trend, and their generation costs about h8's plus the writing (h9 was generated in 4 parts, in 13 minutes). h11 is generated differently (by BFS), needs its 58 GiB of RAM to generate too, and took 4.4 minutes on 48 cores. Generation needed about the table's size in RAM plus 0.3 GB; <code>--parts 2</code> halved that, at up to twice the time. A table that does not fit in RAM is read from disk on every miss, hundreds of times slower. Source: <a href="https://github.com/ArhanChaudhary/egg-solver/commit/d4125fd510afd197cc495d22f43ab1f257644d90">d4125fd</a>.</p>
+</details>
+<details>
+<summary>Shared-memory attach time and page size (recorded 2026-11-05)</summary>
+<p>h7 attached in 0.00 s on 1 GiB pages, against 28 s to copy it from a ~140 MB/s disk, and solved as fast as from a hugetlbfs map of the same table. On 4 KiB pages the search was much slower (h7: 27% fewer solves/s at 1 thread, 32% at 48 threads, than on 1 GiB pages; attaching mapped 0.95 million pages in 0.6 s). The solver warns when a segment is on 4 KiB pages. Source: <a href="https://github.com/ArhanChaudhary/egg-solver/commit/6ae0bb2388e3dd928bb2ad50ffe99d0de7d727e7">6ae0bb2</a>.</p>
+<pre><code class="language-text">$ solve --shm-load /mnt/huge/h7
+segment 0x636f0709 shmid 42: h7 base 9, 4.00 GiB on 1 GiB pages, made from /mnt/huge/h7 in 0.10s
+$ ipcs -m
+------ Shared Memory Segments --------
+key        shmid      owner      perms      bytes      nattch     status
+0x636f0709 42         super      400        4294967296 0
+</code></pre>
+</details>
+<details>
+<summary>WebAssembly timings (recorded 2026-11-04 and 2026-11-05)</summary>
+<p><a id="speed"></a></p>
+<p>Time per random-state cube, one at a time, mean and median of 10 cubes (h4: 5), on Zen 5 cores (8 threads: one L3 domain), in V8 (Chrome's engine; measured in Node 26) and in Bun (JavaScriptCore, Safari's engine):</p>
+<div class="table-wrap" role="region" aria-label="Historical measurements" tabindex="0"><table id="docs-table-4"><caption>Historical measurements</caption>
+<thead>
+<tr><th>table</th><th align="right">size</th><th>runs in</th><th>made by</th><th>1 thread: V8</th><th>1 thread: Bun</th><th>8 threads: V8</th><th>8 threads: Bun</th></tr>
+</thead>
+<tbody>
+<tr><td>h0..h3</td><td align="right">≤ 0.2 GiB</td><td>any browser</td><td>the module: h0 in 2.5 s</td><td>short scrambles</td><td></td><td></td><td></td></tr>
+<tr><td>h4 base 8</td><td align="right">0.45 GiB</td><td>any browser</td><td>the module: 75 s (8 threads: 13 s)</td><td>21.6 s, 20.7 s</td><td></td><td></td><td></td></tr>
+<tr><td>h5</td><td align="right">0.9 GiB</td><td>desktop browsers</td><td><code>gen 5 auto</code></td><td>19.4 s, 10.3 s</td><td></td><td></td><td></td></tr>
+<tr><td>h6</td><td align="right">1.8 GiB</td><td>desktop browsers</td><td><code>gen 6 auto</code></td><td>12.6 s, 5.0 s</td><td>12.2 s, 4.9 s</td><td>1.6 s, 0.65 s</td><td>1.6 s, 0.65 s</td></tr>
+</tbody>
+</table></div>
+<p>Loading from a file took seconds (from a local server into headless Chromium: h6 3-13 s; <code>verify</code> adds a checksum pass).</p>
+<p>100 depth-17 cubes on h6 (14.8M nodes each), one thread, <code>solveMany</code> / <code>bench</code> batch mode, on one Zen 5 core:</p>
+<div class="table-wrap" role="region" aria-label="Historical measurements" tabindex="0"><table id="docs-table-5"><caption>Historical measurements</caption>
+<thead>
+<tr><th>build</th><th align="right">time</th><th align="right">Mnodes/s</th></tr>
+</thead>
+<tbody>
+<tr><td>native x86 (AVX-512, <code>simd.rs</code>)</td><td align="right">21.7 s</td><td align="right">68</td></tr>
+<tr><td>wasm in wasmtime 44</td><td align="right">122 s</td><td align="right">12.2</td></tr>
+<tr><td>wasm in V8 (Node 26)</td><td align="right">124 s</td><td align="right">11.9</td></tr>
+<tr><td>wasm in Bun 1.4.4 (JavaScriptCore)</td><td align="right">127 s</td><td align="right">11.7</td></tr>
+</tbody>
+</table></div>
+<p>The WebAssembly build was about 5.7 times slower than the native x86 build in this record, with the same solutions and node counts. NEON was only run under qemu, which says nothing about speed. Two things mattered for WebAssembly speed:</p>
+<ul>
+<li>WebAssembly has no prefetch instruction: <code>prefetch::read_once</code> is a plain load there, which starts the cache miss just as well (+53% in wasmtime, +45% in V8). Lanes still paid off: 1 lane 200.6 s, 8 lanes 123.8 s, flat up to 64; the module used 16.</li>
+<li>V8 (Chrome) starts new code in its baseline compiler and gives a function optimized code only from its next call: a long first solve would run slowly to its end (187.7 s instead of 129.5 s). <code>loadTable</code> and <code>generateTable</code> therefore run a short warm-up (<code>warmUp</code>, then ~0.6 s), and all exports share one copy of the search loop. JavaScriptCore (Bun, Safari) moves a running loop to optimized code: in Bun the warm-up is skipped (126.5 and 127.2 s without it, 127.0 and 127.9 s with it).</li>
+</ul>
+<p>With 8 threads (<code>egg-solver-threads.wasm</code>, one L3 domain), one cube at a time got 7.2-7.8 times the one-thread speed (h6: 88.6 Mnodes/s in V8, 90.7 in Bun; in headless Chromium 0.63-0.66 s instead of 5.15 s for the same cube), and generating h4 base 8 took 13 s instead of 75 s.</p>
+<p>Node counts matched the native ones (h5, 20 random states: identical nodes, lookups and lengths natively, in wasmtime and in V8; h6, 100 depth-17 cubes: the same in Bun). Sources: <a href="https://github.com/ArhanChaudhary/egg-solver/commit/db0b8ac510361f067f8c08497a63e50c66d7061f">db0b8ac</a> and <a href="https://github.com/ArhanChaudhary/egg-solver/commit/cc43b7779fc239e7d5b6f6252ff4b33fcb584280">cc43b77</a>.</p>
+</details>
 <h2 id="development-and-publishing">Development and publishing</h2>
 <p><a href="../guide/DEVELOPMENT.html">Development checks</a> covers checks, Miri and stress runs. <a href="../guide/PUBLISHING.html">Publishing</a> describes the Pages workflow and local site build. Shell completions are available through <code>--completions</code> (bash, zsh, fish, elvish and powershell).</p>
 
-<p class="source-link"><a href="USER_GUIDE.md">Markdown source</a></p></main>
+<p class="source-link"><a href="USER_GUIDE.md">Markdown source</a></p></main></div>
 <footer><a href="../PROVENANCE.html">Sources and evidence scope</a></footer>
 <script>
 for (const wrapper of document.querySelectorAll('.table-wrap')) {
@@ -188,5 +285,8 @@ function revealTarget(){
   for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
 }
 revealTarget(); window.addEventListener('hashchange',revealTarget);
+const menu=document.querySelector('.site-menu');
+if(menu){const wide=matchMedia('(min-width:901px)');const sync=()=>{menu.open=wide.matches;};sync();wide.addEventListener('change',sync);
+const current=menu.querySelector('[aria-current]');if(current&&wide.matches)current.scrollIntoView({block:'nearest'});}
 </script>
 </body></html>

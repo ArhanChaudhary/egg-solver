@@ -4,12 +4,24 @@
 :root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
 * { box-sizing:border-box; }
 body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
-header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header { padding:1rem max(1rem,calc((100vw - 1400px)/2)); background:#132c40; color:white; }
 header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
 header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
 header a { color:#d9f0ff; }
 header a[aria-current] { color:white; text-decoration-thickness:3px; }
-main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+.layout { max-width:1400px; margin:1.5rem auto; padding:0 1rem; display:grid; grid-template-columns:15rem minmax(0,1fr); gap:1.5rem; align-items:start; }
+.site-nav { position:sticky; top:1rem; max-height:calc(100vh - 2rem); overflow:auto; font-size:.9rem; }
+.site-menu { margin:0; padding:.4rem .8rem .8rem; background:white; }
+.site-menu summary { padding:.3rem 0; }
+.nav-group { margin:.9rem 0 .25rem; font-size:.75rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+.site-nav ul { list-style:none; margin:0; padding:0; }
+.site-nav li { margin:0; }
+.site-nav li a { display:block; padding:.2rem .45rem; border-radius:4px; text-decoration:none; line-height:1.35; }
+.site-nav li a:hover { background:#eef3f6; }
+.site-nav a[aria-current] { background:#e2edf5; font-weight:650; color:var(--ink); }
+@media(min-width:901px) { .site-menu > summary { display:none; } }
+@media(max-width:900px) { .layout { display:block; margin:.75rem auto; } .site-nav { position:static; max-height:none; margin-bottom:.75rem; } }
+main { margin:0; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
 h1 { margin-top:0; font-size:2rem; line-height:1.25; }
 h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
 h3 { margin-top:1.5rem; }
@@ -32,13 +44,13 @@ summary { cursor:pointer; font-weight:600; }
 .note,.source-link,footer { color:var(--muted); font-size:.85rem; }
 .source-link { margin-top:2rem; }
 .archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
-footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+footer { max-width:1400px; margin:1rem auto 2rem; padding:0 1rem; }
 blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
 svg { max-width:100%; height:auto; }
 :target { scroll-margin-top:1rem; }
 .skip-link { position:absolute; left:-10000px; }
 .skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
-@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+@media(max-width:700px) { .layout { padding:0 .5rem; } main { padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
 </style></head>
 <body>
 <a class="skip-link" href="#docs-content">Skip to content</a>
@@ -47,28 +59,213 @@ svg { max-width:100%; height:auto; }
 <a href="comparisons/index.html">Benchmarks</a>
 <a href="performance/index.html">Performance</a>
 <a href="safety/index.html">Safety</a>
-<a href="history/index.html">History</a>
-<a href="BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<a href="history/DELETED_EXPERIMENTS.html">Experiments</a>
+<a href="BENCHMARK_CATALOG.html">Catalog</a>
+<a href="https://egg-solver.arhan.sh/">Solver demo ↗</a></nav></header>
+<div class="layout"><nav class="site-nav" aria-label="All documentation pages"><details class="site-menu" open><summary>All pages</summary><p class="nav-group">Start</p><ul><li><a href="index.html">Overview</a></li><li><a href="guide/QUICKSTART.html">Quick start</a></li><li><a href="guide/OVERVIEW.html">Tables and memory</a></li><li><a href="guide/HOW_IT_WORKS.html">How the search works</a></li><li><a href="guide/GLOSSARY.html">Glossary</a></li></ul><p class="nav-group">Reference</p><ul><li><a href="reference/USER_GUIDE.html">User guide</a></li><li><a href="guide/DEVELOPMENT.html">Development checks</a></li><li><a href="guide/PUBLISHING.html">Publishing the site</a></li><li><a href="reference/inventories/index.html">Technique inventories</a></li></ul><p class="nav-group">Benchmarks</p><ul><li><a href="comparisons/index.html">Solver benchmarks</a></li><li><a href="comparisons/METHODS.html">Reading the tables</a></li><li><a href="comparisons/NISSY_THROUGHPUT.html">nissy throughput</a></li><li><a href="comparisons/NXOPT32.html">nxopt, 62 GB table</a></li><li><a href="comparisons/CUBEOPT_AUDIT.html">cubeopt audit</a></li><li><a href="comparisons/TABLE_ANALYSIS.html">h4 table analysis</a></li><li><a href="comparisons/RESULTS.html">Multi-solver matrix</a></li><li><a href="comparisons/COMPETITOR_FINDINGS.html">Competitor findings</a></li></ul><p class="nav-group">Performance</p><ul><li><a href="performance/index.html">Performance studies</a></li><li><a href="performance/PARALLELISM.html">Parallelism</a></li><li><a href="performance/HARDWARE_COUNTERS.html">Hardware counters</a></li><li><a href="performance/OPTIMIZATION_REVIEW.html">Optimization review</a></li></ul><p class="nav-group">Safety</p><ul><li><a href="safety/index.html">Correctness and safety</a></li><li><a href="safety/NO_UB.html">Undefined behavior</a></li><li><a href="safety/MORDANT.html">Mordant audit</a></li></ul><p class="nav-group">Evidence and history</p><ul><li><a href="BENCHMARK_CATALOG.html">Benchmark catalog</a></li><li><a href="reproduce/index.html">Reproduce results</a></li><li><a href="PROVENANCE.html" aria-current="page">Sources and IDs</a></li><li><a href="history/DELETED_EXPERIMENTS.html">Deleted experiments</a></li></ul></details></nav>
 <main id="docs-content"><h1 id="source-identities-and-evidence-scope">Source identities and evidence scope</h1>
 <p><a href="index.html">Documentation</a> · <a href="comparisons/index.html">Benchmarks</a> · <a href="reproduce/index.html">Verification</a></p>
 <p>Usage guides describe the commands in this source checkout. Benchmark and safety reports describe the specific source bytes they tested. A dated source identifier is not a claim that it is still the repository's current <code>main</code>.</p>
+<p>The repository history was rebuilt on 2026-11-10: the public repository had started from one squashed commit, and the full development history is now included. Agent commits are attributed to Claude, and two commit messages were reworded to remove excluded backend timing comparisons, so every commit has a new ID; file contents are unchanged. The guides cite current IDs. Raw records under <code>data/</code> keep the IDs that were current when they were written. The table maps the 172 old IDs that raw records cite. For example, the published source used by the November 8 studies, <code>947c20d</code> in raw records, is now <code>1b243c0</code>.</p>
+<details>
+<summary>Old commit IDs in raw records</summary>
 <div class="table-wrap" role="region" aria-label="Source identities and evidence scope" tabindex="0"><table id="docs-table-1"><caption>Source identities and evidence scope</caption>
+<thead>
+<tr><th>Date</th><th>Old ID</th><th>Current ID</th></tr>
+</thead>
+<tbody>
+<tr><td>2026-11-02</td><td><code>ec7e133</code></td><td><code>900ed03</code></td></tr>
+<tr><td>2026-11-02</td><td><code>9090310</code></td><td><code>e68e619</code></td></tr>
+<tr><td>2026-11-02</td><td><code>046c33f</code></td><td><code>bf0bcff</code></td></tr>
+<tr><td>2026-11-02</td><td><code>dc26266</code></td><td><code>aa80cec</code></td></tr>
+<tr><td>2026-11-02</td><td><code>9f9a4d3</code></td><td><code>4ffb6f2</code></td></tr>
+<tr><td>2026-11-02</td><td><code>7bce67d</code></td><td><code>ce1cee9</code></td></tr>
+<tr><td>2026-11-02</td><td><code>0c48355</code></td><td><code>448f4fb</code></td></tr>
+<tr><td>2026-11-02</td><td><code>2271355</code></td><td><code>9e5e320</code></td></tr>
+<tr><td>2026-11-02</td><td><code>c52cb63</code></td><td><code>856204b</code></td></tr>
+<tr><td>2026-11-02</td><td><code>31c2878</code></td><td><code>99c6237</code></td></tr>
+<tr><td>2026-11-02</td><td><code>2bb148d</code></td><td><code>c49c3fd</code></td></tr>
+<tr><td>2026-11-02</td><td><code>a0681ad</code></td><td><code>1da36db</code></td></tr>
+<tr><td>2026-11-02</td><td><code>0b65adf</code></td><td><code>7ebb3f1</code></td></tr>
+<tr><td>2026-11-02</td><td><code>d2674d5</code></td><td><code>a482e6b</code></td></tr>
+<tr><td>2026-11-02</td><td><code>aa43192</code></td><td><code>fd48890</code></td></tr>
+<tr><td>2026-11-02</td><td><code>d63535b</code></td><td><code>bc453e7</code></td></tr>
+<tr><td>2026-11-02</td><td><code>5cea944</code></td><td><code>3a7b790</code></td></tr>
+<tr><td>2026-11-02</td><td><code>59ce145</code></td><td><code>2b88284</code></td></tr>
+<tr><td>2026-11-03</td><td><code>42a7c98</code></td><td><code>43d148f</code></td></tr>
+<tr><td>2026-11-03</td><td><code>ae4fc49</code></td><td><code>3540328</code></td></tr>
+<tr><td>2026-11-03</td><td><code>f99ebc4</code></td><td><code>417a74d</code></td></tr>
+<tr><td>2026-11-03</td><td><code>3957bbc</code></td><td><code>f1e2092</code></td></tr>
+<tr><td>2026-11-03</td><td><code>ebd6c20</code></td><td><code>6ccd6c8</code></td></tr>
+<tr><td>2026-11-03</td><td><code>5b0f6ab</code></td><td><code>7c6c7b2</code></td></tr>
+<tr><td>2026-11-03</td><td><code>e9d751e</code></td><td><code>cedc001</code></td></tr>
+<tr><td>2026-11-03</td><td><code>6d265dd</code></td><td><code>af142e4</code></td></tr>
+<tr><td>2026-11-03</td><td><code>d708f1c</code></td><td><code>388b911</code></td></tr>
+<tr><td>2026-11-03</td><td><code>814ae96</code></td><td><code>1176dad</code></td></tr>
+<tr><td>2026-11-03</td><td><code>042f13c</code></td><td><code>cc8c00c</code></td></tr>
+<tr><td>2026-11-03</td><td><code>fe58740</code></td><td><code>95d1619</code></td></tr>
+<tr><td>2026-11-03</td><td><code>7a173a1</code></td><td><code>169da9e</code></td></tr>
+<tr><td>2026-11-03</td><td><code>b90b706</code></td><td><code>82da6e7</code></td></tr>
+<tr><td>2026-11-03</td><td><code>8b2cf71</code></td><td><code>3b10f59</code></td></tr>
+<tr><td>2026-11-03</td><td><code>70567ff</code></td><td><code>ffbd072</code></td></tr>
+<tr><td>2026-11-03</td><td><code>45a5a0b</code></td><td><code>ef92dda</code></td></tr>
+<tr><td>2026-11-03</td><td><code>18ef7f0</code></td><td><code>ca2921f</code></td></tr>
+<tr><td>2026-11-03</td><td><code>ff2b7a4</code></td><td><code>c897107</code></td></tr>
+<tr><td>2026-11-03</td><td><code>c914d66</code></td><td><code>8de8048</code></td></tr>
+<tr><td>2026-11-03</td><td><code>496b096</code></td><td><code>1e7ccce</code></td></tr>
+<tr><td>2026-11-03</td><td><code>1326046</code></td><td><code>403680a</code></td></tr>
+<tr><td>2026-11-03</td><td><code>60153a7</code></td><td><code>7652948</code></td></tr>
+<tr><td>2026-11-03</td><td><code>eee3432</code></td><td><code>d482047</code></td></tr>
+<tr><td>2026-11-03</td><td><code>a741d66</code></td><td><code>cff820d</code></td></tr>
+<tr><td>2026-11-03</td><td><code>c509dd1</code></td><td><code>30810e7</code></td></tr>
+<tr><td>2026-11-03</td><td><code>35c608c</code></td><td><code>55120b7</code></td></tr>
+<tr><td>2026-11-03</td><td><code>431e46a</code></td><td><code>12a7bce</code></td></tr>
+<tr><td>2026-11-03</td><td><code>236bf33</code></td><td><code>567e005</code></td></tr>
+<tr><td>2026-11-03</td><td><code>ee18653</code></td><td><code>0fc4f92</code></td></tr>
+<tr><td>2026-11-03</td><td><code>68dfaf6</code></td><td><code>3356857</code></td></tr>
+<tr><td>2026-11-03</td><td><code>9caf0e2</code></td><td><code>32a42c5</code></td></tr>
+<tr><td>2026-11-03</td><td><code>82ff5c8</code></td><td><code>0dc6f47</code></td></tr>
+<tr><td>2026-11-03</td><td><code>4911370</code></td><td><code>80fa308</code></td></tr>
+<tr><td>2026-11-03</td><td><code>5c3efa9</code></td><td><code>a5248b0</code></td></tr>
+<tr><td>2026-11-03</td><td><code>78ce33e</code></td><td><code>ea4da12</code></td></tr>
+<tr><td>2026-11-03</td><td><code>ecd311e</code></td><td><code>1560974</code></td></tr>
+<tr><td>2026-11-03</td><td><code>26b4f4c</code></td><td><code>94e405d</code></td></tr>
+<tr><td>2026-11-03</td><td><code>85e9c79</code></td><td><code>d0ab36f</code></td></tr>
+<tr><td>2026-11-03</td><td><code>621b70a</code></td><td><code>c564dc3</code></td></tr>
+<tr><td>2026-11-03</td><td><code>d2a3c2e</code></td><td><code>84b03da</code></td></tr>
+<tr><td>2026-11-03</td><td><code>82b291e</code></td><td><code>2b14dad</code></td></tr>
+<tr><td>2026-11-03</td><td><code>cb8cb70</code></td><td><code>00d998c</code></td></tr>
+<tr><td>2026-11-03</td><td><code>6f033a4</code></td><td><code>2f5a122</code></td></tr>
+<tr><td>2026-11-03</td><td><code>4088803</code></td><td><code>a8ae5f9</code></td></tr>
+<tr><td>2026-11-03</td><td><code>fcc8d7b</code></td><td><code>7233222</code></td></tr>
+<tr><td>2026-11-03</td><td><code>f947454</code></td><td><code>1b1ac4f</code></td></tr>
+<tr><td>2026-11-03</td><td><code>7853462</code></td><td><code>7ea2a6c</code></td></tr>
+<tr><td>2026-11-03</td><td><code>b2f4b13</code></td><td><code>bc6be36</code></td></tr>
+<tr><td>2026-11-03</td><td><code>8953929</code></td><td><code>88afbf5</code></td></tr>
+<tr><td>2026-11-03</td><td><code>b84fb7c</code></td><td><code>29de940</code></td></tr>
+<tr><td>2026-11-03</td><td><code>f0efcde</code></td><td><code>4f559fa</code></td></tr>
+<tr><td>2026-11-03</td><td><code>47b5da2</code></td><td><code>75e1e9a</code></td></tr>
+<tr><td>2026-11-03</td><td><code>1235cdd</code></td><td><code>865b1f8</code></td></tr>
+<tr><td>2026-11-03</td><td><code>c5d7705</code></td><td><code>8a1f55c</code></td></tr>
+<tr><td>2026-11-04</td><td><code>36668cc</code></td><td><code>08d637a</code></td></tr>
+<tr><td>2026-11-03</td><td><code>21e3ca9</code></td><td><code>bc310cc</code></td></tr>
+<tr><td>2026-11-04</td><td><code>26af596</code></td><td><code>0354803</code></td></tr>
+<tr><td>2026-11-04</td><td><code>0b35690</code></td><td><code>af1b296</code></td></tr>
+<tr><td>2026-11-04</td><td><code>2203a07</code></td><td><code>3430808</code></td></tr>
+<tr><td>2026-11-04</td><td><code>f2cb1f4</code></td><td><code>97e1abd</code></td></tr>
+<tr><td>2026-11-04</td><td><code>595e424</code></td><td><code>8163366</code></td></tr>
+<tr><td>2026-11-04</td><td><code>abce87c</code></td><td><code>44b7d8a</code></td></tr>
+<tr><td>2026-11-04</td><td><code>d13944f</code></td><td><code>78bc088</code></td></tr>
+<tr><td>2026-11-04</td><td><code>71d69ae</code></td><td><code>13a13fa</code></td></tr>
+<tr><td>2026-11-04</td><td><code>55e048e</code></td><td><code>e7b094e</code></td></tr>
+<tr><td>2026-11-04</td><td><code>b2f2c9a</code></td><td><code>555a6ea</code></td></tr>
+<tr><td>2026-11-04</td><td><code>301115f</code></td><td><code>e591236</code></td></tr>
+<tr><td>2026-11-04</td><td><code>4453092</code></td><td><code>1e0ede1</code></td></tr>
+<tr><td>2026-11-04</td><td><code>ece816a</code></td><td><code>1f9dcaf</code></td></tr>
+<tr><td>2026-11-04</td><td><code>854dfe8</code></td><td><code>d5f3c52</code></td></tr>
+<tr><td>2026-11-04</td><td><code>3cc6ee3</code></td><td><code>ff86d68</code></td></tr>
+<tr><td>2026-11-04</td><td><code>3f7054d</code></td><td><code>c6c7c5f</code></td></tr>
+<tr><td>2026-11-04</td><td><code>ab5d21a</code></td><td><code>3e59901</code></td></tr>
+<tr><td>2026-11-04</td><td><code>b608890</code></td><td><code>f66ec5a</code></td></tr>
+<tr><td>2026-11-04</td><td><code>dda14e2</code></td><td><code>56f5b58</code></td></tr>
+<tr><td>2026-11-04</td><td><code>c9a1c4d</code></td><td><code>9e4bc24</code></td></tr>
+<tr><td>2026-11-04</td><td><code>735dd25</code></td><td><code>b3f0bfb</code></td></tr>
+<tr><td>2026-11-04</td><td><code>33ca449</code></td><td><code>3bf5530</code></td></tr>
+<tr><td>2026-11-04</td><td><code>085a9fd</code></td><td><code>0339dd2</code></td></tr>
+<tr><td>2026-11-04</td><td><code>1f4c85a</code></td><td><code>7c46566</code></td></tr>
+<tr><td>2026-11-04</td><td><code>9e69243</code></td><td><code>5029d24</code></td></tr>
+<tr><td>2026-11-04</td><td><code>5cce44d</code></td><td><code>6a05ec8</code></td></tr>
+<tr><td>2026-11-04</td><td><code>1c31eca</code></td><td><code>1c2749a</code></td></tr>
+<tr><td>2026-11-04</td><td><code>f8a4919</code></td><td><code>387034c</code></td></tr>
+<tr><td>2026-11-04</td><td><code>673d49e</code></td><td><code>42b986b</code></td></tr>
+<tr><td>2026-11-04</td><td><code>84a4aa1</code></td><td><code>5f130cd</code></td></tr>
+<tr><td>2026-11-04</td><td><code>fe926ed</code></td><td><code>d4125fd</code></td></tr>
+<tr><td>2026-11-04</td><td><code>a546429</code></td><td><code>0abb347</code></td></tr>
+<tr><td>2026-11-04</td><td><code>857a0c6</code></td><td><code>f07b109</code></td></tr>
+<tr><td>2026-11-04</td><td><code>8926c95</code></td><td><code>887c892</code></td></tr>
+<tr><td>2026-11-04</td><td><code>def2cd0</code></td><td><code>f2cf828</code></td></tr>
+<tr><td>2026-11-04</td><td><code>7eaede8</code></td><td><code>fa2b454</code></td></tr>
+<tr><td>2026-11-04</td><td><code>876a97e</code></td><td><code>db0b8ac</code></td></tr>
+<tr><td>2026-11-04</td><td><code>8977134</code></td><td><code>57b3a5d</code></td></tr>
+<tr><td>2026-11-04</td><td><code>33a8042</code></td><td><code>710716d</code></td></tr>
+<tr><td>2026-11-04</td><td><code>95cbb11</code></td><td><code>03abdfc</code></td></tr>
+<tr><td>2026-11-04</td><td><code>7608a28</code></td><td><code>d28335f</code></td></tr>
+<tr><td>2026-11-04</td><td><code>2a0574f</code></td><td><code>81eae95</code></td></tr>
+<tr><td>2026-11-05</td><td><code>3a9a50a</code></td><td><code>7075875</code></td></tr>
+<tr><td>2026-11-05</td><td><code>9be649d</code></td><td><code>ee62734</code></td></tr>
+<tr><td>2026-11-05</td><td><code>1571c47</code></td><td><code>2ad24b8</code></td></tr>
+<tr><td>2026-11-05</td><td><code>c620d69</code></td><td><code>942d44c</code></td></tr>
+<tr><td>2026-11-05</td><td><code>a7ce28f</code></td><td><code>76a488f</code></td></tr>
+<tr><td>2026-11-05</td><td><code>ca31e63</code></td><td><code>cc43b77</code></td></tr>
+<tr><td>2026-11-05</td><td><code>585b3b6</code></td><td><code>d690a46</code></td></tr>
+<tr><td>2026-11-05</td><td><code>89dca7b</code></td><td><code>ee9e887</code></td></tr>
+<tr><td>2026-11-05</td><td><code>66c4f03</code></td><td><code>6ff4350</code></td></tr>
+<tr><td>2026-11-05</td><td><code>aee1645</code></td><td><code>13ea1af</code></td></tr>
+<tr><td>2026-11-05</td><td><code>0d1a0e8</code></td><td><code>64877d5</code></td></tr>
+<tr><td>2026-11-04</td><td><code>2f4fb7a</code></td><td><code>9c45b7a</code></td></tr>
+<tr><td>2026-11-04</td><td><code>bb07598</code></td><td><code>828737e</code></td></tr>
+<tr><td>2026-11-05</td><td><code>31525f1</code></td><td><code>2bdc042</code></td></tr>
+<tr><td>2026-11-05</td><td><code>4c74267</code></td><td><code>965ff32</code></td></tr>
+<tr><td>2026-11-05</td><td><code>508cbe5</code></td><td><code>0e453b6</code></td></tr>
+<tr><td>2026-11-05</td><td><code>ca820b6</code></td><td><code>6244eaa</code></td></tr>
+<tr><td>2026-11-05</td><td><code>6990603</code></td><td><code>9a338aa</code></td></tr>
+<tr><td>2026-11-05</td><td><code>55bca49</code></td><td><code>102023f</code></td></tr>
+<tr><td>2026-11-05</td><td><code>0d6a899</code></td><td><code>5f9e56b</code></td></tr>
+<tr><td>2026-11-05</td><td><code>a5c7a6f</code></td><td><code>6353621</code></td></tr>
+<tr><td>2026-11-05</td><td><code>43fc26b</code></td><td><code>f5e5400</code></td></tr>
+<tr><td>2026-11-05</td><td><code>0c4bfe2</code></td><td><code>d68e49e</code></td></tr>
+<tr><td>2026-11-05</td><td><code>b9fc895</code></td><td><code>d786c0d</code></td></tr>
+<tr><td>2026-11-05</td><td><code>b6d7821</code></td><td><code>c4bf6a8</code></td></tr>
+<tr><td>2026-11-05</td><td><code>760ad75</code></td><td><code>1b5ecd9</code></td></tr>
+<tr><td>2026-11-05</td><td><code>229b99f</code></td><td><code>979dcf6</code></td></tr>
+<tr><td>2026-11-05</td><td><code>80620c4</code></td><td><code>7d8b606</code></td></tr>
+<tr><td>2026-11-05</td><td><code>18c4a66</code></td><td><code>52ab88f</code></td></tr>
+<tr><td>2026-11-05</td><td><code>7f4950d</code></td><td><code>68047f2</code></td></tr>
+<tr><td>2026-11-05</td><td><code>0b5b5a6</code></td><td><code>1f5eb70</code></td></tr>
+<tr><td>2026-11-05</td><td><code>2403aa3</code></td><td><code>6a131a3</code></td></tr>
+<tr><td>2026-11-05</td><td><code>10977c2</code></td><td><code>c2fd2a1</code></td></tr>
+<tr><td>2026-11-05</td><td><code>ffd2394</code></td><td><code>6ae0bb2</code></td></tr>
+<tr><td>2026-11-05</td><td><code>4bf1b5e</code></td><td><code>67bddf5</code></td></tr>
+<tr><td>2026-11-05</td><td><code>ae25e0a</code></td><td><code>5739dd0</code></td></tr>
+<tr><td>2026-11-05</td><td><code>ae49125</code></td><td><code>9d41ad7</code></td></tr>
+<tr><td>2026-11-05</td><td><code>3eff157</code></td><td><code>76c3714</code></td></tr>
+<tr><td>2026-11-05</td><td><code>db87483</code></td><td><code>0a5b0cf</code></td></tr>
+<tr><td>2026-11-05</td><td><code>2627ad3</code></td><td><code>f4c064a</code></td></tr>
+<tr><td>2026-11-06</td><td><code>4b1707a</code></td><td><code>baa021d</code></td></tr>
+<tr><td>2026-11-06</td><td><code>e127307</code></td><td><code>b6913e8</code></td></tr>
+<tr><td>2026-11-06</td><td><code>a1fce13</code></td><td><code>bbc455e</code></td></tr>
+<tr><td>2026-11-06</td><td><code>935cb7f</code></td><td><code>01e7683</code></td></tr>
+<tr><td>2026-11-06</td><td><code>0ed8002</code></td><td><code>75f5e8c</code></td></tr>
+<tr><td>2026-11-06</td><td><code>cd963dc</code></td><td><code>5489b2d</code></td></tr>
+<tr><td>2026-11-06</td><td><code>af9a7e7</code></td><td><code>050ecb3</code></td></tr>
+<tr><td>2026-11-06</td><td><code>56ace9c</code></td><td><code>c551a06</code></td></tr>
+<tr><td>2026-11-06</td><td><code>447e432</code></td><td><code>ce92f83</code></td></tr>
+<tr><td>2026-11-06</td><td><code>12bb580</code></td><td><code>4dda0ab</code></td></tr>
+<tr><td>2026-11-06</td><td><code>93867a4</code></td><td><code>da134bc</code></td></tr>
+<tr><td>2026-11-07</td><td><code>988f289</code></td><td><code>e18e971</code></td></tr>
+<tr><td>2026-11-07</td><td><code>316597f</code></td><td><code>13307ba</code></td></tr>
+<tr><td>2026-11-07</td><td><code>842a504</code></td><td><code>a247321</code></td></tr>
+<tr><td>2026-11-07</td><td><code>947c20d</code></td><td><code>1b243c0</code></td></tr>
+</tbody>
+</table></div>
+</details>
+<div class="table-wrap" role="region" aria-label="Source identities and evidence scope" tabindex="0"><table id="docs-table-2"><caption>Source identities and evidence scope</caption>
 <thead>
 <tr><th>Evidence</th><th>Measured source / scope</th><th>Record</th></tr>
 </thead>
 <tbody>
-<tr><td>November 8 nissy throughput</td><td>Published source <code>947c20d</code>; retained CLI build inputs match except generator help text not linked into <code>solve</code></td><td><a href="comparisons/NISSY_THROUGHPUT.html">Report</a>, <a href="data/nissy-throughput-20261108/manifest.json">manifest</a></td></tr>
-<tr><td>Earlier multi-solver matrix</td><td>Egg <code>229b99f</code>; later <code>842a504</code> checked separately</td><td><a href="comparisons/RESULTS.html">Historical matrix</a></td></tr>
-<tr><td>Miri and sanitizer audit</td><td>Candidate <code>316597f</code>, integrated as <code>842a504</code>; source fingerprint recorded</td><td><a href="safety/NO_UB.html">Safety assessment</a></td></tr>
-<tr><td>Physical Xeon counters</td><td><code>935cb7f</code> plus the recorded profiling patch; Westmere build</td><td><a href="performance/HARDWARE_COUNTERS.html">Counter study</a></td></tr>
-<tr><td>Other experiments</td><td>Their own pinned sources, compilers, inputs and timing formulas</td><td><a href="BENCHMARK_CATALOG.html">Catalog</a>, <a href="history/index.html">history</a></td></tr>
+<tr><td>November 8 nissy throughput</td><td>Published source <code>1b243c0</code> (<code>947c20d</code> in raw records); retained CLI build inputs match except generator help text not linked into <code>solve</code></td><td><a href="comparisons/NISSY_THROUGHPUT.html">Report</a>, <a href="data/nissy-throughput-20261108/manifest.json">manifest</a></td></tr>
+<tr><td>Earlier multi-solver matrix</td><td>Egg <code>979dcf6</code>; later <code>a247321</code> checked separately</td><td><a href="comparisons/RESULTS.html">Historical matrix</a></td></tr>
+<tr><td>Miri and sanitizer audit</td><td>Candidate <code>13307ba</code>, integrated as <code>a247321</code>; source fingerprint recorded</td><td><a href="safety/NO_UB.html">Safety assessment</a></td></tr>
+<tr><td>Physical Xeon counters</td><td><code>01e7683</code> plus the recorded profiling patch; Westmere build</td><td><a href="performance/HARDWARE_COUNTERS.html">Counter study</a></td></tr>
+<tr><td>Other experiments</td><td>Their own pinned sources, compilers, inputs and timing formulas</td><td><a href="BENCHMARK_CATALOG.html">Catalog</a>, <a href="history/DELETED_EXPERIMENTS.html">deleted experiments</a></td></tr>
 </tbody>
 </table></div>
 <p>The retained evidence includes raw text/CSV/JSON, datasets, methods, licenses, source snapshots and dated experiment notes. Executables, build caches, pruning-table data and binary PMU recordings are excluded. Machine paths in raw records identify the measurement environment; they are not installation requirements.</p>
 <p><code>MANIFEST.sha256</code> checks the current documentation file bytes. <code>SOURCES.json</code> records origins and hashes from the original evidence collection; it is a provenance record, not the checksum list for later edited guides. Individual studies also retain their own raw-output hashes. These checks detect changed files, not incorrect scientific claims.</p>
 <p>Historical evidence is preserved when a summary is rewritten. Old status messages, pending work, test counts and benchmark formulas are interpreted at their recorded date. Backend correctness identities remain where relevant; the excluded backend performance comparisons are not republished.</p>
 
-<p class="source-link"><a href="PROVENANCE.md">Markdown source</a></p></main>
+<p class="source-link"><a href="PROVENANCE.md">Markdown source</a></p></main></div>
 <footer><a href="PROVENANCE.html">Sources and evidence scope</a></footer>
 <script>
 for (const wrapper of document.querySelectorAll('.table-wrap')) {
@@ -95,5 +292,8 @@ function revealTarget(){
   for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
 }
 revealTarget(); window.addEventListener('hashchange',revealTarget);
+const menu=document.querySelector('.site-menu');
+if(menu){const wide=matchMedia('(min-width:901px)');const sync=()=>{menu.open=wide.matches;};sync();wide.addEventListener('change',sync);
+const current=menu.querySelector('[aria-current]');if(current&&wide.matches)current.scrollIntoView({block:'nearest'});}
 </script>
 </body></html>

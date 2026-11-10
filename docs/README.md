@@ -15,6 +15,6 @@ Use the native solver with a table you generate once and keep in RAM. The comman
 
 ## Evidence and development
 
-The [benchmark catalog](BENCHMARK_CATALOG.md) lists measured studies and their raw records. [Experiment history](history/README.md) preserves earlier work, including rejected ideas. Historical records keep their original dates and source versions; they are not current usage instructions.
+The [benchmark catalog](BENCHMARK_CATALOG.md) lists measured studies and their raw records. [Experiment history](history/DELETED_EXPERIMENTS.md) preserves earlier work, including rejected ideas. Historical records keep their original dates and source versions; they are not current usage instructions.
 
-See [reproduction](reproduce/README.md) to check recorded results, [publishing](guide/PUBLISHING.md) to build the documentation site, and [provenance](PROVENANCE.md) for source identities and archive scope. Markdown is the editable source; `index.html` is the offline entry point.
+See [reproduction](reproduce/README.md) to check recorded results, [publishing](guide/PUBLISHING.md) to build the documentation site, and [provenance](PROVENANCE.md) for source identities and evidence scope. Markdown is the editable source; `index.html` is the offline entry point.

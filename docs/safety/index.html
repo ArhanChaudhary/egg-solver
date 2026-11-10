@@ -4,12 +4,24 @@
 :root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
 * { box-sizing:border-box; }
 body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
-header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header { padding:1rem max(1rem,calc((100vw - 1400px)/2)); background:#132c40; color:white; }
 header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
 header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
 header a { color:#d9f0ff; }
 header a[aria-current] { color:white; text-decoration-thickness:3px; }
-main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+.layout { max-width:1400px; margin:1.5rem auto; padding:0 1rem; display:grid; grid-template-columns:15rem minmax(0,1fr); gap:1.5rem; align-items:start; }
+.site-nav { position:sticky; top:1rem; max-height:calc(100vh - 2rem); overflow:auto; font-size:.9rem; }
+.site-menu { margin:0; padding:.4rem .8rem .8rem; background:white; }
+.site-menu summary { padding:.3rem 0; }
+.nav-group { margin:.9rem 0 .25rem; font-size:.75rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+.site-nav ul { list-style:none; margin:0; padding:0; }
+.site-nav li { margin:0; }
+.site-nav li a { display:block; padding:.2rem .45rem; border-radius:4px; text-decoration:none; line-height:1.35; }
+.site-nav li a:hover { background:#eef3f6; }
+.site-nav a[aria-current] { background:#e2edf5; font-weight:650; color:var(--ink); }
+@media(min-width:901px) { .site-menu > summary { display:none; } }
+@media(max-width:900px) { .layout { display:block; margin:.75rem auto; } .site-nav { position:static; max-height:none; margin-bottom:.75rem; } }
+main { margin:0; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
 h1 { margin-top:0; font-size:2rem; line-height:1.25; }
 h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
 h3 { margin-top:1.5rem; }
@@ -32,13 +44,13 @@ summary { cursor:pointer; font-weight:600; }
 .note,.source-link,footer { color:var(--muted); font-size:.85rem; }
 .source-link { margin-top:2rem; }
 .archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
-footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+footer { max-width:1400px; margin:1rem auto 2rem; padding:0 1rem; }
 blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
 svg { max-width:100%; height:auto; }
 :target { scroll-margin-top:1rem; }
 .skip-link { position:absolute; left:-10000px; }
 .skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
-@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+@media(max-width:700px) { .layout { padding:0 .5rem; } main { padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
 </style></head>
 <body>
 <a class="skip-link" href="#docs-content">Skip to content</a>
@@ -47,8 +59,10 @@ svg { max-width:100%; height:auto; }
 <a href="../comparisons/index.html">Benchmarks</a>
 <a href="../performance/index.html">Performance</a>
 <a href="index.html" aria-current="page">Safety</a>
-<a href="../history/index.html">History</a>
-<a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<a href="../history/DELETED_EXPERIMENTS.html">Experiments</a>
+<a href="../BENCHMARK_CATALOG.html">Catalog</a>
+<a href="https://egg-solver.arhan.sh/">Solver demo ↗</a></nav></header>
+<div class="layout"><nav class="site-nav" aria-label="All documentation pages"><details class="site-menu" open><summary>All pages</summary><p class="nav-group">Start</p><ul><li><a href="../index.html">Overview</a></li><li><a href="../guide/QUICKSTART.html">Quick start</a></li><li><a href="../guide/OVERVIEW.html">Tables and memory</a></li><li><a href="../guide/HOW_IT_WORKS.html">How the search works</a></li><li><a href="../guide/GLOSSARY.html">Glossary</a></li></ul><p class="nav-group">Reference</p><ul><li><a href="../reference/USER_GUIDE.html">User guide</a></li><li><a href="../guide/DEVELOPMENT.html">Development checks</a></li><li><a href="../guide/PUBLISHING.html">Publishing the site</a></li><li><a href="../reference/inventories/index.html">Technique inventories</a></li></ul><p class="nav-group">Benchmarks</p><ul><li><a href="../comparisons/index.html">Solver benchmarks</a></li><li><a href="../comparisons/METHODS.html">Reading the tables</a></li><li><a href="../comparisons/NISSY_THROUGHPUT.html">nissy throughput</a></li><li><a href="../comparisons/NXOPT32.html">nxopt, 62 GB table</a></li><li><a href="../comparisons/CUBEOPT_AUDIT.html">cubeopt audit</a></li><li><a href="../comparisons/TABLE_ANALYSIS.html">h4 table analysis</a></li><li><a href="../comparisons/RESULTS.html">Multi-solver matrix</a></li><li><a href="../comparisons/COMPETITOR_FINDINGS.html">Competitor findings</a></li></ul><p class="nav-group">Performance</p><ul><li><a href="../performance/index.html">Performance studies</a></li><li><a href="../performance/PARALLELISM.html">Parallelism</a></li><li><a href="../performance/HARDWARE_COUNTERS.html">Hardware counters</a></li><li><a href="../performance/OPTIMIZATION_REVIEW.html">Optimization review</a></li></ul><p class="nav-group">Safety</p><ul><li><a href="index.html" aria-current="page">Correctness and safety</a></li><li><a href="NO_UB.html">Undefined behavior</a></li><li><a href="MORDANT.html">Mordant audit</a></li></ul><p class="nav-group">Evidence and history</p><ul><li><a href="../BENCHMARK_CATALOG.html">Benchmark catalog</a></li><li><a href="../reproduce/index.html">Reproduce results</a></li><li><a href="../PROVENANCE.html">Sources and IDs</a></li><li><a href="../history/DELETED_EXPERIMENTS.html">Deleted experiments</a></li></ul></details></nav>
 <main id="docs-content"><h1 id="correctness-optimality-and-memory-safety">Correctness, optimality and memory safety</h1>
 <p><a href="../index.html">Documentation home</a> · <a href="NO_UB.html">Detailed UB assessment</a> · <a href="MORDANT.html">Mordant findings</a></p>
 <p>There are three different questions to ask about a fast solver:</p>
@@ -63,14 +77,14 @@ svg { max-width:100%; height:auto; }
 </tbody>
 </table></div>
 <h2 id="recorded-validation-scope">Recorded validation scope</h2>
-<p>The audited source fingerprint is <code>93478bc5c45ba267255574f8cb466f02f006f1c7bf558fb8f9d088ec4307a4c9</code>, integrated as <code>842a504</code> on November 7, 2026. The complete Miri catalogues executed 50 of 56 x86 tests and 48 of 54 portable tests, with six explicit exclusions per backend. Each backend also ran the shared-search tests under 16 scheduling seeds. Native/backend, focused strict-provenance, AddressSanitizer and ThreadSanitizer checks completed.</p>
-<p>The <a href="NO_UB.html">NO_UB report</a> explains the fixed API, bounds, memory ownership and publication defects, the provenance-mode qualifications, and the OS/assembly/backend exclusions. It retains earlier failed or incomplete snapshots as history; the summary identifies the audited source and links the full dated assessment.</p>
-<p><a href="MORDANT.html">Mordant</a> produced 14 distinct native and 70 WASI lint diagnostics, with zero compiler errors in the accepted November 7 runs. Those diagnostics were reviewed. A successful lint run is not a claim of zero warnings or a safety proof.</p>
+<p>The audited source fingerprint is <code>93478bc5c45ba267255574f8cb466f02f006f1c7bf558fb8f9d088ec4307a4c9</code>, integrated as <code>a247321</code> on November 7, 2026. The complete Miri catalogues executed 50 of 56 x86 tests and 48 of 54 portable tests, with six explicit exclusions per backend. Each backend also ran the shared-search tests under 16 scheduling seeds. Native/backend, focused strict-provenance, AddressSanitizer and ThreadSanitizer checks completed.</p>
+<p>The <a href="NO_UB.html">UB evidence summary</a> explains the fixed API, bounds, memory ownership and publication defects, the provenance-mode qualifications, and the OS/assembly/backend exclusions, and identifies the audited source. The <a href="NO_UB_20261107.html">complete November 7 assessment record</a> retains test names, compiler versions, exclusions and earlier failed or incomplete snapshots as history.</p>
+<p><a href="MORDANT.html">Mordant</a>, a third-party Rust lint tool, produced 14 distinct native and 70 WASI lint diagnostics, with zero compiler errors in the accepted November 7 runs. Those diagnostics were reviewed. A successful lint run is not a claim of zero warnings or a safety proof.</p>
 <p>The no-panic policy removes intentional runtime panic calls from shipped first-party code, with the documented test/constant/debug-assert exceptions. That scanner result does not prove absence of every implicit or dependency panic.</p>
 <p>For comparing algorithms, see <a href="../comparisons/RESULTS.html">solution lengths in the complete report</a>. For implementation detail, see the <a href="../guide/HOW_IT_WORKS.html#source-map">source map</a>.</p>
 <p>The November 8 throughput study additionally replayed all 15,000 final solutions in both independent cube models. <a href="../data/nissy-throughput-20261108/cross-replay.json">Its raw validation</a> is a result check on those 500 distinct states, not a new Miri run or universal optimality proof.</p>
 
-<p class="source-link"><a href="README.md">Markdown source</a></p></main>
+<p class="source-link"><a href="README.md">Markdown source</a></p></main></div>
 <footer><a href="../PROVENANCE.html">Sources and evidence scope</a></footer>
 <script>
 for (const wrapper of document.querySelectorAll('.table-wrap')) {
@@ -97,5 +111,8 @@ function revealTarget(){
   for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
 }
 revealTarget(); window.addEventListener('hashchange',revealTarget);
+const menu=document.querySelector('.site-menu');
+if(menu){const wide=matchMedia('(min-width:901px)');const sync=()=>{menu.open=wide.matches;};sync();wide.addEventListener('change',sync);
+const current=menu.querySelector('[aria-current]');if(current&&wide.matches)current.scrollIntoView({block:'nearest'});}
 </script>
 </body></html>

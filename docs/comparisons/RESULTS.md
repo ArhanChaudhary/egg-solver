@@ -2,7 +2,7 @@
 
 [Benchmarks](README.md) · [Timing definitions](METHODS.md) · [Full dated matrix](archive/MATRIX_20261107.md)
 
-This is the **November 7, 2026 snapshot**, measured on the 48-core EPYC VM with egg source **`229b99f`**. It is not the latest throughput study and does not describe every later source revision. For the complete 500-state, h6–h10 finite-batch test, use the [November 8 nissy comparison](NISSY_THROUGHPUT.md).
+This is the **November 7, 2026 snapshot**, measured on the 48-core EPYC VM with egg source **`979dcf6`**. It is not the latest throughput study and does not describe every later source revision. For the complete 500-state, h6–h10 finite-batch test, use the [November 8 nissy comparison](NISSY_THROUGHPUT.md).
 
 ## What is retained
 
@@ -27,7 +27,7 @@ Times in the detailed matrix are **seconds per cube under that section's formula
 - [New nissy throughput](NISSY_THROUGHPUT.md): complete-batch wall time on all 500 states with tuned allocations.
 - [Safety assessment](../safety/NO_UB.md): validation is bound to its audited source fingerprint, not inferred from timing.
 
-The later `842a504` source had separate h11 A/B validation against `229b99f`: stream throughput changed by −1.28% at one worker and −1.01% at 48 workers; the stated latency checks changed by +0.16%, +2.84% and +1.20% time. Those records remain in the full matrix. Historical gains are not added together or silently attributed to the latest checkout.
+The later `a247321` source had separate h11 A/B validation against `979dcf6`: stream throughput changed by −1.28% at one worker and −1.01% at 48 workers; the stated latency checks changed by +0.16%, +2.84% and +1.20% time. Those records remain in the full matrix. Historical gains are not added together or silently attributed to the latest checkout.
 
 ## Detailed sections and old bookmarks
 
@@ -178,18 +178,18 @@ These links retain the earlier report's entry points. Each opens the matching se
 
 <a id="bugs-and-issues-found-in-other-solvers-for-the-final-report-the-user-will-report-them-upstream"></a>
 
-[Historical section](archive/MATRIX_20261107.md#bugs-and-issues-found-in-other-solvers-for-the-final-report-the-user-will-report-them-upstream).
+- [Bugs and issues found in other solvers](COMPETITOR_FINDINGS.md)
 
 <a id="competitor-bug-findings"></a>
 
-[Historical section](archive/MATRIX_20261107.md#competitor-bug-findings).
+- [Competitor bug findings](COMPETITOR_FINDINGS.md)
 
 <a id="no-panic-source-inventory"></a>
 
-[Historical section](archive/MATRIX_20261107.md#no-panic-source-inventory).
+- [No-panic source inventory](archive/MATRIX_20261107.md#safety-evidence)
 
 <a id="no-panic-integration-remaining-implicit-check-inventory"></a>
 
-[Historical section](archive/MATRIX_20261107.md#no-panic-integration-remaining-implicit-check-inventory).
+- [No-panic integration: remaining implicit-check inventory](archive/MATRIX_20261107.md#safety-evidence)
 
 </details>

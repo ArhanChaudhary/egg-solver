@@ -4,7 +4,7 @@
 //! so the pointers need not be valid (except for `read_once`).
 
 /// Prefetch for a read used once (table lookups): x86 `prefetchnta`
-/// (measured better than T0 for the table, ebd6c20: +2.6%), aarch64
+/// (measured better than T0 for the table, 6ccd6c8: +2.6%), aarch64
 /// `pldl1strm`, wasm32 a one-byte load (below).
 ///
 /// # Safety

@@ -1,11 +1,19 @@
 # Additional UB audit — 2026-11-07
 
-The baseline is candidate `988f289fed03f2490359fe660297d9f502363845`, frozen in
-`/data/agents/ub-audit/source`. Fixes are being validated in
-`/data/agents/ub-audit/fix`. They are not yet merged or certified by complete
-Miri runs. The superseded automatic integration and Miri supervisors are held;
-the authorized benchmark matrix completed at 06:53 UTC. Main integration
-still waits for complete validation of the new candidate.
+[UB evidence summary](../../../safety/NO_UB.md) · [Complete assessment record](../../../safety/NO_UB_20261107.md)
+
+This record was written during the audit on November 7, 2026. Status statements
+in its body describe that point in time: the fixes were then not yet merged or
+certified by complete Miri runs. Both full Miri catalogues later passed and the
+fixes were integrated as `a247321`; see the
+[UB evidence summary](../../../safety/NO_UB.md) for the final status.
+
+The baseline is candidate `e18e971b2f8beef6b171f436900c8ab74d58f160`, frozen as
+the `source/` snapshot in this directory. Fixes were developed and validated in a
+separate working copy; the `fix/` snapshot here holds selected corrected source files. At
+the time of writing, the superseded automatic integration and Miri supervisors
+were held, the benchmark matrix had completed at 06:53 UTC, and main
+integration waited for complete validation of the new candidate.
 
 ## Reproduced safe-public-API failures
 
@@ -101,11 +109,12 @@ The pre-tracing-fix source fingerprint
 passed the full native/backend check script, both hot-code comparisons, three
 new boundary/publication tests under strict-provenance Miri on both backends,
 16 publication seeds per backend, and native ThreadSanitizer checks of the
-shared-search and boundary tests. Those results are preserved in
-`before-trace-fix/` (historical reference: `/data/agents/ub-audit/before-trace-fix`). They do **not**
-certify later edits and demonstrably did not cover the tracing bug.
+shared-search and boundary tests. Those results were preserved with the original
+audit records (`before-trace-fix/`), which are not included in this documentation
+set. They do **not** certify later edits and demonstrably did not cover the
+tracing bug.
 
-The final candidate `316597f64a9bd749e8a01b67f96c108c03611e68`
+The final candidate `13307bad3150bd7eaeb138f9e0af5d75ae040640`
 (source SHA-256 `93478bc5c45ba267255574f8cb466f02f006f1c7bf558fb8f9d088ec4307a4c9`)
 passed the full native/backend script, both hot-code comparisons, focused
 strict-provenance Miri checks on both backends and ThreadSanitizer. Evidence
@@ -113,13 +122,13 @@ is recorded in
 [`FROZEN.json`](FROZEN.json). Current certificates are
 accepted only if their source fingerprints match. An intermediate compile
 failure from missing unsafe blocks in test cleanup and a stale-source Miri
-run are preserved in
-`test-callsite-compile-failure/` (historical reference: `/data/agents/ub-audit/test-callsite-compile-failure`);
-neither is counted as a pass. Full x86 and portable Miri catalogues began
-concurrently at 07:07 UTC and remain a separate integration requirement.
+run were preserved with the original audit records
+(`test-callsite-compile-failure/`, not included here); neither is counted as a
+pass. Full x86 and portable Miri catalogues began concurrently at 07:07 UTC as a
+separate integration requirement; both later passed.
 They include all four shared-search tests under 16 seeds per backend.
 The additional native AddressSanitizer run passed the library and integration
 tests, including native ISA and actual mapping paths omitted by Miri.
 Its source-bound certificate is [asan-validation.json](asan-validation.json).
-See [current status](current-status.json) and
-[NO_UB.md](../../../safety/NO_UB.md) for later source-bound completion.
+See the [final audit status](current-status.json) and the
+[UB evidence summary](../../../safety/NO_UB.md) for later source-bound completion.

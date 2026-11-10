@@ -38,4 +38,4 @@ The archived competitor harness and measurement scripts contain paths and depend
 
 ## Physical-host analysis
 
-The [Xeon study](../performance/HARDWARE_COUNTERS.md) has its own host, source and counter definitions. `historical/analyze-phack.py`, `pmu_reporting.py` and `replay-phack-exports.py` retain the analysis and export corrections. Full replay needs the separately retained original counter archive; available CSV/JSON and checked aggregates are under `data/phack/`. This VM has no hardware PMU counters.
+The [Xeon study](../performance/HARDWARE_COUNTERS.md) has its own host, source and counter definitions. `historical/analyze-phack.py`, `pmu_reporting.py` and `replay-phack-exports.py` retain the analysis and export corrections. Full replay needs the separately retained original counter archive; available CSV/JSON and checked aggregates are under [`data/phack/`](../data/phack/README.md). The EPYC VM used for the main benchmarks has no hardware PMU counters.

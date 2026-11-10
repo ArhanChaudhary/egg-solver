@@ -1,15 +1,27 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>nxopt technique inventory (agent x-nx) — egg-solver</title><style>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>nxopt technique inventory — egg-solver</title><style>
 :root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
 * { box-sizing:border-box; }
 body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
-header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header { padding:1rem max(1rem,calc((100vw - 1400px)/2)); background:#132c40; color:white; }
 header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
 header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
 header a { color:#d9f0ff; }
 header a[aria-current] { color:white; text-decoration-thickness:3px; }
-main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+.layout { max-width:1400px; margin:1.5rem auto; padding:0 1rem; display:grid; grid-template-columns:15rem minmax(0,1fr); gap:1.5rem; align-items:start; }
+.site-nav { position:sticky; top:1rem; max-height:calc(100vh - 2rem); overflow:auto; font-size:.9rem; }
+.site-menu { margin:0; padding:.4rem .8rem .8rem; background:white; }
+.site-menu summary { padding:.3rem 0; }
+.nav-group { margin:.9rem 0 .25rem; font-size:.75rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+.site-nav ul { list-style:none; margin:0; padding:0; }
+.site-nav li { margin:0; }
+.site-nav li a { display:block; padding:.2rem .45rem; border-radius:4px; text-decoration:none; line-height:1.35; }
+.site-nav li a:hover { background:#eef3f6; }
+.site-nav a[aria-current] { background:#e2edf5; font-weight:650; color:var(--ink); }
+@media(min-width:901px) { .site-menu > summary { display:none; } }
+@media(max-width:900px) { .layout { display:block; margin:.75rem auto; } .site-nav { position:static; max-height:none; margin-bottom:.75rem; } }
+main { margin:0; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
 h1 { margin-top:0; font-size:2rem; line-height:1.25; }
 h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
 h3 { margin-top:1.5rem; }
@@ -32,13 +44,13 @@ summary { cursor:pointer; font-weight:600; }
 .note,.source-link,footer { color:var(--muted); font-size:.85rem; }
 .source-link { margin-top:2rem; }
 .archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
-footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+footer { max-width:1400px; margin:1rem auto 2rem; padding:0 1rem; }
 blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
 svg { max-width:100%; height:auto; }
 :target { scroll-margin-top:1rem; }
 .skip-link { position:absolute; left:-10000px; }
 .skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
-@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+@media(max-width:700px) { .layout { padding:0 .5rem; } main { padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
 </style></head>
 <body>
 <a class="skip-link" href="#docs-content">Skip to content</a>
@@ -47,15 +59,17 @@ svg { max-width:100%; height:auto; }
 <a href="../../comparisons/index.html">Benchmarks</a>
 <a href="../../performance/index.html">Performance</a>
 <a href="../../safety/index.html">Safety</a>
-<a href="../../history/index.html">History</a>
-<a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
-<main id="docs-content"><h1 id="nxopt-technique-inventory-agent-x-nx">nxopt technique inventory (agent x-nx)</h1>
+<a href="../../history/DELETED_EXPERIMENTS.html">Experiments</a>
+<a href="../../BENCHMARK_CATALOG.html">Catalog</a>
+<a href="https://egg-solver.arhan.sh/">Solver demo ↗</a></nav></header>
+<div class="layout"><nav class="site-nav" aria-label="All documentation pages"><details class="site-menu" open><summary>All pages</summary><p class="nav-group">Start</p><ul><li><a href="../../index.html">Overview</a></li><li><a href="../../guide/QUICKSTART.html">Quick start</a></li><li><a href="../../guide/OVERVIEW.html">Tables and memory</a></li><li><a href="../../guide/HOW_IT_WORKS.html">How the search works</a></li><li><a href="../../guide/GLOSSARY.html">Glossary</a></li></ul><p class="nav-group">Reference</p><ul><li><a href="../USER_GUIDE.html">User guide</a></li><li><a href="../../guide/DEVELOPMENT.html">Development checks</a></li><li><a href="../../guide/PUBLISHING.html">Publishing the site</a></li><li><a href="index.html">Technique inventories</a></li></ul><p class="nav-group">Benchmarks</p><ul><li><a href="../../comparisons/index.html">Solver benchmarks</a></li><li><a href="../../comparisons/METHODS.html">Reading the tables</a></li><li><a href="../../comparisons/NISSY_THROUGHPUT.html">nissy throughput</a></li><li><a href="../../comparisons/NXOPT32.html">nxopt, 62 GB table</a></li><li><a href="../../comparisons/CUBEOPT_AUDIT.html">cubeopt audit</a></li><li><a href="../../comparisons/TABLE_ANALYSIS.html">h4 table analysis</a></li><li><a href="../../comparisons/RESULTS.html">Multi-solver matrix</a></li><li><a href="../../comparisons/COMPETITOR_FINDINGS.html">Competitor findings</a></li></ul><p class="nav-group">Performance</p><ul><li><a href="../../performance/index.html">Performance studies</a></li><li><a href="../../performance/PARALLELISM.html">Parallelism</a></li><li><a href="../../performance/HARDWARE_COUNTERS.html">Hardware counters</a></li><li><a href="../../performance/OPTIMIZATION_REVIEW.html">Optimization review</a></li></ul><p class="nav-group">Safety</p><ul><li><a href="../../safety/index.html">Correctness and safety</a></li><li><a href="../../safety/NO_UB.html">Undefined behavior</a></li><li><a href="../../safety/MORDANT.html">Mordant audit</a></li></ul><p class="nav-group">Evidence and history</p><ul><li><a href="../../BENCHMARK_CATALOG.html">Benchmark catalog</a></li><li><a href="../../reproduce/index.html">Reproduce results</a></li><li><a href="../../PROVENANCE.html">Sources and IDs</a></li><li><a href="../../history/DELETED_EXPERIMENTS.html">Deleted experiments</a></li></ul></details></nav>
+<main id="docs-content"><h1 id="nxopt-technique-inventory">nxopt technique inventory</h1>
 <p class="archive-note">Historical snapshot. Its source, timings and pending statements belong to the recorded experiment, not the current checkout. <a href="../../index.html">Documentation home</a>.</p>
-<p>Sources read in full: <code>~/ref/cube20src/nxopt.w</code> (2062 lines), <code>nxopt.md</code>, <code>makefile-nxopt</code>, <code>README.md</code>,
+<p>Sources read in full, from Tom Rokicki's <a href="https://github.com/rokicki/cube20src">cube20src</a>: <code>nxopt.w</code> (2062 lines), <code>nxopt.md</code>, <code>makefile-nxopt</code>, <code>README.md</code>,
 <code>TODO.md</code>, <code>cubepos.w</code> (move, inverse, movepc, symmetry, canonical sequences, threading), <code>kocsymm.w</code>,
 <code>phase1prune.w</code>, <code>phase1prune2.w</code> (the last three are the two-phase solver's, but they are in the
 same source set, so their techniques are listed too).</p>
-<p>&quot;Ours&quot; cites main <strong>55e048e</strong> (<code>~/cube-opt</code>); line numbers are of that commit. Every &quot;have it&quot; was
+<p>&quot;Ours&quot; cites egg-solver (then named cube-opt) main <strong>e7b094e</strong>; line numbers are of that commit. Every &quot;have it&quot; was
 checked in the code, not assumed. nxopt line numbers are <code>nxopt.w</code> unless another file is named.</p>
 <p>Mapping used below (proved in the inventory notes at the end): nxopt's subgroup contains all U/D
 moves for the UD-axis table; H48's 48-symmetric subgroup H contains exactly the six half turns
@@ -63,7 +77,7 @@ among the 18 moves. In our kernel a node branches on one side (the &quot;moved&q
 side <code>b</code> is premultiplied by <code>m^-1</code>, so its value depends on the coset <code>H m^-1 b</code>.</p>
 <p>Verdicts: <strong>done</strong> (we have it, or something strictly stronger), <strong>gap</strong> (applies, we lack it),
 <strong>n/a</strong> (does not apply to H48 / our setting), <strong>neg</strong> (tried, measured not to pay).</p>
-<details class="contents"><summary>On this page</summary><ul><li><a href="#a-search-loop">A. Search loop</a></li><li><a href="#b-pruning-table-design-and-encoding">B. Pruning table design and encoding</a></li><li><a href="#c-coordinates-cube-moves-symmetry">C. Coordinates, cube moves, symmetry</a></li><li><a href="#d-lookup-scheduling-memory-threads-compiler-i-o">D. Lookup scheduling, memory, threads, compiler, I/O</a></li><li><a href="#e-table-generation-not-on-the-solve-path">E. Table generation (not on the solve path)</a></li><li><a href="#f-brainstorm-ideas-assigned-to-x-nx-p-ideas-txt">F. Brainstorm ideas assigned to x-nx ($P/ideas.txt)</a></li><li><a href="#m-measurements-and-prototypes-x-nx">M. Measurements and prototypes (x-nx)</a></li><li><a href="#notes-why-the-mapping-holds">Notes: why the mapping holds</a></li></ul></details>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#a-search-loop">A. Search loop</a></li><li><a href="#b-pruning-table-design-and-encoding">B. Pruning table design and encoding</a></li><li><a href="#c-coordinates-cube-moves-symmetry">C. Coordinates, cube moves, symmetry</a></li><li><a href="#d-lookup-scheduling-memory-threads-compiler-i-o">D. Lookup scheduling, memory, threads, compiler, I/O</a></li><li><a href="#e-table-generation-not-on-the-solve-path">E. Table generation (not on the solve path)</a></li><li><a href="#f-ideas-from-the-idea-list">F. Ideas from the idea list</a></li><li><a href="#m-measurements-and-prototypes">M. Measurements and prototypes</a></li><li><a href="#notes-why-the-mapping-holds">Notes: why the mapping holds</a></li></ul></details>
 <h2 id="a-search-loop">A. Search loop</h2>
 <div class="table-wrap" role="region" aria-label="A. Search loop" tabindex="0"><table id="docs-table-1"><caption>A. Search loop</caption>
 <thead>
@@ -79,7 +93,7 @@ side <code>b</code> is premultiplied by <code>m^-1</code>, so its value depends 
 <tr><td>A7</td><td>Bidirectional search: extend the end with fewer allowed moves</td><td>1693-1701 (<code>dir = popcount(rfmask) - popcount(fmask)</code>)</td><td>per node, branch on the front (movepc) or back (move) end</td><td><code>child_node</code> 1255, <code>make_node</code> 1335, <code>solver.rs:315</code></td><td>yes</td><td>-</td><td>done</td></tr>
 <tr><td>A8</td><td>Tie-break of A7 by probe sums</td><td>1697-1700</td><td>equal counts: extend the end whose fresh probes are higher</td><td><code>neg/a2-side-tiebreak</code> (count*64+bound = exactly this rule)</td><td>yes</td><td>a2: -0.07% nodes (1K); re-measured on main, 20K: -0.02% (M3)</td><td>neg</td></tr>
 <tr><td>A9</td><td>Inherit one probe from the parent (<code>skipat</code>/<code>skipval</code>)</td><td>1710-1711, 1736-1737, <code>lookup3</code> switch</td><td>the probe of the moved axis on the moved end is the parent's</td><td>X2 keeps the other side's value (<code>advance</code> 1065 <code>po = select(half, lo, tw)</code>); X and X' share it (<code>Node::tw</code> 79-87, <code>skip_xprime</code> 1099)</td><td>yes</td><td>-</td><td>done</td></tr>
-<tr><td>A10</td><td><strong>Inheritance along an axis</strong> (nxopt chains <code>skipval</code> through consecutive same-axis moves: U then D keeps the UD probe)</td><td><code>skipat</code> passed through recursive same-axis moves</td><td>value reused across two same-axis moves</td><td>no (<code>child_node</code> starts every node with <code>tw = [0xFF; 6]</code>)</td><td><strong>yes, partly</strong>: for X on even face F and Y on the opposite face, <code>H Y^-1 X^-1 b = H Y^-1 X b</code> (X2 in H, X/Y commute) and <code>H Y^-1 X2 b = H Y^-1 b</code>; so the X' child reuses the X child's face-F+1 value, and the X2 child's face-F+1 value is the node's own</td><td>measured: -2.4% lookups, nodes identical; but -5.6% to -15.6% at 1T in every kernel form (spills double)</td><td><strong>neg</strong> (<code>$P/x-nx/neg-axis-inheritance.patch</code>)</td></tr>
+<tr><td>A10</td><td><strong>Inheritance along an axis</strong> (nxopt chains <code>skipval</code> through consecutive same-axis moves: U then D keeps the UD probe)</td><td><code>skipat</code> passed through recursive same-axis moves</td><td>value reused across two same-axis moves</td><td>no (<code>child_node</code> starts every node with <code>tw = [0xFF; 6]</code>)</td><td><strong>yes, partly</strong>: for X on even face F and Y on the opposite face, <code>H Y^-1 X^-1 b = H Y^-1 X b</code> (X2 in H, X/Y commute) and <code>H Y^-1 X2 b = H Y^-1 b</code>; so the X' child reuses the X child's face-F+1 value, and the X2 child's face-F+1 value is the node's own</td><td>measured: -2.4% lookups, nodes identical; but -5.6% to -15.6% at 1T in every kernel form (spills double)</td><td><strong>neg</strong> (<code>neg/xnx-axis-inheritance</code>)</td></tr>
 <tr><td>A11</td><td>Same-face sibling pruning on a child's return value</td><td>1719-1726, 1745-1752 (<code>tt &gt; togo+1</code>)</td><td>a child &gt;= 2 over prunes its face</td><td><code>note_value</code> 1088, pop path 993-1003</td><td>yes</td><td>-</td><td>done</td></tr>
 <tr><td>A12</td><td>Return value of a subtree</td><td>1755-1758 (returns the node's own probe, or 1)</td><td>-</td><td>children's bounds back-propagated (<code>max_dec</code> 1315, pop 998): back-jumps over whole nodes</td><td>yes</td><td>-</td><td>done (stronger)</td></tr>
 <tr><td>A13</td><td>Canonical move sequences (7-state automaton, HTM)</td><td><code>cubepos.w</code> 1813-1960; <code>next_cs</code>/<code>cs_mask</code> 1712, 1738</td><td>no same face twice, opposite faces in fixed order</td><td><code>solver.rs:12-26</code> <code>ALLOWED_AFTER</code></td><td>yes</td><td>-</td><td>done</td></tr>
@@ -89,7 +103,7 @@ side <code>b</code> is premultiplied by <code>m^-1</code>, so its value depends 
 <tr><td>A17</td><td>Early exit inside a side's probes</td><td><code>lookup3</code> 1436-1441</td><td>stop at the first probe &gt; togo</td><td>per child: other side first, moved side only if it passes (<code>resolve_other</code> 1116)</td><td>yes</td><td>-</td><td>done</td></tr>
 <tr><td>A18</td><td>Prefix jobs (&quot;heads&quot;, 4 moves)</td><td><code>topn</code> 1586-1666, <code>TOPSIZE</code> 1588-1591</td><td>above base+4, split the root into 4-move prefixes</td><td><code>solver.rs:156</code> <code>job_len</code> (1..4 moves above base+3), <code>lanes.rs</code> <code>extend_jobs</code> 478</td><td>yes</td><td>-</td><td>done</td></tr>
 <tr><td>A19</td><td>Order prefixes by last iteration's effort / <code>order_mult[cs]</code></td><td>1597, 1664, <code>order_mult</code> 2021-2042 (stationary count of canonical continuations)</td><td>most promising prefix first in the final iteration</td><td><code>job_weight</code> 100 (47525/58206 = the same 1.2247 ratio of continuations after an even/odd face), <code>sort_jobs</code> 116, c7/c8 per-child ordering (<code>build_first</code> 616, <code>build_rest</code> 671)</td><td>yes</td><td>-</td><td>done (stronger: 8^(16-h) statistic, per-child split)</td></tr>
-<tr><td>A20</td><td>Symmetric start (<code>-s</code>)</td><td><code>calcsymm</code> 1301-1331, 1774-1775</td><td>skip first-move faces whose children are 96-equivalent (symmetry or antisymmetry) to an earlier face's</td><td>no</td><td>yes, only for symmetric/antisymmetric inputs</td><td>0 on random states</td><td>gap, handed to x-h48 (implementing it; nxopt specifics sent via main)</td></tr>
+<tr><td>A20</td><td>Symmetric start (<code>-s</code>)</td><td><code>calcsymm</code> 1301-1331, 1774-1775</td><td>skip first-move faces whose children are 96-equivalent (symmetry or antisymmetry) to an earlier face's</td><td>no</td><td>yes, only for symmetric/antisymmetric inputs</td><td>0 on random states</td><td>gap; handed to the symmetric-start work then in progress (later merged as f07b109)</td></tr>
 <tr><td>A21</td><td><code>-l</code> leftover (no U/D first move)</td><td>1783-1785</td><td>coset-search special case</td><td>-</td><td>no (coset solver feature)</td><td>-</td><td>n/a</td></tr>
 <tr><td>A22</td><td><code>-A</code> all solutions, <code>-n/-x</code> depth limits</td><td>2001-2017</td><td>features</td><td>-</td><td>not speed</td><td>-</td><td>n/a</td></tr>
 <tr><td>A23</td><td>QTM parity bound</td><td>1767-1780, <code>parity</code> 1278-1295</td><td>odd/even depth from parity</td><td>-</td><td>no (HTM)</td><td>-</td><td>n/a</td></tr>
@@ -104,7 +118,7 @@ side <code>b</code> is premultiplied by <code>m^-1</code>, so its value depends 
 <tbody>
 <tr><td>B1</td><td>Coset tables of subgroups containing all U/D moves (12 sizes)</td><td><code>nxopt.md</code> Subgroups/Edges; 144-338</td><td>EO1-3 x EP1-4 subgroups, 20 MB..4 TB</td><td>H48 (nissy) h11: 48-sym subgroup containing half turns (<code>coord.rs</code> 1-12)</td><td>different design</td><td>H48 h11 (58 GiB): ~3.06M nodes/cube; nxopt's comparable 62 GB EO3EP2 (avg6 12.72) is weaker per byte (16-fold vs 48-fold reduction)</td><td>done (H48 chosen)</td></tr>
 <tr><td>B2</td><td>2-bit entries relative to a base</td><td>342-582 (BASE per table), lookup 1354</td><td>codes &lt;=base, +1, +2, &gt;=+3</td><td><code>solver.rs:123-138</code> <code>value</code> (base 10)</td><td>yes</td><td>-</td><td>done</td></tr>
-<tr><td>B3</td><td>Base chosen empirically per table (&quot;yes; 10% faster than 10&quot;)</td><td>393</td><td>base tuned by timing</td><td>base 10 inherited from nissy/cube48opt</td><td>yes</td><td>simulated (M2): base 11 +38% nodes (x-h48 exact: +10.2%), base 9 +268%</td><td>done (10 is best)</td></tr>
+<tr><td>B3</td><td>Base chosen empirically per table (&quot;yes; 10% faster than 10&quot;)</td><td>393</td><td>base tuned by timing</td><td>base 10 inherited from nissy/cube48opt</td><td>yes</td><td>simulated (M2): base 11 +38% nodes (exact emulation in the <a href="x-h48-inventory.html">nissy-core inventory</a>: +10.2%), base 9 +268%</td><td>done (10 is best)</td></tr>
 <tr><td>B4</td><td>4-bit group minimum interleaved in the same 16 bytes</td><td><code>nxopt.md</code> Edges; 697-700, 1359-1360</td><td>fallback bound for code 0, same cache line</td><td><code>value</code> 123-138 (<code>*p.add(w &amp; !1) &amp; 15</code>), slots 64k/64k+1 reserved (<code>coord.rs:60-78</code>)</td><td>yes</td><td>-</td><td>done</td></tr>
 <tr><td>B5</td><td>495 -&gt; 512 packing to make room for the minimum</td><td><code>epadd</code> 604, test 776</td><td>2 free slots per 64</td><td><code>coord.rs:60-78</code> <code>mk_eslot</code></td><td>yes</td><td>-</td><td>done</td></tr>
 <tr><td>B6</td><td>E-slice occupancy (495) as least significant index part</td><td><code>nxopt.md</code></td><td>cheap packing</td><td>same layout (<code>coord.rs:11-12</code>)</td><td>yes</td><td>-</td><td>done</td></tr>
@@ -162,8 +176,9 @@ side <code>b</code> is premultiplied by <code>m^-1</code>, so its value depends 
 <tr><td>E6</td><td>TESTTABLE: average probe value statistics</td><td>1837-1864</td><td>table quality metric</td><td>- (node counts used instead)</td><td>diagnostic</td><td>-</td><td>n/a</td></tr>
 </tbody>
 </table></div>
-<h2 id="f-brainstorm-ideas-assigned-to-x-nx-p-ideas-txt">F. Brainstorm ideas assigned to x-nx (<code>$P/ideas.txt</code>)</h2>
-<div class="table-wrap" role="region" aria-label="F. Brainstorm ideas assigned to x-nx ($P/ideas.txt)" tabindex="0"><table id="docs-table-6"><caption>F. Brainstorm ideas assigned to x-nx ($P/ideas.txt)</caption>
+<h2 id="f-ideas-from-the-idea-list">F. Ideas from the idea list</h2>
+<p>These rows follow the numbering of the idea list assessed in the <a href="ideas-assessment.html">ideas assessment</a>.</p>
+<div class="table-wrap" role="region" aria-label="F. Ideas from the idea list" tabindex="0"><table id="docs-table-6"><caption>F. Ideas from the idea list</caption>
 <thead>
 <tr><th>#</th><th>idea</th><th>ours</th><th>measurement</th><th>verdict</th></tr>
 </thead>
@@ -174,12 +189,12 @@ side <code>b</code> is premultiplied by <code>m^-1</code>, so its value depends 
 <tr><td>B3 / nxopt</td><td>Empirical base</td><td>base 10</td><td>base 11 +38% / 9 +268% nodes (M2)</td><td>done (10)</td></tr>
 </tbody>
 </table></div>
-<h2 id="m-measurements-and-prototypes-x-nx">M. Measurements and prototypes (x-nx)</h2>
+<h2 id="m-measurements-and-prototypes">M. Measurements and prototypes</h2>
 <p>All counts: <code>count.sh</code> (8 threads, deterministic), lengths identical unless noted.</p>
 <p><strong>M1, A10 axis inheritance</strong> (nodes identical by construction; lookups):</p>
-<div class="table-wrap" role="region" aria-label="M. Measurements and prototypes (x-nx)" tabindex="0"><table id="docs-table-7"><caption>M. Measurements and prototypes (x-nx)</caption>
+<div class="table-wrap" role="region" aria-label="M. Measurements and prototypes" tabindex="0"><table id="docs-table-7"><caption>M. Measurements and prototypes</caption>
 <thead>
-<tr><th>set</th><th>main 55e048e lookups/cube</th><th>axis (v2) lookups/cube</th><th>change</th></tr>
+<tr><th>set</th><th>main e7b094e lookups/cube</th><th>axis (v2) lookups/cube</th><th>change</th></tr>
 </thead>
 <tbody>
 <tr><td>random:1000:2026</td><td>2588380</td><td>2526492</td><td>-2.39% (v1 with root relays: -2.72%)</td></tr>
@@ -191,8 +206,8 @@ v1 -14.7%, v2 -11.7%, v2a -8.4%, v2b -7.5%, consumer only -5.6%, pop relay only 
 v3 (known flag in <code>skip</code> bits) -15.6/-15.0%. <code>stream_thread</code> spill references: 157 (main), 189
 (consumer only), 316 (v2), 319 (v3). The ceiling (~2.4% of lookups) is below the cost of every
 form. Negative.</p>
-<p><strong>M2, B3 base</strong> (simulated from the base-10 table on random:1000:2026; x-h48's exact base-11 emulation: +10.2% nodes):</p>
-<div class="table-wrap" role="region" aria-label="M. Measurements and prototypes (x-nx)" tabindex="0"><table id="docs-table-8"><caption>M. Measurements and prototypes (x-nx)</caption>
+<p><strong>M2, B3 base</strong> (simulated from the base-10 table on random:1000:2026; the nissy-core inventory's exact base-11 emulation: +10.2% nodes):</p>
+<div class="table-wrap" role="region" aria-label="M. Measurements and prototypes" tabindex="0"><table id="docs-table-8"><caption>M. Measurements and prototypes</caption>
 <thead>
 <tr><th>base</th><th>rule</th><th>nodes/cube</th><th>lookups/cube</th></tr>
 </thead>
@@ -219,7 +234,7 @@ whatever their parents' bounds. Measured with path bound = max over prefixes of 
 <p><strong>M5, 5.4 duplicates beyond commuting order</strong> (reference solver, random:200:2026, every generated
 node hashed with its remaining depth; a node is a duplicate if the same position was generated
 before with at least as many moves left):</p>
-<div class="table-wrap" role="region" aria-label="M. Measurements and prototypes (x-nx)" tabindex="0"><table id="docs-table-9"><caption>M. Measurements and prototypes (x-nx)</caption>
+<div class="table-wrap" role="region" aria-label="M. Measurements and prototypes" tabindex="0"><table id="docs-table-9"><caption>M. Measurements and prototypes</caption>
 <thead>
 <tr><th>depth from root</th><th>nodes</th><th>within the job</th><th>within the iteration (any job)</th></tr>
 </thead>
@@ -234,7 +249,7 @@ before with at least as many moves left):</p>
 </tbody>
 </table></div>
 <p>Perfect duplicate elimination saves at most 0.48% of nodes, and inside jobs 0.0035%. A DFA cannot
-reach the 1% bar. twsearch's <code>--newcanon</code> is not in <code>~/ref/twsearch</code> (Rust port only:
+reach the 1% bar. twsearch's <code>--newcanon</code> is not in the twsearch checkout that was read (Rust port only:
 <code>canonical_fsm.rs</code> builds the commuting-class FSM, the same as ours).</p>
 <p><strong>M6, 3.6 small in-cache table.</strong> Candidate: the exact projection of h11, min over (msplit, eslot)
 per (cocsep class, eo11), 3393 x 2048 = 6.9M entries (3.5 MB at 4 bits), built from the group
@@ -255,7 +270,7 @@ not commute with X2, so nothing else is shared; and the moved side's cosets <cod
 quarter turns without probing the children.</li>
 </ul>
 
-<p class="source-link"><a href="x-nxopt-inventory.md">Markdown source</a></p></main>
+<p class="source-link"><a href="x-nxopt-inventory.md">Markdown source</a></p></main></div>
 <footer><a href="../../PROVENANCE.html">Sources and evidence scope</a></footer>
 <script>
 for (const wrapper of document.querySelectorAll('.table-wrap')) {
@@ -282,5 +297,8 @@ function revealTarget(){
   for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
 }
 revealTarget(); window.addEventListener('hashchange',revealTarget);
+const menu=document.querySelector('.site-menu');
+if(menu){const wide=matchMedia('(min-width:901px)');const sync=()=>{menu.open=wide.matches;};sync();wide.addEventListener('change',sync);
+const current=menu.querySelector('[aria-current]');if(current&&wide.matches)current.scrollIntoView({block:'nearest'});}
 </script>
 </body></html>

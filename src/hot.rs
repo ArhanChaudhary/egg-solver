@@ -3,9 +3,9 @@
 //! On this machine (Zen 5), the 1-thread stream throughput can depend on
 //! where `bench::stream_thread` (the stream loop, with `run_lanes` inlined)
 //! starts within a 64-byte line. Functions are 16-byte aligned, so it can
-//! start at offset 0, 16, 32 or 48. On main abce87c, the same code at these
+//! start at offset 0, 16, 32 or 48. On main 44b7d8a, the same code at these
 //! offsets gave about 25.5, 25.0, 24.9 and 25.2 solves/s (3 layouts each).
-//! On 735dd25 the four pads were within the noise of each other (+-0.7%).
+//! On b3f0bfb the four pads were within the noise of each other (+-0.7%).
 //!
 //! The linker places functions one after another, so the offset changed
 //! with any change anywhere in the binary, and it moved A/B results by up
@@ -18,9 +18,9 @@
 //! build variables `EGG_SOLVER_STREAM_PAD` and `EGG_SOLVER_SHARE_PAD` (0, 16, 32
 //! or 48), and use the same pads on both sides of an A/B.
 
-/// Offset of `bench::stream_thread` in its 64-byte line: 16, where 735dd25
+/// Offset of `bench::stream_thread` in its 64-byte line: 16, where b3f0bfb
 /// had it (its four pads were within the noise of each other at 1T), and
-/// the best pad for m8's loop on def2cd0 (1T against main at 16, 2 pairs
+/// the best pad for m8's loop on f2cf828 (1T against main at 16, 2 pairs
 /// per pad: 0 -0.3 +0.6%, 16 +4.0 +0.5%, 32 -0.1 +1.2%, 48 +2.4 +1.3%).
 pub const STREAM_PAD: usize = {
     let pad = pad(
@@ -37,7 +37,7 @@ pub const STREAM_PAD: usize = {
 
 /// Offset of the share mode's round loop (`share::Worker::rounds`) in its
 /// 64-byte line: 16. (With the loop visiting the lanes by pointer, m8 on
-/// def2cd0, 1T share against main at its pad 0, 2 pairs per pad: 0 +1.3
+/// f2cf828, 1T share against main at its pad 0, 2 pairs per pad: 0 +1.3
 /// +1.8%, 16 +5.3 +3.2%, 32 +1.6 +1.0%, 48 +1.7 +1.9%. Before: at 48T the
 /// four pads were within the noise, +-0.3%; at 1T share, 0 against 48:
 /// +1.7 +0.1 +0.0%.)

@@ -1,15 +1,27 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>xcr: bench entry for cube48opt-rust (for f1) — egg-solver</title><style>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>cube48opt-rust benchmark setup — egg-solver</title><style>
 :root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
 * { box-sizing:border-box; }
 body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
-header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header { padding:1rem max(1rem,calc((100vw - 1400px)/2)); background:#132c40; color:white; }
 header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
 header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
 header a { color:#d9f0ff; }
 header a[aria-current] { color:white; text-decoration-thickness:3px; }
-main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+.layout { max-width:1400px; margin:1.5rem auto; padding:0 1rem; display:grid; grid-template-columns:15rem minmax(0,1fr); gap:1.5rem; align-items:start; }
+.site-nav { position:sticky; top:1rem; max-height:calc(100vh - 2rem); overflow:auto; font-size:.9rem; }
+.site-menu { margin:0; padding:.4rem .8rem .8rem; background:white; }
+.site-menu summary { padding:.3rem 0; }
+.nav-group { margin:.9rem 0 .25rem; font-size:.75rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+.site-nav ul { list-style:none; margin:0; padding:0; }
+.site-nav li { margin:0; }
+.site-nav li a { display:block; padding:.2rem .45rem; border-radius:4px; text-decoration:none; line-height:1.35; }
+.site-nav li a:hover { background:#eef3f6; }
+.site-nav a[aria-current] { background:#e2edf5; font-weight:650; color:var(--ink); }
+@media(min-width:901px) { .site-menu > summary { display:none; } }
+@media(max-width:900px) { .layout { display:block; margin:.75rem auto; } .site-nav { position:static; max-height:none; margin-bottom:.75rem; } }
+main { margin:0; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
 h1 { margin-top:0; font-size:2rem; line-height:1.25; }
 h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
 h3 { margin-top:1.5rem; }
@@ -32,13 +44,13 @@ summary { cursor:pointer; font-weight:600; }
 .note,.source-link,footer { color:var(--muted); font-size:.85rem; }
 .source-link { margin-top:2rem; }
 .archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
-footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+footer { max-width:1400px; margin:1rem auto 2rem; padding:0 1rem; }
 blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
 svg { max-width:100%; height:auto; }
 :target { scroll-margin-top:1rem; }
 .skip-link { position:absolute; left:-10000px; }
 .skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
-@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+@media(max-width:700px) { .layout { padding:0 .5rem; } main { padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
 </style></head>
 <body>
 <a class="skip-link" href="#docs-content">Skip to content</a>
@@ -47,11 +59,14 @@ svg { max-width:100%; height:auto; }
 <a href="../../comparisons/index.html">Benchmarks</a>
 <a href="../../performance/index.html">Performance</a>
 <a href="../../safety/index.html">Safety</a>
-<a href="../../history/index.html">History</a>
-<a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
-<main id="docs-content"><h1 id="xcr-bench-entry-for-cube48opt-rust-for-f1">xcr: bench entry for cube48opt-rust (for f1)</h1>
+<a href="../../history/DELETED_EXPERIMENTS.html">Experiments</a>
+<a href="../../BENCHMARK_CATALOG.html">Catalog</a>
+<a href="https://egg-solver.arhan.sh/">Solver demo ↗</a></nav></header>
+<div class="layout"><nav class="site-nav" aria-label="All documentation pages"><details class="site-menu" open><summary>All pages</summary><p class="nav-group">Start</p><ul><li><a href="../../index.html">Overview</a></li><li><a href="../../guide/QUICKSTART.html">Quick start</a></li><li><a href="../../guide/OVERVIEW.html">Tables and memory</a></li><li><a href="../../guide/HOW_IT_WORKS.html">How the search works</a></li><li><a href="../../guide/GLOSSARY.html">Glossary</a></li></ul><p class="nav-group">Reference</p><ul><li><a href="../USER_GUIDE.html">User guide</a></li><li><a href="../../guide/DEVELOPMENT.html">Development checks</a></li><li><a href="../../guide/PUBLISHING.html">Publishing the site</a></li><li><a href="index.html">Technique inventories</a></li></ul><p class="nav-group">Benchmarks</p><ul><li><a href="../../comparisons/index.html">Solver benchmarks</a></li><li><a href="../../comparisons/METHODS.html">Reading the tables</a></li><li><a href="../../comparisons/NISSY_THROUGHPUT.html">nissy throughput</a></li><li><a href="../../comparisons/NXOPT32.html">nxopt, 62 GB table</a></li><li><a href="../../comparisons/CUBEOPT_AUDIT.html">cubeopt audit</a></li><li><a href="../../comparisons/TABLE_ANALYSIS.html">h4 table analysis</a></li><li><a href="../../comparisons/RESULTS.html">Multi-solver matrix</a></li><li><a href="../../comparisons/COMPETITOR_FINDINGS.html">Competitor findings</a></li></ul><p class="nav-group">Performance</p><ul><li><a href="../../performance/index.html">Performance studies</a></li><li><a href="../../performance/PARALLELISM.html">Parallelism</a></li><li><a href="../../performance/HARDWARE_COUNTERS.html">Hardware counters</a></li><li><a href="../../performance/OPTIMIZATION_REVIEW.html">Optimization review</a></li></ul><p class="nav-group">Safety</p><ul><li><a href="../../safety/index.html">Correctness and safety</a></li><li><a href="../../safety/NO_UB.html">Undefined behavior</a></li><li><a href="../../safety/MORDANT.html">Mordant audit</a></li></ul><p class="nav-group">Evidence and history</p><ul><li><a href="../../BENCHMARK_CATALOG.html">Benchmark catalog</a></li><li><a href="../../reproduce/index.html">Reproduce results</a></li><li><a href="../../PROVENANCE.html">Sources and IDs</a></li><li><a href="../../history/DELETED_EXPERIMENTS.html">Deleted experiments</a></li></ul></details></nav>
+<main id="docs-content"><h1 id="cube48opt-rust-benchmark-setup">cube48opt-rust benchmark setup</h1>
 <p class="archive-note">Historical snapshot. Its source, timings and pending statements belong to the recorded experiment, not the current checkout. <a href="../../index.html">Documentation home</a>.</p>
-<p>Source: github.com/2017YANR02/cuberoot.me, <code>solver/experiments/cube48opt-rust</code> at 1effb34 (2026-11-05), read-only copy in <code>/data/agents/xcr/src/cuberoot.me/solver/experiments/cube48opt-rust</code>.</p>
+<p>Source: <a href="https://github.com/2017YANR02/cuberoot.me">github.com/2017YANR02/cuberoot.me</a>, <code>solver/experiments/cube48opt-rust</code> at 1effb34 (2026-11-05), built from a read-only local copy.</p>
+<p>This page records how cube48opt-rust was built, given its tables and run for the <a href="../../comparisons/RESULTS.html">historical multi-solver comparison</a>. It was written for the comparison harness before the measured runs; the harness function it describes is in <a href="../../reproduce/harness/runtest.sh"><code>runtest.sh</code></a>. Paths on the measurement machine are written as placeholders.</p>
 <p>What it is:</p>
 <ul>
 <li>A Rust port of Chen Shuang's cube48opt1..9. The Opt backend reads cube48opt's own <code>h48prunNN.dat</code> tables and the WASM's <code>small-memory.bin</code>.</li>
@@ -59,10 +74,10 @@ svg { max-width:100%; height:auto; }
 <li>An <strong>H48 backend</strong> reads nissy-core's <code>h48hN</code> files.</li>
 <li>The crate has no dependencies and no build.rs, so builds are offline and reproducible.</li>
 </ul>
-<p>All files are under <code>D=/mnt/egg/super/xcr/cube48opt-rust</code> (binaries in <code>$D/bin</code>, tables in <code>$D/optN</code>), except Opt10's table, which is f1's <code>/data2/competitors/cube48opt10/h48prun31h1.dat</code>, used in place.</p>
-<details class="contents"><summary>On this page</summary><ul><li><a href="#1-builds">1. Builds</a></li><li><a href="#2-tables">2. Tables</a></li><li><a href="#3-run">3. Run</a></li><li><a href="#4-pages-natively-and-through-hugeshim">4. Pages (natively and through hugeshim)</a></li><li><a href="#5-smoke-results-all-lengths-equal-cube-opt-s-181-5-cubes-0-mismatches">5. Smoke results (all lengths equal cube-opt's, 181 + 5 cubes, 0 mismatches)</a></li><li><a href="#6-fairness">6. Fairness</a></li><li><a href="#7-rows-for-f1-s-matrix">7. Rows for f1's matrix</a></li></ul></details>
+<p>All files are under one working directory, written <code>$D</code> below (binaries in <code>$D/bin</code>, tables in <code>$D/optN</code>), except Opt10's table, which is the comparison's raw cube48opt10 table <code>h48prun31h1.dat</code>, used in place.</p>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#1-builds">1. Builds</a></li><li><a href="#2-tables">2. Tables</a></li><li><a href="#3-run">3. Run</a></li><li><a href="#4-pages-natively-and-through-hugeshim">4. Pages (natively and through hugeshim)</a></li><li><a href="#5-smoke-results-all-lengths-equal-egg-solver-s-181-5-cubes-0-mismatches">5. Smoke results (all lengths equal egg-solver's, 181 + 5 cubes, 0 mismatches)</a></li><li><a href="#6-fairness">6. Fairness</a></li><li><a href="#7-comparison-rows">7. Comparison rows</a></li></ul></details>
 <h2 id="1-builds">1. Builds</h2>
-<p>Every binary is built from inside its folder with <code>cargo build --release --locked --bin cube48opt-research --target-dir /mnt/egg/super/xcr/target/&lt;name&gt; [--features F]</code>. <code>RUSTFLAGS</code> is per row below.</p>
+<p>Every binary is built from inside its folder with <code>cargo build --release --locked --bin cube48opt-research --target-dir TARGET/&lt;name&gt; [--features F]</code>. <code>RUSTFLAGS</code> is per row below.</p>
 <div class="table-wrap" role="region" aria-label="1. Builds" tabindex="0"><table id="docs-table-1"><caption>1. Builds</caption>
 <thead>
 <tr><th><code>$D/bin/</code> name</th><th>target dir</th><th>RUSTFLAGS</th><th>features</th><th>what it is</th></tr>
@@ -81,7 +96,7 @@ svg { max-width:100%; height:auto; }
 <tr><td><code>c48rs-h7..h10</code> (<code>-nat</code>)</td><td>default / native</td><td></td><td>default</td><td>H48 backend (<code>solve-h48 N</code>) on nissy files</td></tr>
 </tbody>
 </table></div>
-<p>The shim source is <code>/data/agents/xcr/src-shim/cube48opt-rust</code>; the patch alone is <code>/data/agents/xcr/opt10-loader-shim.patch</code>.</p>
+<p>The loader-only shim of §2 is a small patch to cube48opt-rust's table loader; it is not published.</p>
 <h2 id="2-tables">2. Tables</h2>
 <div class="table-wrap" role="region" aria-label="2. Tables" tabindex="0"><table id="docs-table-2"><caption>2. Tables</caption>
 <thead>
@@ -90,24 +105,24 @@ svg { max-width:100%; height:auto; }
 <tbody>
 <tr><td>opt7</td><td><code>$D/opt7/h48prun31h7.dat</code> (3,891,363,840 B) + <code>$D/opt7/small-memory.bin</code></td><td>their documented <code>cube48opt-research init --variant 7 --threads 8</code> (the pinned cube48opt7.wasm generator via Node 26): 177 s wall, 4.0 GB peak</td><td>SHA-256 b9032e3c… = their published Opt7 hash</td></tr>
 <tr><td>opt8</td><td><code>$D/opt8/h48prun31h8.dat</code> (7,782,727,680 B) + <code>$D/opt8/small-memory.bin</code></td><td><code>init --variant 8 --threads 48</code> (one exclusive hold): 365 s wall, 8.3 GB peak</td><td>SHA-256 0c742e0a… = their published Opt8 hash</td></tr>
-<tr><td>opt10</td><td><code>/data2/competitors/cube48opt10/h48prun31h1.dat</code> (raw, 31,130,910,720 B) + side header <code>$D/opt10/h48prun31h1.header</code> (1 KiB) + <code>$D/opt9-small/small-memory.bin</code></td><td>f1's cube48opt10 table, unchanged on disk</td><td>see below</td></tr>
-<tr><td>h7, h8, h9, h10 (H48 backend)</td><td><code>/data2/competitors/h48/h48hN</code> (nissy files)</td><td>f1's</td><td>their loader checks the exact size, the three headers and nissy's pinned code distribution. f1's h48h7 passes</td></tr>
+<tr><td>opt10</td><td>cube48opt10's raw <code>h48prun31h1.dat</code> (31,130,910,720 B) + side header <code>$D/opt10/h48prun31h1.header</code> (1 KiB) + <code>$D/opt9-small/small-memory.bin</code></td><td>the comparison's cube48opt10 table, unchanged on disk</td><td>see below</td></tr>
+<tr><td>h7, h8, h9, h10 (H48 backend)</td><td>nissy's <code>h48hN</code> files</td><td>the comparison's nissy tables</td><td>their loader checks the exact size, the three headers and nissy's pinned code distribution. The comparison's h48h7 passes</td></tr>
 </tbody>
 </table></div>
 <p>Why not our tables:</p>
 <ul>
-<li>Our h7/h8/h10 have the same sizes and the same 16-byte-group layout, but they are <strong>not byte-identical</strong> to cube48opt's: the index order differs. Our h7 XOR is 0x99293616, cube48opt's Opt7 is 0xe6843b35. f1's step 2c found the same for h10 vs cube48opt10.</li>
+<li>Our h7/h8/h10 have the same sizes and the same 16-byte-group layout, but they are <strong>not byte-identical</strong> to cube48opt's: the index order differs. Our h7 XOR is 0x99293616, cube48opt's Opt7 is 0xe6843b35. The comparison's <a href="../../data/comparison/results.html#cube48opt10-s-table-vs-egg-solver-h10">byte check</a> found the same for h10 vs cube48opt10.</li>
 <li>So Opt7/Opt8 were generated with their own generator.</li>
 </ul>
 <p><strong>Opt10: same bytes, different load path (a labelled deviation).</strong></p>
 <ul>
 <li>cube48opt-rust's Opt10 file format is a 1 KiB header plus a 31,130,910,720-byte payload (<code>src/eo_table.rs:17-147</code>).</li>
-<li>I streamed cube48opt10's raw <code>h48prun31h1.dat</code> and set every 4-bit block minimum above the base to the base. 1,267,916,448 blocks changed, all of them the sentinel 15, which is never read: such a block has no code-0 cell. The result has SHA-256 <code>2ce3d57dbefc8d4fb557568398c280ebbd827f5e19125c1cdcc9d5f79032c3e8</code>, <strong>equal to their published official Opt10 payload</strong> (<code>opt10-development.md:39</code>).</li>
+<li>Streaming cube48opt10's raw <code>h48prun31h1.dat</code> and setting every 4-bit block minimum above the base to the base changed 1,267,916,448 blocks, all of them the sentinel 15, which is never read: such a block has no code-0 cell. The result has SHA-256 <code>2ce3d57dbefc8d4fb557568398c280ebbd827f5e19125c1cdcc9d5f79032c3e8</code>, <strong>equal to their published official Opt10 payload</strong> (<code>opt10-development.md:39</code>).</li>
 <li>So their own Opt10 table is cube48opt10's table with the unread minima written as 10 (their generator's initial value, <code>eo_table.rs:166-176</code>).</li>
 <li>Running it as shipped would need a 31 GB copy with a header. Instead, the shim build reads the header from <code>CUBEOPT_EO_HEADER</code> (a side file) and the payload from the raw file. It rewrites those minimum nibbles in memory before their own unchanged checks: payload SHA-256 against the header (2ce3d57d…), the full distribution and the snapshot hash.</li>
 <li><strong>Every load therefore re-proves byte identity with their own table.</strong></li>
-<li><strong>Search code is byte-identical.</strong> I disassembled both builds and normalized addresses and RIP offsets: 959 of 962 functions are identical, including every <code>search::*</code>, <code>native_parallel::*</code> and Opt10 oracle function. Only <code>Opt10Solver::open</code>, <code>Opt11Solver::open</code> (the inlined loader) and <code>run</code> differ. The same holds for the <code>-pf</code> pair. Code addresses shift, as they do in any rebuild.</li>
-<li>I made the side header with <code>/data/agents/xcr/tools/opt10header.py</code>; it holds the distribution, the payload SHA and the Opt9 snapshot SHA.</li>
+<li><strong>Search code is byte-identical.</strong> Both builds were disassembled with addresses and RIP offsets normalized: 959 of 962 functions are identical, including every <code>search::*</code>, <code>native_parallel::*</code> and Opt10 oracle function. Only <code>Opt10Solver::open</code>, <code>Opt11Solver::open</code> (the inlined loader) and <code>run</code> differ. The same holds for the <code>-pf</code> pair. Code addresses shift, as they do in any rebuild.</li>
+<li>The side header was made by a small script (not published); it holds the distribution, the payload SHA and the Opt9 snapshot SHA.</li>
 <li>Their own generator (<code>generate-opt10</code>) is the fallback, but it needs 31.4 GB RAM (1G pool) for ~1 h at 16 threads. It's not needed, since the bytes are proven equal.</li>
 </ul>
 <h2 id="3-run">3. Run</h2>
@@ -135,17 +150,17 @@ svg { max-width:100%; height:auto; }
 <li><strong>Load:</strong>
 <ul>
 <li>Opt7/8 read the whole table into a <code>Vec&lt;u32&gt;</code> and, on the first run, validate the checksum and distribution. A <code>&lt;table&gt;.verified</code> file next to the table then skips validation; the folder is writable.</li>
-<li>Opt10 reads 31 GB from /data2 and SHA-256s it on every run: <strong>about 4 min per run</strong>, outside <code>seconds</code>.</li>
+<li>Opt10 reads 31 GB from disk and SHA-256s it on every run: <strong>about 4 min per run</strong>, outside <code>seconds</code>.</li>
 <li>H48 mmaps the nissy file read-only and scans its distribution on every start.</li>
 </ul>
 </li>
 </ul>
-<p><strong>runtest.sh function:</strong> <code>/data/agents/xcr/f1-patch/runtest.sh.patch</code> (against your current runtest.sh):</p>
+<p><strong>Harness function:</strong> a <code>c48rs</code> function for the comparison harness's <a href="../../reproduce/harness/runtest.sh"><code>runtest.sh</code></a>:</p>
 <ul>
 <li>It adds <code>c48rs &lt;dataset&gt; &lt;v&gt; [batch]</code> and the names <code>c48rs&lt;v&gt;</code> (latency) and <code>c48rsbatch&lt;v&gt;</code> (throughput), for <code>&lt;v&gt;</code> = <code>opt7|opt8|opt9|opt10|h7..h10</code>.</li>
 <li>It prints the harness's <code>NNN x.xxxM nodes, y ns/node</code> per-cube lines and <code>Avg …, tt=…</code>. tt is the mean per-cube seconds for latency (like h48/cubeopt), and Σseconds/cubes/threads for batch (like nxopt/vcube).</li>
 <li>Env: <code>c48rs_build</code> = <code>nat</code> | <code>pgo</code> | <code>pf</code> | <code>pfnat</code> (binary suffix), <code>c48rs_threads</code> (search threads instead of min(nthread, 18)), <code>c48rs_simd</code>, <code>c48rs_dir</code>, <code>c48rs_opt10</code>, <code>c48rs_h48</code>.</li>
-<li><strong>Length cross-check:</strong> the raw log has JSON lines <code>{&quot;id&quot;:&quot;&lt;cube index&gt;&quot;, … &quot;length&quot;:N, …}</code>. Your rawlog parser needs a JSON case: id = cube index from 0, length = <code>&quot;length&quot;</code>.</li>
+<li><strong>Length cross-check:</strong> the raw log has JSON lines <code>{&quot;id&quot;:&quot;&lt;cube index&gt;&quot;, … &quot;length&quot;:N, …}</code>. The harness's raw-log parser needs a JSON case: id = cube index from 0, length = <code>&quot;length&quot;</code>.</li>
 </ul>
 <h2 id="4-pages-natively-and-through-hugeshim">4. Pages (natively and through hugeshim)</h2>
 <div class="table-wrap" role="region" aria-label="4. Pages (natively and through hugeshim)" tabindex="0"><table id="docs-table-3"><caption>4. Pages (natively and through hugeshim)</caption>
@@ -169,8 +184,8 @@ svg { max-width:100%; height:auto; }
 </tbody>
 </table></div>
 <p>1T on 5 random_state cubes (default build): THP vs 4K is Opt7 −8.0% ns/node (67.4 vs 73.2) and Opt8 −15.8% (63.6 vs 75.5). So the shipped 4K page type is clearly slower here.</p>
-<h2 id="5-smoke-results-all-lengths-equal-cube-opt-s-181-5-cubes-0-mismatches">5. Smoke results (all lengths equal cube-opt's, 181 + 5 cubes, 0 mismatches)</h2>
-<div class="table-wrap" role="region" aria-label="5. Smoke results (all lengths equal cube-opt's, 181 + 5 cubes, 0 mismatches)" tabindex="0"><table id="docs-table-5"><caption>5. Smoke results (all lengths equal cube-opt's, 181 + 5 cubes, 0 mismatches)</caption>
+<h2 id="5-smoke-results-all-lengths-equal-egg-solver-s-181-5-cubes-0-mismatches">5. Smoke results (all lengths equal egg-solver's, 181 + 5 cubes, 0 mismatches)</h2>
+<div class="table-wrap" role="region" aria-label="5. Smoke results (all lengths equal egg-solver's, 181 + 5 cubes, 0 mismatches)" tabindex="0"><table id="docs-table-5"><caption>5. Smoke results (all lengths equal egg-solver's, 181 + 5 cubes, 0 mismatches)</caption>
 <thead>
 <tr><th>run</th><th align="right">cubes</th><th>pages</th><th>build</th><th align="right">nodes/cube</th><th align="right">ns/node</th><th align="right">tt (s/cube)</th></tr>
 </thead>
@@ -197,15 +212,15 @@ svg { max-width:100%; height:auto; }
 <ul>
 <li>Natively the Opt backends get 4 KiB pages here: a malloc'd Vec with no madvise.</li>
 <li>The H48 backend gets 4 KiB page cache (a file mmap).</li>
-<li>For Opt7/8/10 both columns work through your hugeshim: <code>thp</code> mode (glibc.malloc.hugetlb=1 madvises the Vec's mmapped chunk) and <code>hugetlb</code> mode with an arena (Rust's System allocator calls malloc through the PLT, so the shim's malloc takes it).</li>
+<li>For Opt7/8/10 both columns work through the harness's hugeshim: <code>thp</code> mode (glibc.malloc.hugetlb=1 madvises the Vec's mmapped chunk) and <code>hugetlb</code> mode with an arena (Rust's System allocator calls malloc through the PLT, so the shim's malloc takes it).</li>
 <li>Measured placements are in §4. Treat them like nxopt/nissy: THP = hugeshim thp, 1G = hugeshim arena.</li>
 <li>The H48 backend can only run on 4K, so it has no row in a same-page comparison. Use it only as a note: same table as nissy's h48h7 run, their search; 1T 118 ns/node on 4K.</li>
 </ul>
 </li>
-<li><strong>Builds.</strong> Screen shipped vs native vs PGO, as you did for the others; all are built (§1). For Opt7 and Opt10 also screen the <code>pf</code> variants: their own optional x86 prefetch features, unmeasured upstream and off in their official sets. My 1T screening is below, and the 48T screening is yours.</li>
+<li><strong>Builds.</strong> Screen shipped vs native vs PGO, as for the other solvers; all are built (§1). For Opt7 and Opt10 also screen the <code>pf</code> variants: their own optional x86 prefetch features, unmeasured upstream and off in their official sets. The 48T screening belongs to the comparison runs.</li>
 <li><strong>PGO.</strong>
 <ul>
-<li>Built with <code>scripts/pgo-c48.sh</code> (in /data/agents/xcr/scripts): <code>-Cprofile-generate</code> on the native build, then training with your PGO training cubes, <code>dataset/train_pgo.txt</code> (random_state lines 301-400, disjoint from the evaluated cubes):
+<li>Built with a PGO script (<code>pgo-c48.sh</code>, not published): <code>-Cprofile-generate</code> on the native build, then training with the harness's PGO training cubes, <code>dataset/train_pgo.txt</code> (random_state lines 301-400, disjoint from the evaluated cubes):
 <ul>
 <li>16 cubes with <code>CUBEOPT_SEARCH_THREADS=8</code>;</li>
 <li>4 cubes single-thread;</li>
@@ -214,7 +229,7 @@ svg { max-width:100%; height:auto; }
 </ul>
 </li>
 <li>Then <code>llvm-profdata merge</code> (rustup's llvm-tools) and <code>-Cprofile-use</code>.</li>
-<li>Opt10 PGO is not built; training needs the 1G slot. If PGO wins clearly on Opt7/8, I can train Opt10 in one of your 1G windows: about 5 min plus a 4 min load.</li>
+<li>Opt10 PGO is not built; training needs the 1 GiB-page slot (about 5 min plus a 4 min load).</li>
 </ul>
 </li>
 <li><strong>Threads.</strong>
@@ -226,23 +241,23 @@ svg { max-width:100%; height:auto; }
 </ul>
 </li>
 <li><strong>Timing.</strong> Per-cube <code>seconds</code> excludes the table load and includes per-cube thread spawn and depth barriers. That is its own definition, as for h48/cubeopt.</li>
-<li><strong>Lengths:</strong> every one of the 186 smoke cubes (latency, batch, 1T, 4K/THP/1G, Opt7/8/10, H48 backend) has cube-opt's length. The first solutions are even the same move sequences.</li>
+<li><strong>Lengths:</strong> every one of the 186 smoke cubes (latency, batch, 1T, 4K/THP/1G, Opt7/8/10, H48 backend) has egg-solver's length. The first solutions are even the same move sequences.</li>
 </ol>
-<h3 id="1t-build-screening-thp-5-random-state-cubes-2-rounds-rotated-pairs-in-two-ccd-slots">1T build screening (THP, 5 random_state cubes, 2 rounds, rotated pairs in two CCD slots)</h3>
-<p>SCREEN_TABLE</p>
-<h2 id="7-rows-for-f1-s-matrix">7. Rows for f1's matrix</h2>
-<p>Format: <code>name threads dataset n pages build repeat</code>. All rows below at <code>build</code> = the screening winner (SCREEN_WINNER), plus <code>shipped</code> for the record.</p>
-<pre><code># latency, ~3.9 GB (vs cube-opt h7, 1.00x)
+<h3 id="build-screening">Build screening</h3>
+<p>A 1T screening (THP, 5 random_state cubes, 2 rounds, rotated pairs in two CCD slots) was planned here; its table was never filled in on this page. The comparison's own <a href="../../data/comparison/results.html#build-screening-shipped-flags-vs-o3-march-native-and-vs-pgo">build screening</a> covers these builds and selected Opt7 <code>pfpgo</code>, Opt8 <code>native</code> and Opt10 <code>pfnative</code>.</p>
+<h2 id="7-comparison-rows">7. Comparison rows</h2>
+<p>Format: <code>name threads dataset n pages build repeat</code>. All rows below use <code>build</code> = the screening winner (written B), plus <code>shipped</code> for the record.</p>
+<pre><code># latency, ~3.9 GB (vs egg-solver h7, 1.00x)
 c48rsopt7        48 random_state  200 1g   B 1..3      # 18 search threads (its cap)
 c48rsopt7        48 random_state  200 thp  B 1..3
 c48rsopt7         1 random_state   50 1g   B 1        # or 2 x 25 chunks
 c48rsopt7         1 random_state   50 thp  B 1
-# latency, ~7.8 GB (vs cube-opt h8, 1.00x)
+# latency, ~7.8 GB (vs egg-solver h8, 1.00x)
 c48rsopt8        48 random_state  200 1g   B 1..3
 c48rsopt8        48 random_state  200 thp  B 1..3
 c48rsopt8         1 random_state   50 1g   B 1
 c48rsopt8         1 random_state   50 thp  B 1
-# latency, large (1G only): Opt10 31.13 GB vs cube-opt h10 31.13 GB (1.00x)
+# latency, large (1G only): Opt10 31.13 GB vs egg-solver h10 31.13 GB (1.00x)
 c48rsopt10       48 random_state  200 1g   B 1..3
 c48rsopt10        1 random_state   50 1g   B 1
 # throughput (one cube per thread)
@@ -259,37 +274,37 @@ c48rsopt7         1 random_move_17f 100 thp B 1
 c48rsopt7         1 random_state_from50 50 thp B 1
 (same four for c48rsopt8 thp, and for c48rsopt10 1g)
 </code></pre>
-<p>Your final-compare.sh needs these entries (the names follow the runtest patch):</p>
+<p>The comparison's driver script (<code>final-compare.sh</code>) needs these entries (the names follow the harness function; <code>$D</code>, <code>$CUBE48OPT10</code> and <code>$NISSY</code> stand for local directories):</p>
 <pre><code>capfor:    c48rs*opt7) 7G ;; c48rs*opt8) 11G ;; c48rs*opt10) 8G ;; c48rs*h7) 6G ;; c48rs*h8) 10G ;;
            # (thp/4K: the table is anon memory; 1g: hugetlb is not counted, but the 31 GB Opt10
            # read goes through the page cache inside the cgroup, which it reclaims: 8G worked)
-tablefile: c48rs*opt7) /mnt/egg/super/xcr/cube48opt-rust/opt7/h48prun31h7.dat ;;
-           c48rs*opt8) /mnt/egg/super/xcr/cube48opt-rust/opt8/h48prun31h8.dat ;;
-           c48rs*opt10) /data2/competitors/cube48opt10/h48prun31h1.dat ;;
-           c48rs*h[0-9]*) /data2/competitors/h48/h48h${1##*h} ;;
+tablefile: c48rs*opt7) $D/opt7/h48prun31h7.dat ;;
+           c48rs*opt8) $D/opt8/h48prun31h8.dat ;;
+           c48rs*opt10) $CUBE48OPT10/h48prun31h1.dat ;;
+           c48rs*h[0-9]*) $NISSY/h48h${1##*h} ;;
 pagemode:  c48rs*: 1g -&gt; hugetlb, thp -&gt; thp (as nxopt/nissy)
 arena_for: c48rs*opt7) &quot;$((4 * g)) $g c48rs-opt7&quot; ;; c48rs*opt8) &quot;$((8 * g)) $g c48rs-opt8&quot; ;;
            c48rs*opt10) &quot;$((30 * g)) $g c48rs-opt10&quot; ;;
            # HUGESHIM_ONLY must name the binary actually run: c48rs-opt7, c48rs-opt7-nat,
-           # c48rs-opt7-pgo, c48rs-opt7-pfna (15-char comm of -pfnat) ...; your inner() appends &quot;-pgo&quot;
+           # c48rs-opt7-pgo, c48rs-opt7-pfna (15-char comm of -pfnat) ...; the harness's inner() appends &quot;-pgo&quot;
            # already, add &quot;-nat&quot; and &quot;-pfna&quot; the same way
 build:     native -&gt; c48rs_build=nat; pgo -&gt; c48rs_build=pgo; pf -&gt; pf; pfnative -&gt; pfnat
 </code></pre>
 <p><strong>Expected run times</strong> (smoke-based; THP/1G):</p>
-<div class="table-wrap" role="region" aria-label="7. Rows for f1's matrix" tabindex="0"><table id="docs-table-6"><caption>7. Rows for f1's matrix</caption>
+<div class="table-wrap" role="region" aria-label="7. Comparison rows" tabindex="0"><table id="docs-table-6"><caption>7. Comparison rows</caption>
 <thead>
 <tr><th>row</th><th align="right">per cube</th><th align="right">200 cubes (48T)</th><th align="right">50 cubes (1T)</th><th>load per run</th></tr>
 </thead>
 <tbody>
-<tr><td>Opt7 latency</td><td align="right">0.18 s (18 threads)</td><td align="right">~40 s</td><td align="right">~3.5 min (3.8 s/cube)</td><td>~5-10 s (3.9 GB from /mnt/egg; the first run per table validates, ~10 s more)</td></tr>
+<tr><td>Opt7 latency</td><td align="right">0.18 s (18 threads)</td><td align="right">~40 s</td><td align="right">~3.5 min (3.8 s/cube)</td><td>~5-10 s (3.9 GB from the data disk; the first run per table validates, ~10 s more)</td></tr>
 <tr><td>Opt8 latency</td><td align="right">0.063 s</td><td align="right">~15 s</td><td align="right">~1 min (1.0 s/cube)</td><td>~10-15 s</td></tr>
-<tr><td>Opt10 latency</td><td align="right">0.02 s</td><td align="right">~5 s</td><td align="right">~30 s (est.)</td><td><strong>~4 min</strong>: a 31 GB read from /data2 plus SHA-256 and distribution, every run (the page cache can't hold it)</td></tr>
+<tr><td>Opt10 latency</td><td align="right">0.02 s</td><td align="right">~5 s</td><td align="right">~30 s (est.)</td><td><strong>~4 min</strong>: a 31 GB read from disk plus SHA-256 and distribution, every run (the page cache can't hold it)</td></tr>
 <tr><td>Opt7 / Opt8 batch</td><td align="right">0.071 / 0.025 s per cube of throughput</td><td align="right">~15 s / ~5 s</td><td align="right"></td><td>as above</td></tr>
 <tr><td>wiki 15f/16f/17f (1T, 100 cubes)</td><td align="right">Opt7 ~0.1-0.5 s, Opt8 less</td><td align="right"></td><td align="right">~1-3 min per row</td><td></td></tr>
 </tbody>
 </table></div>
 
-<p class="source-link"><a href="xcr-bench-entry.md">Markdown source</a></p></main>
+<p class="source-link"><a href="xcr-bench-entry.md">Markdown source</a></p></main></div>
 <footer><a href="../../PROVENANCE.html">Sources and evidence scope</a></footer>
 <script>
 for (const wrapper of document.querySelectorAll('.table-wrap')) {
@@ -316,5 +331,8 @@ function revealTarget(){
   for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
 }
 revealTarget(); window.addEventListener('hashchange',revealTarget);
+const menu=document.querySelector('.site-menu');
+if(menu){const wide=matchMedia('(min-width:901px)');const sync=()=>{menu.open=wide.matches;};sync();wide.addEventListener('change',sync);
+const current=menu.querySelector('[aria-current]');if(current&&wide.matches)current.scrollIntoView({block:'nearest'});}
 </script>
 </body></html>

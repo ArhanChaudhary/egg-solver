@@ -1,7 +1,7 @@
 #!/bin/bash
 # Profile-guided (PGO) build of the `solve` binary (share mode only; `bench`
 # and the default `cargo build` are not affected). 1T `solve -c 1`: -2.1%
-# ms/cube (8 of 8 pairs); 48T `-c 1` neutral (pb1, 66c4f03).
+# ms/cube (8 of 8 pairs); 48T `-c 1` neutral (pb1, 6ff4350).
 #
 #   scripts/experiments/pgo-solve.sh <table> [threads]
 #
@@ -29,9 +29,9 @@ if [ ! -x "$PROFDATA" ]; then
 fi
 # The PGO build's share loop (`share::Worker::rounds`) at offset 0 of its
 # 64-byte line (src/hot.rs): PGO rewrites the loop, and its best pad moved
-# from main's 16 to 0 (1T `solve -c 1` on 585b3b6, PGO against main at pad
+# from main's 16 to 0 (1T `solve -c 1` on d690a46, PGO against main at pad
 # 16, ms/cube, 2 pairs each: pad 0 -2.0 -3.4%, 16 +0.6 +0.5%, 32 -2.0 -1.7%,
-# 48 -2.2 -2.9%; on 3a9a50a pad 0 was the best too).
+# 48 -2.2 -2.9%; on 7075875 pad 0 was the best too).
 export EGG_SOLVER_SHARE_PAD=${EGG_SOLVER_SHARE_PAD:-0}
 # Extra rustflags for every target (joined with the repo's per-target flags).
 flags() { echo "target.'cfg(all())'.rustflags=[\"$1\"]"; }

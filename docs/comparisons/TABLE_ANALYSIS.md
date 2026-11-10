@@ -1,6 +1,8 @@
 # cstimer h4: table size and compression base
 
-Measured investigation completed 2026-11-08. The requested exact target is **cube48opt4 on https://cstimer.net/cubeopt/**, displayed as **486M**.
+[Benchmarks](README.md) · [Methods](METHODS.md) · [Raw records](../data/cubeopt-audit-20261108/README.md)
+
+Investigation completed 2026-11-08. The target is **cube48opt4 on https://cstimer.net/cubeopt/**, displayed as **486M**.
 
 ## Verified size
 
@@ -10,7 +12,7 @@ The deployed Opt4 module reports `h48prun31h4.dat`, **486,420,480 bytes**. Egg h
 
 This is **486.420480 decimal MB = 463.886719 MiB**. At the start of the investigation egg displayed **464 MiB** and cstimer **486M**; egg's updated selector displays both units. The displayed size difference is a unit conversion, not additional table capacity. Egg's metadata trailer is additional file overhead, not pruning data.
 
-At the November 8 capture, the web page offered Opt1–9, up to 15,565,455,360 bytes. The existing local cube48opt10 table is 31,130,910,720 bytes. The freshly downloaded Opt9 WASM and wrapper match the retained copies byte-for-byte (WASM SHA-256 `a041e72e9a05182425722c18a1c262cd0ac6018014c5dcd817069693883a734f`). This does not establish the version of the friend's Mac executable.
+At the November 8 capture, the web page offered Opt1–9, up to 15,565,455,360 bytes. The supplied Linux cube48opt10 uses a 31,130,910,720-byte h10 table. The freshly downloaded Opt9 WASM and wrapper match the retained copies byte-for-byte (WASM SHA-256 `a041e72e9a05182425722c18a1c262cd0ac6018014c5dcd817069693883a734f`). This does not establish the version of the separately reported Mac executable.
 
 ## What can differ despite equal sizes
 
@@ -22,11 +24,11 @@ A smaller node count can also come from search ordering, canonical move pruning,
 
 ## Experiment
 
-Artifacts are under `/data/agents/cubeopt-current/`. The exact deployed modules are downloaded without modification for generation. The query oracle adds exports to a checksum-pinned in-memory copy, leaving function code and table values unchanged. It evaluates corresponding physical states rather than assuming matching raw indices.
+The exact deployed modules are downloaded without modification for generation. The query oracle adds exports to a checksum-pinned in-memory copy, leaving function code and table values unchanged. It evaluates corresponding physical states rather than assuming matching raw indices.
 
 The corpus contains the 500 published random states followed by their scramble prefixes: **10,568 states**, evaluated in normal and inverse directions. Prefix lengths provide known upper bounds; solved and short prefixes check near-goal behavior. Native egg h4 base 8 and base 9 were generated and compared against fresh web Opt4 data. The tests distinguished direct lower-bound strength, actual search node counts, wall time, and correctness.
 
-The measurements below support changing the browser’s recommended compression base. They do not establish that the web table dominates egg’s table or explain the friend’s Mac h10 result.
+The measurements below support changing the browser’s recommended compression base. They do not establish that the web table dominates egg’s table or explain the reported Mac h10 result.
 
 ## Exact files and provenance
 
@@ -53,7 +55,7 @@ Base 9 also has a tradeoff: it is stronger more often on the full random states 
 
 ## Controlled native solve experiment
 
-Both rows use the same retained native egg executable, AMD EPYC 9V45 VM, 48 threads, 40 lanes, batch concurrency, copy loading, all 500 input states once, and serialized runs under the benchmark locks. Loading is excluded. These are ordinary copied tables; explicit 1 GiB page coverage is not claimed for this experiment. Source identity matches the published Rust source at `947c20d93564f150aad9c292486ab730a329b86c`.
+Both rows use the same retained native egg executable, AMD EPYC 9V45 VM, 48 threads, 40 lanes, batch concurrency, copy loading, all 500 input states once, and serialized runs under the benchmark locks. Loading is excluded. These are ordinary copied tables; explicit 1 GiB page coverage is not claimed for this experiment. Source identity matches the published Rust source at `1b243c01983b85f364ab8101aaeaef268fdd7039` (recorded as `1b243c01983b85f364ab8101aaeaef268fdd7039` in the raw records, before the repository history was rebuilt).
 
 | Egg h4 | Batch wall time | Wall time/cube | Mean nodes/cube |
 |---|---:|---:|---:|
@@ -78,4 +80,4 @@ Initialization is the cost: native generation took 2.1 s for base 8 and 7.6 s fo
 
 The exact size observation is explained by decimal MB versus binary MiB. Fresh generation and semantic queries do not show that current cstimer Opt4 contains universally better pruning data. A useful existing table optimization was being bypassed by egg's browser selector; that selector is now corrected and tested. It does not explain 4.88M nodes for the unidentified Mac h10 implementation, and no claim is made about that release or an unmeasured larger table.
 
-Reproduction records are indexed in [the evidence directory](../data/cubeopt-audit-20261108/README.md). The original research layout contained `native-h4.sh`, `opt4/generate.mjs`, `opt4/query-web.mjs`, `egg/examples/table_bounds.rs`, `analyze.py`, the pinned assets, input corpus, logs and `analysis.json` under `/data/agents/cubeopt-current/`. Raw timings, node counts, witnesses and stop reasons are retained. The native generation commands are `gen 4 8 FILE -t 48` and `gen 4 auto FILE -t 48`; solve commands are preserved in `native-h4.sh`.
+Reproduction records are indexed in [the evidence directory](../data/cubeopt-audit-20261108/README.md). It retains `native-h4.sh`, `analyze.py`, the input corpus, logs, asset hashes and `analysis.json`. The original research workspace also held the web scripts `opt4/generate.mjs` and `opt4/query-web.mjs`, an `examples/table_bounds.rs` helper and the pinned web assets; those files are not in this repository. Raw timings, node counts, witnesses and stop reasons are retained. The native generation commands are `gen 4 8 FILE -t 48` and `gen 4 auto FILE -t 48`; solve commands are preserved in `native-h4.sh`.

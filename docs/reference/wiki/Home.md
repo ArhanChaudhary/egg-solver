@@ -1,3 +1,7 @@
+# Reference copy: cube_solver_test wiki home page
+
+This page is a copy of the home page of the [cube_solver_test wiki](https://github.com/cs0x7f/cube_solver_test/wiki) (repository [cs0x7f/cube_solver_test](https://github.com/cs0x7f/cube_solver_test)), taken for the November 2026 solver comparison. It is not egg-solver documentation. Its timing tables were measured on an Intel Core i7-10750H, not on this project's machine. The text below this note is unchanged from the copy. [`final-report.py`](../../reproduce/final-report.py) reads its tables as the published reference values; the corresponding measurements on this project's machine are in [the comparison results](../../data/comparison/results.md#cube-solver-test-wiki-metrics-this-machine).
+
 # Solvers
 
 | Solver                                                                                     | Language | Variations                                       |

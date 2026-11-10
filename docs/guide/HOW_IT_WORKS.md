@@ -45,6 +45,6 @@ The [safety report](../safety/NO_UB.md) discusses the ownership and publication 
 | [`src/bin/solve.rs`](../reference/source/src/bin/solve.rs.html) | Interactive/batch command-line interface |
 | [`tests/correctness.rs`](../reference/source/tests/correctness.rs.html) | Independent search and optimal-length cross-checks |
 
-The linked source views are snapshots from release `842a504`. Historical performance records name their own source commits; line numbers and mechanisms can differ in those older versions.
+The linked source views are snapshots from release `a247321`. Historical performance records name their own source commits; line numbers and mechanisms can differ in those older versions.
 
 See [parallelism measurements](../performance/PARALLELISM.md) for the distinction between CPU workers, software lanes, query-slot occupancy and measured speedup.

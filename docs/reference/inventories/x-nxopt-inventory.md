@@ -1,11 +1,11 @@
-# nxopt technique inventory (agent x-nx)
+# nxopt technique inventory
 
-Sources read in full: `~/ref/cube20src/nxopt.w` (2062 lines), `nxopt.md`, `makefile-nxopt`, `README.md`,
+Sources read in full, from Tom Rokicki's [cube20src](https://github.com/rokicki/cube20src): `nxopt.w` (2062 lines), `nxopt.md`, `makefile-nxopt`, `README.md`,
 `TODO.md`, `cubepos.w` (move, inverse, movepc, symmetry, canonical sequences, threading), `kocsymm.w`,
 `phase1prune.w`, `phase1prune2.w` (the last three are the two-phase solver's, but they are in the
 same source set, so their techniques are listed too).
 
-"Ours" cites main **55e048e** (`~/cube-opt`); line numbers are of that commit. Every "have it" was
+"Ours" cites egg-solver (then named cube-opt) main **e7b094e**; line numbers are of that commit. Every "have it" was
 checked in the code, not assumed. nxopt line numbers are `nxopt.w` unless another file is named.
 
 Mapping used below (proved in the inventory notes at the end): nxopt's subgroup contains all U/D
@@ -29,7 +29,7 @@ Verdicts: **done** (we have it, or something strictly stronger), **gap** (applie
 | A7 | Bidirectional search: extend the end with fewer allowed moves | 1693-1701 (`dir = popcount(rfmask) - popcount(fmask)`) | per node, branch on the front (movepc) or back (move) end | `child_node` 1255, `make_node` 1335, `solver.rs:315` | yes | - | done |
 | A8 | Tie-break of A7 by probe sums | 1697-1700 | equal counts: extend the end whose fresh probes are higher | `neg/a2-side-tiebreak` (count*64+bound = exactly this rule) | yes | a2: -0.07% nodes (1K); re-measured on main, 20K: -0.02% (M3) | neg |
 | A9 | Inherit one probe from the parent (`skipat`/`skipval`) | 1710-1711, 1736-1737, `lookup3` switch | the probe of the moved axis on the moved end is the parent's | X2 keeps the other side's value (`advance` 1065 `po = select(half, lo, tw)`); X and X' share it (`Node::tw` 79-87, `skip_xprime` 1099) | yes | - | done |
-| A10 | **Inheritance along an axis** (nxopt chains `skipval` through consecutive same-axis moves: U then D keeps the UD probe) | `skipat` passed through recursive same-axis moves | value reused across two same-axis moves | no (`child_node` starts every node with `tw = [0xFF; 6]`) | **yes, partly**: for X on even face F and Y on the opposite face, `H Y^-1 X^-1 b = H Y^-1 X b` (X2 in H, X/Y commute) and `H Y^-1 X2 b = H Y^-1 b`; so the X' child reuses the X child's face-F+1 value, and the X2 child's face-F+1 value is the node's own | measured: -2.4% lookups, nodes identical; but -5.6% to -15.6% at 1T in every kernel form (spills double) | **neg** (`$P/x-nx/neg-axis-inheritance.patch`) |
+| A10 | **Inheritance along an axis** (nxopt chains `skipval` through consecutive same-axis moves: U then D keeps the UD probe) | `skipat` passed through recursive same-axis moves | value reused across two same-axis moves | no (`child_node` starts every node with `tw = [0xFF; 6]`) | **yes, partly**: for X on even face F and Y on the opposite face, `H Y^-1 X^-1 b = H Y^-1 X b` (X2 in H, X/Y commute) and `H Y^-1 X2 b = H Y^-1 b`; so the X' child reuses the X child's face-F+1 value, and the X2 child's face-F+1 value is the node's own | measured: -2.4% lookups, nodes identical; but -5.6% to -15.6% at 1T in every kernel form (spills double) | **neg** (`neg/xnx-axis-inheritance`) |
 | A11 | Same-face sibling pruning on a child's return value | 1719-1726, 1745-1752 (`tt > togo+1`) | a child >= 2 over prunes its face | `note_value` 1088, pop path 993-1003 | yes | - | done |
 | A12 | Return value of a subtree | 1755-1758 (returns the node's own probe, or 1) | - | children's bounds back-propagated (`max_dec` 1315, pop 998): back-jumps over whole nodes | yes | - | done (stronger) |
 | A13 | Canonical move sequences (7-state automaton, HTM) | `cubepos.w` 1813-1960; `next_cs`/`cs_mask` 1712, 1738 | no same face twice, opposite faces in fixed order | `solver.rs:12-26` `ALLOWED_AFTER` | yes | - | done |
@@ -39,7 +39,7 @@ Verdicts: **done** (we have it, or something strictly stronger), **gap** (applie
 | A17 | Early exit inside a side's probes | `lookup3` 1436-1441 | stop at the first probe > togo | per child: other side first, moved side only if it passes (`resolve_other` 1116) | yes | - | done |
 | A18 | Prefix jobs ("heads", 4 moves) | `topn` 1586-1666, `TOPSIZE` 1588-1591 | above base+4, split the root into 4-move prefixes | `solver.rs:156` `job_len` (1..4 moves above base+3), `lanes.rs` `extend_jobs` 478 | yes | - | done |
 | A19 | Order prefixes by last iteration's effort / `order_mult[cs]` | 1597, 1664, `order_mult` 2021-2042 (stationary count of canonical continuations) | most promising prefix first in the final iteration | `job_weight` 100 (47525/58206 = the same 1.2247 ratio of continuations after an even/odd face), `sort_jobs` 116, c7/c8 per-child ordering (`build_first` 616, `build_rest` 671) | yes | - | done (stronger: 8^(16-h) statistic, per-child split) |
-| A20 | Symmetric start (`-s`) | `calcsymm` 1301-1331, 1774-1775 | skip first-move faces whose children are 96-equivalent (symmetry or antisymmetry) to an earlier face's | no | yes, only for symmetric/antisymmetric inputs | 0 on random states | gap, handed to x-h48 (implementing it; nxopt specifics sent via main) |
+| A20 | Symmetric start (`-s`) | `calcsymm` 1301-1331, 1774-1775 | skip first-move faces whose children are 96-equivalent (symmetry or antisymmetry) to an earlier face's | no | yes, only for symmetric/antisymmetric inputs | 0 on random states | gap; handed to the symmetric-start work then in progress (later merged as f07b109) |
 | A21 | `-l` leftover (no U/D first move) | 1783-1785 | coset-search special case | - | no (coset solver feature) | - | n/a |
 | A22 | `-A` all solutions, `-n/-x` depth limits | 2001-2017 | features | - | not speed | - | n/a |
 | A23 | QTM parity bound | 1767-1780, `parity` 1278-1295 | odd/even depth from parity | - | no (HTM) | - | n/a |
@@ -51,7 +51,7 @@ Verdicts: **done** (we have it, or something strictly stronger), **gap** (applie
 |---|---|---|---|---|---|---|---|
 | B1 | Coset tables of subgroups containing all U/D moves (12 sizes) | `nxopt.md` Subgroups/Edges; 144-338 | EO1-3 x EP1-4 subgroups, 20 MB..4 TB | H48 (nissy) h11: 48-sym subgroup containing half turns (`coord.rs` 1-12) | different design | H48 h11 (58 GiB): ~3.06M nodes/cube; nxopt's comparable 62 GB EO3EP2 (avg6 12.72) is weaker per byte (16-fold vs 48-fold reduction) | done (H48 chosen) |
 | B2 | 2-bit entries relative to a base | 342-582 (BASE per table), lookup 1354 | codes <=base, +1, +2, >=+3 | `solver.rs:123-138` `value` (base 10) | yes | - | done |
-| B3 | Base chosen empirically per table ("yes; 10% faster than 10") | 393 | base tuned by timing | base 10 inherited from nissy/cube48opt | yes | simulated (M2): base 11 +38% nodes (x-h48 exact: +10.2%), base 9 +268% | done (10 is best) |
+| B3 | Base chosen empirically per table ("yes; 10% faster than 10") | 393 | base tuned by timing | base 10 inherited from nissy/cube48opt | yes | simulated (M2): base 11 +38% nodes (exact emulation in the [nissy-core inventory](x-h48-inventory.md): +10.2%), base 9 +268% | done (10 is best) |
 | B4 | 4-bit group minimum interleaved in the same 16 bytes | `nxopt.md` Edges; 697-700, 1359-1360 | fallback bound for code 0, same cache line | `value` 123-138 (`*p.add(w & !1) & 15`), slots 64k/64k+1 reserved (`coord.rs:60-78`) | yes | - | done |
 | B5 | 495 -> 512 packing to make room for the minimum | `epadd` 604, test 776 | 2 free slots per 64 | `coord.rs:60-78` `mk_eslot` | yes | - | done |
 | B6 | E-slice occupancy (495) as least significant index part | `nxopt.md` | cheap packing | same layout (`coord.rs:11-12`) | yes | - | done |
@@ -99,7 +99,9 @@ Verdicts: **done** (we have it, or something strictly stronger), **gap** (applie
 | E5 | Group minimum maintained in the same pass | 950-954 | - | `lower_nibble` (`gen.rs:49`) | yes | - | done |
 | E6 | TESTTABLE: average probe value statistics | 1837-1864 | table quality metric | - (node counts used instead) | diagnostic | - | n/a |
 
-## F. Brainstorm ideas assigned to x-nx (`$P/ideas.txt`)
+## F. Ideas from the idea list
+
+These rows follow the numbering of the idea list assessed in the [ideas assessment](ideas-assessment.md).
 
 | # | idea | ours | measurement | verdict |
 |---|---|---|---|---|
@@ -108,13 +110,13 @@ Verdicts: **done** (we have it, or something strictly stronger), **gap** (applie
 | 3.6 | Small exact in-cache table | cocsep depth precheck | (class, eo11) projection of h11, 3.5 MB: prunes 0.16% of lookups (M6) | neg |
 | B3 / nxopt | Empirical base | base 10 | base 11 +38% / 9 +268% nodes (M2) | done (10) |
 
-## M. Measurements and prototypes (x-nx)
+## M. Measurements and prototypes
 
 All counts: `count.sh` (8 threads, deterministic), lengths identical unless noted.
 
 **M1, A10 axis inheritance** (nodes identical by construction; lookups):
 
-| set | main 55e048e lookups/cube | axis (v2) lookups/cube | change |
+| set | main e7b094e lookups/cube | axis (v2) lookups/cube | change |
 |---|---|---|---|
 | random:1000:2026 | 2588380 | 2526492 | -2.39% (v1 with root relays: -2.72%) |
 | random:20000:99 | 2607693 | 2545909 | -2.37% |
@@ -125,7 +127,7 @@ v3 (known flag in `skip` bits) -15.6/-15.0%. `stream_thread` spill references: 1
 (consumer only), 316 (v2), 319 (v3). The ceiling (~2.4% of lookups) is below the cost of every
 form. Negative.
 
-**M2, B3 base** (simulated from the base-10 table on random:1000:2026; x-h48's exact base-11 emulation: +10.2% nodes):
+**M2, B3 base** (simulated from the base-10 table on random:1000:2026; the nissy-core inventory's exact base-11 emulation: +10.2% nodes):
 
 | base | rule | nodes/cube | lookups/cube |
 |---|---|---|---|
@@ -165,7 +167,7 @@ before with at least as many moves left):
 | all (957M) | | **0.0035%** | **0.48%** |
 
 Perfect duplicate elimination saves at most 0.48% of nodes, and inside jobs 0.0035%. A DFA cannot
-reach the 1% bar. twsearch's `--newcanon` is not in `~/ref/twsearch` (Rust port only:
+reach the 1% bar. twsearch's `--newcanon` is not in the twsearch checkout that was read (Rust port only:
 `canonical_fsm.rs` builds the commuting-class FSM, the same as ours).
 
 **M6, 3.6 small in-cache table.** Candidate: the exact projection of h11, min over (msplit, eslot)

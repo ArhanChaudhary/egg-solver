@@ -4,12 +4,24 @@
 :root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
 * { box-sizing:border-box; }
 body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
-header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header { padding:1rem max(1rem,calc((100vw - 1400px)/2)); background:#132c40; color:white; }
 header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
 header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
 header a { color:#d9f0ff; }
 header a[aria-current] { color:white; text-decoration-thickness:3px; }
-main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+.layout { max-width:1400px; margin:1.5rem auto; padding:0 1rem; display:grid; grid-template-columns:15rem minmax(0,1fr); gap:1.5rem; align-items:start; }
+.site-nav { position:sticky; top:1rem; max-height:calc(100vh - 2rem); overflow:auto; font-size:.9rem; }
+.site-menu { margin:0; padding:.4rem .8rem .8rem; background:white; }
+.site-menu summary { padding:.3rem 0; }
+.nav-group { margin:.9rem 0 .25rem; font-size:.75rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+.site-nav ul { list-style:none; margin:0; padding:0; }
+.site-nav li { margin:0; }
+.site-nav li a { display:block; padding:.2rem .45rem; border-radius:4px; text-decoration:none; line-height:1.35; }
+.site-nav li a:hover { background:#eef3f6; }
+.site-nav a[aria-current] { background:#e2edf5; font-weight:650; color:var(--ink); }
+@media(min-width:901px) { .site-menu > summary { display:none; } }
+@media(max-width:900px) { .layout { display:block; margin:.75rem auto; } .site-nav { position:static; max-height:none; margin-bottom:.75rem; } }
+main { margin:0; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
 h1 { margin-top:0; font-size:2rem; line-height:1.25; }
 h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
 h3 { margin-top:1.5rem; }
@@ -32,13 +44,13 @@ summary { cursor:pointer; font-weight:600; }
 .note,.source-link,footer { color:var(--muted); font-size:.85rem; }
 .source-link { margin-top:2rem; }
 .archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
-footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+footer { max-width:1400px; margin:1rem auto 2rem; padding:0 1rem; }
 blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
 svg { max-width:100%; height:auto; }
 :target { scroll-margin-top:1rem; }
 .skip-link { position:absolute; left:-10000px; }
 .skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
-@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+@media(max-width:700px) { .layout { padding:0 .5rem; } main { padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
 </style></head>
 <body>
 <a class="skip-link" href="#docs-content">Skip to content</a>
@@ -47,8 +59,10 @@ svg { max-width:100%; height:auto; }
 <a href="index.html">Benchmarks</a>
 <a href="../performance/index.html">Performance</a>
 <a href="../safety/index.html">Safety</a>
-<a href="../history/index.html">History</a>
-<a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<a href="../history/DELETED_EXPERIMENTS.html">Experiments</a>
+<a href="../BENCHMARK_CATALOG.html">Catalog</a>
+<a href="https://egg-solver.arhan.sh/">Solver demo ↗</a></nav></header>
+<div class="layout"><nav class="site-nav" aria-label="All documentation pages"><details class="site-menu" open><summary>All pages</summary><p class="nav-group">Start</p><ul><li><a href="../index.html">Overview</a></li><li><a href="../guide/QUICKSTART.html">Quick start</a></li><li><a href="../guide/OVERVIEW.html">Tables and memory</a></li><li><a href="../guide/HOW_IT_WORKS.html">How the search works</a></li><li><a href="../guide/GLOSSARY.html">Glossary</a></li></ul><p class="nav-group">Reference</p><ul><li><a href="../reference/USER_GUIDE.html">User guide</a></li><li><a href="../guide/DEVELOPMENT.html">Development checks</a></li><li><a href="../guide/PUBLISHING.html">Publishing the site</a></li><li><a href="../reference/inventories/index.html">Technique inventories</a></li></ul><p class="nav-group">Benchmarks</p><ul><li><a href="index.html">Solver benchmarks</a></li><li><a href="METHODS.html">Reading the tables</a></li><li><a href="NISSY_THROUGHPUT.html" aria-current="page">nissy throughput</a></li><li><a href="NXOPT32.html">nxopt, 62 GB table</a></li><li><a href="CUBEOPT_AUDIT.html">cubeopt audit</a></li><li><a href="TABLE_ANALYSIS.html">h4 table analysis</a></li><li><a href="RESULTS.html">Multi-solver matrix</a></li><li><a href="COMPETITOR_FINDINGS.html">Competitor findings</a></li></ul><p class="nav-group">Performance</p><ul><li><a href="../performance/index.html">Performance studies</a></li><li><a href="../performance/PARALLELISM.html">Parallelism</a></li><li><a href="../performance/HARDWARE_COUNTERS.html">Hardware counters</a></li><li><a href="../performance/OPTIMIZATION_REVIEW.html">Optimization review</a></li></ul><p class="nav-group">Safety</p><ul><li><a href="../safety/index.html">Correctness and safety</a></li><li><a href="../safety/NO_UB.html">Undefined behavior</a></li><li><a href="../safety/MORDANT.html">Mordant audit</a></li></ul><p class="nav-group">Evidence and history</p><ul><li><a href="../BENCHMARK_CATALOG.html">Benchmark catalog</a></li><li><a href="../reproduce/index.html">Reproduce results</a></li><li><a href="../PROVENANCE.html">Sources and IDs</a></li><li><a href="../history/DELETED_EXPERIMENTS.html">Deleted experiments</a></li></ul></details></nav>
 <main id="docs-content"><h1 id="nissy-versus-egg-500-state-batch-throughput">Nissy versus egg: 500-state batch throughput</h1>
 <p><a href="index.html">Benchmarks</a> · <a href="METHODS.html">Timing definitions</a> · <a href="../performance/PARALLELISM.html">Lane and scaling study</a></p>
 <p>Measured <strong>November 8, 2026</strong>, on the <strong>48-core AMD EPYC 9V45 VM</strong>. Each final run completes the same <strong>500 distinct random states</strong>, in repository order, with resident <strong>1 GiB table pages</strong>. The result is the median of <strong>three fresh-process batches per solver and table</strong>. Higher throughput is faster.</p>
@@ -112,7 +126,7 @@ svg { max-width:100%; height:auto; }
 </code></pre>
 <p>Runs hold exclusive benchmark locks, check unrelated CPU use, verify table integrity and record actual HugeTLB coverage. There are no hardware PMU counters on this VM. <a href="../data/nissy-throughput-20261108/run-index.csv">Raw-index metadata</a> identifies all <strong>305 accepted measurements</strong>, including screens and separately labeled exploratory runs. <a href="../data/nissy-throughput-20261108/cross-replay.json">Cross-replay</a> and <a href="../data/nissy-throughput-20261108/evidence-audit.json">grid/hash/page audit</a> record acceptance checks.</p>
 <h2 id="tuning-and-source-limits">Tuning and source limits</h2>
-<p>Egg's measured CLI inputs match published source <code>947c20d</code> except a generator help-text edit that is not linked into <code>solve</code>. Binary and source hashes are in the <a href="../data/nissy-throughput-20261108/manifest.json">manifest</a>. The native release uses <code>target-cpu=native</code>.</p>
+<p>Egg's measured CLI inputs match published source <code>1b243c0</code> except a generator help-text edit that is not linked into <code>solve</code>. The raw records cite that source as <code>947c20d</code>, its ID before the repository history was rebuilt. Binary and source hashes are in the <a href="../data/nissy-throughput-20261108/manifest.json">manifest</a>. The native release uses <code>target-cpu=native</code>.</p>
 <p>Production egg screens used the shipped CLI at 8, 16, 24, 32, 40, 48, 64, 96 and 128 lanes, then tested 8–48 worker threads at the winning lane count. <strong>Lanes 12 and 20 were not tested.</strong> An ordinary <code>Pool::run</code> research caller had different timings and lane rankings from the CLI's fixed-stack-placement path. Its raw results are preserved as exploratory evidence and excluded from final configuration selection.</p>
 <p>Nissy-core was pinned to <code>1f7e8e9</code>. Five builds were screened on a fixed 100-state pilot with 48 single-thread cube workers: upstream flags, native, retained PGO, rank-initialized native, and a rank-initialized compile-time single-thread build. The selected build's allocations were checked on all 500 states, including all factorizations of 48 threads. Builds and allocations were not exhaustively crossed. These are the best observed settings in the declared grid, not a global optimum.</p>
 <p><strong>PGO overlap:</strong> the retained nissy profile was trained on a subset of the legacy training file, which overlaps this 500-state evaluation. This is not a held-out result. Unmodified nissy builds also retain the identified uninitialized task-rank issue; patched controls and the one-line patch are included. Correct replay does not establish absence of undefined behavior in upstream C.</p>
@@ -121,7 +135,7 @@ svg { max-width:100%; height:auto; }
 <p><a href="../data/nissy-throughput-20261108/analysis.json">Analysis JSON</a> contains every final wall, range and rate. <a href="../reproduce/index.html">Reproduction</a> explains how to recompute the table without rerunning solvers. <a href="../data/nissy-throughput-20261108/index.html">The evidence directory</a> contains the harnesses, datasets, compiler records and rejected attempts.</p>
 <p>These figures do not replace the differently measured historical latency/stream results. They are not a new measurement of closed-source cubeopt, the reported MacBook release or another CPU.</p>
 
-<p class="source-link"><a href="NISSY_THROUGHPUT.md">Markdown source</a></p></main>
+<p class="source-link"><a href="NISSY_THROUGHPUT.md">Markdown source</a></p></main></div>
 <footer><a href="../PROVENANCE.html">Sources and evidence scope</a></footer>
 <script>
 for (const wrapper of document.querySelectorAll('.table-wrap')) {
@@ -148,5 +162,8 @@ function revealTarget(){
   for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
 }
 revealTarget(); window.addEventListener('hashchange',revealTarget);
+const menu=document.querySelector('.site-menu');
+if(menu){const wide=matchMedia('(min-width:901px)');const sync=()=>{menu.open=wide.matches;};sync();wide.addEventListener('change',sync);
+const current=menu.querySelector('[aria-current]');if(current&&wide.matches)current.scrollIntoView({block:'nearest'});}
 </script>
 </body></html>

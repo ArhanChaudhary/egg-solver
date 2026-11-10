@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Deleted experiments — egg-solver</title><style>
+:root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
+header { padding:1rem max(1rem,calc((100vw - 1400px)/2)); background:#132c40; color:white; }
+header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
+header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
+header a { color:#d9f0ff; }
+header a[aria-current] { color:white; text-decoration-thickness:3px; }
+.layout { max-width:1400px; margin:1.5rem auto; padding:0 1rem; display:grid; grid-template-columns:15rem minmax(0,1fr); gap:1.5rem; align-items:start; }
+.site-nav { position:sticky; top:1rem; max-height:calc(100vh - 2rem); overflow:auto; font-size:.9rem; }
+.site-menu { margin:0; padding:.4rem .8rem .8rem; background:white; }
+.site-menu summary { padding:.3rem 0; }
+.nav-group { margin:.9rem 0 .25rem; font-size:.75rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+.site-nav ul { list-style:none; margin:0; padding:0; }
+.site-nav li { margin:0; }
+.site-nav li a { display:block; padding:.2rem .45rem; border-radius:4px; text-decoration:none; line-height:1.35; }
+.site-nav li a:hover { background:#eef3f6; }
+.site-nav a[aria-current] { background:#e2edf5; font-weight:650; color:var(--ink); }
+@media(min-width:901px) { .site-menu > summary { display:none; } }
+@media(max-width:900px) { .layout { display:block; margin:.75rem auto; } .site-nav { position:static; max-height:none; margin-bottom:.75rem; } }
+main { margin:0; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+h1 { margin-top:0; font-size:2rem; line-height:1.25; }
+h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
+h3 { margin-top:1.5rem; }
+a { color:var(--accent); overflow-wrap:anywhere; }
+p,li { max-width:90ch; }
+code { background:#eff3f6; border-radius:3px; padding:.1em .25em; overflow-wrap:anywhere; font-size:.9em; }
+pre { max-width:100%; padding:1rem; background:#eef3f6; overflow:auto; line-height:1.45; }
+pre code { background:none; padding:0; overflow-wrap:normal; }
+.table-wrap { max-width:100%; overflow:auto; margin:1rem 0 1.5rem; border:1px solid var(--line); }
+.table-wrap.long-table { max-height:70vh; }
+table { width:100%; border-collapse:collapse; font-size:.9rem; font-variant-numeric:tabular-nums; }
+th,td { padding:.55rem .65rem; border:1px solid var(--line); vertical-align:top; overflow-wrap:normal; }
+th { background:#eaf1f6; text-align:left; position:sticky; top:0; z-index:1; }
+tr:nth-child(even) { background:#f8fafb; }
+caption,.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+details { border:1px solid var(--line); padding:.6rem 1rem; border-radius:5px; margin:1rem 0; }
+summary { cursor:pointer; font-weight:600; }
+.table-tools { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:.6rem; background:#f4f7f9; }
+.table-tools input { font:inherit; border:1px solid #afc0ce; border-radius:4px; padding:.3rem .5rem; width:min(100%,22rem); min-width:0; }
+.note,.source-link,footer { color:var(--muted); font-size:.85rem; }
+.source-link { margin-top:2rem; }
+.archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
+footer { max-width:1400px; margin:1rem auto 2rem; padding:0 1rem; }
+blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
+svg { max-width:100%; height:auto; }
+:target { scroll-margin-top:1rem; }
+.skip-link { position:absolute; left:-10000px; }
+.skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
+@media(max-width:700px) { .layout { padding:0 .5rem; } main { padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+</style></head>
+<body>
+<a class="skip-link" href="#docs-content">Skip to content</a>
+<header><strong>egg-solver</strong><nav aria-label="Documentation"><a href="../index.html">Home</a>
+<a href="../guide/OVERVIEW.html">Learn</a>
+<a href="../comparisons/index.html">Benchmarks</a>
+<a href="../performance/index.html">Performance</a>
+<a href="../safety/index.html">Safety</a>
+<a href="DELETED_EXPERIMENTS.html" aria-current="page">Experiments</a>
+<a href="../BENCHMARK_CATALOG.html">Catalog</a>
+<a href="https://egg-solver.arhan.sh/">Solver demo ↗</a></nav></header>
+<div class="layout"><nav class="site-nav" aria-label="All documentation pages"><details class="site-menu" open><summary>All pages</summary><p class="nav-group">Start</p><ul><li><a href="../index.html">Overview</a></li><li><a href="../guide/QUICKSTART.html">Quick start</a></li><li><a href="../guide/OVERVIEW.html">Tables and memory</a></li><li><a href="../guide/HOW_IT_WORKS.html">How the search works</a></li><li><a href="../guide/GLOSSARY.html">Glossary</a></li></ul><p class="nav-group">Reference</p><ul><li><a href="../reference/USER_GUIDE.html">User guide</a></li><li><a href="../guide/DEVELOPMENT.html">Development checks</a></li><li><a href="../guide/PUBLISHING.html">Publishing the site</a></li><li><a href="../reference/inventories/index.html">Technique inventories</a></li></ul><p class="nav-group">Benchmarks</p><ul><li><a href="../comparisons/index.html">Solver benchmarks</a></li><li><a href="../comparisons/METHODS.html">Reading the tables</a></li><li><a href="../comparisons/NISSY_THROUGHPUT.html">nissy throughput</a></li><li><a href="../comparisons/NXOPT32.html">nxopt, 62 GB table</a></li><li><a href="../comparisons/CUBEOPT_AUDIT.html">cubeopt audit</a></li><li><a href="../comparisons/TABLE_ANALYSIS.html">h4 table analysis</a></li><li><a href="../comparisons/RESULTS.html">Multi-solver matrix</a></li><li><a href="../comparisons/COMPETITOR_FINDINGS.html">Competitor findings</a></li></ul><p class="nav-group">Performance</p><ul><li><a href="../performance/index.html">Performance studies</a></li><li><a href="../performance/PARALLELISM.html">Parallelism</a></li><li><a href="../performance/HARDWARE_COUNTERS.html">Hardware counters</a></li><li><a href="../performance/OPTIMIZATION_REVIEW.html">Optimization review</a></li></ul><p class="nav-group">Safety</p><ul><li><a href="../safety/index.html">Correctness and safety</a></li><li><a href="../safety/NO_UB.html">Undefined behavior</a></li><li><a href="../safety/MORDANT.html">Mordant audit</a></li></ul><p class="nav-group">Evidence and history</p><ul><li><a href="../BENCHMARK_CATALOG.html">Benchmark catalog</a></li><li><a href="../reproduce/index.html">Reproduce results</a></li><li><a href="../PROVENANCE.html">Sources and IDs</a></li><li><a href="DELETED_EXPERIMENTS.html" aria-current="page">Deleted experiments</a></li></ul></details></nav>
+<main id="docs-content"><h1 id="deleted-experiments">Deleted experiments</h1>
+<p class="archive-note">Historical snapshot. Its source, timings and pending statements belong to the recorded experiment, not the current checkout. <a href="../index.html">Documentation home</a>.</p>
+<p><a href="../index.html">Documentation home</a></p>
+<p>When the git history was rebuilt for publication on 2026-11-10, the 213 experiment branches and tags that were never merged were deleted: 151 rejected or neutral experiments, 59 archived experiments and 3 other unmerged branches. Their code is not in the published history. Each row gives the experiment's name, date and one-line summary, which usually states its measured result. Results use different baselines and workloads, so percentages are not additive.</p>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#rejected-and-neutral-experiments">Rejected and neutral experiments</a></li><li><a href="#archived-experiments">Archived experiments</a></li><li><a href="#other-unmerged-branches">Other unmerged branches</a></li></ul></details>
+<h2 id="rejected-and-neutral-experiments">Rejected and neutral experiments</h2>
+<div class="table-wrap" role="region" aria-label="Rejected and neutral experiments" tabindex="0"><table id="docs-table-1"><caption>Rejected and neutral experiments</caption>
+<thead>
+<tr><th>Experiment</th><th>Date</th><th>Summary</th></tr>
+</thead>
+<tbody>
+<tr><td><a id="ref-neg-a2-jobstat-max"></a><code>neg/a2-jobstat-max</code></td><td>2026-11-03</td><td>a2: job statistic = best root child instead of the sum (negative, +0.3% nodes)</td></tr>
+<tr><td><a id="ref-neg-a2-opp-tight"></a><code>neg/a2-opp-tight</code></td><td>2026-11-03</td><td>a2: exclude the opposite face's half turn on tight bounds (negative, +-0.07% nodes)</td></tr>
+<tr><td><a id="ref-neg-a2-side-tiebreak"></a><code>neg/a2-side-tiebreak</code></td><td>2026-11-03</td><td>a2: side choice tie-break by the other side's bound (negative, -0.07% nodes)</td></tr>
+<tr><td><a id="ref-neg-a7-bolt"></a><code>neg/a7-bolt</code></td><td>2026-11-03</td><td>NEGATIVE: BOLT post-link layout (build-bolt.sh): +0.3% at 1T on 00d998c, within noise</td></tr>
+<tr><td><a id="ref-neg-a7-llvm-args"></a><code>neg/a7-llvm-args</code></td><td>2026-11-03</td><td>NEGATIVE: LLVM codegen flags (-C llvm-args=...): none faster at 1T</td></tr>
+<tr><td><a id="ref-neg-a7-lto-thin"></a><code>neg/a7-lto-thin</code></td><td>2026-11-03</td><td>NEGATIVE: lto = &quot;thin&quot; instead of &quot;fat&quot; (-1.0% at 1T)</td></tr>
+<tr><td><a id="ref-neg-a7-nightly"></a><code>neg/a7-nightly</code></td><td>2026-11-03</td><td>NEGATIVE: nightly toolchain (1.101, LLVM 23.1.5) and nightly -Z flags (0.0% / -0.5% at 1T)</td></tr>
+<tr><td><a id="ref-neg-a7-opt-level-2"></a><code>neg/a7-opt-level-2</code></td><td>2026-11-03</td><td>NEGATIVE: opt-level = 2 for the release profile (neutral at 1T on ea4da12 and 00d998c)</td></tr>
+<tr><td><a id="ref-neg-a7-pgo"></a><code>neg/a7-pgo</code></td><td>2026-11-03</td><td>NEGATIVE: PGO trained on the exact stream workload, with and without BOLT (-1.3..-1.5% at 1T)</td></tr>
+<tr><td><a id="ref-neg-a7-relocation-static"></a><code>neg/a7-relocation-static</code></td><td>2026-11-03</td><td>NEGATIVE: -C relocation-model=static (non-PIE executable) (-0.4% at 1T on ea4da12, +0.1% on 00d998c)</td></tr>
+<tr><td><a id="ref-neg-a7-target-cpu"></a><code>neg/a7-target-cpu</code></td><td>2026-11-03</td><td>NEGATIVE: target-cpu alternatives to native (znver5, znver4, x86-64-v4, -avx512f)</td></tr>
+<tr><td><a id="ref-neg-advance-v4"></a><code>neg/advance-v4</code></td><td>2026-11-03</td><td>Eager sibling pruning + branchless advance (rejected: -2%)</td></tr>
+<tr><td><a id="ref-neg-b2-moved-push-branchless-incr"></a><code>neg/b2-moved-push-branchless-incr</code></td><td>2026-11-03</td><td>b2: branchless moved-side resolution (negative, -2.2%)</td></tr>
+<tr><td><a id="ref-neg-b2-readahead-bookkeeping-dispatch"></a><code>neg/b2-readahead-bookkeeping-dispatch</code></td><td>2026-11-03</td><td>b2: read-ahead with the resolve bookkeeping and a unified dispatch (negative, -8.0%)</td></tr>
+<tr><td><a id="ref-neg-b2-readahead-eager-sibling"></a><code>neg/b2-readahead-eager-sibling</code></td><td>2026-11-03</td><td>b2: read-ahead with eager sibling clearing (negative, -11.0%)</td></tr>
+<tr><td><a id="ref-neg-b2-readahead-value"></a><code>neg/b2-readahead-value</code></td><td>2026-11-03</td><td>b2: read ahead the next lane's lookup value (negative, -4.4%)</td></tr>
+<tr><td><a id="ref-neg-b2-skip-cmov-guard-cumulative"></a><code>neg/b2-skip-cmov-guard-cumulative</code></td><td>2026-11-03</td><td>b2: branch-free skip guard and a single pop branch (negative, -8.1%)</td></tr>
+<tr><td><a id="ref-neg-b2-skip-node-ab-layout"></a><code>neg/b2-skip-node-ab-layout</code></td><td>2026-11-03</td><td>b2: node stores the chosen-side cubes, 96-byte node (negative, -2.9%)</td></tr>
+<tr><td><a id="ref-neg-b2-skipk-unified-resolve"></a><code>neg/b2-skipk-unified-resolve</code></td><td>2026-11-03</td><td>b2: unified resolve on top of skip-sibling (negative, -4.5%)</td></tr>
+<tr><td><a id="ref-neg-b2-unified-resolve"></a><code>neg/b2-unified-resolve</code></td><td>2026-11-03</td><td>b2: unified resolve without the phase dispatch (negative, -3.3%)</td></tr>
+<tr><td><a id="ref-neg-b2-unified-resolve-only"></a><code>neg/b2-unified-resolve-only</code></td><td>2026-11-03</td><td>b2: one resolve for both lookup kinds, advance unchanged (negative, -3.8%)</td></tr>
+<tr><td><a id="ref-neg-c10-dord"></a><code>neg/c10-dord</code></td><td>2026-11-04</td><td>NEGATIVE c10: dord (not merged)</td></tr>
+<tr><td><a id="ref-neg-c10-first-pass-order"></a><code>neg/c10-first-pass-order</code></td><td>2026-11-04</td><td>NEGATIVE c10: first-pass-order (not merged)</td></tr>
+<tr><td><a id="ref-neg-c10-pass-big-first"></a><code>neg/c10-pass-big-first</code></td><td>2026-11-04</td><td>NEGATIVE c10: pass-big-first (not merged)</td></tr>
+<tr><td><a id="ref-neg-c11-sort-chunk"></a><code>neg/c11-sort-chunk</code></td><td>2026-11-04</td><td>NEGATIVE c11: sort-chunk (not merged), plus the order-replay diagnostics</td></tr>
+<tr><td><a id="ref-neg-c4-canonical-whole-order"></a><code>neg/c4-canonical-whole-order</code></td><td>2026-11-03</td><td>c4: whole-job iterations in canonical job order (negative, +2.6% nodes)</td></tr>
+<tr><td><a id="ref-neg-c4-childorder"></a><code>neg/c4-childorder</code></td><td>2026-11-03</td><td>Per-child job ordering, paid only in iterations on unchanged jobs (c4)</td></tr>
+<tr><td><a id="ref-neg-c4-free-side"></a><code>neg/c4-free-side</code></td><td>2026-11-03</td><td>c4: free side choice at job roots (negative, -4.23% vs -5.74% nodes)</td></tr>
+<tr><td><a id="ref-neg-c4-group-caps"></a><code>neg/c4-group-caps</code></td><td>2026-11-03</td><td>c4: cap the first-part runs per job (negative, +1.88% / -4.26% vs -5.74% nodes)</td></tr>
+<tr><td><a id="ref-neg-c4-merge-wide"></a><code>neg/c4-merge-wide</code></td><td>2026-11-03</td><td>c4: MERGE = 8, wider first-part runs (negative, -3.85% vs -4.01% nodes)</td></tr>
+<tr><td><a id="ref-neg-c4-next-run-not-cold"></a><code>neg/c4-next-run-not-cold</code></td><td>2026-11-03</td><td>c4: next_run without #[cold] (negative, -2.7% on c897107, neutral on 55120b7)</td></tr>
+<tr><td><a id="ref-neg-c4-no-face-bias"></a><code>neg/c4-no-face-bias</code></td><td>2026-11-03</td><td>c4: no face bias in the child statistic (negative, -5.48% vs -5.76% nodes)</td></tr>
+<tr><td><a id="ref-neg-c4-per-job-2"></a><code>neg/c4-per-job-2</code></td><td>2026-11-03</td><td>c4: FIRST_PER_JOB = 2 (negative, -5.40% vs -5.76% nodes)</td></tr>
+<tr><td><a id="ref-neg-c4-per-job-4"></a><code>neg/c4-per-job-4</code></td><td>2026-11-03</td><td>c4: FIRST_PER_JOB = 4 (negative, -3.91% vs -4.23% nodes)</td></tr>
+<tr><td><a id="ref-neg-c4-root-child-field"></a><code>neg/c4-root-child-field</code></td><td>2026-11-03</td><td>c4: carry the job root's child in each Node (negative, no measurable change)</td></tr>
+<tr><td><a id="ref-neg-c4-sticky-inverse"></a><code>neg/c4-sticky-inverse</code></td><td>2026-11-03</td><td>c4: sticky inverse side for INV jobs (negative, -3.14% vs -3.87% nodes)</td></tr>
+<tr><td><a id="ref-neg-c7-dataset-dseval"></a><code>neg/c7-dataset-dseval</code></td><td>2026-11-03</td><td>EXPERIMENT (c7): final-iteration dataset (C7DUMP) and offline policy evaluator (dseval)</td></tr>
+<tr><td><a id="ref-neg-c7-free-side-inv-whole"></a><code>neg/c7-free-side-inv-whole</code></td><td>2026-11-03</td><td>NEGATIVE (c7): keep the solver's free side choice at full-length job roots; inverse-side jobs run whole</td></tr>
+<tr><td><a id="ref-neg-c7-jc"></a><code>neg/c7-jc</code></td><td>2026-11-03</td><td>NEGATIVE: lanes: cache the job prefix cubes in setup_job (c7)</td></tr>
+<tr><td><a id="ref-neg-c7-jobcache"></a><code>neg/c7-jobcache</code></td><td>2026-11-03</td><td>NEGATIVE: lanes: cache the job prefix cubes in setup_job (c7)</td></tr>
+<tr><td><a id="ref-neg-c7-knob-experiments"></a><code>neg/c7-knob-experiments</code></td><td>2026-11-03</td><td>NEGATIVE/EXPERIMENT (c7): the knob build behind c7-childsplit's tuning (C7K env), with all variants measured</td></tr>
+<tr><td><a id="ref-neg-c7-ntstore"></a><code>neg/c7-ntstore</code></td><td>2026-11-03</td><td>NEUTRAL (c7): non-temporal JobX stores in whole runs; NTA prefetch in th (patch file)</td></tr>
+<tr><td><a id="ref-neg-c7-overhead-probes"></a><code>neg/c7-overhead-probes</code></td><td>2026-11-03</td><td>NEGATIVE (c7): per-node overhead probes of the per-child bookkeeping (1T (patch file)</td></tr>
+<tr><td><a id="ref-neg-c8-predictor-study"></a><code>neg/c8-predictor-study</code></td><td>2026-11-04</td><td>NEGATIVE c8: predictor study for final-iteration ordering (not merged)</td></tr>
+<tr><td><a id="ref-neg-c8-share-child-order"></a><code>neg/c8-share-child-order</code></td><td>2026-11-04</td><td>NEGATIVE c8: c7's child ordering ported to share mode (not merged)</td></tr>
+<tr><td><a id="ref-neg-c9-claims-idle-lanes"></a><code>neg/c9-claims-idle-lanes</code></td><td>2026-11-04</td><td>NEGATIVE c9: claims sized to idle lanes (not merged)</td></tr>
+<tr><td><a id="ref-neg-cold-paths"></a><code>neg/cold-paths</code></td><td>2026-11-03</td><td>#[cold]/#[inline(never)] on setup_job, start_iteration, reconstruct (rejected: ~-1.5%)</td></tr>
+<tr><td><a id="ref-neg-d1-atomic-float"></a><code>neg/d1-atomic-float</code></td><td>2026-11-05</td><td>NEG share: job statistics as atomic_float::AtomicF32 (fetch_add for add_f32)</td></tr>
+<tr><td><a id="ref-neg-d1-backoff-idle"></a><code>neg/d1-backoff-idle</code></td><td>2026-11-05</td><td>NEG share: idle wait with crossbeam's Backoff</td></tr>
+<tr><td><a id="ref-neg-d1-backoff-spinrw"></a><code>neg/d1-backoff-spinrw</code></td><td>2026-11-05</td><td>NEG share: SpinRw waits with crossbeam's Backoff</td></tr>
+<tr><td><a id="ref-neg-d1-fx-dfs"></a><code>neg/d1-fx-dfs</code></td><td>2026-11-05</td><td>NEG gen: FxHashSet for the dfs prefix set (hashbrown's set adopted instead)</td></tr>
+<tr><td><a id="ref-neg-d1-fx-symstart"></a><code>neg/d1-fx-symstart</code></td><td>2026-11-05</td><td>NEG symstart: FxHashMap for the dedup map</td></tr>
+<tr><td><a id="ref-neg-d1-inspection"></a><code>neg/d1-inspection</code></td><td>2026-11-05</td><td>NEG (no code): in-house items kept after inspection (d1 crate sweep)</td></tr>
+<tr><td><a id="ref-neg-d1-pl-rwlock"></a><code>neg/d1-pl-rwlock</code></td><td>2026-11-05</td><td>NEG share: open list under parking_lot::RwLock instead of SpinRw</td></tr>
+<tr><td><a id="ref-neg-d1-radsort"></a><code>neg/d1-radsort</code></td><td>2026-11-05</td><td>NEG lanes: sort_jobs and sort_runs by radsort</td></tr>
+<tr><td><a id="ref-neg-d1-spin-rwlock"></a><code>neg/d1-spin-rwlock</code></td><td>2026-11-05</td><td>NEG share: open list under spin::RwLock instead of SpinRw</td></tr>
+<tr><td><a id="ref-neg-eager-prune"></a><code>neg/eager-prune</code></td><td>2026-11-03</td><td>Eager pruning on top of jobs+nobc (rejected: -1.3%)</td></tr>
+<tr><td><a id="ref-neg-g1-counters-write"></a><code>neg/g1-counters-write</code></td><td>2026-11-05</td><td>NEG share: write! instead of format! + extend in Pool::counters (+1.1 KB bench::run)</td></tr>
+<tr><td><a id="ref-neg-g1-generator-derived-box"></a><code>neg/g1-generator-derived-box</code></td><td>2026-11-05</td><td>NEG gen: Box&lt;[T]&gt; for Generator::derived (changes the BFS relabel pass)</td></tr>
+<tr><td><a id="ref-neg-g1-sort-unstable-trace"></a><code>neg/g1-sort-unstable-trace</code></td><td>2026-11-05</td><td>NEG share: sort_unstable_by for the trace's finish times (+7.6 KB bench .text)</td></tr>
+<tr><td><a id="ref-neg-grouped-scheduler"></a><code>neg/grouped-scheduler</code></td><td>2026-11-03</td><td>Grouped lane scheduler: step W lanes, then batch their index computations (rejected: -9%/-12%)</td></tr>
+<tr><td><a id="ref-neg-jobstat-max"></a><code>neg/jobstat-max</code></td><td>2026-11-03</td><td>Job statistic = best child instead of sum (rejected: +0.3% nodes)</td></tr>
+<tr><td><a id="ref-neg-k11-specialize"></a><code>neg/k11-specialize</code></td><td>2026-11-03</td><td>Compile-time k = 11 copy of the lane engine (rejected: -2%)</td></tr>
+<tr><td><a id="ref-neg-l6-align-all-functions"></a><code>neg/l6-align-all-functions</code></td><td>2026-11-04</td><td>NEGATIVE l6: align-all-functions (not merged)</td></tr>
+<tr><td><a id="ref-neg-l6-early-4move-prefixes"></a><code>neg/l6-early-4move-prefixes</code></td><td>2026-11-04</td><td>NEGATIVE l6: early-4move-prefixes (not merged)</td></tr>
+<tr><td><a id="ref-neg-l6-early-builds"></a><code>neg/l6-early-builds</code></td><td>2026-11-04</td><td>NEGATIVE l6: early-builds (not merged)</td></tr>
+<tr><td><a id="ref-neg-l6-poolrun-inline-never"></a><code>neg/l6-poolrun-inline-never</code></td><td>2026-11-04</td><td>NEGATIVE l6: poolrun-inline-never (not merged)</td></tr>
+<tr><td><a id="ref-neg-l6-yield-at-once"></a><code>neg/l6-yield-at-once</code></td><td>2026-11-04</td><td>NEGATIVE l6: yield-at-once (not merged)</td></tr>
+<tr><td><a id="ref-neg-lazy-cube"></a><code>neg/lazy-cube</code></td><td>2026-11-03</td><td>Compute only the cube needed for the next lookup (rejected: ~-1%)</td></tr>
+<tr><td><a id="ref-neg-m3-k11-specialize"></a><code>neg/m3-k11-specialize</code></td><td>2026-11-03</td><td>m3: compile-time k = 11 copy of the lane engine (negative, -2.1%)</td></tr>
+<tr><td><a id="ref-neg-m3-merged-node-count"></a><code>neg/m3-merged-node-count</code></td><td>2026-11-03</td><td>m3: merged node counting in advance (negative, -1.1%)</td></tr>
+<tr><td><a id="ref-neg-m3-push-select"></a><code>neg/m3-push-select</code></td><td>2026-11-03</td><td>m3: branch-free side selection in push_child (negative, -4.0%)</td></tr>
+<tr><td><a id="ref-neg-m4-diag-bre-incl-c6"></a><code>neg/m4-diag-brE-incl-c6</code></td><td>2026-11-03</td><td>m4: diagnostic, 50% random early-resolving branch per visit (negative, -13.2%)</td></tr>
+<tr><td><a id="ref-neg-m4-diag-brl-incl-c6"></a><code>neg/m4-diag-brL-incl-c6</code></td><td>2026-11-03</td><td>m4: diagnostic, 50% random branch resolving after the lookup (negative, -15.1%)</td></tr>
+<tr><td><a id="ref-neg-m4-diag-extra-index"></a><code>neg/m4-diag-extra-index</code></td><td>2026-11-03</td><td>m4: diagnostic, one extra index computation per generated node (negative, -13%)</td></tr>
+<tr><td><a id="ref-neg-m4-diag-extra-index-prefetch"></a><code>neg/m4-diag-extra-index-prefetch</code></td><td>2026-11-03</td><td>m4: diagnostic, extra index computation and prefetch per child (negative, -16.8%)</td></tr>
+<tr><td><a id="ref-neg-m4-fmask-branchy-incl-c6"></a><code>neg/m4-fmask-branchy-incl-c6</code></td><td>2026-11-03</td><td>m4: sibling-face masks from a table, written as if/else (negative, -4.3%)</td></tr>
+<tr><td><a id="ref-neg-m4-fmask-on-stack"></a><code>neg/m4-fmask-on-stack</code></td><td>2026-11-03</td><td>m4: sibling-face masks from a table with select_unpredictable (negative, neutral -0.3%)</td></tr>
+<tr><td><a id="ref-neg-m4-fmx"></a><code>neg/m4-fmx</code></td><td>2026-11-03</td><td>m4: Node::lb replaced by a max-fmax byte and a dead mask (negative, -1.1%)</td></tr>
+<tr><td><a id="ref-neg-m4-live-on-stack"></a><code>neg/m4-live-on-stack</code></td><td>2026-11-03</td><td>m4: exhaustion test on live instead of the remaining todo (negative, neutral)</td></tr>
+<tr><td><a id="ref-neg-m4-nextjob-on-stack"></a><code>neg/m4-nextjob-on-stack</code></td><td>2026-11-03</td><td>m4: job-finished path out of line (negative, -1.7%)</td></tr>
+<tr><td><a id="ref-neg-m4-nolb"></a><code>neg/m4-nolb</code></td><td>2026-11-03</td><td>m4: drop Node::lb, compute max(fmax) at pop (negative, -3.3%)</td></tr>
+<tr><td><a id="ref-neg-m4-pair-lookups"></a><code>neg/m4-pair-lookups</code></td><td>2026-11-03</td><td>m4: paired lookups for X children (negative, -40%)</td></tr>
+<tr><td><a id="ref-neg-m6-lane-hot-fields-first"></a><code>neg/m6-lane-hot-fields-first</code></td><td>2026-11-03</td><td>lanes: Lane hot fields first</td></tr>
+<tr><td><a id="ref-neg-m6-lazy-child-cube"></a><code>neg/m6-lazy-child-cube</code></td><td>2026-11-03</td><td>lanes: compute only the looked-up side's child cube</td></tr>
+<tr><td><a id="ref-neg-m6-node-96-bytes"></a><code>neg/m6-node-96-bytes</code></td><td>2026-11-03</td><td>lanes: Node without align(64): 96 bytes</td></tr>
+<tr><td><a id="ref-neg-m6-packed-counter"></a><code>neg/m6-packed-counter</code></td><td>2026-11-03</td><td>lanes: count lookups at issue, merged with the node count</td></tr>
+<tr><td><a id="ref-neg-m6-prefetch-t0-t1"></a><code>neg/m6-prefetch-t0-t1</code></td><td>2026-11-03</td><td>solver: table prefetch hint T0 instead of NTA (negative, -1.0% 1T)</td></tr>
+<tr><td><a id="ref-neg-m6-resolve-prologue"></a><code>neg/m6-resolve-prologue</code></td><td>2026-11-03</td><td>lanes: resolve prologue before the phase dispatch</td></tr>
+<tr><td><a id="ref-neg-m6-ring-next-early"></a><code>neg/m6-ring-next-early</code></td><td>2026-11-03</td><td>lanes: compute the next lane pointer early (neutral/negative)</td></tr>
+<tr><td><a id="ref-neg-m6-ring-roundrobin"></a><code>neg/m6-ring-roundrobin</code></td><td>2026-11-03</td><td>lanes: round-robin without a per-round exit branch</td></tr>
+<tr><td><a id="ref-neg-m6-value-branchless"></a><code>neg/m6-value-branchless</code></td><td>2026-11-03</td><td>lanes: value of the pending lookup without a branch on the code</td></tr>
+<tr><td><a id="ref-neg-m7-diag-value-latency"></a><code>neg/m7-diag-value-latency</code></td><td>2026-11-04</td><td>NEGATIVE m7: diag-value-latency (not merged)</td></tr>
+<tr><td><a id="ref-neg-m7-memcnt"></a><code>neg/m7-memcnt</code></td><td>2026-11-03</td><td>lanes: count nodes into Lane::stats where they are reached</td></tr>
+<tr><td><a id="ref-neg-m7-memcnt-595"></a><code>neg/m7-memcnt-595</code></td><td>2026-11-04</td><td>lanes: count nodes into Lane::stats where they are reached</td></tr>
+<tr><td><a id="ref-neg-m7-memory-node-count"></a><code>neg/m7-memory-node-count</code></td><td>2026-11-04</td><td>NEGATIVE m7: memory-node-count (not merged)</td></tr>
+<tr><td><a id="ref-neg-m7-neutral-lazy"></a><code>neg/m7-neutral-lazy</code></td><td>2026-11-04</td><td>lanes: fewer µops per child (lazy child cube, early stores, blsmsk count, move tables, index tweaks)</td></tr>
+<tr><td><a id="ref-neg-m7-ra"></a><code>neg/m7-ra</code></td><td>2026-11-03</td><td>lanes: read the next lane's lookup ahead, and the prune bound</td></tr>
+<tr><td><a id="ref-neg-m7-read-ahead"></a><code>neg/m7-read-ahead</code></td><td>2026-11-04</td><td>NEGATIVE m7: read-ahead (not merged)</td></tr>
+<tr><td><a id="ref-neg-m7-spec-prefetch"></a><code>neg/m7-spec-prefetch</code></td><td>2026-11-04</td><td>NEGATIVE m7: spec-prefetch (not merged)</td></tr>
+<tr><td><a id="ref-neg-m8-index-rows-applymove-runprefetch"></a><code>neg/m8-index-rows-applymove-runprefetch</code></td><td>2026-11-04</td><td>NEGATIVE m8: index without the multiply after the msplit lookup, both fix-up candidates in apply_move, runs prefetched 4 ahead (neutral as a stack)</td></tr>
+<tr><td><a id="ref-neg-m8-rounds-live-set"></a><code>neg/m8-rounds-live-set</code></td><td>2026-11-05</td><td>NEGATIVE m8: Worker::rounds keeps only the lane pointers live (neutral to negative)</td></tr>
+<tr><td><a id="ref-neg-m8-run-prefetch-4"></a><code>neg/m8-run-prefetch-4</code></td><td>2026-11-05</td><td>NEGATIVE m8: setup_run prefetches the job and child order of the run 4 entries ahead (neutral)</td></tr>
+<tr><td><a id="ref-neg-merged-node-count"></a><code>neg/merged-node-count</code></td><td>2026-11-03</td><td>Merged node counting in advance (rejected: -1%)</td></tr>
+<tr><td><a id="ref-neg-merged-tails"></a><code>neg/merged-tails</code></td><td>2026-11-03</td><td>Merge the X2/X'/X index/prefetch sites (rejected: -1.6%)</td></tr>
+<tr><td><a id="ref-neg-moved-push-branchless"></a><code>neg/moved-push-branchless</code></td><td>2026-11-03</td><td>Branchless moved-side resolution (rejected: -2.2%)</td></tr>
+<tr><td><a id="ref-neg-neutral-cptr-mergedcount"></a><code>neg/neutral-cptr-mergedcount</code></td><td>2026-11-03</td><td>Cached cocsep pointer plus merged node counting (rejected: neutral)</td></tr>
+<tr><td><a id="ref-neg-neutral-early-pop"></a><code>neg/neutral-early-pop</code></td><td>2026-11-03</td><td>Early pop via a k_last flag (rejected: neutral)</td></tr>
+<tr><td><a id="ref-neg-next-lane-prefetch"></a><code>neg/next-lane-prefetch</code></td><td>2026-11-03</td><td>Prefetch the next lane's header and top node (rejected: no gain)</td></tr>
+<tr><td><a id="ref-neg-node-ab-layout"></a><code>neg/node-ab-layout</code></td><td>2026-11-03</td><td>Node stores the chosen-side cubes, 96-byte node (rejected: -2.9%)</td></tr>
+<tr><td><a id="ref-neg-opp-tight"></a><code>neg/opp-tight</code></td><td>2026-11-03</td><td>Opposite-face half-turn rule on tight bounds (rejected: no effect)</td></tr>
+<tr><td><a id="ref-neg-p10-h11-lanes40"></a><code>neg/p10-h11-lanes40</code></td><td>2026-11-04</td><td>NEGATIVE p10: h11-lanes40 (not merged)</td></tr>
+<tr><td><a id="ref-neg-p10-h7-base10"></a><code>neg/p10-h7-base10</code></td><td>2026-11-04</td><td>NEGATIVE p10: h7-base10 (not merged)</td></tr>
+<tr><td><a id="ref-neg-p10-map-4k-pages"></a><code>neg/p10-map-4k-pages</code></td><td>2026-11-04</td><td>NEGATIVE p10: map-4k-pages (not merged)</td></tr>
+<tr><td><a id="ref-neg-p5-bucket-2groups"></a><code>neg/p5-bucket-2groups</code></td><td>2026-11-03</td><td>p5: phase buckets within two fixed lane groups (negative, -8.4%)</td></tr>
+<tr><td><a id="ref-neg-p5-bucket-bitmask"></a><code>neg/p5-bucket-bitmask</code></td><td>2026-11-03</td><td>p5: phase buckets as lane bit masks (negative, +6.9% instructions/node, not timed)</td></tr>
+<tr><td><a id="ref-neg-p5-bucket-fifo"></a><code>neg/p5-bucket-fifo</code></td><td>2026-11-03</td><td>p5: phase-bucketed lane scheduling with FIFO pointer arrays (negative, -6.1%)</td></tr>
+<tr><td><a id="ref-neg-p5-bucket-fifo-lanepf"></a><code>neg/p5-bucket-fifo-lanepf</code></td><td>2026-11-03</td><td>p5: bucket-fifo with prefetch of the next lanes' state (negative, -2.5% 1T vs bucket-fifo)</td></tr>
+<tr><td><a id="ref-neg-p5-bucket-fifo-t0"></a><code>neg/p5-bucket-fifo-t0</code></td><td>2026-11-03</td><td>p5: bucket-fifo with prefetcht0 instead of NTA (negative, -8.2%)</td></tr>
+<tr><td><a id="ref-neg-p5-diag-perm-identity"></a><code>neg/p5-diag-perm-identity</code></td><td>2026-11-03</td><td>p5: diagnostic, lanes visited through FIFO pointer arrays in identity order (negative, -5.1% 1T)</td></tr>
+<tr><td><a id="ref-neg-p5-diag-perm-random"></a><code>neg/p5-diag-perm-random</code></td><td>2026-11-03</td><td>p5: diagnostic, bucket-fifo's visit order with main's dispatch (negative, -4.5% 1T vs identity)</td></tr>
+<tr><td><a id="ref-neg-p5-fresh-child"></a><code>neg/p5-fresh-child</code></td><td>2026-11-03</td><td>p5: fresh-child fast path on top of regs (negative, neutral -0.0%)</td></tr>
+<tr><td><a id="ref-neg-pb1-diag-alloc-count"></a><code>neg/pb1-diag-alloc-count</code></td><td>2026-11-05</td><td>DIAGNOSTIC (not for merging): counting global allocator in bench and solve</td></tr>
+<tr><td><a id="ref-neg-pb1-pgo-bolt"></a><code>neg/pb1-pgo-bolt</code></td><td>2026-11-05</td><td>NEGATIVE: BOLT on top of PGO (bench): stream -1.3% at 1T, share no better than PGO alone</td></tr>
+<tr><td><a id="ref-neg-pb1-pgo-stream"></a><code>neg/pb1-pgo-stream</code></td><td>2026-11-05</td><td>NEGATIVE: PGO of bench, stream mode, re-measured with pinned hot-loop pads (best pad 32: -0.2% at 1T)</td></tr>
+<tr><td><a id="ref-neg-pgo"></a><code>neg/pgo</code></td><td>2026-11-03</td><td>PGO measurement (rejected: -1 to -1.5%)</td></tr>
+<tr><td><a id="ref-neg-pin-threads"></a><code>neg/pin-threads</code></td><td>2026-11-03</td><td>bench: pin worker thread i to CPU i (negative, -0.4%)</td></tr>
+<tr><td><a id="ref-neg-pmu-byte-packed-load"></a><code>neg/pmu-byte-packed-load</code></td><td>2026-11-07</td><td>Archive rejected byte-sized packed table decoder</td></tr>
+<tr><td><a id="ref-neg-pmu-outlined-lane-advance"></a><code>neg/pmu-outlined-lane-advance</code></td><td>2026-11-07</td><td>Archive rejected outlined lane advancement</td></tr>
+<tr><td><a id="ref-neg-push-select"></a><code>neg/push-select</code></td><td>2026-11-03</td><td>Branch-free side selection in push_child (rejected: -4%)</td></tr>
+<tr><td><a id="ref-neg-r8-worker-new-frame"></a><code>neg/r8-worker-new-frame</code></td><td>2026-11-05</td><td>NEGATIVE (r8): Pool::run building its Worker through a <code>Worker::new</code> constructor (applies on top of work/r8 f99a27b, i.e. 3a9a50a + r8-share-fix).</td></tr>
+<tr><td><a id="ref-neg-readahead"></a><code>neg/readahead</code></td><td>2026-11-03</td><td>Read-ahead: resolve the next lane's value one visit early (rejected: -4.4%)</td></tr>
+<tr><td><a id="ref-neg-s9-full-pin"></a><code>neg/s9-full-pin</code></td><td>2026-11-05</td><td>neg: page-pin the hot code and stack of both binaries (stream loop, its helpers, share)</td></tr>
+<tr><td><a id="ref-neg-s9-placement-sweep"></a><code>neg/s9-placement-sweep</code></td><td>2026-11-05</td><td>neg: stack and heap placement sweeps of the share and stream threads (tools, no gain)</td></tr>
+<tr><td><a id="ref-neg-s9-stack-pin-only"></a><code>neg/s9-stack-pin-only</code></td><td>2026-11-05</td><td>neg: stack placement pinned without pinning the hot code's page offset</td></tr>
+<tr><td><a id="ref-neg-side-tiebreak"></a><code>neg/side-tiebreak</code></td><td>2026-11-03</td><td>Side choice tie-break by bound (rejected: no effect)</td></tr>
+<tr><td><a id="ref-neg-skip-cmov-guard"></a><code>neg/skip-cmov-guard</code></td><td>2026-11-03</td><td>Branch-free skip guard plus a single pop branch (rejected: -8%)</td></tr>
+<tr><td><a id="ref-neg-twinearly"></a><code>neg/twinearly</code></td><td>2026-11-03</td><td>Hoist the X' twin-bound prune before cube computation (rejected: -2.5%)</td></tr>
+<tr><td><a id="ref-neg-twinlate"></a><code>neg/twinlate</code></td><td>2026-11-03</td><td>Twin-bound prune saving with the original branch structure (rejected: neutral)</td></tr>
+<tr><td><a id="ref-neg-unified-resolve"></a><code>neg/unified-resolve</code></td><td>2026-11-03</td><td>Unified resolve without the phase dispatch (rejected: -3.3%)</td></tr>
+<tr><td><a id="ref-neg-xh48-base11-h11"></a><code>neg/xh48-base11-h11</code></td><td>2026-11-04</td><td>NEGATIVE x-h48: base11-h11 (not merged)</td></tr>
+<tr><td><a id="ref-neg-xh48-eoesep-fallback"></a><code>neg/xh48-eoesep-fallback</code></td><td>2026-11-04</td><td>NEGATIVE x-h48: eoesep-fallback (not merged)</td></tr>
+<tr><td><a id="ref-neg-xh48-parity-bit"></a><code>neg/xh48-parity-bit</code></td><td>2026-11-04</td><td>NEGATIVE x-h48: permutation parity bit instead of an EO bit (not merged)</td></tr>
+<tr><td><a id="ref-neg-xnx-axis-inheritance"></a><code>neg/xnx-axis-inheritance</code></td><td>2026-11-04</td><td>NEGATIVE x-nx: axis-inheritance (not merged)</td></tr>
+<tr><td><a id="ref-neg-xnx-diagnostics"></a><code>neg/xnx-diagnostics</code></td><td>2026-11-04</td><td>NEGATIVE x-nx: diagnostics (not merged)</td></tr>
+<tr><td><a id="ref-neg-xvc-ck2-halfsplit"></a><code>neg/xvc-ck2-halfsplit</code></td><td>2026-11-04</td><td>NEGATIVE x-vc: ck2-halfsplit (not merged)</td></tr>
+<tr><td><a id="ref-neg-xvc-clflushopt-table-lines"></a><code>neg/xvc-clflushopt-table-lines</code></td><td>2026-11-04</td><td>NEGATIVE x-vc: clflushopt-table-lines (not merged)</td></tr>
+<tr><td><a id="ref-neg-xvc-cocsep-18bit-p18d"></a><code>neg/xvc-cocsep-18bit-p18d</code></td><td>2026-11-04</td><td>NEGATIVE x-vc: cocsep-18bit-p18d (not merged)</td></tr>
+<tr><td><a id="ref-neg-xvc-diag-index-chain-latency"></a><code>neg/xvc-diag-index-chain-latency</code></td><td>2026-11-04</td><td>NEGATIVE x-vc: diag-index-chain-latency (not merged)</td></tr>
+<tr><td><a id="ref-neg-xvc-p18-dense"></a><code>neg/xvc-p18-dense</code></td><td>2026-11-04</td><td>NEGATIVE x-vc: p18-dense (not merged)</td></tr>
+<tr><td><a id="ref-neg-xvc-p18bc-variants"></a><code>neg/xvc-p18bc-variants</code></td><td>2026-11-04</td><td>NEGATIVE x-vc: p18bc-variants (not merged)</td></tr>
+</tbody>
+</table></div>
+<h2 id="archived-experiments">Archived experiments</h2>
+<div class="table-wrap" role="region" aria-label="Archived experiments" tabindex="0"><table id="docs-table-2"><caption>Archived experiments</caption>
+<thead>
+<tr><th>Experiment</th><th>Date</th><th>Summary</th></tr>
+</thead>
+<tbody>
+<tr><td><a id="ref-archive-c7-childsplit"></a><code>archive/c7-childsplit</code></td><td>2026-11-03</td><td>lanes: order root children across jobs in the iterations on unchanged jobs (c7)</td></tr>
+<tr><td><a id="ref-archive-c7-clean"></a><code>archive/c7-clean</code></td><td>2026-11-03</td><td>c7-glob WIP: split iterations with knobs</td></tr>
+<tr><td><a id="ref-archive-c7-exp"></a><code>archive/c7-exp</code></td><td>2026-11-03</td><td>c7: diag knobs (force normal), dseval policies</td></tr>
+<tr><td><a id="ref-archive-c7-glob"></a><code>archive/c7-glob</code></td><td>2026-11-03</td><td>c7-glob: fix knob 11 enable</td></tr>
+<tr><td><a id="ref-archive-m7"></a><code>archive/m7</code></td><td>2026-11-03</td><td>wip memcnt: count nodes in stats directly</td></tr>
+<tr><td><a id="ref-archive-m7-align-abce"></a><code>archive/m7-align-abce</code></td><td>2026-11-04</td><td>wip align: hot sections at fixed 64-byte offsets</td></tr>
+<tr><td><a id="ref-archive-m7-c1"></a><code>archive/m7-c1</code></td><td>2026-11-04</td><td>wip c1 align</td></tr>
+<tr><td><a id="ref-archive-m7-c1n"></a><code>archive/m7-c1n</code></td><td>2026-11-04</td><td>wip c1 align</td></tr>
+<tr><td><a id="ref-archive-m7-c2"></a><code>archive/m7-c2</code></td><td>2026-11-04</td><td>wip c2 stack</td></tr>
+<tr><td><a id="ref-archive-m7-c2n"></a><code>archive/m7-c2n</code></td><td>2026-11-04</td><td>wip c2 stack</td></tr>
+<tr><td><a id="ref-archive-m7-cnt"></a><code>archive/m7-cnt</code></td><td>2026-11-03</td><td>wip cnt: count the reached moves with blsmsk</td></tr>
+<tr><td><a id="ref-archive-m7-diag"></a><code>archive/m7-diag</code></td><td>2026-11-04</td><td>diag: prune outcome of each lookup by the node's bound on that side</td></tr>
+<tr><td><a id="ref-archive-m7-dlat"></a><code>archive/m7-dlat</code></td><td>2026-11-04</td><td>diag: 9 cycles of extra latency on the pending value</td></tr>
+<tr><td><a id="ref-archive-m7-dnolat"></a><code>archive/m7-dnolat</code></td><td>2026-11-03</td><td>diag: 3 imuls off the value chain</td></tr>
+<tr><td><a id="ref-archive-m7-early"></a><code>archive/m7-early</code></td><td>2026-11-03</td><td>wip early2: corner-depth test against r</td></tr>
+<tr><td><a id="ref-archive-m7-final"></a><code>archive/m7-final</code></td><td>2026-11-04</td><td>wip align: hot sections at fixed 64-byte offsets</td></tr>
+<tr><td><a id="ref-archive-m7-idx"></a><code>archive/m7-idx</code></td><td>2026-11-03</td><td>wip idx3: 64-bit vpmovmskb output</td></tr>
+<tr><td><a id="ref-archive-m7-kind"></a><code>archive/m7-kind</code></td><td>2026-11-03</td><td>wip kind2: X-move blend mask from a table</td></tr>
+<tr><td><a id="ref-archive-m7-lanes"></a><code>archive/m7-lanes</code></td><td>2026-11-04</td><td>lanes: 24 lanes per thread by default</td></tr>
+<tr><td><a id="ref-archive-m7-lazy"></a><code>archive/m7-lazy</code></td><td>2026-11-03</td><td>wip lazy: only the looked-up child cube, from selected operands</td></tr>
+<tr><td><a id="ref-archive-m7-lz"></a><code>archive/m7-lz</code></td><td>2026-11-04</td><td>lz: names, docs, pedantic</td></tr>
+<tr><td><a id="ref-archive-m7-lz-595"></a><code>archive/m7-lz-595</code></td><td>2026-11-04</td><td>lanes: compute only the looked-up child cube (wip message)</td></tr>
+<tr><td><a id="ref-archive-m7-lz-f2"></a><code>archive/m7-lz-f2</code></td><td>2026-11-04</td><td>lanes: compute only the looked-up child cube (wip message)</td></tr>
+<tr><td><a id="ref-archive-m7-lz-next"></a><code>archive/m7-lz-next</code></td><td>2026-11-04</td><td>lanes: compute only the looked-up child cube (wip message)</td></tr>
+<tr><td><a id="ref-archive-m7-lz-rb"></a><code>archive/m7-lz-rb</code></td><td>2026-11-04</td><td>lz: names, docs, pedantic</td></tr>
+<tr><td><a id="ref-archive-m7-memcnt-595"></a><code>archive/m7-memcnt-595</code></td><td>2026-11-04</td><td>lanes: count nodes into Lane::stats where they are reached</td></tr>
+<tr><td><a id="ref-archive-m7-memcnt-f2"></a><code>archive/m7-memcnt-f2</code></td><td>2026-11-04</td><td>lanes: count nodes into Lane::stats where they are reached</td></tr>
+<tr><td><a id="ref-archive-m7-port"></a><code>archive/m7-port</code></td><td>2026-11-04</td><td>port: stack + align on b3f0bfb (wip)</td></tr>
+<tr><td><a id="ref-archive-m7-port-base"></a><code>archive/m7-port-base</code></td><td>2026-11-04</td><td>mine renamed</td></tr>
+<tr><td><a id="ref-archive-m7-ra"></a><code>archive/m7-ra</code></td><td>2026-11-03</td><td>wip ra6: read-ahead word through the next lane's k_word</td></tr>
+<tr><td><a id="ref-archive-m7-ra-next"></a><code>archive/m7-ra-next</code></td><td>2026-11-04</td><td>lanes: read the next lane's lookup ahead, and the prune bound</td></tr>
+<tr><td><a id="ref-archive-m7-ra2"></a><code>archive/m7-ra2</code></td><td>2026-11-03</td><td>wip ra2: pending child's remaining moves kept in the lane</td></tr>
+<tr><td><a id="ref-archive-m7-ra5"></a><code>archive/m7-ra5</code></td><td>2026-11-03</td><td>wip ra2: pending child's remaining moves kept in the lane</td></tr>
+<tr><td><a id="ref-archive-m7-ra7"></a><code>archive/m7-ra7</code></td><td>2026-11-03</td><td>wip ra2: pending child's remaining moves kept in the lane</td></tr>
+<tr><td><a id="ref-archive-m7-s1"></a><code>archive/m7-s1</code></td><td>2026-11-03</td><td>wip idx3: 64-bit vpmovmskb output</td></tr>
+<tr><td><a id="ref-archive-m7-smc-abce"></a><code>archive/m7-smc-abce</code></td><td>2026-11-04</td><td>wip smc: stack + node count into stats</td></tr>
+<tr><td><a id="ref-archive-m7-spec"></a><code>archive/m7-spec</code></td><td>2026-11-03</td><td>lanes: speculative prefetch of the next face's first child</td></tr>
+<tr><td><a id="ref-archive-m7-stack-595"></a><code>archive/m7-stack-595</code></td><td>2026-11-04</td><td>stack: gain comments</td></tr>
+<tr><td><a id="ref-archive-m7-stack-abce"></a><code>archive/m7-stack-abce</code></td><td>2026-11-04</td><td>stack: gain comments</td></tr>
+<tr><td><a id="ref-archive-m7-stack-next"></a><code>archive/m7-stack-next</code></td><td>2026-11-04</td><td>stack: gain comments</td></tr>
+<tr><td><a id="ref-archive-m8-e1"></a><code>archive/m8-e1</code></td><td>2026-11-04</td><td>WIP e1: prefetch runs 4 ahead</td></tr>
+<tr><td><a id="ref-archive-m8-ix"></a><code>archive/m8-ix</code></td><td>2026-11-04</td><td>WIP ix: msplit rows pre-shifted (no imul after the msplit lookup)</td></tr>
+<tr><td><a id="ref-archive-m8-ix3"></a><code>archive/m8-ix3</code></td><td>2026-11-04</td><td>WIP ix: msplit rows pre-shifted (no imul after the msplit lookup)</td></tr>
+<tr><td><a id="ref-archive-m8-pm"></a><code>archive/m8-pm</code></td><td>2026-11-04</td><td>WIP pm: apply_move both fix-up candidates in parallel</td></tr>
+<tr><td><a id="ref-archive-m8-pre-def2"></a><code>archive/m8-pre-def2</code></td><td>2026-11-04</td><td>WIP rp: share lanes by pointer</td></tr>
+<tr><td><a id="ref-archive-m8-rp"></a><code>archive/m8-rp</code></td><td>2026-11-04</td><td>WIP rp: share lanes by pointer</td></tr>
+<tr><td><a id="ref-archive-m8-rp2"></a><code>archive/m8-rp2</code></td><td>2026-11-04</td><td>WIP rp2: only next/end live across the visits</td></tr>
+<tr><td><a id="ref-archive-m8-stack"></a><code>archive/m8-stack</code></td><td>2026-11-04</td><td>WIP rp: share lanes by pointer</td></tr>
+<tr><td><a id="ref-archive-m8-stack2"></a><code>archive/m8-stack2</code></td><td>2026-11-04</td><td>NEGATIVE m8: index without the multiply after the msplit lookup, both fix-up candidates in apply_move, runs prefetched 4 ahead (neutral as a stack)</td></tr>
+<tr><td><a id="ref-archive-m8-ul"></a><code>archive/m8-uL</code></td><td>2026-11-04</td><td>WIP uL: unsafe pass without share.rs</td></tr>
+<tr><td><a id="ref-archive-opt-batch-other"></a><code>archive/opt/batch-other</code></td><td>2026-11-02</td><td>Batch the other-side lookups of a node (REGRESSION, not merged)</td></tr>
+<tr><td><a id="ref-archive-opt-childorder"></a><code>archive/opt/childorder</code></td><td>2026-11-03</td><td>Per-child final-iteration ordering (neutral: -4..6% nodes, +0.3% throughput)</td></tr>
+<tr><td><a id="ref-archive-opt-cocsep-additive"></a><code>archive/opt/cocsep-additive</code></td><td>2026-11-03</td><td>Additive cocsep coordinate (rejected: neutral)</td></tr>
+<tr><td><a id="ref-archive-opt-cocsep-prefetch-lanes"></a><code>archive/opt/cocsep-prefetch-lanes</code></td><td>2026-11-03</td><td>Prefetch the moved-side cocsep entry early (rejected: -3%)</td></tr>
+<tr><td><a id="ref-archive-opt-value-branchless"></a><code>archive/opt/value-branchless</code></td><td>2026-11-03</td><td>Branchless value() (rejected: -4%)</td></tr>
+<tr><td><a id="ref-archive-r6c"></a><code>archive/r6c</code></td><td>2026-11-03</td><td>lanes: value of the pending lookup without a branch on the code (wip)</td></tr>
+<tr><td><a id="ref-archive-r6e"></a><code>archive/r6e</code></td><td>2026-11-03</td><td>lanes: Node without align(64): 96 bytes</td></tr>
+<tr><td><a id="ref-archive-s2-prologue"></a><code>archive/s2-prologue</code></td><td>2026-11-03</td><td>lanes: resolve prologue before the phase dispatch (wip)</td></tr>
+<tr><td><a id="ref-archive-stash-82da6e7"></a><code>archive/stash-82da6e7</code></td><td>2026-11-03</td><td>WIP on (no branch): 82da6e7 Merge opt/skip-sibling: branch-free sibling pruning (+13.6%)</td></tr>
+</tbody>
+</table></div>
+<h2 id="other-unmerged-branches">Other unmerged branches</h2>
+<div class="table-wrap" role="region" aria-label="Other unmerged branches" tabindex="0"><table id="docs-table-3"><caption>Other unmerged branches</caption>
+<thead>
+<tr><th>Experiment</th><th>Date</th><th>Summary</th></tr>
+</thead>
+<tbody>
+<tr><td><a id="ref-work-m8-r2"></a><code>work/m8-r2</code></td><td>2026-11-05</td><td>WIP e1: prefetch runs 4 ahead</td></tr>
+<tr><td><a id="ref-work-p11"></a><code>work/p11</code></td><td>2026-11-05</td><td>wasm: Bun instead of Node for the JavaScript tooling (Bun 1.4.4)</td></tr>
+<tr><td><a id="ref-work-r8"></a><code>work/r8</code></td><td>2026-11-05</td><td>check.sh: under qemu, the /proc/self/maps test runs alone; failed greps stop the script</td></tr>
+</tbody>
+</table></div>
+
+<p class="source-link"><a href="DELETED_EXPERIMENTS.md">Markdown source</a></p></main></div>
+<footer><a href="../PROVENANCE.html">Sources and evidence scope</a></footer>
+<script>
+for (const wrapper of document.querySelectorAll('.table-wrap')) {
+  const table=wrapper.querySelector('table');
+  const rows=[...table.tBodies].flatMap(body=>[...body.rows]);
+  if(rows.length>50) wrapper.classList.add('long-table');
+  if(rows.length<=12) continue;
+  const tools=document.createElement('div'); tools.className='table-tools';
+  const label=document.createElement('label'); label.textContent='Filter this table';
+  const input=document.createElement('input'); input.type='search'; input.id=table.id+'-filter';
+  label.htmlFor=input.id; input.setAttribute('aria-controls',table.id);
+  const count=document.createElement('span'); count.className='note'; count.setAttribute('aria-live','polite');
+  count.textContent=rows.length+' rows';
+  input.addEventListener('input',()=>{
+    const query=input.value.trim().toLowerCase(); let shown=0;
+    for(const row of rows){row.hidden=!!query&&!row.textContent.toLowerCase().includes(query);if(!row.hidden)shown++;}
+    count.textContent=shown+' of '+rows.length+' rows';
+  });
+  tools.append(label,input,count); wrapper.before(tools);
+}
+function revealTarget(){
+  let id;try{id=decodeURIComponent(location.hash.slice(1));}catch{return;}
+  const target=document.getElementById(id);if(!target)return;
+  for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+}
+revealTarget(); window.addEventListener('hashchange',revealTarget);
+const menu=document.querySelector('.site-menu');
+if(menu){const wide=matchMedia('(min-width:901px)');const sync=()=>{menu.open=wide.matches;};sync();wide.addEventListener('change',sync);
+const current=menu.querySelector('[aria-current]');if(current&&wide.matches)current.scrollIntoView({block:'nearest'});}
+</script>
+</body></html>

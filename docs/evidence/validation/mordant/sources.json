@@ -2,7 +2,7 @@
   "main": {
     "source": "/home/super/egg-solver",
     "snapshot": "/data/agents/mordant-audit/sources/main",
-    "commit": "56ace9c10792b91d3fa521ca4af24801ca8b71fc",
+    "commit": "c551a061bbfb76c3e8a115e75cbd3056ba23e90a",
     "git_status": " M miri.sh\n",
     "files": {
       ".cargo/config.toml": "8af4de2b9bddbd204fbc77fd1365c7c524d8450cfe2ee1c58bd72fcba8a3a2f7",
@@ -77,7 +77,7 @@
   "safety": {
     "source": "/data/agents/codex-resume/miri-checks",
     "snapshot": "/data/agents/mordant-audit/sources/safety",
-    "commit": "988f289fed03f2490359fe660297d9f502363845",
+    "commit": "e18e971b2f8beef6b171f436900c8ab74d58f160",
     "git_status": "",
     "files": {
       ".cargo/config.toml": "8af4de2b9bddbd204fbc77fd1365c7c524d8450cfe2ee1c58bd72fcba8a3a2f7",
@@ -177,7 +177,7 @@
   "ssse3": {
     "source": "/data/agents/pmu-westmere/source",
     "snapshot": "/data/agents/mordant-audit/sources/ssse3",
-    "commit": "93867a4597ab821b4064a0d407d3c89e133c9013",
+    "commit": "da134bc6d27b925fdb8b8ff42eea732c931831fc",
     "git_status": "M  build.rs\nM  check.sh\nM  miri.sh\nM  src/lib.rs\nM  src/portable/mod.rs\nA  src/portable/v16_ssse3.rs\n",
     "files": {
       ".cargo/config.toml": "8af4de2b9bddbd204fbc77fd1365c7c524d8450cfe2ee1c58bd72fcba8a3a2f7",

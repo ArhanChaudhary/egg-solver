@@ -1,15 +1,27 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Assessment of ~/ideas.txt (Rokicki and Arhan brainstorm, 2026-11-04) — egg-solver</title><style>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Assessment of optimization ideas from Tom Rokicki and Arhan Chaudhary (2026-11-04) — egg-solver</title><style>
 :root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
 * { box-sizing:border-box; }
 body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
-header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header { padding:1rem max(1rem,calc((100vw - 1400px)/2)); background:#132c40; color:white; }
 header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
 header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
 header a { color:#d9f0ff; }
 header a[aria-current] { color:white; text-decoration-thickness:3px; }
-main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+.layout { max-width:1400px; margin:1.5rem auto; padding:0 1rem; display:grid; grid-template-columns:15rem minmax(0,1fr); gap:1.5rem; align-items:start; }
+.site-nav { position:sticky; top:1rem; max-height:calc(100vh - 2rem); overflow:auto; font-size:.9rem; }
+.site-menu { margin:0; padding:.4rem .8rem .8rem; background:white; }
+.site-menu summary { padding:.3rem 0; }
+.nav-group { margin:.9rem 0 .25rem; font-size:.75rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+.site-nav ul { list-style:none; margin:0; padding:0; }
+.site-nav li { margin:0; }
+.site-nav li a { display:block; padding:.2rem .45rem; border-radius:4px; text-decoration:none; line-height:1.35; }
+.site-nav li a:hover { background:#eef3f6; }
+.site-nav a[aria-current] { background:#e2edf5; font-weight:650; color:var(--ink); }
+@media(min-width:901px) { .site-menu > summary { display:none; } }
+@media(max-width:900px) { .layout { display:block; margin:.75rem auto; } .site-nav { position:static; max-height:none; margin-bottom:.75rem; } }
+main { margin:0; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
 h1 { margin-top:0; font-size:2rem; line-height:1.25; }
 h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
 h3 { margin-top:1.5rem; }
@@ -32,13 +44,13 @@ summary { cursor:pointer; font-weight:600; }
 .note,.source-link,footer { color:var(--muted); font-size:.85rem; }
 .source-link { margin-top:2rem; }
 .archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
-footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+footer { max-width:1400px; margin:1rem auto 2rem; padding:0 1rem; }
 blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
 svg { max-width:100%; height:auto; }
 :target { scroll-margin-top:1rem; }
 .skip-link { position:absolute; left:-10000px; }
 .skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
-@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+@media(max-width:700px) { .layout { padding:0 .5rem; } main { padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
 </style></head>
 <body>
 <a class="skip-link" href="#docs-content">Skip to content</a>
@@ -47,38 +59,41 @@ svg { max-width:100%; height:auto; }
 <a href="../../comparisons/index.html">Benchmarks</a>
 <a href="../../performance/index.html">Performance</a>
 <a href="../../safety/index.html">Safety</a>
-<a href="../../history/index.html">History</a>
-<a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
-<main id="docs-content"><h1 id="assessment-of-ideas-txt-rokicki-and-arhan-brainstorm-2026-11-04">Assessment of ~/ideas.txt (Rokicki and Arhan brainstorm, 2026-11-04)</h1>
+<a href="../../history/DELETED_EXPERIMENTS.html">Experiments</a>
+<a href="../../BENCHMARK_CATALOG.html">Catalog</a>
+<a href="https://egg-solver.arhan.sh/">Solver demo ↗</a></nav></header>
+<div class="layout"><nav class="site-nav" aria-label="All documentation pages"><details class="site-menu" open><summary>All pages</summary><p class="nav-group">Start</p><ul><li><a href="../../index.html">Overview</a></li><li><a href="../../guide/QUICKSTART.html">Quick start</a></li><li><a href="../../guide/OVERVIEW.html">Tables and memory</a></li><li><a href="../../guide/HOW_IT_WORKS.html">How the search works</a></li><li><a href="../../guide/GLOSSARY.html">Glossary</a></li></ul><p class="nav-group">Reference</p><ul><li><a href="../USER_GUIDE.html">User guide</a></li><li><a href="../../guide/DEVELOPMENT.html">Development checks</a></li><li><a href="../../guide/PUBLISHING.html">Publishing the site</a></li><li><a href="index.html">Technique inventories</a></li></ul><p class="nav-group">Benchmarks</p><ul><li><a href="../../comparisons/index.html">Solver benchmarks</a></li><li><a href="../../comparisons/METHODS.html">Reading the tables</a></li><li><a href="../../comparisons/NISSY_THROUGHPUT.html">nissy throughput</a></li><li><a href="../../comparisons/NXOPT32.html">nxopt, 62 GB table</a></li><li><a href="../../comparisons/CUBEOPT_AUDIT.html">cubeopt audit</a></li><li><a href="../../comparisons/TABLE_ANALYSIS.html">h4 table analysis</a></li><li><a href="../../comparisons/RESULTS.html">Multi-solver matrix</a></li><li><a href="../../comparisons/COMPETITOR_FINDINGS.html">Competitor findings</a></li></ul><p class="nav-group">Performance</p><ul><li><a href="../../performance/index.html">Performance studies</a></li><li><a href="../../performance/PARALLELISM.html">Parallelism</a></li><li><a href="../../performance/HARDWARE_COUNTERS.html">Hardware counters</a></li><li><a href="../../performance/OPTIMIZATION_REVIEW.html">Optimization review</a></li></ul><p class="nav-group">Safety</p><ul><li><a href="../../safety/index.html">Correctness and safety</a></li><li><a href="../../safety/NO_UB.html">Undefined behavior</a></li><li><a href="../../safety/MORDANT.html">Mordant audit</a></li></ul><p class="nav-group">Evidence and history</p><ul><li><a href="../../BENCHMARK_CATALOG.html">Benchmark catalog</a></li><li><a href="../../reproduce/index.html">Reproduce results</a></li><li><a href="../../PROVENANCE.html">Sources and IDs</a></li><li><a href="../../history/DELETED_EXPERIMENTS.html">Deleted experiments</a></li></ul></details></nav>
+<main id="docs-content"><h1 id="assessment-of-optimization-ideas-from-tom-rokicki-and-arhan-chaudhary-2026-11-04">Assessment of optimization ideas from Tom Rokicki and Arhan Chaudhary (2026-11-04)</h1>
 <p class="archive-note">Historical snapshot. Its source, timings and pending statements belong to the recorded experiment, not the current checkout. <a href="../../index.html">Documentation home</a>.</p>
-<p>Copy of the ideas: <code>$P/ideas.txt</code>. Our solver: H48 h11, 2-bit entries, base 10, 4-bit group minima; IDA* with 24 lanes per thread.</p>
-<div class="table-wrap" role="region" aria-label="Assessment of ~/ideas.txt (Rokicki and Arhan brainstorm, 2026-11-04)" tabindex="0"><table id="docs-table-1"><caption>Assessment of ~/ideas.txt (Rokicki and Arhan brainstorm, 2026-11-04)</caption>
+<p>This table assesses a numbered list of optimization ideas from Tom Rokicki and Arhan Chaudhary. The list itself is not published; the first column keeps its numbering, which the other inventories cite as “idea 2.4” and similar. The Action column records the follow-up planned at the time, with the recorded outcome where one of the other inventories measured it.</p>
+<p>The solver at the time: H48 h11, 2-bit entries, base 10, 4-bit group minima; IDA* with 24 lanes per thread.</p>
+<div class="table-wrap" role="region" aria-label="Assessment of optimization ideas from Tom Rokicki and Arhan Chaudhary (2026-11-04)" tabindex="0"><table id="docs-table-1"><caption>Assessment of optimization ideas from Tom Rokicki and Arhan Chaudhary (2026-11-04)</caption>
 <thead>
 <tr><th>#</th><th>Idea</th><th>Status in our solver</th><th>Action</th></tr>
 </thead>
 <tbody>
-<tr><td>1.1–1.5</td><td>Faster table generation (scanning, batched writes, symmetry at the root)</td><td>Affects only generation time. Our limit is RAM, not generation time.</td><td>Use in the new any-k <code>gen</code> for laptop tables (p10).</td></tr>
-<tr><td>2.1</td><td>nxopt 2-bit + per-line min + base</td><td>Done. cube48opt-style 16-byte groups with a 4-bit min; base 10 confirmed best for h11 (x-nx, x-h48 simulations: base 11 +38%, base 9 +268% nodes).</td><td>none</td></tr>
-<tr><td>2.2–2.4, 2.6</td><td>Denser or entropy-coded tables (trits 1.25x, bitmaps, tANS ~1.5x, lossy)</td><td>They only pay if the freed memory buys a bigger effective table, and H48 tops out at h11 (full EO).</td><td><strong>x-h48:</strong> feasibility study of a &quot;bigger effective table within ~65 GiB&quot;: a coset refinement × an encoding, with the expected nodes gain and decode cost.</td></tr>
+<tr><td>1.1–1.5</td><td>Faster table generation (scanning, batched writes, symmetry at the root)</td><td>Affects only generation time. Our limit is RAM, not generation time.</td><td>Use in the new any-k <code>gen</code> for laptop-sized tables.</td></tr>
+<tr><td>2.1</td><td>nxopt 2-bit + per-line min + base</td><td>Done. cube48opt-style 16-byte groups with a 4-bit min; base 10 confirmed best for h11 (simulations in the <a href="x-nxopt-inventory.html">nxopt</a> and <a href="x-h48-inventory.html">nissy-core</a> inventories: base 11 +38%, base 9 +268% nodes).</td><td>none</td></tr>
+<tr><td>2.2–2.4, 2.6</td><td>Denser or entropy-coded tables (trits 1.25x, bitmaps, tANS ~1.5x, lossy)</td><td>They only pay if the freed memory buys a bigger effective table, and H48 tops out at h11 (full EO).</td><td>Feasibility study of a &quot;bigger effective table within ~65 GiB&quot;: a coset refinement × an encoding, with the expected nodes gain and decode cost. Outcome: infeasible (<a href="x-h48-inventory.html">nissy-core inventory</a>, feasibility section).</td></tr>
 <tr><td>2.7</td><td>Non-power-of-two sizes without division</td><td>N/A: exact index, no hashing.</td><td>none</td></tr>
 <tr><td>3.1–3.4</td><td>One big table; mean h is the key metric; nodes × size ≈ constant</td><td>Known; it guides the study above.</td><td>—</td></tr>
-<tr><td>3.6</td><td>Small exact in-cache table that catches many lookups (untried)</td><td>We have only the cocsep corner-depth precheck.</td><td><strong>x-nx:</strong> measure the fraction of h11 lookups a cache-resident projection table (≤ L2/L3 size) would prune.</td></tr>
-<tr><td>3.8</td><td>Table checksum before/after runs</td><td>We have table-meta validation, tabcheck and a read-only mapping.</td><td>Optional <code>--verify-table</code> (xxhash) for the final comparison (p10).</td></tr>
+<tr><td>3.6</td><td>Small exact in-cache table that catches many lookups (untried)</td><td>We have only the cocsep corner-depth precheck.</td><td>Measure the fraction of h11 lookups a cache-resident projection table (≤ L2/L3 size) would prune. Outcome: 0.16% of lookups; negative (<a href="x-nxopt-inventory.html">nxopt inventory</a>, M6).</td></tr>
+<tr><td>3.8</td><td>Table checksum before/after runs</td><td>We have table-meta validation, tabcheck and a read-only mapping.</td><td>Optional <code>--verify-table</code> (xxhash) for the final comparison.</td></tr>
 <tr><td>4.1, 4.5, 4.6, 4.7</td><td>Inverse probe; rotated probes; fast representative; mirroring</td><td>Done, or N/A for a 48-symmetric table.</td><td>—</td></tr>
-<tr><td>4.2–4.4</td><td>Merge the inverse into the table (96-way)</td><td>It needs a coset structure closed under inversion. The H48 coset of p and of p⁻¹ differ, and the mod-3 encoding is invalid on the inverse side.</td><td>Part of x-h48's bigger-table study.</td></tr>
-<tr><td>4.8</td><td>Symmetric inputs: search the first levels slowly, drop symmetric duplicates (symmetry² speedup)</td><td>x-h48 is implementing symmetric start.</td><td>Use Rokicki's deeper version; we report one solution, so the all-solutions caveat doesn't apply.</td></tr>
+<tr><td>4.2–4.4</td><td>Merge the inverse into the table (96-way)</td><td>It needs a coset structure closed under inversion. The H48 coset of p and of p⁻¹ differ, and the mod-3 encoding is invalid on the inverse side.</td><td>Part of the bigger-table feasibility study above.</td></tr>
+<tr><td>4.8</td><td>Symmetric inputs: search the first levels slowly, drop symmetric duplicates (symmetry² speedup)</td><td>Symmetric start was being implemented (later merged as f07b109).</td><td>Use Rokicki's deeper version; we report one solution, so the all-solutions caveat doesn't apply.</td></tr>
 <tr><td>4.9</td><td>Symmetry duplicates during search</td><td>Not worth it (confirmed).</td><td>—</td></tr>
-<tr><td>5.2</td><td>BPMX / pathmax (full: return early from the parent)</td><td>We have sibling-face skip and back-jumps (lanes.rs doc).</td><td><strong>x-nx:</strong> verify we do the <em>full</em> BPMX early return on both sides, including against premoves (the inverse side); if not, measure it.</td></tr>
+<tr><td>5.2</td><td>BPMX / pathmax (full: return early from the parent)</td><td>We have sibling-face skip and back-jumps (lanes.rs doc).</td><td>Verify that the <em>full</em> BPMX early return happens on both sides, including against premoves (the inverse side); if not, measure it. Outcome: in-tree BPMX is complete; job-level pathmax would skip 0 jobs (<a href="x-nxopt-inventory.html">nxopt inventory</a>, M4).</td></tr>
 <tr><td>5.3</td><td>Continue in the direction with fewer allowed moves</td><td>Done (side choice by popcount, inverse-first).</td><td>—</td></tr>
-<tr><td>5.4</td><td>Canonical sequences beyond commuting (twsearch <code>--newcanon</code>, longer identities)</td><td>Commuting order only. Depth-4 duplicates 0.035%, depth-5 0.43% (x-vc); an earlier estimate said ≤ 0.5%.</td><td><strong>x-nx:</strong> measure duplicate sequences in the real search tree at depths 5–10 (positions reached by &gt;1 canonical sequence within a job) and read twsearch's newcanon (~/ref/twsearch/src). Implement a DFA if it pays ≥ 1%.</td></tr>
+<tr><td>5.4</td><td>Canonical sequences beyond commuting (twsearch <code>--newcanon</code>, longer identities)</td><td>Commuting order only. Depth-4 duplicates 0.035%, depth-5 0.43% (<a href="x-vcube-inventory.html">vcube inventory</a>); an earlier estimate said ≤ 0.5%.</td><td>Measure duplicate sequences in the real search tree at depths 5–10 (positions reached by &gt;1 canonical sequence within a job) and read twsearch's newcanon source. Implement a DFA if it pays ≥ 1%. Outcome: at most 0.48% of nodes, below the 1% threshold (<a href="x-nxopt-inventory.html">nxopt inventory</a>, M5).</td></tr>
 <tr><td>5.5, 6.1, 6.2, 6.3</td><td>Preallocated stacks; deep splits; microthreading; huge pages</td><td>Done: lanes = microthreading; 1 GiB pages; 2–4-move job prefixes.</td><td>—</td></tr>
-<tr><td>7.2</td><td>min(v, v−3) mod-3 fix; SIMD inverse</td><td>Done (x-vc: our move 4.6 Ir, child cubes 12.5 Ir, vs vcube's 4.4 and 53.8).</td><td>—</td></tr>
-<tr><td>7.4</td><td>Ranking: popcount Lehmer, half-split tables, digit parallelism</td><td>Our index chain is 45 Ir and 15.2 ns latency (x-vc).</td><td><strong>x-vc:</strong> apply these to shorten the index chain (coordinated with m7).</td></tr>
-<tr><td>7.1, 7.5</td><td>Throughput over many positions; Apple Silicon differences</td><td>—</td><td>Laptop/NEON port (p10).</td></tr>
+<tr><td>7.2</td><td>min(v, v−3) mod-3 fix; SIMD inverse</td><td>Done (vcube inventory: our move 4.6 Ir, child cubes 12.5 Ir, vs vcube's 4.4 and 53.8).</td><td>—</td></tr>
+<tr><td>7.4</td><td>Ranking: popcount Lehmer, half-split tables, digit parallelism</td><td>Our index chain is 45 Ir and 15.2 ns latency (<a href="x-vcube-inventory.html">vcube inventory</a>).</td><td>Apply these to shorten the index chain. Outcome: the index has no permutation ranks for popcount Lehmer ranking, digit-parallel ranking was already in use, and the half-split variant was negative (<a href="x-vcube-inventory.html">vcube inventory</a>, section F).</td></tr>
+<tr><td>7.1, 7.5</td><td>Throughput over many positions; Apple Silicon differences</td><td>—</td><td>Laptop/NEON port.</td></tr>
 </tbody>
 </table></div>
 
-<p class="source-link"><a href="ideas-assessment.md">Markdown source</a></p></main>
+<p class="source-link"><a href="ideas-assessment.md">Markdown source</a></p></main></div>
 <footer><a href="../../PROVENANCE.html">Sources and evidence scope</a></footer>
 <script>
 for (const wrapper of document.querySelectorAll('.table-wrap')) {
@@ -105,5 +120,8 @@ function revealTarget(){
   for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
 }
 revealTarget(); window.addEventListener('hashchange',revealTarget);
+const menu=document.querySelector('.site-menu');
+if(menu){const wide=matchMedia('(min-width:901px)');const sync=()=>{menu.open=wide.matches;};sync();wide.addEventListener('change',sync);
+const current=menu.querySelector('[aria-current]');if(current&&wide.matches)current.scrollIntoView({block:'nearest'});}
 </script>
 </body></html>

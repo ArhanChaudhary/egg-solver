@@ -3,10 +3,10 @@
 //! Rokicki's "drop symmetry duplicates in the first levels").
 //!
 //! Gains (x-h48's 14 symmetric and antisymmetric test positions, `solve -c
-//! 1`, on main fe926ed): 22.8x at 1T (9.75 -> 0.43 s) and 7.9x at 48T
+//! 1`, on main d4125fd): 22.8x at 1T (9.75 -> 0.43 s) and 7.9x at 48T
 //! (267 -> 34 ms), nearly all of it the superflip's (71x at 1T, 21x at
 //! 48T); the 7 positions with only a symmetry 1.87x at 1T (-47% nodes) and
-//! 1.30x at 48T. Stream mode (8 threads, on f8a4919): 28.9x solves/s,
+//! 1.30x at 48T. Stream mode (8 threads, on 387034c): 28.9x solves/s,
 //! -96.6% nodes.
 //!
 //! A job is a canonical move prefix `p` of the solution, searched from

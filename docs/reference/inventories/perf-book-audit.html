@@ -1,15 +1,27 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>The Rust Performance Book: audit for cube-opt (pb1) — egg-solver</title><style>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>The Rust Performance Book: technique audit — egg-solver</title><style>
 :root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
 * { box-sizing:border-box; }
 body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
-header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header { padding:1rem max(1rem,calc((100vw - 1400px)/2)); background:#132c40; color:white; }
 header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
 header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
 header a { color:#d9f0ff; }
 header a[aria-current] { color:white; text-decoration-thickness:3px; }
-main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+.layout { max-width:1400px; margin:1.5rem auto; padding:0 1rem; display:grid; grid-template-columns:15rem minmax(0,1fr); gap:1.5rem; align-items:start; }
+.site-nav { position:sticky; top:1rem; max-height:calc(100vh - 2rem); overflow:auto; font-size:.9rem; }
+.site-menu { margin:0; padding:.4rem .8rem .8rem; background:white; }
+.site-menu summary { padding:.3rem 0; }
+.nav-group { margin:.9rem 0 .25rem; font-size:.75rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+.site-nav ul { list-style:none; margin:0; padding:0; }
+.site-nav li { margin:0; }
+.site-nav li a { display:block; padding:.2rem .45rem; border-radius:4px; text-decoration:none; line-height:1.35; }
+.site-nav li a:hover { background:#eef3f6; }
+.site-nav a[aria-current] { background:#e2edf5; font-weight:650; color:var(--ink); }
+@media(min-width:901px) { .site-menu > summary { display:none; } }
+@media(max-width:900px) { .layout { display:block; margin:.75rem auto; } .site-nav { position:static; max-height:none; margin-bottom:.75rem; } }
+main { margin:0; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
 h1 { margin-top:0; font-size:2rem; line-height:1.25; }
 h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
 h3 { margin-top:1.5rem; }
@@ -32,13 +44,13 @@ summary { cursor:pointer; font-weight:600; }
 .note,.source-link,footer { color:var(--muted); font-size:.85rem; }
 .source-link { margin-top:2rem; }
 .archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
-footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+footer { max-width:1400px; margin:1rem auto 2rem; padding:0 1rem; }
 blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
 svg { max-width:100%; height:auto; }
 :target { scroll-margin-top:1rem; }
 .skip-link { position:absolute; left:-10000px; }
 .skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
-@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+@media(max-width:700px) { .layout { padding:0 .5rem; } main { padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
 </style></head>
 <body>
 <a class="skip-link" href="#docs-content">Skip to content</a>
@@ -47,48 +59,50 @@ svg { max-width:100%; height:auto; }
 <a href="../../comparisons/index.html">Benchmarks</a>
 <a href="../../performance/index.html">Performance</a>
 <a href="../../safety/index.html">Safety</a>
-<a href="../../history/index.html">History</a>
-<a href="../../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
-<main id="docs-content"><h1 id="the-rust-performance-book-audit-for-cube-opt-pb1">The Rust Performance Book: audit for cube-opt (pb1)</h1>
+<a href="../../history/DELETED_EXPERIMENTS.html">Experiments</a>
+<a href="../../BENCHMARK_CATALOG.html">Catalog</a>
+<a href="https://egg-solver.arhan.sh/">Solver demo ↗</a></nav></header>
+<div class="layout"><nav class="site-nav" aria-label="All documentation pages"><details class="site-menu" open><summary>All pages</summary><p class="nav-group">Start</p><ul><li><a href="../../index.html">Overview</a></li><li><a href="../../guide/QUICKSTART.html">Quick start</a></li><li><a href="../../guide/OVERVIEW.html">Tables and memory</a></li><li><a href="../../guide/HOW_IT_WORKS.html">How the search works</a></li><li><a href="../../guide/GLOSSARY.html">Glossary</a></li></ul><p class="nav-group">Reference</p><ul><li><a href="../USER_GUIDE.html">User guide</a></li><li><a href="../../guide/DEVELOPMENT.html">Development checks</a></li><li><a href="../../guide/PUBLISHING.html">Publishing the site</a></li><li><a href="index.html">Technique inventories</a></li></ul><p class="nav-group">Benchmarks</p><ul><li><a href="../../comparisons/index.html">Solver benchmarks</a></li><li><a href="../../comparisons/METHODS.html">Reading the tables</a></li><li><a href="../../comparisons/NISSY_THROUGHPUT.html">nissy throughput</a></li><li><a href="../../comparisons/NXOPT32.html">nxopt, 62 GB table</a></li><li><a href="../../comparisons/CUBEOPT_AUDIT.html">cubeopt audit</a></li><li><a href="../../comparisons/TABLE_ANALYSIS.html">h4 table analysis</a></li><li><a href="../../comparisons/RESULTS.html">Multi-solver matrix</a></li><li><a href="../../comparisons/COMPETITOR_FINDINGS.html">Competitor findings</a></li></ul><p class="nav-group">Performance</p><ul><li><a href="../../performance/index.html">Performance studies</a></li><li><a href="../../performance/PARALLELISM.html">Parallelism</a></li><li><a href="../../performance/HARDWARE_COUNTERS.html">Hardware counters</a></li><li><a href="../../performance/OPTIMIZATION_REVIEW.html">Optimization review</a></li></ul><p class="nav-group">Safety</p><ul><li><a href="../../safety/index.html">Correctness and safety</a></li><li><a href="../../safety/NO_UB.html">Undefined behavior</a></li><li><a href="../../safety/MORDANT.html">Mordant audit</a></li></ul><p class="nav-group">Evidence and history</p><ul><li><a href="../../BENCHMARK_CATALOG.html">Benchmark catalog</a></li><li><a href="../../reproduce/index.html">Reproduce results</a></li><li><a href="../../PROVENANCE.html">Sources and IDs</a></li><li><a href="../../history/DELETED_EXPERIMENTS.html">Deleted experiments</a></li></ul></details></nav>
+<main id="docs-content"><h1 id="the-rust-performance-book-technique-audit">The Rust Performance Book: technique audit</h1>
 <p class="archive-note">Historical snapshot. Its source, timings and pending statements belong to the recorded experiment, not the current checkout. <a href="../../index.html">Documentation home</a>.</p>
 <p>Source: https://nnethercote.github.io/perf-book/ (all 18 chapters, read in full from the
-book's print.html on 2026-11-04). Code refs are on main 7608a28 (x86 code identical to 3a9a50a);
-the deliverables are rebased onto 585b3b6 and the final PGO numbers were measured there. &quot;Status&quot; is one of
+book's print.html on 2026-11-04). Code refs are on main d28335f (x86 code identical to 7075875);
+the deliverables are rebased onto d690a46 and the final PGO numbers were measured there. &quot;Status&quot; is one of
 <strong>done</strong> (with the commit or code), <strong>tried-negative</strong> (with the branch), <strong>N/A</strong> (with the
-reason), <strong>not yet tried</strong>, or <strong>newly tried (pb1)</strong> with the result. &quot;Expected gain&quot; is
+reason), <strong>not yet tried</strong>, or <strong>newly tried</strong> (by this audit) with the result. &quot;Expected gain&quot; is
 for the solver's measured workloads: bench stream (1T/48T), bench share, solve -c 1/-c 0.</p>
 <p>Context that decides most rows: 1T stream spends 93% of cpu-clock samples in one function
 (<code>bench::stream_thread</code>, the lane loop), 2.4% setup_run, 1.6% next_run, 1.3% start_iteration,
 1.2% extend_jobs, 0.21% kernel, 0.03% libc (malloc/free/memset/memmove together)
-(/data/agents/perfprof/stream1t.data, main 95cbb11). At 48T the limit is DRAM latency and
+(cpu-clock profile of a 1T stream run on main 03abdfc). At 48T the limit is DRAM latency and
 memory-level parallelism, so instruction-count savings show mostly at 1T.</p>
-<details class="contents"><summary>On this page</summary><ul><li><a href="#summary-pb1">Summary (pb1)</a></li><li><a href="#benchmarking">Benchmarking</a></li><li><a href="#build-configuration">Build Configuration</a></li><li><a href="#linting">Linting</a></li><li><a href="#profiling">Profiling</a></li><li><a href="#inlining">Inlining</a></li><li><a href="#hashing">Hashing</a></li><li><a href="#heap-allocations">Heap Allocations</a></li><li><a href="#type-sizes">Type Sizes</a></li><li><a href="#standard-library-types">Standard Library Types</a></li><li><a href="#iterators">Iterators</a></li><li><a href="#bounds-checks">Bounds Checks</a></li><li><a href="#i-o">I/O</a></li><li><a href="#logging-and-debugging">Logging and Debugging</a></li><li><a href="#wrapper-types">Wrapper Types</a></li><li><a href="#machine-code">Machine Code</a></li><li><a href="#parallelism">Parallelism</a></li><li><a href="#general-tips">General Tips</a></li><li><a href="#compile-times">Compile Times</a></li><li><a href="#appendix-type-sizes-t1">Appendix: type sizes (T1)</a></li><li><a href="#appendix-allocations-and-memory-syscalls-a1-a12-c5-c7">Appendix: allocations and memory syscalls (A1, A12, C5/C7)</a></li></ul></details>
-<h2 id="summary-pb1">Summary (pb1)</h2>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#summary">Summary</a></li><li><a href="#benchmarking">Benchmarking</a></li><li><a href="#build-configuration">Build Configuration</a></li><li><a href="#linting">Linting</a></li><li><a href="#profiling">Profiling</a></li><li><a href="#inlining">Inlining</a></li><li><a href="#hashing">Hashing</a></li><li><a href="#heap-allocations">Heap Allocations</a></li><li><a href="#type-sizes">Type Sizes</a></li><li><a href="#standard-library-types">Standard Library Types</a></li><li><a href="#iterators">Iterators</a></li><li><a href="#bounds-checks">Bounds Checks</a></li><li><a href="#i-o">I/O</a></li><li><a href="#logging-and-debugging">Logging and Debugging</a></li><li><a href="#wrapper-types">Wrapper Types</a></li><li><a href="#machine-code">Machine Code</a></li><li><a href="#parallelism">Parallelism</a></li><li><a href="#general-tips">General Tips</a></li><li><a href="#compile-times">Compile Times</a></li><li><a href="#appendix-type-sizes-t1">Appendix: type sizes (T1)</a></li><li><a href="#appendix-allocations-and-memory-syscalls-a1-a12-c5-c7">Appendix: allocations and memory syscalls (A1, A12, C5/C7)</a></li></ul></details>
+<h2 id="summary">Summary</h2>
 <p>120 techniques (one row each, 18 chapters). <strong>done 58</strong> (with commits/code), <strong>N/A 42</strong> (with the
-reason), <strong>tried-negative before pb1 1</strong> as the row's main status (G12; another 8 &quot;done&quot; rows carry a
+reason), <strong>tried-negative before this audit 1</strong> as the row's main status (G12; another 8 &quot;done&quot; rows carry a
 tried-negative variant: C3, C8, C12, I2, I5, T5, G10, plus neg/a7-bolt in C11), <strong>not yet tried 4</strong>
-(P8 Coz, H1 FxHash in symstart's dedup, A15 dhat-rs heap tests, S6 parking_lot: d1's area; all
-expected &lt;0.5% or 0 on random states), <strong>newly tried or checked by pb1 15</strong> (C5, C7, C10, C11, C16,
+(P8 Coz, H1 FxHash in symstart's dedup, A15 dhat-rs heap tests, S6 parking_lot: left to the crate-replacement work; all
+expected &lt;0.5% or 0 on random states), <strong>newly tried or checked by this audit 15</strong> (C5, C7, C10, C11, C16,
 L4, P5, A1, A12, A14, T1, T8, IO1, IO2, IO3).</p>
-<p>What pb1 measured (1T = bench slots, paired and alternating; 48T = exclusive holds):</p>
-<div class="table-wrap" role="region" aria-label="Summary (pb1)" tabindex="0"><table id="docs-table-1"><caption>Summary (pb1)</caption>
+<p>What this audit measured (1T = bench slots, paired and alternating; 48T = exclusive holds):</p>
+<div class="table-wrap" role="region" aria-label="Summary" tabindex="0"><table id="docs-table-1"><caption>Summary</caption>
 <thead>
 <tr><th>Item</th><th>Variant</th><th>1T</th><th>48T</th><th>Verdict</th></tr>
 </thead>
 <tbody>
 <tr><td>C10 PGO, bench (stream)</td><td>pads 0/16/32/48 swept; profile: stream seed 2026 (the evaluation stream: favours PGO, so the negative stands) + share random:300:99</td><td>pad 32 (best): pairs -0.19 -0.57 -0.13 +0.07 -1.29 -0.48 0.00 -0.13% (median 24.667 -&gt; 24.567); pad 0 -2.70 -0.41; pad 16 -4.17 -3.13; pad 48 -1.36 +0.45 -3.86 -1.14</td><td>not run</td><td>negative: neg/pb1-pgo-stream</td></tr>
 <tr><td>C10 PGO, bench (share)</td><td>same builds, bench random:1000:2026 share 1T</td><td>pad 16 +1.76 +2.80%; pad 32 +3.19 +3.43% solves/s</td><td>-</td><td>led to the solve-only build below</td></tr>
-<tr><td>C10 PGO, <code>solve</code> only (scripts/pgo-solve.sh, 585b3b6, trained on 300 script-made 40-move scrambles, pad 0)</td><td>solve -t 1 -c 1 -n 200 random_state, ms/cube</td><td>8 pairs -1.97 -3.38 -1.57 -1.85 -2.18 -2.25 -1.29 -2.41%: 44.407 -&gt; 43.474 (-2.1%)</td><td>solve -t 48 -c 1 -n 300, 7 holds, median of pairs: random_state +0.2%, random_move_17f -0.7%, random_state_depth17 -0.4% (neutral)</td><td>1T win, 48T neutral: opt/pb1-pgo-solve, $P/pb1-pgo-solve.patch (optional; default build unchanged)</td></tr>
-<tr><td>C10 + s9 placement patch</td><td>s9's page-pinned frames (removes the 0x21c0 vs 0x1f40 frame confound), PGO vs non-PGO on it</td><td>-</td><td>7 holds, median of pairs: -1.8% / -2.1% / -0.6% (inside 48T noise)</td><td>leaning faster, not significant</td></tr>
+<tr><td>C10 PGO, <code>solve</code> only (scripts/pgo-solve.sh, d690a46, trained on 300 script-made 40-move scrambles, pad 0)</td><td>solve -t 1 -c 1 -n 200 random_state, ms/cube</td><td>8 pairs -1.97 -3.38 -1.57 -1.85 -2.18 -2.25 -1.29 -2.41%: 44.407 -&gt; 43.474 (-2.1%)</td><td>solve -t 48 -c 1 -n 300, 7 holds, median of pairs: random_state +0.2%, random_move_17f -0.7%, random_state_depth17 -0.4% (neutral)</td><td>1T win, 48T neutral: merged as 6ff4350 via <code>opt/pb1</code> (<code>scripts/pgo-solve.sh</code>, now archived as <code>scripts/experiments/pgo-solve.sh</code>; optional; default build unchanged)</td></tr>
+<tr><td>C10 + page-pinning patch</td><td>the page-pinned frames of <code>opt/s9-pin-v2</code> (removes the 0x21c0 vs 0x1f40 frame confound), PGO vs non-PGO on it</td><td>-</td><td>7 holds, median of pairs: -1.8% / -2.1% / -0.6% (inside 48T noise)</td><td>leaning faster, not significant</td></tr>
 <tr><td>C11 PGO+BOLT, bench</td><td>ext-tsp + hfsort + split, on the PGO bench</td><td>stream -1.35 -1.15%; share +1.98 +1.75% (PGO alone: +1.8..+3.4)</td><td>not run</td><td>negative: neg/pb1-pgo-bolt</td></tr>
 <tr><td>C5/C7, A12 allocator, buffer reuse</td><td>counting global allocator + strace + perf stat</td><td>6-26 allocations per cube; 6 madvise / 14 munmap per 35-s 1T run; libc 0.03% of samples</td><td>-</td><td>nothing to win; not timed (neg/pb1-diag-alloc-count)</td></tr>
-<tr><td>IO1-IO3 stdout in solve</td><td>strace</td><td>1 write(2) per cube, ~0.7 us, after the cube's slot is released</td><td>-</td><td>&lt;0.1%; not timed (reported to the coordinator for u1)</td></tr>
+<tr><td>IO1-IO3 stdout in solve</td><td>strace</td><td>1 write(2) per cube, ~0.7 us, after the cube's slot is released</td><td>-</td><td>&lt;0.1%; not timed (noted for the CLI work)</td></tr>
 <tr><td>C16 debug = 1 vs 0</td><td>objdump</td><td>same instructions everywhere but <code>main</code> (2)</td><td>-</td><td>no effect</td></tr>
-<tr><td>T8 size asserts</td><td>const assert Node/Job/ChildOrder</td><td>.text/.rodata byte-identical</td><td>-</td><td>adopted as a guard: $P/pb1-size-asserts.patch</td></tr>
+<tr><td>T8 size asserts</td><td>const assert Node/Job/ChildOrder</td><td>.text/.rodata byte-identical</td><td>-</td><td>adopted as a guard: merged as 13ea1af via <code>opt/pb1</code></td></tr>
 <tr><td>T1 type sizes, L4 nursery lints</td><td>-Zprint-type-sizes; clippy nursery</td><td>see appendix / L4</td><td>-</td><td>nothing new to shrink or fix</td></tr>
 </tbody>
 </table></div>
-<p>Search identity: verify.sh on a PGO bench (7608a28, pad 32) prints main's numbers exactly
+<p>Search identity: verify.sh on a PGO bench (d28335f, pad 32) prints main's numbers exactly
 (3058198/2588380, lengths 15:1 16:35 17:270 18:662 19:32; 3644301/3084160, 18:100); every one of
 the 28 <code>solve</code> runs per set in the 48T holds gives the same (cube, length) list, 0 BAD.</p>
 <h2 id="benchmarking">Benchmarking</h2>
@@ -97,10 +111,10 @@ the 28 <code>solve</code> runs per set in the 48T holds gives the same (cube, le
 <tr><th>#</th><th>Technique</th><th>Where it applies</th><th>Status</th><th>Expected gain for us</th></tr>
 </thead>
 <tbody>
-<tr><td>B1</td><td>Realistic workloads, several of them</td><td><code>bench stream</code> (random states), <code>bench ... share</code>, <code>solve</code> on cube_solver_test sets (random_state, random_move_<em>f, random_state_depth</em>), testdata/</td><td>done (bench.rs, solve.rs, $P/verify.sh)</td><td>-</td></tr>
-<tr><td>B2</td><td>A harness (built-in bench, Criterion, Divan, Hyperfine, Gungraun, custom)</td><td>custom: <code>bench</code> binary + $P/bin/{bench1t,ab1t,ab48,abl1t,abl48}.sh, conf48 scripts</td><td>done. Criterion/Divan N/A: each sample is a multi-second run on a 58 GiB table, not a microbenchmark</td><td>-</td></tr>
-<tr><td>B3</td><td>Lower-variance metrics (instructions, cycles) next to wall time</td><td>cachegrind Ir/node on x86-64-v3 builds, node/lookup counts (count.sh), TAGE branch simulator ($P/b2/tage)</td><td>done. Cycles N/A: no PMU on this VM</td><td>-</td></tr>
-<tr><td>B4</td><td>Beware layout-induced fluctuations</td><td>hot-loop placement pinned (src/hot.rs, 1c31eca); build-folder fix f2cb1f4; layout-averaged A/B (abl1t/abl48)</td><td>done</td><td>-</td></tr>
+<tr><td>B1</td><td>Realistic workloads, several of them</td><td><code>bench stream</code> (random states), <code>bench ... share</code>, <code>solve</code> on cube_solver_test sets (random_state, random_move_<em>f, random_state_depth</em>), testdata/</td><td>done (bench.rs, solve.rs, a separate verification script)</td><td>-</td></tr>
+<tr><td>B2</td><td>A harness (built-in bench, Criterion, Divan, Hyperfine, Gungraun, custom)</td><td>custom: <code>bench</code> binary + measurement scripts (bench1t, ab1t, ab48, abl1t, abl48, conf48)</td><td>done. Criterion/Divan N/A: each sample is a multi-second run on a 58 GiB table, not a microbenchmark</td><td>-</td></tr>
+<tr><td>B3</td><td>Lower-variance metrics (instructions, cycles) next to wall time</td><td>cachegrind Ir/node on x86-64-v3 builds, node/lookup counts (count.sh), TAGE branch simulator</td><td>done. Cycles N/A: no PMU on this VM</td><td>-</td></tr>
+<tr><td>B4</td><td>Beware layout-induced fluctuations</td><td>hot-loop placement pinned (src/hot.rs, 1c2749a); build-folder fix 97e1abd; layout-averaged A/B (abl1t/abl48)</td><td>done</td><td>-</td></tr>
 <tr><td>B5</td><td>Continuous benchmarking (Bencher on CI)</td><td>no CI; every merge carries 48T + 1T tables</td><td>N/A</td><td>-</td></tr>
 </tbody>
 </table></div>
@@ -114,18 +128,18 @@ the 28 <code>solve</code> runs per set in the 48T holds gives the same (cube, le
 <tr><td>C2</td><td><code>codegen-units = 1</code></td><td>Cargo.toml:16</td><td>done</td><td>-</td></tr>
 <tr><td>C3</td><td>Fat LTO (<code>lto = &quot;fat&quot;</code>)</td><td>Cargo.toml:15</td><td>done; thin LTO tried-negative neg/a7-lto-thin (-1.0% 1T)</td><td>-</td></tr>
 <tr><td>C4</td><td><code>lto = false/&quot;off&quot;</code></td><td>-</td><td>N/A (only compile time)</td><td>-</td></tr>
-<tr><td>C5</td><td>jemalloc (tikv-jemallocator)</td><td>global allocator of bench/solve</td><td>newly checked (pb1), not timed: nothing for an allocator to win (see &quot;Allocations&quot; below: ~13 allocator calls per cube in stream mode, ~9 in share mode, ~25-29 in solve; no mmap/madvise churn)</td><td>~0 (libc incl. malloc/free is 0.03% of 1T stream samples)</td></tr>
+<tr><td>C5</td><td>jemalloc (tikv-jemallocator)</td><td>global allocator of bench/solve</td><td>newly checked by this audit, not timed: nothing for an allocator to win (see &quot;Allocations&quot; below: ~13 allocator calls per cube in stream mode, ~9 in share mode, ~25-29 in solve; no mmap/madvise churn)</td><td>~0 (libc incl. malloc/free is 0.03% of 1T stream samples)</td></tr>
 <tr><td>C6</td><td>jemalloc with THP (<code>MALLOC_CONF=thp:always</code>)</td><td>the heap</td><td>N/A: the only large memory, the table, is on 1 GiB hugetlbfs pages (tables.rs mmap); the heap is ~1.4 MB per lane</td><td>0</td></tr>
-<tr><td>C7</td><td>mimalloc</td><td>global allocator of bench/solve</td><td>as C5: newly checked (pb1), not timed</td><td>~0</td></tr>
+<tr><td>C7</td><td>mimalloc</td><td>global allocator of bench/solve</td><td>as C5: newly checked by this audit, not timed</td><td>~0</td></tr>
 <tr><td>C8</td><td><code>-C target-cpu=native</code> (+ check <code>rustc --print cfg</code>)</td><td>.cargo/config.toml:6 (x86_64 only)</td><td>done; znver4 / x86-64-v4 / -avx512f tried-negative neg/a7-target-cpu; native = znver5 features (a7)</td><td>-</td></tr>
 <tr><td>C9</td><td><code>-C target-feature</code></td><td>build.rs selects the x86/AVX-512 kernels from the enabled features</td><td>done</td><td>-</td></tr>
-<tr><td>C10</td><td>PGO (rustc PGO / cargo-pgo)</td><td>whole binary; rewrites the hot loops</td><td>newly re-tried with pinned pads (pb1). <strong>bench/stream: tried-negative</strong> neg/pb1-pgo-stream (best pad 32: -0.2% median of 8 pairs at 1T; pads 0/16/48: -1.6/-3.7/-1.5%; PGO turns cmovs into branches: 114 vs 92 jcc in stream_thread). <strong>solve/share: win at 1T only</strong>: scripts/pgo-solve.sh, opt/pb1-pgo-solve, $P/pb1-pgo-solve.patch (solve 1T -2.1% ms/cube, 8 of 8 pairs; 48T -c 1 neutral, 7 holds)</td><td>solve 1T -2%; 48T 0; stream &lt;0</td></tr>
-<tr><td>C11</td><td>BOLT (cargo-pgo)</td><td>post-link layout</td><td>BOLT alone tried-negative neg/a7-bolt (+0.3% in noise). PGO+BOLT newly re-tried (pb1): <strong>tried-negative</strong> neg/pb1-pgo-bolt (stream 1T -1.35/-1.15%; share 1T +2.0/+1.75%, no better than PGO alone; taken branches -34.9%)</td><td>&lt;0</td></tr>
+<tr><td>C10</td><td>PGO (rustc PGO / cargo-pgo)</td><td>whole binary; rewrites the hot loops</td><td>newly re-tried with pinned pads by this audit. <strong>bench/stream: tried-negative</strong> neg/pb1-pgo-stream (best pad 32: -0.2% median of 8 pairs at 1T; pads 0/16/48: -1.6/-3.7/-1.5%; PGO turns cmovs into branches: 114 vs 92 jcc in stream_thread). <strong>solve/share: win at 1T only</strong>: scripts/pgo-solve.sh (merged as 6ff4350 via <code>opt/pb1</code>; now archived as scripts/experiments/pgo-solve.sh) (solve 1T -2.1% ms/cube, 8 of 8 pairs; 48T -c 1 neutral, 7 holds)</td><td>solve 1T -2%; 48T 0; stream &lt;0</td></tr>
+<tr><td>C11</td><td>BOLT (cargo-pgo)</td><td>post-link layout</td><td>BOLT alone tried-negative neg/a7-bolt (+0.3% in noise). PGO+BOLT newly re-tried by this audit: <strong>tried-negative</strong> neg/pb1-pgo-bolt (stream 1T -1.35/-1.15%; share 1T +2.0/+1.75%, no better than PGO alone; taken branches -34.9%)</td><td>&lt;0</td></tr>
 <tr><td>C12</td><td><code>opt-level = &quot;z&quot;/&quot;s&quot;</code></td><td>-</td><td>N/A (binary size); opt-level 2 tried-negative neg/a7-opt-level-2 (neutral)</td><td>-</td></tr>
 <tr><td>C13</td><td><code>panic = &quot;abort&quot;</code></td><td>Cargo.toml:17</td><td>done</td><td>-</td></tr>
 <tr><td>C14</td><td><code>strip = &quot;symbols&quot;</code></td><td>profile.wasm-release (Cargo.toml)</td><td>done for wasm; N/A for speed (size only)</td><td>0</td></tr>
 <tr><td>C15</td><td>Faster linker (lld, mold, wild)</td><td>link step</td><td>N/A (link time only); lld is already the default on Linux since Rust 1.90 (rustc 1.99 here). Layout effects of linking are neutralised by src/hot.rs</td><td>0</td></tr>
-<tr><td>C16</td><td><code>debug = false</code> / <code>&quot;line-tables-only&quot;</code></td><td>Cargo.toml:18 <code>debug = 1</code> in release (for perf annotate)</td><td>newly checked (pb1): a <code>debug = 0</code> build of bench has the same instructions in every function except <code>main</code> (2 instructions), and the hot loops sit at the same offsets mod 64; keep <code>debug = 1</code></td><td>0 (no codegen change)</td></tr>
+<tr><td>C16</td><td><code>debug = false</code> / <code>&quot;line-tables-only&quot;</code></td><td>Cargo.toml:18 <code>debug = 1</code> in release (for perf annotate)</td><td>newly checked by this audit: a <code>debug = 0</code> build of bench has the same instructions in every function except <code>main</code> (2 instructions), and the hot loops sit at the same offsets mod 64; keep <code>debug = 1</code></td><td>0 (no codegen change)</td></tr>
 <tr><td>C17</td><td>Parallel front-end (<code>-Zthreads</code>)</td><td>-</td><td>N/A (compile time)</td><td>0</td></tr>
 <tr><td>C18</td><td>Cranelift backend</td><td>-</td><td>N/A (compile time; slower code)</td><td>0</td></tr>
 <tr><td>C19</td><td>Custom profiles</td><td>profile.wasm-release, profile.test opt-level 3</td><td>done</td><td>-</td></tr>
@@ -138,10 +152,10 @@ the 28 <code>solve</code> runs per set in the 48T holds gives the same (cube, le
 <tr><th>#</th><th>Technique</th><th>Where it applies</th><th>Status</th><th>Expected gain for us</th></tr>
 </thead>
 <tbody>
-<tr><td>L1</td><td>Clippy, incl. the <code>perf</code> group</td><td>check.sh: clippy <code>-D warnings</code> (perf is in the default set); <code>pedantic</code> in Cargo.toml:23-24</td><td>done (b2f2c9a, c9a1c4d)</td><td>-</td></tr>
+<tr><td>L1</td><td>Clippy, incl. the <code>perf</code> group</td><td>check.sh: clippy <code>-D warnings</code> (perf is in the default set); <code>pedantic</code> in Cargo.toml:23-24</td><td>done (555a6ea, 9e4bc24)</td><td>-</td></tr>
 <tr><td>L2</td><td><code>ptr_arg</code> (<code>&amp;mut Vec&lt;T&gt;</code> -&gt; <code>&amp;mut [T]</code>)</td><td>default style lint, enforced; the remaining <code>&amp;mut Vec&lt;Job&gt;</code> (sort_jobs) swaps Vecs</td><td>done</td><td>-</td></tr>
-<tr><td>L3</td><td><code>disallowed_types</code> to keep out std types once replaced</td><td>one std HashMap (symstart.rs:157); std Mutex in share.rs</td><td>N/A now; applies if d1 standardizes on crate types</td><td>0</td></tr>
-<tr><td>L4</td><td>(pb1) perf-adjacent lints outside the default set (<code>nursery</code>: needless_collect, redundant_clone, or_fun_call, large_stack_frames ...)</td><td>whole crate</td><td>newly tried (pb1): <code>clippy --all-targets -W clippy::nursery -W clippy::perf -W clippy::large_stack_frames -W clippy::large_stack_arrays</code> on 7608a28. Two hits, both off the solve path: <code>needless_collect</code> at parallel.rs:15 (a false positive: the collect starts all threads before thread 0 works) and <code>or_fun_call</code> at tables/file.rs:443 (startup, trivial call). No <code>redundant_clone</code> or large-frame hits. The other 266 are style lints (<code>use_self</code>, <code>missing_const_for_fn</code>, ...)</td><td>0</td></tr>
+<tr><td>L3</td><td><code>disallowed_types</code> to keep out std types once replaced</td><td>one std HashMap (symstart.rs:157); std Mutex in share.rs</td><td>N/A now; applies if the crate-replacement work standardizes on crate types</td><td>0</td></tr>
+<tr><td>L4</td><td>(added by this audit) perf-adjacent lints outside the default set (<code>nursery</code>: needless_collect, redundant_clone, or_fun_call, large_stack_frames ...)</td><td>whole crate</td><td>newly tried by this audit: <code>clippy --all-targets -W clippy::nursery -W clippy::perf -W clippy::large_stack_frames -W clippy::large_stack_arrays</code> on d28335f. Two hits, both off the solve path: <code>needless_collect</code> at parallel.rs:15 (a false positive: the collect starts all threads before thread 0 works) and <code>or_fun_call</code> at tables/file.rs:443 (startup, trivial call). No <code>redundant_clone</code> or large-frame hits. The other 266 are style lints (<code>use_self</code>, <code>missing_const_for_fn</code>, ...)</td><td>0</td></tr>
 </tbody>
 </table></div>
 <h2 id="profiling">Profiling</h2>
@@ -150,11 +164,11 @@ the 28 <code>solve</code> runs per set in the 48T holds gives the same (cube, le
 <tr><th>#</th><th>Technique</th><th>Where it applies</th><th>Status</th><th>Expected gain for us</th></tr>
 </thead>
 <tbody>
-<tr><td>P1</td><td>perf (+ Hotspot / Firefox Profiler)</td><td>cpu-clock sampling (no PMU), perf annotate</td><td>done (/data/agents/perfprof, m8/perf-*.data)</td><td>-</td></tr>
+<tr><td>P1</td><td>perf (+ Hotspot / Firefox Profiler)</td><td>cpu-clock sampling (no PMU), perf annotate</td><td>done (perf profiles of the stream and share loops)</td><td>-</td></tr>
 <tr><td>P2</td><td>Instruments / VTune / AMD uProf</td><td>-</td><td>N/A (macOS / Intel; uProf needs the PMU, absent on this VM)</td><td>-</td></tr>
 <tr><td>P3</td><td>samply / flamegraph</td><td>-</td><td>N/A: one function holds 93% of samples; perf annotate is the useful view</td><td>-</td></tr>
-<tr><td>P4</td><td>Cachegrind / Callgrind</td><td>x86-64-v3 builds (valgrind cannot run AVX-512)</td><td>done (m-rounds' Ir/node; /data/agents/m8/cg.sh)</td><td>-</td></tr>
-<tr><td>P5</td><td>DHAT (allocation sites and rates, memcpy)</td><td>allocations per cube</td><td>newly done (pb1) with a counting <code>#[global_allocator]</code> instead (valgrind cannot run the AVX-512 build): diag/alloc-count in /data/agents/pb1/src; results under &quot;Allocations&quot;</td><td>-</td></tr>
+<tr><td>P4</td><td>Cachegrind / Callgrind</td><td>x86-64-v3 builds (valgrind cannot run AVX-512)</td><td>done (Ir/node in the m-series micro rounds)</td><td>-</td></tr>
+<tr><td>P5</td><td>DHAT (allocation sites and rates, memcpy)</td><td>allocations per cube</td><td>newly done by this audit with a counting <code>#[global_allocator]</code> instead (valgrind cannot run the AVX-512 build): branch <code>neg/pb1-diag-alloc-count</code>; results under &quot;Allocations&quot;</td><td>-</td></tr>
 <tr><td>P6</td><td>heaptrack / bytehound</td><td>-</td><td>N/A (same question as P5; heap is small)</td><td>-</td></tr>
 <tr><td>P7</td><td><code>counts</code> / ad-hoc eprintln profiling</td><td>share trace lines (CUBE_TRACE), diag patches (diag-code0, c9-trace)</td><td>done</td><td>-</td></tr>
 <tr><td>P8</td><td>Coz causal profiling</td><td>-</td><td>not yet tried; low value: the stream loop is one function, share latency was mapped by CUBE_TRACE</td><td>&lt;0.5% (finding only)</td></tr>
@@ -171,10 +185,10 @@ the 28 <code>solve</code> runs per set in the 48T holds gives the same (cube, le
 </thead>
 <tbody>
 <tr><td>I1</td><td><code>#[inline]</code> / <code>#[inline(always)]</code> on small or single-call hot functions</td><td>101 <code>inline(always)</code> sites; the kernel is fully inlined into <code>bench::stream_thread</code> and <code>share::Worker::rounds</code></td><td>done (m1-m8 rounds; <code>inline_always</code> allowed in Cargo.toml)</td><td>-</td></tr>
-<tr><td>I2</td><td><code>#[inline(never)]</code></td><td>bench.rs:108,124 (one function per mode, 595e424); share.rs:2318,2414,3397,3469,1740</td><td>done; Pool::run inline(never) tried-negative neg/l6-poolrun-inline-never</td><td>-</td></tr>
+<tr><td>I2</td><td><code>#[inline(never)]</code></td><td>bench.rs:108,124 (one function per mode, 8163366); share.rs:2318,2414,3397,3469,1740</td><td>done; Pool::run inline(never) tried-negative neg/l6-poolrun-inline-never</td><td>-</td></tr>
 <tr><td>I3</td><td>Check inlining (cachegrind / asm)</td><td>cargo asm in every micro round</td><td>done</td><td>-</td></tr>
 <tr><td>I4</td><td>Split a function into inline(always) + inline(never) variants (hot vs cold call sites)</td><td><code>Lane::advance</code> inlined in the loop, <code>advance_cold</code> (lanes.rs:1581) for refills</td><td>done</td><td>-</td></tr>
-<tr><td>I5</td><td>Outlining rare code with <code>#[cold]</code></td><td>lanes.rs:1033 next_run; share.rs:1234,1514,2109,2175. The stream loop's found path is already out of line (calls reconstruct, Timespec::now, the record and refill closures: perfprof/ann.txt)</td><td>done; more tried-negative: opt/neg-cold-paths (setup_job/start_iteration/reconstruct, -1.5%), neg c4 next_run not cold (6efbdec)</td><td>~0: the remaining rare paths in the stream loop are already calls; m8 owns the loop bodies</td></tr>
+<tr><td>I5</td><td>Outlining rare code with <code>#[cold]</code></td><td>lanes.rs:1033 next_run; share.rs:1234,1514,2109,2175. The stream loop's found path is already out of line (calls reconstruct, Timespec::now, the record and refill closures, per perf annotate)</td><td>done; more tried-negative: opt/neg-cold-paths (setup_job/start_iteration/reconstruct, -1.5%), neg c4 next_run not cold (6efbdec)</td><td>~0: the remaining rare paths in the stream loop are already calls; the loop bodies were being changed by the m8 series</td></tr>
 </tbody>
 </table></div>
 <h2 id="hashing">Hashing</h2>
@@ -183,7 +197,7 @@ the 28 <code>solve</code> runs per set in the 48T holds gives the same (cube, le
 <tr><th>#</th><th>Technique</th><th>Where it applies</th><th>Status</th><th>Expected gain for us</th></tr>
 </thead>
 <tbody>
-<tr><td>H1</td><td>Faster hasher (FxHash, FNV, aHash)</td><td>symstart.rs:157 std <code>HashMap&lt;(u64,u128),usize&gt;</code> (SipHash): <code>dedup</code> of job levels &lt;= 8192 jobs, only for cubes with a symmetry AND an antisymmetry (superflip-like); gen/dfs.rs:70 in-house set (d1)</td><td>not yet tried (d1 owns the gen set)</td><td>0 on random states; the map is a minor part of dedup's ~0.2 us/job (96 conjugations per key dominate): &lt;0.5% on superflip-like cubes only</td></tr>
+<tr><td>H1</td><td>Faster hasher (FxHash, FNV, aHash)</td><td>symstart.rs:157 std <code>HashMap&lt;(u64,u128),usize&gt;</code> (SipHash): <code>dedup</code> of job levels &lt;= 8192 jobs, only for cubes with a symmetry AND an antisymmetry (superflip-like); gen/dfs.rs:70 in-house set</td><td>not yet tried (the generator's set was left to the crate-replacement work)</td><td>0 on random states; the map is a minor part of dedup's ~0.2 us/job (96 conjugations per key dominate): &lt;0.5% on superflip-like cubes only</td></tr>
 <tr><td>H2</td><td>nohash_hasher for random-valued keys</td><td>-</td><td>N/A (no such map in the solve path)</td><td>0</td></tr>
 <tr><td>H3</td><td>Byte-wise hashing (<code>ByteHash</code>)</td><td>-</td><td>N/A (no derived Hash in hot code)</td><td>0</td></tr>
 <tr><td>H4</td><td><code>disallowed_types</code> for the std maps</td><td>-</td><td>N/A (one site)</td><td>0</td></tr>
@@ -195,10 +209,10 @@ the 28 <code>solve</code> runs per set in the 48T holds gives the same (cube, le
 <tr><th>#</th><th>Technique</th><th>Where it applies</th><th>Status</th><th>Expected gain for us</th></tr>
 </thead>
 <tbody>
-<tr><td>A1</td><td>Check whether malloc/free are hot</td><td>1T stream profile: libc 0.03%, kernel 0.21%</td><td>done (perfprof); counted (pb1): 0.0004 allocations per 1000 nodes in stream mode (13 per ~3.3M-node cube) vs the book's ~10 per million instructions threshold</td><td>0</td></tr>
+<tr><td>A1</td><td>Check whether malloc/free are hot</td><td>1T stream profile: libc 0.03%, kernel 0.21%</td><td>done (perf profile); counted by this audit: 0.0004 allocations per 1000 nodes in stream mode (13 per ~3.3M-node cube) vs the book's ~10 per million instructions threshold</td><td>0</td></tr>
 <tr><td>A2</td><td>Box a field to shrink a hot type</td><td><code>Lane::run_state: Box&lt;RunState&gt;</code> (lanes.rs:481) keeps the cold run state out of the lane's hot lines</td><td>done</td><td>-</td></tr>
 <tr><td>A3</td><td>Rc/Arc only for shared values</td><td><code>Arc&lt;CubeCtx&gt;</code> per share-mode cube (shared by the threads); clones only at rare events (share.rs:2828,2952,3357)</td><td>done</td><td>0</td></tr>
-<tr><td>A4</td><td><code>Vec::with_capacity</code> / <code>reserve</code> / growth</td><td>share: <code>Inner</code>/<code>Bufs</code> recycled (share.rs:653-654), buffers pre-touched (8926c95, 17f -8%); lanes reuse <code>jobs</code>/<code>jobs_tmp</code></td><td>done</td><td>-</td></tr>
+<tr><td>A4</td><td><code>Vec::with_capacity</code> / <code>reserve</code> / growth</td><td>share: <code>Inner</code>/<code>Bufs</code> recycled (share.rs:653-654), buffers pre-touched (887c892, 17f -8%); lanes reuse <code>jobs</code>/<code>jobs_tmp</code></td><td>done</td><td>-</td></tr>
 <tr><td>A5</td><td>SmallVec for many short vectors</td><td>-</td><td>N/A (no hot short Vecs; job prefixes are <code>[u8; 4]</code>)</td><td>0</td></tr>
 <tr><td>A6</td><td>ArrayVec when the max length is known</td><td>the per-cube solution <code>Vec&lt;u8&gt;</code> (&lt;= 20 moves)</td><td>N/A (once per cube)</td><td>0</td></tr>
 <tr><td>A7</td><td><code>shrink_to_fit</code></td><td>-</td><td>N/A (memory is not the constraint; reuse is wanted)</td><td>0</td></tr>
@@ -206,7 +220,7 @@ the 28 <code>solve</code> runs per set in the 48T holds gives the same (cube, le
 <tr><td>A9</td><td><code>clone_from</code></td><td>-</td><td>N/A (no hot clones of heap data)</td><td>0</td></tr>
 <tr><td>A10</td><td>Remove unnecessary <code>clone</code></td><td>-</td><td>done (s8 sweep; see L4)</td><td>0</td></tr>
 <tr><td>A11</td><td>Avoid <code>to_owned</code> / use <code>Cow</code></td><td>-</td><td>N/A (no owned strings in the solve path)</td><td>0</td></tr>
-<tr><td>A12</td><td>Reuse a workhorse collection</td><td>lanes, share: done for jobs, Inner, Bufs. NOT for <code>sort_jobs</code>' keys + scratch (lanes.rs:145-150): two n x 8-byte Vecs per sorted iteration (~43K jobs: 2 x 344 KB)</td><td>newly checked (pb1), not timed: the 2.2 allocations of &gt;= 128 KiB per cube come from glibc's arena without page faults after warm-up (strace, 35 s of 1T stream: 6 madvise, 14 munmap, 25 mmap in total; perf stat: 24.8K page faults per run, nearly all start-up). A reused buffer would save one malloc/free pair per ~0.4 ms sort</td><td>~0 (&lt;0.01%)</td></tr>
+<tr><td>A12</td><td>Reuse a workhorse collection</td><td>lanes, share: done for jobs, Inner, Bufs. NOT for <code>sort_jobs</code>' keys + scratch (lanes.rs:145-150): two n x 8-byte Vecs per sorted iteration (~43K jobs: 2 x 344 KB)</td><td>newly checked by this audit, not timed: the 2.2 allocations of &gt;= 128 KiB per cube come from glibc's arena without page faults after warm-up (strace, 35 s of 1T stream: 6 madvise, 14 munmap, 25 mmap in total; perf stat: 24.8K page faults per run, nearly all start-up). A reused buffer would save one malloc/free pair per ~0.4 ms sort</td><td>~0 (&lt;0.01%)</td></tr>
 <tr><td>A13</td><td><code>read_line</code> into a workhorse String</td><td>solve.rs:59 <code>stdin().lock().lines()</code></td><td>N/A (input read once at startup, before the clock starts)</td><td>0</td></tr>
 <tr><td>A14</td><td>Alternative allocator</td><td>see C5/C7</td><td>see C5/C7</td><td>-</td></tr>
 <tr><td>A15</td><td>dhat-rs heap-usage tests against regressions</td><td>-</td><td>not yet tried; the hot loops cannot allocate by construction</td><td>0</td></tr>
@@ -218,14 +232,14 @@ the 28 <code>solve</code> runs per set in the 48T holds gives the same (cube, le
 <tr><th>#</th><th>Technique</th><th>Where it applies</th><th>Status</th><th>Expected gain for us</th></tr>
 </thead>
 <tbody>
-<tr><td>T1</td><td>Measure layouts with <code>-Zprint-type-sizes</code></td><td>Node, Job, Lane, RunState, ChildOrder, SharedLane, Local, CubeCtx, Inner</td><td>newly done (pb1, nightly-2026-11-03, target-cpu=native): see &quot;Type sizes&quot; below. Nothing is bigger than its design: Node 128 B, two lines with 40 B of tail padding (96 B was tried: neg/m6-node-96-bytes, -2.9%); Job 12 B; the Lane's per-visit fields span 6 lines after its 3328-B stack (packing the hot ones first was tried: neg/m6-lane-hot-fields-first). The per-cube CubeCtx is 1792 B (ArcInner 1920 B)</td><td>0: no untried shrink with a mechanism</td></tr>
+<tr><td>T1</td><td>Measure layouts with <code>-Zprint-type-sizes</code></td><td>Node, Job, Lane, RunState, ChildOrder, SharedLane, Local, CubeCtx, Inner</td><td>newly done by this audit (nightly-2026-11-03, target-cpu=native): see &quot;Type sizes&quot; below. Nothing is bigger than its design: Node 128 B, two lines with 40 B of tail padding (96 B was tried: neg/m6-node-96-bytes, -2.9%); Job 12 B; the Lane's per-visit fields span 6 lines after its 3328-B stack (packing the hot ones first was tried: neg/m6-lane-hot-fields-first). The per-cube CubeCtx is 1792 B (ArcInner 1920 B)</td><td>0: no untried shrink with a mechanism</td></tr>
 <tr><td>T2</td><td>Types &gt; 128 bytes are copied with memcpy</td><td>Node = 128 B (copied inline); Lane (~3.5 KB) is never copied in the loop</td><td>done (memmove: 0.01% of 1T samples)</td><td>0</td></tr>
 <tr><td>T3</td><td>Field ordering</td><td>automatic (no <code>repr(C)</code> on hot structs except ChildOrder, deliberately)</td><td>done</td><td>0</td></tr>
 <tr><td>T4</td><td>Box an outsized enum variant</td><td>enums are tiny (<code>Phase</code> repr(u8), <code>Step</code>)</td><td>N/A</td><td>0</td></tr>
 <tr><td>T5</td><td>Smaller integers</td><td>u8 depths/bounds/moves, u32 move masks; Job = 12 bytes</td><td>done; Node 96 bytes tried-negative neg/m6-node-96-bytes (-2.9%), packed counter neg/m6-packed-counter</td><td>-</td></tr>
 <tr><td>T6</td><td>Boxed slices instead of Vec</td><td>CubeCtx task_log / thread_done_ns already <code>Box&lt;[T]&gt;</code>; Vec fields elsewhere grow</td><td>N/A for speed (8 bytes per field)</td><td>0</td></tr>
 <tr><td>T7</td><td>ThinVec</td><td>-</td><td>N/A</td><td>0</td></tr>
-<tr><td>T8</td><td>Static size assertions for hot types</td><td>Node (128 B), Job (12 B), ChildOrder (32 B)</td><td>newly done (pb1): const assert on x86-64 in lanes.rs, opt/pb1-size-asserts, $P/pb1-size-asserts.patch; .text and .rodata byte-identical to main 585b3b6</td><td>0 (regression guard)</td></tr>
+<tr><td>T8</td><td>Static size assertions for hot types</td><td>Node (128 B), Job (12 B), ChildOrder (32 B)</td><td>newly done by this audit: const assert on x86-64 in lanes.rs, merged as 13ea1af via <code>opt/pb1</code>; .text and .rodata byte-identical to main d690a46</td><td>0 (regression guard)</td></tr>
 </tbody>
 </table></div>
 <h2 id="standard-library-types">Standard Library Types</h2>
@@ -239,7 +253,7 @@ the 28 <code>solve</code> runs per set in the 48T holds gives the same (cube, le
 <tr><td>S3</td><td><code>retain</code></td><td>share.rs:846,888 (open list), symstart.rs:169</td><td>done</td><td>-</td></tr>
 <tr><td>S4</td><td>Lazy <code>ok_or_else</code> / <code>unwrap_or_else</code> / <code>map_or_else</code></td><td><code>spare.unwrap_or_else(Inner::touched)</code> (share.rs)</td><td>done (see L4 for <code>or_fun_call</code>)</td><td>0</td></tr>
 <tr><td>S5</td><td><code>Rc::make_mut</code> / <code>Arc::make_mut</code></td><td>-</td><td>N/A</td><td>0</td></tr>
-<tr><td>S6</td><td>parking_lot Mutex / RwLock / Condvar / Once</td><td>share.rs std <code>Mutex</code> (per-cube or rare: spare, bufs, result, pass) and in-house <code>SpinRw</code> (share.rs:279, -38.8% -c 1 vs std RwLock, l6-share-a)</td><td>not tried by pb1: d1's area (crates for spin locks, Pad, Mutex)</td><td>&lt;0.5% (the std locks are off the per-node and per-job paths)</td></tr>
+<tr><td>S6</td><td>parking_lot Mutex / RwLock / Condvar / Once</td><td>share.rs std <code>Mutex</code> (per-cube or rare: spare, bufs, result, pass) and in-house <code>SpinRw</code> (share.rs:279, -38.8% -c 1 vs std RwLock, l6-share-a)</td><td>not tried by this audit: left to the crate-replacement work (crates for spin locks, Pad, Mutex)</td><td>&lt;0.5% (the std locks are off the per-node and per-job paths)</td></tr>
 </tbody>
 </table></div>
 <h2 id="iterators">Iterators</h2>
@@ -255,7 +269,7 @@ the 28 <code>solve</code> runs per set in the 48T holds gives the same (cube, le
 <tr><td>It5</td><td><code>filter_map</code> instead of filter + map</td><td>-</td><td>N/A (none in hot code)</td><td>0</td></tr>
 <tr><td>It6</td><td><code>chunks_exact</code> instead of <code>chunks</code></td><td>share.rs:1188 (<code>inner.jobs.chunks(chunk)</code>, once per build stage, uneven tail)</td><td>N/A (not hot)</td><td>0</td></tr>
 <tr><td>It7</td><td><code>iter().copied()</code> for small types</td><td>hot loops walk lanes by pointer and index tables with <code>get_unchecked</code></td><td>N/A in hot code</td><td>0</td></tr>
-<tr><td>It8</td><td>(pb1) iterator vs index codegen in the hot loops</td><td>stream loop iterates <code>lanes[..n_active]</code> (lanes.rs:1975); share rounds walk lane pointers (95cbb11, +3.2% 1T as part of m8)</td><td>done</td><td>-</td></tr>
+<tr><td>It8</td><td>(added by this audit) iterator vs index codegen in the hot loops</td><td>stream loop iterates <code>lanes[..n_active]</code> (lanes.rs:1975); share rounds walk lane pointers (03abdfc, +3.2% 1T as part of <code>opt/m8-unsafe</code>)</td><td>done</td><td>-</td></tr>
 </tbody>
 </table></div>
 <h2 id="bounds-checks">Bounds Checks</h2>
@@ -264,10 +278,10 @@ the 28 <code>solve</code> runs per set in the 48T holds gives the same (cube, le
 <tr><th>#</th><th>Technique</th><th>Where it applies</th><th>Status</th><th>Expected gain for us</th></tr>
 </thead>
 <tbody>
-<tr><td>BC1</td><td>Iterate instead of indexing</td><td>lane loops (lanes.rs:1975; share rounds by pointer 95cbb11)</td><td>done</td><td>-</td></tr>
+<tr><td>BC1</td><td>Iterate instead of indexing</td><td>lane loops (lanes.rs:1975; share rounds by pointer 03abdfc)</td><td>done</td><td>-</td></tr>
 <tr><td>BC2</td><td>Slice before the loop</td><td>done throughout</td><td>done</td><td>-</td></tr>
-<tr><td>BC3</td><td>Assert index ranges</td><td>replaced by <code>get_unchecked</code> per the user's rule (b608890)</td><td>done</td><td>-</td></tr>
-<tr><td>BC4</td><td><code>get_unchecked</code></td><td>33a8042 (m8 unsafe pass: search, run and job paths), b608890 (s8)</td><td>done</td><td>-</td></tr>
+<tr><td>BC3</td><td>Assert index ranges</td><td>replaced by <code>get_unchecked</code> under the project's rule for unchecked indexing (f66ec5a)</td><td>done</td><td>-</td></tr>
+<tr><td>BC4</td><td><code>get_unchecked</code></td><td>710716d (unsafe pass of <code>opt/m8-unsafe</code>: search, run and job paths), f66ec5a (s8)</td><td>done</td><td>-</td></tr>
 </tbody>
 </table></div>
 <h2 id="i-o">I/O</h2>
@@ -276,7 +290,7 @@ the 28 <code>solve</code> runs per set in the 48T holds gives the same (cube, le
 <tr><th>#</th><th>Technique</th><th>Where it applies</th><th>Status</th><th>Expected gain for us</th></tr>
 </thead>
 <tbody>
-<tr><td>IO1</td><td>Lock stdout once for repeated prints</td><td>solve.rs:96-114: <code>Mutex&lt;Stdout&gt;</code>, <code>writeln!</code> + <code>flush</code> per cube</td><td>newly checked (pb1), not timed; reported to the coordinator (u1 owns the bins). One <code>write(2)</code> per cube, 0.7 us each under strace (101 writes for 100 cubes). The callback runs in <code>Worker::release</code> after <code>publish_solution</code> has already freed the cube's <code>active</code> slot (share.rs:2507), so idle threads start the next cube without waiting for the write</td><td>&lt;0.1% at -c 1 48T (17f: 0.57 ms/cube); not measurable</td></tr>
+<tr><td>IO1</td><td>Lock stdout once for repeated prints</td><td>solve.rs:96-114: <code>Mutex&lt;Stdout&gt;</code>, <code>writeln!</code> + <code>flush</code> per cube</td><td>newly checked by this audit, not timed; noted for the CLI work, which owned the binaries. One <code>write(2)</code> per cube, 0.7 us each under strace (101 writes for 100 cubes). The callback runs in <code>Worker::release</code> after <code>publish_solution</code> has already freed the cube's <code>active</code> slot (share.rs:2507), so idle threads start the next cube without waiting for the write</td><td>&lt;0.1% at -c 1 48T (17f: 0.57 ms/cube); not measurable</td></tr>
 <tr><td>IO2</td><td>BufWriter for many small writes</td><td>solve: stdout is line-buffered, one <code>write(2)</code> per solved cube; bench prints only a summary; gen writes tables through mmap</td><td>as IO1. A BufWriter would also delay the per-cube lines that cube_solver_test's awk reads as they come</td><td>&lt;0.1%</td></tr>
 <tr><td>IO3</td><td>Lock + buffer stdout together</td><td>as IO1/IO2</td><td>as IO1</td><td>as IO1</td></tr>
 <tr><td>IO4</td><td>BufReader / read_line</td><td>solve.rs:59 reads stdin once</td><td>N/A (startup)</td><td>0</td></tr>
@@ -289,7 +303,7 @@ the 28 <code>solve</code> runs per set in the 48T holds gives the same (cube, le
 <tr><th>#</th><th>Technique</th><th>Where it applies</th><th>Status</th><th>Expected gain for us</th></tr>
 </thead>
 <tbody>
-<tr><td>LD1</td><td>No logging/debug work when disabled</td><td>share trace and costly counters behind <code>CUBE_TRACE</code> bits (33ca449; c10 found the always-on trace cost -c 0 +4.7%)</td><td>done</td><td>-</td></tr>
+<tr><td>LD1</td><td>No logging/debug work when disabled</td><td>share trace and costly counters behind <code>CUBE_TRACE</code> bits (3bf5530; c10 found the always-on trace cost -c 0 +4.7%)</td><td>done</td><td>-</td></tr>
 <tr><td>LD2</td><td><code>debug_assert!</code> for hot non-safety asserts</td><td>hot paths use <code>debug_assert!</code> / unchecked calls; <code>assert!</code> only in setup, tests and the checked <code>apply_move</code> (simd.rs:305,337) not used by the kernel</td><td>done</td><td>-</td></tr>
 </tbody>
 </table></div>
@@ -318,7 +332,7 @@ the 28 <code>solve</code> runs per set in the 48T holds gives the same (cube, le
 <tr><th>#</th><th>Technique</th><th>Where it applies</th><th>Status</th><th>Expected gain for us</th></tr>
 </thead>
 <tbody>
-<tr><td>Pa1</td><td>Threads (rayon, crossbeam, atomics and locks)</td><td>std::thread::scope + in-house work-sharing pool (share.rs: atomics, mailboxes, spin locks)</td><td>done in-house; crate replacements are d1's area</td><td>-</td></tr>
+<tr><td>Pa1</td><td>Threads (rayon, crossbeam, atomics and locks)</td><td>std::thread::scope + in-house work-sharing pool (share.rs: atomics, mailboxes, spin locks)</td><td>done in-house; crate replacements were separate work (<code>opt/d1-crates-v2</code>)</td><td>-</td></tr>
 <tr><td>Pa2</td><td>Data parallelism (SIMD)</td><td>cube ops in SIMD; 24 interleaved lanes per thread for memory-level parallelism</td><td>done</td><td>-</td></tr>
 </tbody>
 </table></div>
@@ -334,13 +348,13 @@ the 28 <code>solve</code> runs per set in the 48T holds gives the same (cube, le
 <tr><td>G4</td><td>Many small speedups add up</td><td>m1-m8 micro rounds</td><td>done</td><td>-</td></tr>
 <tr><td>G5</td><td>More than one profiler</td><td>perf, cachegrind, TAGE sim, cargo asm, CUBE_TRACE</td><td>done</td><td>-</td></tr>
 <tr><td>G6</td><td>Make it faster or call it less</td><td>e.g. twin lookups (-29% lookups), sibling-face pruning</td><td>done</td><td>-</td></tr>
-<tr><td>G7</td><td>Remove silly slowdowns</td><td>trace cost (c10), page faults in share builds (8926c95)</td><td>done</td><td>-</td></tr>
-<tr><td>G8</td><td>Lazy / on-demand computation</td><td>lazy child cube (f8a4919), other side only when needed</td><td>done</td><td>-</td></tr>
-<tr><td>G9</td><td>Special-case the common small cases</td><td>first pass for early iterations (085a9fd), tail lanes (1f4c85a), corner-bound precheck</td><td>done</td><td>-</td></tr>
+<tr><td>G7</td><td>Remove silly slowdowns</td><td>trace cost (c10), page faults in share builds (887c892)</td><td>done</td><td>-</td></tr>
+<tr><td>G8</td><td>Lazy / on-demand computation</td><td>lazy child cube (387034c), other side only when needed</td><td>done</td><td>-</td></tr>
+<tr><td>G9</td><td>Special-case the common small cases</td><td>first pass for early iterations (0339dd2), tail lanes (7c46566), corner-bound precheck</td><td>done</td><td>-</td></tr>
 <tr><td>G10</td><td>Compact representation + fallback table</td><td>2-bit table entries with base offset; eoesep fallback tried-negative neg/xh48-eoesep-fallback</td><td>done</td><td>-</td></tr>
 <tr><td>G11</td><td>Most common cases first</td><td>resolve order by phase frequency (m4)</td><td>done</td><td>-</td></tr>
-<tr><td>G12</td><td>Small cache in front of a structure with locality</td><td>cocsep table is the in-cache stage; extra in-cache table tried-negative (x-nx 3.6, neg/xnx-diagnostics)</td><td>done / tried-negative</td><td>-</td></tr>
-<tr><td>G13</td><td>Comments that cite measurements</td><td>annotation rule (dda14e2, 55e048e)</td><td>done</td><td>-</td></tr>
+<tr><td>G12</td><td>Small cache in front of a structure with locality</td><td>cocsep table is the in-cache stage; extra in-cache table tried-negative (idea 3.6 in the <a href="x-nxopt-inventory.html">nxopt inventory</a>, <code>neg/xnx-diagnostics</code>)</td><td>done / tried-negative</td><td>-</td></tr>
+<tr><td>G13</td><td>Comments that cite measurements</td><td>annotation rule (56f5b58, e7b094e)</td><td>done</td><td>-</td></tr>
 </tbody>
 </table></div>
 <h2 id="compile-times">Compile Times</h2>
@@ -357,7 +371,7 @@ the 28 <code>solve</code> runs per set in the 48T holds gives the same (cube, le
 </table></div>
 <h2 id="appendix-type-sizes-t1">Appendix: type sizes (T1)</h2>
 <p><code>RUSTFLAGS=&quot;-C target-cpu=native -Zprint-type-sizes&quot; cargo +nightly build --release --lib</code>
-(nightly-2026-11-03, main 7608a28; full output /data/agents/pb1/logs/typesizes.txt).</p>
+(nightly-2026-11-03, main d28335f; the full output is not published).</p>
 <div class="table-wrap" role="region" aria-label="Appendix: type sizes (T1)" tabindex="0"><table id="docs-table-20"><caption>Appendix: type sizes (T1)</caption>
 <thead>
 <tr><th>Type</th><th>Size, align</th><th>Layout notes</th></tr>
@@ -378,8 +392,8 @@ the 28 <code>solve</code> runs per set in the 48T holds gives the same (cube, le
 </tbody>
 </table></div>
 <h2 id="appendix-allocations-and-memory-syscalls-a1-a12-c5-c7">Appendix: allocations and memory syscalls (A1, A12, C5/C7)</h2>
-<p>Counting global allocator (branch diag/alloc-count, 10a9237; counts every alloc, realloc and
-alloc_zeroed). Runs in 1T bench slots on main 7608a28:</p>
+<p>Counting global allocator (branch diag/alloc-count, 10a9237, retained as <code>neg/pb1-diag-alloc-count</code>,
+<a href="../../history/DELETED_EXPERIMENTS.html#ref-neg-pb1-diag-alloc-count">38ab386</a>; counts every alloc, realloc and alloc_zeroed). Runs in 1T bench slots on main d28335f:</p>
 <div class="table-wrap" role="region" aria-label="Appendix: allocations and memory syscalls (A1, A12, C5/C7)" tabindex="0"><table id="docs-table-21"><caption>Appendix: allocations and memory syscalls (A1, A12, C5/C7)</caption>
 <thead>
 <tr><th>Run</th><th>Cubes</th><th>Allocs per cube</th><th>Reallocs per cube</th><th>Bytes per cube</th><th>&gt;= 128 KiB per cube</th></tr>
@@ -409,7 +423,7 @@ start-up (24 lanes' buffers, cocsep generation). Had each of the ~940 sorts in s
 that alone would be ~160K faults. So glibc keeps them in its arena, and an alternative allocator or a reused sort
 buffer has nothing measurable to win.</p>
 
-<p class="source-link"><a href="perf-book-audit.md">Markdown source</a></p></main>
+<p class="source-link"><a href="perf-book-audit.md">Markdown source</a></p></main></div>
 <footer><a href="../../PROVENANCE.html">Sources and evidence scope</a></footer>
 <script>
 for (const wrapper of document.querySelectorAll('.table-wrap')) {
@@ -436,5 +450,8 @@ function revealTarget(){
   for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
 }
 revealTarget(); window.addEventListener('hashchange',revealTarget);
+const menu=document.querySelector('.site-menu');
+if(menu){const wide=matchMedia('(min-width:901px)');const sync=()=>{menu.open=wide.matches;};sync();wide.addEventListener('change',sync);
+const current=menu.querySelector('[aria-current]');if(current&&wide.matches)current.scrollIntoView({block:'nearest'});}
 </script>
 </body></html>

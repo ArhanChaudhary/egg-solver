@@ -4,7 +4,7 @@
 
 Collected on a **separate physical Xeon X5650 host on November 6, 2026**. These are not hardware counters from the EPYC VM, which has no PMU access.
 
-Archive: `egg-solver-pmu-phack-20261106T194245Z.tar.gz`.
+Original counter archive: `egg-solver-pmu-phack-20261106T194245Z.tar.gz`.
 SHA256: `e4367ce0595fffacadda8647a22024761a4be542e4aae1040a0514c587fa33a3`. The [preserved analyzer](../reproduce/historical/analyze-phack.py) records the formulas. [Raw-data notes](../data/phack/README.md) identify the included aggregates and inputs; full binary replay requires the separately retained archive.
 
 All **242/242 collection runs succeeded**: **236 counted runs**, **621 counter rows**,
@@ -17,11 +17,11 @@ derived comparison has enough completed solves or that every CPU event is free o
 ## Scope and measurement quality
 
 This is the dual-socket Xeon X5650, family 6/model 44, with 12 physical cores and
-24 logical CPUs. The tested source is **935cb7fa369248161244507b7c13aa9c405f9ff1**, plus the included
+24 logical CPUs. The tested source is **01e76830c5a62f56ce5fcd05f15528e9f563d920**, plus the included
 profiling-control patch, compiled for Westmere. The table is **h6,
 1,945,686,016 bytes (1.946 GB / 1.812 GiB)**. This is a separate host/build/table
-dataset from the EPYC comparison matrix. It predates the rename and the current
-Miri-driven safety fixes; those fixes cannot be credited as measured here.
+dataset from the EPYC comparison matrix. It predates the project's rename to egg-solver and the
+Miri-driven safety fixes integrated in `a247321`; those fixes cannot be credited as measured here.
 
 Each run loads the table, warms for eight seconds, then enables counting through
 acknowledged perf control FIFOs for approximately 20 seconds. Observed controlled
@@ -34,9 +34,11 @@ different events are estimates, not simultaneous observations.
 Two optional text exports failed: instruction annotations selected the wrong
 hot symbol, and sample listings requested a CPU field absent from five profiles.
 The raw profiles contain samples. All six annotations and sample listings were
-recovered locally using the returned `symfs`; outputs and replay checks are in
-`phack-analysis/reporting-replay/`. Focused cycle annotations of the actual
-`run_lanes` symbol are also in `phack-analysis/cycles-{one,physical}.annotate.txt`.
+recovered locally using the returned `symfs`, with the
+[replay script](../reproduce/historical/replay-phack-exports.py); recovered
+annotations are included under `data/phack/analysis/`. Focused cycle annotations of the actual
+`run_lanes` symbol are [cycles-one](../data/phack/analysis/cycles-one.annotate.txt)
+and [cycles-physical](../data/phack/analysis/cycles-physical.annotate.txt).
 No host rerun was needed. The collector's “valid” status describes measurement,
 not successful generation of every optional postprocessing file.
 

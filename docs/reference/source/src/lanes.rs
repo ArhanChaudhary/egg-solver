@@ -63,7 +63,7 @@ const MERGE_CODES: u8 = 4;
 /// Lanes per thread unless asked otherwise. Each lane keeps one table miss
 /// in flight; 24 is about the fewest that hide the miss latency, at 1 and at
 /// 48 threads. ~1.4 MB per lane. (24 vs 20 lanes: +3.3% at 48T, +9.7% at 1T
-/// when set, 0b35690.)
+/// when set, af1b296.)
 pub const DEFAULT_LANES: usize = 24;
 
 /// A search node on a lane's explicit stack (128 bytes: two cache lines).
@@ -1303,7 +1303,7 @@ impl Lane {
         // 48T when added, m2-nobc. None left on the search loops' paths at
         // all, with the unchecked move tables and the job and run paths:
         // m8's unsafe pass, stream +1.5% at 1T and +0.4% at 48T alone on
-        // 857a0c6; with m8's share-loop commit on def2cd0, -3.3% instructions
+        // f07b109; with m8's share-loop commit on f2cf828, -3.3% instructions
         // per node, stream +3.2% at 1T and +1.3% at 48T.)
         let (mut todo, mut lower_bound, mut remaining_depth) = {
             let top = unsafe { self.stack.get_unchecked(depth) };

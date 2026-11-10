@@ -1,13 +1,15 @@
 # Historical PMU-guided optimization experiments
 
-Recorded November 7 decision: retain the existing native search-loop implementation. Both PMU-guided native experiments remain rejected and are now archived with the required 1-thread and 48-thread before/after tables. The separately explored older-x86 backend remains an unmerged experiment, excluded from the release and perf package.
+[Performance studies](README.md) · [Xeon hardware-counter study](HARDWARE_COUNTERS.md)
+
+Recorded November 7 decision: retain the existing native search-loop implementation. Both PMU-guided native experiments remain rejected and are now archived with the required 1-thread and 48-thread before/after tables. The separately explored older-x86 backend remains an unmerged experiment, excluded from the release and the profiling kit.
 
 | Experiment | 1-worker throughput change (12 pairs) | 48-worker throughput change (5 pairs) | Decision |
 |---|---:|---:|---|
 | Read packed table values through byte-sized loads | -0.83% | -0.28% | Reject |
 | Move lane advancement out of the stream loop | -7.44% | -10.72% | Reject |
 
-The experiments use historical baseline `93867a4597ab821b4064a0d407d3c89e133c9013` on this EPYC VM. They are not measurements of the final safety build. Higher throughput is better; headline changes are medians of paired ratios, not ratios of marginal medians.
+The experiments use historical baseline `da134bc6d27b925fdb8b8ff42eea732c931831fc` on the 48-core EPYC VM. They are not measurements of the final safety build. Higher throughput is better; headline changes are medians of paired ratios, not ratios of marginal medians.
 
 ## Measurement method and limits
 
@@ -17,7 +19,7 @@ The 48T archival measurements used the same h8 table and frozen binaries, 24 lan
 
 These are short fixed-duration measurements. Completed-work quantization and run-to-run noise limit small-effect claims. They support retaining the rejection decision; they are not a substitute for longer fixed-work measurements required before adopting a new optimization. The VM has no hardware counters, so these data do not demonstrate changes in instructions or cache-miss events.
 
-The initial review stopped after the negative 1T screen. The user's standing rule also required 48T tables for rejected-experiment commits. The supplementary measurements and archival commits below complete that evidence requirement. The earlier review, release receipt and pre-measurement candidate-evidence snapshot are preserved with their original hashes.
+The initial review stopped after the negative 1T screen. The project's standing rule also required 48T tables for rejected-experiment commits. The supplementary measurements and archival commits below complete that evidence requirement. The earlier review, release receipt and pre-measurement candidate-evidence snapshot are preserved with their original hashes.
 
 ## Complete 1T paired screen
 
@@ -50,19 +52,19 @@ Rates are completed solves/s. Each row shares the same baseline. Outside-load va
 | 4 | outline → bytes → base | 154.967 | 154.800 | 0.998922 | 139.000 | 0.896965 | 0.0 / 0.0 / 0.0 |
 | 5 | bytes → base → outline | 153.267 | 153.300 | 1.000215 | 136.700 | 0.891908 | 0.0 / 0.0 / 0.0 |
 
-## Preserved branches and validation
+## Archived experiment branches and validation
 
 | Experiment | Negative branch | Commit |
 |---|---|---|
 | Read packed table values through byte-sized loads | `neg/pmu-byte-packed-load` | `1a6f91913e42a0c1df995f70f5bda82bf6d36719` |
 | Move lane advancement out of the stream loop | `neg/pmu-outlined-lane-advance` | `fb892a97f7fece9cbf4a9b430a58420f63edd34d` |
 
-Each archival commit includes both full timing tables and median ratios. Executable statements match the measured source snapshots; only the inline experiment comment was annotated with the completed results. Original patches, source snapshots, check logs and binary hashes remain available. The branches preserve their historical baseline and are not merged into the audited release main.
+Each archival commit includes both full timing tables and median ratios. Executable statements match the measured source snapshots; only the inline experiment comment was annotated with the completed results. The [archive receipt](../data/pmu-experiments/negative-archive.json) records the original patch hashes, and build/check logs are under `data/pmu-experiments/logs/`. The branches are based on the historical baseline, were not merged, and are not part of the published git history.
 
 Both measured experiments passed native library/integration/CLI tests and clippy. The byte decoder additionally passed its exhaustive focused strict-provenance Miri test on both tested backends. No full-source Miri certificate is claimed for these experimental branches. The new deterministic 20-state check (seed 2026) matched across baseline and both candidates: 18,754,454 nodes/cube, 16,192,780 lookups/cube, length histogram `16:1 17:1 18:18`.
 
-The earlier phack PMU collection motivated these mechanisms: reducing packed-lookup work and reducing instruction footprint. Their timing results did not justify adoption.
+The earlier Xeon X5650 physical-host PMU collection motivated these mechanisms: reducing packed-lookup work and reducing instruction footprint. Their timing results did not justify adoption.
 
-A separate SSSE3 implementation was explored for older x86-64 machines. Its native correctness, lint and focused vector Miri checks passed. It does not alter the AVX2/BMI2 path used by this VM. The experiment is retained under `/data/agents/pmu-westmere/`. Adoption would require complete validation of a rebased candidate and measurements on the intended physical host; it is excluded from main and the shipped profiling kit.
+A separate SSSE3 implementation was explored for older x86-64 machines. Its native correctness, lint and focused vector Miri checks passed. It does not alter the AVX2/BMI2 path used on the EPYC VM. Its [build and validation record](../evidence/validation/westmere-experiment/build-validation.json) is retained. Adoption would require complete validation of a rebased candidate and measurements on the intended physical host; it is not part of the release or the profiling kit.
 
-Evidence: [1T screen](../data/pmu-experiments/screen-summary.json), [48T rounds and identity](../data/pmu-experiments/negative-48t/summary.json), [native/focused checks](../data/pmu-experiments/build-validation.json), [archive receipt](../data/pmu-experiments/negative-archive.json), [initial release decision](../data/pmu-experiments/release-decision.json), [phack PMU analysis](HARDWARE_COUNTERS.md).
+Evidence: [1T screen](../data/pmu-experiments/screen-summary.json), [48T rounds and identity](../data/pmu-experiments/negative-48t/summary.json), [native/focused checks](../data/pmu-experiments/build-validation.json), [archive receipt](../data/pmu-experiments/negative-archive.json), [initial release decision](../data/pmu-experiments/release-decision.json), [Xeon PMU analysis](HARDWARE_COUNTERS.md).

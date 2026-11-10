@@ -4,12 +4,24 @@
 :root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
 * { box-sizing:border-box; }
 body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
-header { padding:1rem max(1rem,calc((100vw - 1120px)/2)); background:#132c40; color:white; }
+header { padding:1rem max(1rem,calc((100vw - 1400px)/2)); background:#132c40; color:white; }
 header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
 header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
 header a { color:#d9f0ff; }
 header a[aria-current] { color:white; text-decoration-thickness:3px; }
-main { max-width:1120px; margin:1.5rem auto; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+.layout { max-width:1400px; margin:1.5rem auto; padding:0 1rem; display:grid; grid-template-columns:15rem minmax(0,1fr); gap:1.5rem; align-items:start; }
+.site-nav { position:sticky; top:1rem; max-height:calc(100vh - 2rem); overflow:auto; font-size:.9rem; }
+.site-menu { margin:0; padding:.4rem .8rem .8rem; background:white; }
+.site-menu summary { padding:.3rem 0; }
+.nav-group { margin:.9rem 0 .25rem; font-size:.75rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+.site-nav ul { list-style:none; margin:0; padding:0; }
+.site-nav li { margin:0; }
+.site-nav li a { display:block; padding:.2rem .45rem; border-radius:4px; text-decoration:none; line-height:1.35; }
+.site-nav li a:hover { background:#eef3f6; }
+.site-nav a[aria-current] { background:#e2edf5; font-weight:650; color:var(--ink); }
+@media(min-width:901px) { .site-menu > summary { display:none; } }
+@media(max-width:900px) { .layout { display:block; margin:.75rem auto; } .site-nav { position:static; max-height:none; margin-bottom:.75rem; } }
+main { margin:0; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
 h1 { margin-top:0; font-size:2rem; line-height:1.25; }
 h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
 h3 { margin-top:1.5rem; }
@@ -32,13 +44,13 @@ summary { cursor:pointer; font-weight:600; }
 .note,.source-link,footer { color:var(--muted); font-size:.85rem; }
 .source-link { margin-top:2rem; }
 .archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
-footer { max-width:1120px; margin:1rem auto 2rem; padding:0 1rem; }
+footer { max-width:1400px; margin:1rem auto 2rem; padding:0 1rem; }
 blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
 svg { max-width:100%; height:auto; }
 :target { scroll-margin-top:1rem; }
 .skip-link { position:absolute; left:-10000px; }
 .skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
-@media(max-width:700px) { main { margin:.5rem; padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+@media(max-width:700px) { .layout { padding:0 .5rem; } main { padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
 </style></head>
 <body>
 <a class="skip-link" href="#docs-content">Skip to content</a>
@@ -47,48 +59,61 @@ svg { max-width:100%; height:auto; }
 <a href="index.html">Benchmarks</a>
 <a href="../performance/index.html">Performance</a>
 <a href="../safety/index.html">Safety</a>
-<a href="../history/index.html">History</a>
-<a href="../BENCHMARK_CATALOG.html">Catalog</a></nav></header>
+<a href="../history/DELETED_EXPERIMENTS.html">Experiments</a>
+<a href="../BENCHMARK_CATALOG.html">Catalog</a>
+<a href="https://egg-solver.arhan.sh/">Solver demo ↗</a></nav></header>
+<div class="layout"><nav class="site-nav" aria-label="All documentation pages"><details class="site-menu" open><summary>All pages</summary><p class="nav-group">Start</p><ul><li><a href="../index.html">Overview</a></li><li><a href="../guide/QUICKSTART.html">Quick start</a></li><li><a href="../guide/OVERVIEW.html">Tables and memory</a></li><li><a href="../guide/HOW_IT_WORKS.html">How the search works</a></li><li><a href="../guide/GLOSSARY.html">Glossary</a></li></ul><p class="nav-group">Reference</p><ul><li><a href="../reference/USER_GUIDE.html">User guide</a></li><li><a href="../guide/DEVELOPMENT.html">Development checks</a></li><li><a href="../guide/PUBLISHING.html">Publishing the site</a></li><li><a href="../reference/inventories/index.html">Technique inventories</a></li></ul><p class="nav-group">Benchmarks</p><ul><li><a href="index.html">Solver benchmarks</a></li><li><a href="METHODS.html">Reading the tables</a></li><li><a href="NISSY_THROUGHPUT.html">nissy throughput</a></li><li><a href="NXOPT32.html">nxopt, 62 GB table</a></li><li><a href="CUBEOPT_AUDIT.html" aria-current="page">cubeopt audit</a></li><li><a href="TABLE_ANALYSIS.html">h4 table analysis</a></li><li><a href="RESULTS.html">Multi-solver matrix</a></li><li><a href="COMPETITOR_FINDINGS.html">Competitor findings</a></li></ul><p class="nav-group">Performance</p><ul><li><a href="../performance/index.html">Performance studies</a></li><li><a href="../performance/PARALLELISM.html">Parallelism</a></li><li><a href="../performance/HARDWARE_COUNTERS.html">Hardware counters</a></li><li><a href="../performance/OPTIMIZATION_REVIEW.html">Optimization review</a></li></ul><p class="nav-group">Safety</p><ul><li><a href="../safety/index.html">Correctness and safety</a></li><li><a href="../safety/NO_UB.html">Undefined behavior</a></li><li><a href="../safety/MORDANT.html">Mordant audit</a></li></ul><p class="nav-group">Evidence and history</p><ul><li><a href="../BENCHMARK_CATALOG.html">Benchmark catalog</a></li><li><a href="../reproduce/index.html">Reproduce results</a></li><li><a href="../PROVENANCE.html">Sources and IDs</a></li><li><a href="../history/DELETED_EXPERIMENTS.html">Deleted experiments</a></li></ul></details></nav>
 <main id="docs-content"><h1 id="supplied-linux-cubeopt-comparison-audit">Supplied Linux cubeopt: comparison audit</h1>
-<p><a href="index.html">Benchmarks</a> · <a href="METHODS.html">Methods</a> · <a href="CUBEOPT_AUDIT_20261108.html">Complete dated audit</a></p>
+<p><a href="index.html">Benchmarks</a> · <a href="METHODS.html">Methods</a> · <a href="../data/cubeopt-audit-20261108/index.html">Raw records</a></p>
 <p><strong>November 8, 2026.</strong> The earlier 5.4× / 20.3× figures are supported by the retained arithmetic, but they describe <strong>one supplied older x86 Linux executable on the EPYC VM</strong>. They are not a comparison against an identified current cubeopt release on an M4 Pro.</p>
-<details class="contents"><summary>On this page</summary><ul><li><a href="#fresh-500-state-latency-check">Fresh 500-state latency check</a></li><li><a href="#executable-and-source-identities">Executable and source identities</a></li><li><a href="#what-the-historical-ratios-mean">What the historical ratios mean</a></li><li><a href="#reported-m4-pro-result">Reported M4 Pro result</a></li><li><a href="#reporting-correction">Reporting correction</a></li></ul></details>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#fresh-500-state-latency-check">Fresh 500-state latency check</a></li><li><a href="#executable-and-source-identities">Executable and source identities</a></li><li><a href="#what-the-historical-ratios-mean">What the historical ratios mean</a></li><li><a href="#fresh-14-thread-check">Fresh 14-thread check</a></li><li><a href="#reported-m4-pro-result">Reported M4 Pro result</a></li><li><a href="#reporting-correction">Reporting correction</a></li></ul></details>
 <h2 id="fresh-500-state-latency-check">Fresh 500-state latency check</h2>
 <p>Both solvers used 48 threads, their own h10 tables, resident 1 GiB pages, and the same 500 repository states once. They solved one cube at a time. The timer excludes loading. <strong>Lower mean latency is faster.</strong> This is one fresh process per solver, not three process repeats.</p>
 <div class="table-wrap" role="region" aria-label="Fresh 500-state latency check" tabindex="0"><table id="docs-table-1"><caption>Fresh 500-state latency check</caption>
 <thead>
-<tr><th>Solver</th><th align="right">Mean latency (ms/cube)</th><th align="right">Mean counted nodes/cube</th></tr>
+<tr><th>Solver</th><th align="right">Mean latency (ms/cube)</th><th align="right">Mean counted nodes/cube</th><th align="right">Sum of per-cube solve times (s)</th></tr>
 </thead>
 <tbody>
-<tr><td>Supplied Linux cube48opt10</td><td align="right">47.654576</td><td align="right">6,700,395</td></tr>
-<tr><td>Egg h10, 32 lanes/worker</td><td align="right">2.363502</td><td align="right">6,293,507</td></tr>
+<tr><td>Supplied Linux cube48opt10</td><td align="right">47.654576</td><td align="right">6,700,395</td><td align="right">23.827288</td></tr>
+<tr><td>Egg h10, 32 lanes/worker</td><td align="right">2.363502</td><td align="right">6,293,507</td><td align="right">1.181751</td></tr>
 </tbody>
 </table></div>
 <p>The ratio of mean solve times is <strong>20.163×</strong> for this paired setup. All 500 returned lengths match; egg also replayed its solutions. Egg's complete batch wall was 1.185386 s. Nodes use each program's own instrumentation and are not a common unit of algorithmic work.</p>
+<p>The input is <code>testdata/random_state.txt</code>, SHA-256 <code>616810c31d090a78ea1357684750642ab017ff394bfa08ba131bb65cc6905de3</code>. It is byte-identical to the dataset used by the historical harness. The runs were serialized under the benchmark locks on a quiet machine. Over the first 200 states, cubeopt averaged 48.177805 ms and 7,209,174.765 nodes/cube. Over all 500 it averaged 6.700M nodes/cube, so the longer dataset does not reproduce the reported 4.88M count described below.</p>
 <p><a href="../data/cubeopt-audit-20261108/h10-cubeopt48.stdout.txt">Cubeopt stdout</a>, <a href="../data/cubeopt-audit-20261108/h10-egg-solver.stdout.txt">egg stdout</a>, <a href="../data/cubeopt-audit-20261108/h10-random_state.txt">input</a>, <a href="../data/cubeopt-audit-20261108/h10-summary.json">summary</a> and <a href="../data/cubeopt-audit-20261108/index.html">checksums/commands</a> preserve the raw test.</p>
 <h2 id="executable-and-source-identities">Executable and source identities</h2>
-<p>The supplied executable's release version is unverified. Its SHA-256 is:</p>
+<p>The supplied executable's release version is unverified. The historical harness ran the same file, byte for byte. Its SHA-256 is:</p>
 <pre><code class="language-text">6a20791d0b90ff946e6addc7e48565f0cb154260b38056b82052affffe94bf56
 </code></pre>
-<p>It is an x86-64 Linux ELF with an embedded GCC 9.4.0 compiler string; that string does not establish its release date. Egg's fresh build inputs match published source <code>947c20d</code>. The older matrix used egg <code>229b99f</code>. The supplied competitor was not rebuilt or retuned from source.</p>
+<p>It is an x86-64 Linux ELF with GNU build ID <code>8169ccfa29e63d769214885e5e1c7c6191be74eb</code> and an embedded GCC 9.4.0 (Ubuntu 20.04) compiler string. Neither that string nor the file modification time establishes its release date. It prints <code>use sse, bmi2</code>, so the comparison includes implementation, compiler and instruction-set choices, not only search-algorithm differences. Its h10 table, <code>h48prun31h1.dat</code>, is 31,130,910,720 bytes. The supplied competitor was not rebuilt or retuned from source.</p>
+<p>Egg's fresh build inputs (a 34-file build-source fingerprint) match published source <code>1b243c0</code>. The raw records cite it as <code>947c20d</code>, its ID before the repository history was rebuilt. The older matrix used egg <code>979dcf6</code>.</p>
 <h2 id="what-the-historical-ratios-mean">What the historical ratios mean</h2>
+<p>The historical comparison was a fixed-configuration test: equal-sized tables, the same datasets, and runs at 1 and 48 threads. The 1-thread result used the first 50 states. The 48-thread result used the first 200 states and three process runs. The retained input file has 500 states.</p>
+<p>The old harness parsed <code>tt=... ms</code> from each cube's output and averaged it. It did not divide cube48opt10's latency by its thread count. These binaries ignore <code>-g</code> (<a href="COMPETITOR_FINDINGS.html">finding #4</a>), and the harness keeps one group, so that option did not introduce a division error either.</p>
 <div class="table-wrap" role="region" aria-label="What the historical ratios mean" tabindex="0"><table id="docs-table-2"><caption>What the historical ratios mean</caption>
 <thead>
-<tr><th>Historical sample</th><th align="right">Cubeopt time</th><th align="right">Egg time</th><th align="right">Cubeopt / egg</th></tr>
+<tr><th>Historical sample</th><th align="right">Cubeopt time (ms/cube)</th><th align="right">Cubeopt nodes/cube</th><th align="right">Egg time (ms/cube)</th></tr>
 </thead>
 <tbody>
-<tr><td>One thread, first 50 states</td><td align="right">368.82422 ms/cube</td><td align="right">68.40798 ms/cube</td><td align="right">5.39154×</td></tr>
-<tr><td>48 threads, first 200 states</td><td align="right">48.89141 ms/cube</td><td align="right">2.414160 ms/cube</td><td align="right">20.25193×</td></tr>
+<tr><td>1 thread, first 50 states</td><td align="right">368.82422</td><td align="right">6,993,163.78</td><td align="right">68.40798</td></tr>
+<tr><td>48 threads, first 200 states, run 1</td><td align="right">48.88043</td><td align="right">7,112,389.26</td><td align="right">2.707375</td></tr>
+<tr><td>48 threads, first 200 states, run 2</td><td align="right">48.89141</td><td align="right">7,214,157.06</td><td align="right">2.409495</td></tr>
+<tr><td>48 threads, first 200 states, run 3</td><td align="right">49.34675</td><td align="right">7,183,479.15</td><td align="right">2.414160</td></tr>
 </tbody>
 </table></div>
-<p>The multi-thread row uses medians over three runs. Those historical configurations were fixed-thread comparisons, not a proof that either setting was globally optimal. The detailed audit retains individual runs, the 14-thread check, page evidence and harness interpretation. <a href="RESULTS.html">The historical matrix</a> keeps all earlier numeric tables.</p>
+<p>The 48-thread medians are 48.89141 ms for cubeopt and 2.414160 ms for egg. The recalculated ratios are therefore <strong>5.39154×</strong> at one thread and <strong>20.25193×</strong> at 48 threads (ratio of medians). The printed 5.4× and 20.3× figures match that arithmetic. Egg's 48-thread end-to-end batch wall time was 2.416–2.422 ms/cube in runs 2 and 3, so its per-cube timer did not hide an order-of-magnitude cleanup cost. Loading and process startup are excluded on both sides.</p>
+<p>Those fixed-thread runs do not show that 48 threads was the best setting for either program. The raw <a href="../data/comparison/raw/cube48opt10_48T_random_state_200_1g.log">cubeopt</a> and <a href="../data/comparison/raw/cubeoptrsh10_48T_random_state_200_1g.log">egg</a> logs sit beside their <code>_r2</code>/<code>_r3</code> repeats and the one-thread logs; per-run summaries are in the matching <code>sum/</code> directory. The <a href="../data/comparison/run-index.csv">historical run index</a> lists every run. The harness is <a href="../reproduce/harness/runtest.sh">runtest.sh</a>, function <code>cubeopt</code>. <a href="RESULTS.html">The historical matrix</a> keeps all earlier numeric tables.</p>
+<h2 id="fresh-14-thread-check">Fresh 14-thread check</h2>
+<p>On November 8, the supplied Linux binary solved the first 200 random states three times in one process at 14 threads. Its table was verified resident on 29 GiB of 1 GiB pages. The three group means were <strong>62.876945, 62.547540 and 62.847185 ms/cube</strong>. Their median is <strong>62.847185 ms/cube</strong>, or <strong>15.912 solves/s</strong> under this serial-solve timing metric. Mean nodes/cube were 7.050M, 7.042M and 7.026M. These repeated groups are not independent process restarts. The raw output of this check is not among the retained records.</p>
+<p>On the VM, this old binary was slower at 14 threads than at 48. It does not reproduce the reported Mac figure of 13.5176 ms/solve. This does not separate hardware from software differences, and the tested settings do not establish a globally best configuration.</p>
 <h2 id="reported-m4-pro-result">Reported M4 Pro result</h2>
-<p>The reported figures were 14 threads, h10, 4.88M nodes/solve and 2.77 ns/node. Their product is 13.5176 ms/solve, equivalent to <strong>73.98 solves/s</strong> under that calculation. The exact binary, command, runtime, input prefix and concurrency mode were not established.</p>
-<p>There is no paired egg measurement on that Mac. Dividing a VM time by the Mac time would not isolate a solver speedup. Matching dataset names or displayed h values does not establish matching versions, table contents or timed workloads. The fresh local run does not explain the lower Mac node count.</p>
+<p>The reported figures were 14 threads, h10, <code>dataset/random_state.txt</code>, 4.88M nodes/solve and 2.77 ns/node. Their product is 13.5176 ms/solve, equivalent to <strong>73.98 solves/s</strong> under that calculation. The exact binary, command, runtime, input prefix and concurrency mode were not established.</p>
+<p>There is no paired egg measurement on that Mac. Dividing a VM time by the Mac time would not isolate a solver speedup. Matching dataset names or displayed h values does not establish matching versions, table contents or timed workloads. The fresh local runs do not explain the lower Mac node count.</p>
 <h2 id="reporting-correction">Reporting correction</h2>
-<p>Keep the executable identity, measured egg source, CPU, table bytes, threads, mode, sample and repeats beside each ratio. The old arithmetic is reproducible; the broader ranking was unsupported. Use the <a href="NISSY_THROUGHPUT.html">new nissy study</a> for the separately measured finite-batch throughput, and the <a href="TABLE_ANALYSIS.html">table study</a> for the cstimer size/pruning question.</p>
+<p>Keep the executable identity, measured egg source, CPU, table bytes, threads, mode, sample and repeats beside each ratio. Label the competitor as the supplied x86-64 Linux cube48opt10 executable, with its checksum, rather than as cubeopt in general. Separate a fixed-thread benchmark from a best-configuration or best-solver claim. A Mac comparison needs both programs on that Mac, on identical input bytes, with equivalent timing boundaries and modes.</p>
+<p>The old arithmetic is reproducible; the broader ranking was unsupported. The audit did not establish a numerical timing error. Use the <a href="NISSY_THROUGHPUT.html">new nissy study</a> for the separately measured finite-batch throughput, and the <a href="TABLE_ANALYSIS.html">table study</a> for the cstimer size/pruning question.</p>
 
-<p class="source-link"><a href="CUBEOPT_AUDIT.md">Markdown source</a></p></main>
+<p class="source-link"><a href="CUBEOPT_AUDIT.md">Markdown source</a></p></main></div>
 <footer><a href="../PROVENANCE.html">Sources and evidence scope</a></footer>
 <script>
 for (const wrapper of document.querySelectorAll('.table-wrap')) {
@@ -115,5 +140,8 @@ function revealTarget(){
   for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
 }
 revealTarget(); window.addEventListener('hashchange',revealTarget);
+const menu=document.querySelector('.site-menu');
+if(menu){const wide=matchMedia('(min-width:901px)');const sync=()=>{menu.open=wide.matches;};sync();wide.addEventListener('change',sync);
+const current=menu.querySelector('[aria-current]');if(current&&wide.matches)current.scrollIntoView({block:'nearest'});}
 </script>
 </body></html>
