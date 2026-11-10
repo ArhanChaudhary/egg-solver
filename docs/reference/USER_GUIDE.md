@@ -161,7 +161,7 @@ The second command generates h4 with base 8 in memory and solves five random sta
 bun wasm/serve.mjs --tables tables
 ```
 
-Open the local URL printed by the server, or the public site, <https://egg-solver.arhan.sh/>. On load the page starts with every core the browser reports and generates h0, the smallest table, so **Solve** works immediately. **Restart** applies a different thread count and rebuilds the selected table. The page can also generate h1–h4 or load a compatible table. Its recommended h4 option uses base 9; the explicit base-8 option trades weaker search pruning for faster generation. [The h4 study](../comparisons/TABLE_ANALYSIS.md) records that tradeoff.
+Open the local URL printed by the server, or the public site, <https://egg-solver.arhan.sh/>. On load the page starts with every core the browser reports and generates h0, the smallest table, so **Solve** works immediately. The page shows only the scramble box, **Solve** and **Random cube**; a status line reports progress. The collapsed **Settings** section holds the thread count and table choice (**Apply** restarts only if the thread count changed), loading a table file or URL, and lanes per thread. The page can also generate h1–h4 or load a compatible table. Its recommended h4 option uses base 9; the explicit base-8 option trades weaker search pruning for faster generation. [The h4 study](../comparisons/TABLE_ANALYSIS.md) records that tradeoff.
 
 ### Tables
 

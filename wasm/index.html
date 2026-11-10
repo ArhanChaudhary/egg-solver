@@ -12,75 +12,75 @@
   body { background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; margin: 0 auto; max-width: 52rem; padding: 1rem; }
   h1 { font-size: 1.4rem; margin: 0.5rem 0; }
   p.note { color: var(--muted); margin: 0.25rem 0 1rem; }
-  fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 0 0 1rem; padding: 0.75rem; }
-  legend { color: var(--muted); padding: 0 0.3rem; }
+  details { border: 1px solid var(--line); border-radius: 6px; margin: 1rem 0; padding: 0.5rem 0.75rem; }
+  summary { cursor: pointer; color: var(--muted); }
+  button.primary { background: var(--accent); color: var(--bg); font-weight: 600; padding: 0.3rem 1.2rem; }
+  #log:empty { display: none; }
   label { margin-right: 0.75rem; white-space: nowrap; }
   input, select, button, textarea { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 0.2rem 0.4rem; }
   button { cursor: pointer; border-color: var(--accent); }
   button:disabled { opacity: 0.5; cursor: default; }
   textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace; }
-  pre { background: color-mix(in srgb, var(--line) 30%, transparent); border-radius: 6px; padding: 0.75rem; overflow-x: auto; white-space: pre-wrap; min-height: 4rem; }
+  pre { background: color-mix(in srgb, var(--line) 30%, transparent); border-radius: 6px; padding: 0.75rem; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
   .row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.4rem 0; }
 </style>
 </head>
 <body>
-<h1>egg-solver: optimal Rubik's cube solver in WebAssembly</h1>
-<p class="note">Optimal (fewest moves, half-turn metric) solutions with an H48 pruning table, in your browser. The page starts on its own with every available core and the smallest table (h0), so you can solve right away. Larger tables solve faster: generate one below, or load a table file made by the native <code>gen</code> (h6 = 1.8 GiB is a good size for a browser).</p>
+<h1>egg-solver</h1>
+<p class="note">Optimal Rubik's cube solutions (fewest moves, half-turn metric), computed in your browser. Enter one scramble or 54-sticker facelet string (URFDLB order) per line.</p>
 
-<fieldset>
-  <legend>1. Module</legend>
+<textarea id="cubes" rows="4" aria-label="Scrambles, one per line" placeholder="One scramble (R U2 F' ...) or facelet string per line">R U R' U' F2 D L2 B'
+UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB</textarea>
+<div class="row">
+  <button id="solve" class="primary" disabled>Solve</button>
+  <button id="random" disabled>Random cube</button>
+  <span id="status" class="note" role="status">Starting…</span>
+</div>
+
+<pre id="log"></pre>
+
+<details id="settings">
+  <summary>Settings</summary>
+  <p class="note">The page starts with every available core and the smallest table (h0). Larger tables solve faster but take longer to build; for hard cubes, load a table made by the native <code>gen</code> (h6 = 1.8 GiB suits a browser).</p>
   <div class="row">
     <label>Threads <input id="threads" type="number" min="1" value="1" style="width:4rem"></label>
-    <button id="init" disabled>Restart</button>
     <span id="isolation" class="note"></span>
   </div>
-</fieldset>
-
-<fieldset>
-  <legend>2. Table</legend>
   <div class="row">
-    <label>Generate <select id="k">
-      <option value="0" selected>h0 (29 MiB, seconds; generated on start)</option>
+    <label>Table <select id="k">
+      <option value="0" selected>h0 (29 MiB, seconds)</option>
       <option value="1">h1 (58 MiB)</option>
       <option value="2">h2 (116 MiB)</option>
       <option value="3">h3 (232 MiB)</option>
-      <option value="4">h4 (486 MB / 464 MiB, recommended base)</option>
-      <option value="4:8">h4 base 8 (464 MiB, faster generation)</option>
+      <option value="4">h4 (464 MiB, recommended base)</option>
+      <option value="4:8">h4 base 8 (464 MiB, faster to build)</option>
     </select></label>
-    <button id="generate" disabled>Generate</button>
+    <button id="apply" disabled>Apply</button>
   </div>
   <div class="row">
-    <label>or load a file <input id="file" type="file" disabled></label>
+    <label>Or load a table file <input id="file" type="file" disabled></label>
   </div>
   <div class="row">
-    <label>or a URL <input id="url" type="text" placeholder="/tables/h6" style="width:14rem"></label>
-    <button id="fetch" disabled>Fetch</button>
+    <label>Or a table URL <input id="url" type="text" placeholder="/tables/h6" style="width:14rem"></label>
+    <button id="fetch" disabled>Load</button>
     <label><input id="verify" type="checkbox"> verify checksum</label>
   </div>
-</fieldset>
-
-<fieldset>
-  <legend>3. Solve</legend>
-  <textarea id="cubes" rows="4" placeholder="One scramble (R U2 F' ...) or facelet string (54 stickers, URFDLB order) per line">R U R' U' F2 D L2 B'
-UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB</textarea>
   <div class="row">
-    <button id="solve" disabled>Solve</button>
-    <button id="random" disabled>Add a random cube</button>
-    <label>Lanes <input id="lanes" type="number" min="0" value="0" style="width:4rem"></label>
+    <label>Lanes per thread <input id="lanes" type="number" min="0" value="0" style="width:4rem"></label>
+    <span class="note">0: automatic</span>
   </div>
-</fieldset>
-
-<pre id="log"></pre>
+</details>
 
 <script type="module">
 const $ = (id) => document.getElementById(id);
 const log = (text) => { $('log').textContent += text + '\n'; };
+const status = (text) => { $('status').textContent = text; };
 const worker = new Worker(new URL('./demo-worker.mjs', import.meta.url), { type: 'module' });
 let nextId = 0;
 const pending = new Map();
 worker.onmessage = ({ data }) => {
   if (data.progress !== undefined) {
-    $('log').textContent = $('log').textContent.replace(/loading \d+%\n$/, '') + `loading ${Math.round(100 * data.progress)}%\n`;
+    $('status').textContent = `Loading the table… ${Math.round(100 * data.progress)}%`;
     return;
   }
   const { resolve, reject } = pending.get(data.id);
@@ -98,6 +98,7 @@ const busy = async (label, f) => {
   try {
     return await f();
   } catch (e) {
+    status(`${label} failed: ${e.message}`);
     log(`${label}: ${e.message}`);
   } finally {
     for (const b of document.querySelectorAll('button, input[type=file]')) b.disabled = false;
@@ -105,9 +106,10 @@ const busy = async (label, f) => {
   }
 };
 let tableReady = false;
-const tableLoaded = (t) => {
+let moduleThreads = 0;
+const tableLoaded = (t, seconds) => {
   tableReady = true;
-  log(`table h${t.k} base ${t.base} (${(t.bytes / 2 ** 20).toFixed(0)} MiB) ready`);
+  status(`Ready · h${t.k} table (${(t.bytes / 2 ** 20).toFixed(0)} MiB, ready in ${seconds.toFixed(1)} s) · ${moduleThreads} thread${moduleThreads === 1 ? '' : 's'}`);
 };
 
 // Default: every core the host offers (one thread without cross-origin isolation).
@@ -122,6 +124,7 @@ $('threads').disabled = !crossOriginIsolated;
 // refuses its 4 GiB shared memory), fall back to one thread.
 const init = async (threads) => {
   tableReady = false;
+  status(`Starting with ${threads} thread${threads === 1 ? '' : 's'}…`);
   try {
     ({ threads } = await call('init', { threads }));
   } catch (e) {
@@ -130,37 +133,37 @@ const init = async (threads) => {
     $('threads').value = 1;
     ({ threads } = await call('init', { threads: 1 }));
   }
-  log(`module ready, ${threads} thread(s)`);
+  moduleThreads = threads;
 };
-// Generate the table selected under "Generate" (h0 by default), with the
-// recommended base unless a faster-generation option requests base 8.
+// Generate the selected table (h0 by default), with the recommended base
+// unless the faster-to-build option requests base 8.
 const generate = async () => {
   const [k, base] = $('k').value.split(':').map(Number);
-  log(`generating h${k} ...`);
+  tableReady = false;
+  status(`Generating the h${k} table…`);
   const start = performance.now();
-  tableLoaded(await call('generate', { k, base: base || 0 }));
-  log(`  in ${((performance.now() - start) / 1000).toFixed(1)} s`);
+  tableLoaded(await call('generate', { k, base: base || 0 }), (performance.now() - start) / 1000);
 };
 
-// Restart with the thread count above, then rebuild the selected table so
-// Solve stays one click away.
-$('init').onclick = () => busy('start', async () => {
-  await init(Number($('threads').value));
+// Settings: restart only if the thread count changed, then build the table.
+$('apply').onclick = () => busy('Apply', async () => {
+  const threads = Number($('threads').value);
+  if (threads !== moduleThreads) await init(threads);
   await generate();
 });
-$('generate').onclick = () => busy('generate', generate);
-const load = (source) => busy('load', async () => {
+const load = (source) => busy('Load', async () => {
+  tableReady = false;
+  status('Loading the table…');
   const start = performance.now();
-  tableLoaded(await call('load', { source, verify: $('verify').checked }));
-  log(`  in ${((performance.now() - start) / 1000).toFixed(1)} s`);
+  tableLoaded(await call('load', { source, verify: $('verify').checked }), (performance.now() - start) / 1000);
 });
 $('file').onchange = () => $('file').files[0] && load($('file').files[0]);
 $('fetch').onclick = () => load(new URL($('url').value, location.href).href);
-$('random').onclick = () => busy('random', async () => {
+$('random').onclick = () => busy('Random cube', async () => {
   const cube = await call('random', { seed: Math.floor(Math.random() * 2 ** 31) });
   $('cubes').value = ($('cubes').value.trim() + '\n' + cube).trim();
 });
-$('solve').onclick = () => busy('solve', async () => {
+$('solve').onclick = () => busy('Solve', async () => {
   for (const cube of $('cubes').value.split('\n').map((l) => l.trim()).filter(Boolean)) {
     const r = await call('solve', { cube, lanes: Number($('lanes').value) });
     log(`${cube}\n  ${r.length} moves in ${r.wall.toFixed(3)} s (${(r.nodes / 1e6).toFixed(1)}M nodes): ${r.moves}`);
@@ -170,7 +173,7 @@ $('solve').onclick = () => busy('solve', async () => {
 // The happy default: all cores and h0, with no clicks. (Set h0 explicitly:
 // browsers may restore an earlier choice of table on reload.)
 $('k').value = '0';
-busy('start', async () => {
+busy('Start', async () => {
   await init(cores);
   await generate();
 });
