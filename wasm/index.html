@@ -29,7 +29,7 @@
 <h1>egg-solver</h1>
 <p class="note">Optimal Rubik's cube solutions (fewest moves, half-turn metric), computed in your browser. Enter one scramble or 54-sticker facelet string (URFDLB order) per line.</p>
 
-<textarea id="cubes" rows="4" aria-label="Scrambles, one per line" placeholder="R U R' U' F2 D L2 B'  (one scramble or facelet string per line)"></textarea>
+<textarea id="cubes" rows="4" aria-label="Scrambles, one per line" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="R U R' U' F2 D L2 B'  (one scramble or facelet string per line)"></textarea>
 <div class="row">
   <button id="solve" class="primary" disabled>Solve</button>
   <button id="random" disabled>Random cube</button>
@@ -40,7 +40,7 @@
 
 <details id="settings">
   <summary>Settings</summary>
-  <p class="note">The page starts with every available core and builds the h4 table (464 MiB) on desktops, or h3 (232 MiB) on phones, tablets and devices with 4 GB of memory or less; both take about as long to build. Smaller tables make hard cubes much slower. For faster solves, load a larger table made by the native <code>gen</code> (h6 = 1.8 GiB suits a desktop browser).</p>
+  <p class="note">The page starts with every available core and builds the h4 table (464 MiB) on desktops, or h3 (232 MiB) on phones, tablets and devices with 4 GB of memory or less; both take about as long to build. Smaller tables make hard cubes much slower. For faster solves you can load a larger table file, such as h6 (1.8 GiB, fine for a desktop browser). Table files are made on a computer with egg-solver's command-line program: see <a href="docs/reference/USER_GUIDE.html#choose-and-generate-a-table">how to make a table</a>.</p>
   <div class="row">
     <label>Threads <input id="threads" type="number" min="1" value="1" style="width:4rem"></label>
     <span id="isolation" class="note"></span>
@@ -162,7 +162,21 @@ $('random').onclick = () => busy('Random cube', async () => {
   const cube = await call('random', { seed: Math.floor(Math.random() * 2 ** 31) });
   $('cubes').value = ($('cubes').value.trim() + '\n' + cube).trim();
 });
+// Phone keyboards substitute curly or look-alike apostrophes (’ ‘ ′ ´ ` ʼ) for
+// the prime ' in moves like R'. Replace them as the user types (one character
+// for one, so the caret stays put) and again before solving.
+const primes = /[\u2018\u2019\u201b\u2032\u00b4\u0060\u02bc\u02b9]/g;
+const plain = (text) => text.replace(primes, "'").replace(/\u00a0/g, ' ');
+$('cubes').addEventListener('input', () => {
+  const box = $('cubes');
+  if (!primes.test(box.value)) return;
+  primes.lastIndex = 0;
+  const [start, end] = [box.selectionStart, box.selectionEnd];
+  box.value = plain(box.value);
+  box.setSelectionRange(start, end);
+});
 $('solve').onclick = () => busy('Solve', async () => {
+  $('cubes').value = plain($('cubes').value);
   const cubes = $('cubes').value.split('\n').map((l) => l.trim()).filter(Boolean);
   if (!cubes.length) {
     status('Enter a scramble, or press Random cube.');
