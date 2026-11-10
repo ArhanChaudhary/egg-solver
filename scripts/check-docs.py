@@ -123,9 +123,9 @@ def main():
     if table[1:] != expected:
         ERRORS.append('Nissy headline table differs from recorded analysis')
     readme = (ROOT.parent / 'README.md').read_text()
-    for row in expected:
-        if '| ' + ' | '.join(row) + ' |' not in readme:
-            ERRORS.append(f'README.md: nissy row {row[0]} differs from recorded analysis')
+    ratios = [analysis['finals'][str(h)]['speedup_egg_over_nissy'] for h in range(6, 11)]
+    if f'| — | {min(ratios):.2f}–{max(ratios):.2f}× |' not in readme:
+        ERRORS.append('README.md: nissy h6–h10 range differs from recorded analysis')
     if ERRORS:
         raise SystemExit('FAIL:\n' + '\n'.join(ERRORS))
     print(f'PASS: {len(pages)} HTML pages, {checked} local links, curated table/heading structure, benchmark headline values')

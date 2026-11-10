@@ -61,38 +61,20 @@ running. See `solve --help` and the [user guide](docs/reference/USER_GUIDE.md).
 
 ## Benchmarks
 
-All measured on a 48-core AMD EPYC 9V45 VM with resident 1 GiB table pages; loading is excluded. Each competitor used its own table. [Solver benchmarks](docs/comparisons/README.md) has the methods, raw outputs and limits.
+How many times faster egg-solver is than each competitor (competitor time ÷ egg-solver time). Measured on a 48-core AMD EPYC 9V45 VM with tables resident in 1 GiB pages; table loading is excluded and each solver used its own table. Each competitor links to its study, with builds, commands and raw output.
 
-**Batch throughput against nissy-core H48** (November 8, 2026): all 500 repository random states per batch, median of three fresh-process batches, same table size for both solvers. Higher solves/s is faster. [Full study](docs/comparisons/NISSY_THROUGHPUT.md)
+| Competitor | Table GB: competitor / egg-solver | Workload | 1 thread | 48 threads |
+|---|---|---|---:|---:|
+| [nissy-core H48](docs/comparisons/NISSY_THROUGHPUT.md) | equal, h6 to h10 | 500 states as one batch | — | 7.10–10.09× |
+| [nissy-core H48](docs/comparisons/RESULTS.md) | 60.67 / 62.26 (h11) | one cube at a time | 10.4× | 31.4× |
+| [cube48opt10](docs/comparisons/CUBEOPT_AUDIT.md) | 31.13 / 31.13 (h10) | one cube at a time | 5.4× | 20.3× |
+| [cubeopt30](docs/comparisons/RESULTS.md) | 2.60 / 3.89 (h7) | one cube at a time | 10.1× | 13.8× |
+| [nxopt22](docs/comparisons/RESULTS.md) | 7.81 / 7.78 (h8) | batch | 21.3× | 18.0× |
+| [nxopt EO3/EP2](docs/comparisons/NXOPT32.md) | 62.47 / 62.26 (h11) | batch | 17.1× | 13.7×\* |
+| [vcube208](docs/comparisons/RESULTS.md) | 7.81 / 7.78 (h8) | batch | 14.2× | 12.3× |
+| [cube48opt-rust Opt8](docs/comparisons/RESULTS.md) | 7.78 / 7.78 (h8) | batch | 3.9× | 3.2× |
 
-| Table | RAM each (GiB) | egg-solver (solves/s) | nissy (solves/s) | egg-solver advantage |
-|---|---:|---:|---:|---:|
-| h6 | 2 | 34.71 | 4.89 | 7.10× |
-| h7 | 4 | 69.56 | 9.71 | 7.16× |
-| h8 | 8 | 146.73 | 14.55 | 10.09× |
-| h9 | 15 | 290.33 | 31.29 | 9.28× |
-| h10 | 29 | 560.63 | 58.40 | 9.60× |
-
-**Other recent comparisons** (November 7–8, 2026); lower time is faster:
-
-| Competitor | Setup | egg-solver | Competitor | Ratio |
-|---|---|---:|---:|---:|
-| cube48opt10 (supplied Linux binary) | h10 tables, 48 threads, 500 states one at a time, mean latency | 2.36 ms | 47.65 ms | 20.2× |
-| nxopt EO3/EP2, 62.474 GB table | egg h11; 1 worker, 50 states | 41.8 ms | 715.3 ms | 17.1× |
-| nxopt EO3/EP2, 62.474 GB table | egg h11; 48 workers, 200 states | 1.158 ms | 15.90 ms | 13.7×* |
-
-\*nxopt reports summed cube durations ÷ workers ÷ cubes, while egg-solver's figure is batch wall time ÷ cubes, so this ratio compares two timing formulas. Details: [cubeopt audit](docs/comparisons/CUBEOPT_AUDIT.md), [nxopt study](docs/comparisons/NXOPT32.md).
-
-**Earlier matrix** (November 7, 2026, egg-solver `979dcf6`): speedup over each competitor, higher is better; GB are decimal table sizes. [Full matrix](docs/comparisons/RESULTS.md)
-
-| Competitor | egg table | GB: competitor / egg | Mode | 1 thread | 48 threads |
-|---|---|---:|---|---:|---:|
-| cubeopt30 | h7 | 2.60 / 3.89 | latency | 10.1× | 13.8× |
-| cube48opt10 | h10 | 31.13 / 31.13 | latency | 5.4× | 20.3× |
-| nissy H48 h11 | h11 | 60.67 / 62.26 | latency | 10.4× | 31.4× |
-| nxopt22 | h8 | 7.81 / 7.78 | throughput | 21.3× | 18.0× |
-| vcube208 | h8 | 7.81 / 7.78 | throughput | 14.2× | 12.3× |
-| cube48opt-rust Opt8 | h8 | 7.78 / 7.78 | throughput | 3.9× | 3.2× |
+\*nxopt reports summed cube durations ÷ workers ÷ cubes; egg-solver's figure is batch wall time ÷ cubes.
 
 ## Browser and documentation
 
