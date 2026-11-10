@@ -468,14 +468,15 @@ fn page_report(_: usize, _: usize) -> String {
 }
 
 /// Lanes per thread for `threads` threads on the table at `path` (of `k`):
-/// `asked`, else from `<path>.tune` (`bench tune`), else the untuned
+/// `asked`, else from its tune file (`bench tune`, see
+/// `tables::file::tune_path`), else the untuned
 /// default for `k` (`tables::file::default_lanes`). Logs where it came from.
 #[must_use]
 pub fn lanes(asked: Option<usize>, path: &str, k: u32, threads: usize) -> usize {
     let lanes = asked.unwrap_or_else(|| crate::tables::file::default_lanes(path, k)(threads));
     let source = if asked.is_some() {
         "as asked"
-    } else if std::path::Path::new(&format!("{path}.tune")).exists() {
+    } else if std::path::Path::new(&crate::tables::file::tune_path(path)).exists() {
         "from the table's .tune file"
     } else {
         "untuned default"

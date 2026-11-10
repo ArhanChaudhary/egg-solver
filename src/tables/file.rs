@@ -10,8 +10,8 @@
 //! with a parity bit in place of an eo bit) must not be read as an h48 one. Files on hugetlbfs are whole 1 GiB pages; their trailer sits in the
 //! slack after the data, so tables made before trailers existed can be
 //! stamped in place (`gen stamp`). Tables without a trailer are described by
-//! a `<path>.meta` sidecar (`k base`), or, for the legacy tables on
-//! `/mnt/huge`, by `tables/<name>.hugemeta` in the build folder. A table can
+//! a `<path>.meta` sidecar (`k base`), or, for tables on hugetlbfs (and
+//! legacy `/mnt/huge` paths), by `tables/<name>.hugemeta` in the build folder. A table can
 //! also be loaded into a shared memory segment that outlives the process
 //! (`LoadMode::Shm`, see `tables::shm`).
 
@@ -613,9 +613,14 @@ impl LoadOptions {
     }
 }
 
-/// Where `bench tune` saves a table's best lane counts.
-fn tune_path(table: &str) -> String {
-    format!("{table}.tune")
+/// Where `bench tune` saves a table's best lane counts. Hugetlbfs cannot
+/// write small files: keep tuning beside the metadata on regular storage.
+pub(crate) fn tune_path(table: &str) -> String {
+    if is_hugetlbfs(table) {
+        format!("{}.tune", super::meta_path(table))
+    } else {
+        format!("{table}.tune")
+    }
 }
 
 /// Save the best lane count per thread count (`threads lanes` lines).

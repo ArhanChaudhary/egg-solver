@@ -62,7 +62,7 @@ target/release/bench tables/h7 tune
 target/release/bench --help
 ```
 
-The tune command writes a `<TABLE>.tune` record for its measured configurations. `solve` and `bench` use a matching record unless `-l` is explicit. The built-in lane candidates end at 48, but explicit larger lane values are supported. Tuning a stream does not guarantee the best finite-batch or single-cube setting. The [measured lane study](../performance/PARALLELISM.md) explains that distinction.
+The tune command writes a `<TABLE>.tune` record for its measured configurations. A table on hugetlbfs (any mount, not only `/mnt/huge`) cannot hold small files, so its record goes to `tables/<NAME>.hugemeta.tune` in the build checkout, beside the optional `tables/<NAME>.hugemeta` metadata sidecar; rebuild on each machine so that path is local, and keep table names distinct across hugetlbfs mounts. `solve` and `bench` use a matching record unless `-l` is explicit. The built-in lane candidates end at 48, but explicit larger lane values are supported. Tuning a stream does not guarantee the best finite-batch or single-cube setting. The [measured lane study](../performance/PARALLELISM.md) explains that distinction.
 
 The historical positional benchmark syntax remains supported. Use `bench --help` and each subcommand's help for named syntax, warm-up and measurement windows. Record the actual command with benchmark output.
 

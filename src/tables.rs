@@ -965,12 +965,11 @@ fn build_dir() -> String {
 }
 
 /// The meta file of a table file (for hugetlbfs files, which cannot hold
-/// small files, in the repository's `tables` directory; a hugetlbfs path
-/// without a file name, like `/mnt/huge/..`, has the usual sidecar).
+/// small files, in the repository's `tables` directory).
 #[must_use]
 pub fn meta_path(path: &str) -> String {
     match std::path::Path::new(path).file_name() {
-        Some(name) if path.starts_with("/mnt/huge") => {
+        Some(name) if file::is_hugetlbfs(path) || path.starts_with("/mnt/huge") => {
             format!("{}/tables/{}.hugemeta", build_dir(), name.to_string_lossy())
         }
         _ => format!("{path}.meta"),

@@ -266,7 +266,8 @@ enum Command {
     Batch(BatchArgs),
     /// Measure lane counts at 1 thread and at all threads; save the best
     /// next to the table (`<TABLE>.tune`, the default of `solve` and
-    /// `bench`).
+    /// `bench`; for a table on hugetlbfs, which holds no small files,
+    /// `tables/<NAME>.hugemeta.tune` in the build folder).
     Tune(TuneArgs),
 }
 

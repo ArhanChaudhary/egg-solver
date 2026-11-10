@@ -484,7 +484,8 @@ fn generate_dfs(
 /// trailer.
 fn create_table_file(path: &str, data_bytes: u64) -> anyhow::Result<std::fs::File> {
     let f = std::fs::File::create(path).with_context(|| format!("cannot create {path}"))?;
-    f.set_len(file::file_bytes(data_bytes, false))
+    // (hugetlbfs files are whole huge pages: the size is rounded up.)
+    f.set_len(file::file_bytes(data_bytes, file::is_hugetlbfs(path)))
         .with_context(|| format!("cannot size {path}"))?;
     Ok(f)
 }
@@ -509,6 +510,28 @@ fn write_all_at(mut f: &std::fs::File, data: &[u8], offset: u64) -> std::io::Res
 /// from the page cache (a table is written once, and read back later if at
 /// all): the dirty page cache stays small, and the disk stays busy.
 fn write_at(f: &std::fs::File, path: &str, data: &[u8], offset: u64) -> anyhow::Result<()> {
+    // hugetlbfs takes no write(2): copy through a shared mapping of the
+    // whole file (parts need not start at a huge page).
+    if file::is_hugetlbfs(path) {
+        let len = usize::try_from(f.metadata()?.len())?;
+        let start = usize::try_from(offset)?;
+        let end = start
+            .checked_add(data.len())
+            .context("write range overflow")?;
+        anyhow::ensure!(end <= len, "write extends beyond {path}");
+        // SAFETY: the output file is ours alone while it is generated (no
+        // other handle or mapping touches it, and it is not truncated while
+        // mapped); `create` keeps its size, already whole huge pages.
+        let mem = unsafe { Memory::map_file(path, len, true) }
+            .with_context(|| format!("cannot map {path}"))?;
+        anyhow::ensure!(end <= mem.len(), "write extends beyond {path}");
+        // SAFETY: `start..end` is inside the writable mapping, which `data`
+        // (anonymous memory) does not overlap.
+        unsafe {
+            std::ptr::copy_nonoverlapping(data.as_ptr(), mem.ptr().add(start), data.len());
+        }
+        return Ok(());
+    }
     let piece = 64 << 20;
     for (i, chunk) in data.chunks(piece).enumerate() {
         let at = offset + (i * piece) as u64;
