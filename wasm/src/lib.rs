@@ -79,6 +79,8 @@ struct State {
     incoming: Option<Memory>,
     /// The last call's result (JSON) or error message.
     output: String,
+    /// The trailer of the table's file image (`egg_solver_table_export`).
+    exported_trailer: Vec<u8>,
 }
 
 static STATE: Mutex<State> = Mutex::new(State {
@@ -86,6 +88,7 @@ static STATE: Mutex<State> = Mutex::new(State {
     table: None,
     incoming: None,
     output: String::new(),
+    exported_trailer: Vec::new(),
 });
 
 /// The state.
@@ -248,6 +251,32 @@ pub extern "C" fn egg_solver_table_load(verify: u32) -> i32 {
         let info = table_json(&table);
         state.table = Some(table);
         Ok(info)
+    })
+}
+
+/// The current table as a table file, for the caller to keep (a browser page
+/// stores it in `IndexedDB`) and load later through `egg_solver_table_buffer`
+/// and `egg_solver_table_load`: the table's data where it lies, then a
+/// trailer with its checksum (computed on `threads` threads, 0: all). Output:
+/// `{"data":..,"data_bytes":..,"trailer":..,"trailer_bytes":..}`, the
+/// addresses and sizes of the two parts of the file, valid until the next
+/// call that changes the table or exports it again.
+#[unsafe(no_mangle)]
+pub extern "C" fn egg_solver_table_export(threads: u32) -> i32 {
+    with_state(|state| {
+        let table = state.table.as_ref().ok_or("no table loaded")?;
+        let trailer = table
+            .trailer(threads_for(threads))
+            .map_err(|e| e.to_string())?
+            .to_bytes();
+        let data = table.data().map_err(|e| e.to_string())?;
+        let (data_ptr, data_bytes) = (data.as_ptr() as usize, data.len());
+        state.exported_trailer = trailer;
+        Ok(format!(
+            r#"{{"data":{data_ptr},"data_bytes":{data_bytes},"trailer":{},"trailer_bytes":{}}}"#,
+            state.exported_trailer.as_ptr() as usize,
+            state.exported_trailer.len()
+        ))
     })
 }
 

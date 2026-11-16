@@ -3,212 +3,736 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>egg-solver in WebAssembly</title>
+<title>egg-solver: optimal Rubik's Cube solver</title>
+<meta name="description" content="Find the shortest solution of any Rubik's Cube in your browser, from a scramble or from the colours of your cube.">
+<script>
+  // The threads build needs a cross-origin isolated page. egg-solver.arhan.sh (Cloudflare) and
+  // wasm/serve.mjs send the headers for it; on a host that cannot, coi-sw.js adds them: register
+  // it and reload once, so that this page is served through it. If the browser still refuses,
+  // the page runs on one thread.
+  (async () => {
+    if (window.crossOriginIsolated || !window.isSecureContext || !('serviceWorker' in navigator)) return;
+    try {
+      await navigator.serviceWorker.register('coi-sw.js');
+      await navigator.serviceWorker.ready;
+      if (!navigator.serviceWorker.controller && !sessionStorage.getItem('coi-reloaded')) {
+        sessionStorage.setItem('coi-reloaded', '1');
+        location.reload();
+      }
+    } catch (error) {
+      console.warn('cross-origin isolation service worker:', error);
+    }
+  })();
+</script>
 <style>
-  :root { --bg: #fdfdfc; --fg: #1d1d1b; --muted: #6b6b66; --line: #d9d8d3; --accent: #2f5fa7; }
+  :root { --bg: #fdfdfc; --fg: #1d1d1b; --muted: #6b6b66; --line: #d9d8d3; --accent: #2f5fa7; --ok: #2c7a3f; --sticker-gap: #26262a; }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #1b1b1a; --fg: #e9e8e4; --muted: #a09f99; --line: #3a3a37; --accent: #7aa5e8; }
+    :root { --bg: #1b1b1a; --fg: #e9e8e4; --muted: #a09f99; --line: #3a3a37; --accent: #7aa5e8; --ok: #6cc486; --sticker-gap: #0e0e10; }
   }
+  [hidden] { display: none !important; }
   body { background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; margin: 0 auto; max-width: 52rem; padding: 1rem; }
+  nav.top { font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; }
+  a { color: var(--accent); }
   h1 { font-size: 1.4rem; margin: 0.5rem 0; }
-  p.note { color: var(--muted); margin: 0.25rem 0 1rem; }
-  details { border: 1px solid var(--line); border-radius: 6px; margin: 1rem 0; padding: 0.5rem 0.75rem; }
+  p.note, .note { color: var(--muted); }
+  p.note { margin: 0.25rem 0 1rem; }
+  details { border: 1px solid var(--line); border-radius: 6px; margin: 1.5rem 0 1rem; padding: 0.5rem 0.75rem; }
   summary { cursor: pointer; color: var(--muted); }
-  button.primary { background: var(--accent); color: var(--bg); font-weight: 600; padding: 0.3rem 1.2rem; }
-  #log:empty { display: none; }
-  label { margin-right: 0.75rem; white-space: nowrap; }
-  input, select, button, textarea { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 0.2rem 0.4rem; }
+  label { white-space: nowrap; }
+  fieldset { border: 1px solid var(--line); border-radius: 6px; margin: 0.5rem 0 0.75rem; padding: 0.2rem 0.75rem 0.5rem; }
+  legend { color: var(--muted); padding: 0 0.3rem; }
+  fieldset label { display: block; white-space: normal; margin: 0.15rem 0; }
+  input, button, textarea, select { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 0.2rem 0.4rem; }
   button { cursor: pointer; border-color: var(--accent); }
-  button:disabled { opacity: 0.5; cursor: default; }
+  button:disabled, input:disabled { opacity: 0.5; cursor: default; }
+  button.primary { background: var(--accent); color: var(--bg); font-weight: 600; padding: 0.3rem 1.2rem; }
   textarea { width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace; }
-  pre { background: color-mix(in srgb, var(--line) 30%, transparent); border-radius: 6px; padding: 0.75rem; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
-  .row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin: 0.4rem 0; }
+  code, pre { font-family: ui-monospace, monospace; }
+  .row { display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem; align-items: center; margin: 0.4rem 0; }
+  #progress { width: 12rem; }
+  .ok { color: var(--ok); }
+  .bad { color: #c0177f; }
+  @media (prefers-color-scheme: dark) { .bad { color: #ff7ac8; } }
+  .switch { margin: 0.6rem 0 0.3rem; }
+  .switch label { margin-right: 1rem; }
+  #cube-help { margin: 0.2rem 0 0.4rem; }
+  .moves { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: 0.4rem 0; font-family: ui-monospace, monospace; }
+  .moves button { min-width: 2.6rem; padding: 0.15rem 0.35rem; border-color: var(--line); }
+  .moves button.done { color: var(--muted); }
+  .moves button[aria-current="step"] { outline: 2px solid var(--accent); outline-offset: 1px; color: var(--fg); }
+  .player { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin: 0.3rem 0; }
+  .player button { min-width: 2.4rem; }
+  #step-text { font-variant-numeric: tabular-nums; }
+  table { border-collapse: collapse; font-size: 0.9em; margin-top: 0.6rem; }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 0 0.75rem 0.2rem 0; }
+  td { padding: 0.1rem 0.75rem 0.1rem 0; vertical-align: top; }
+  td.moves-cell { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+  td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  #batch tr.pick { cursor: pointer; }
+  #batch tr.pick:hover td { color: var(--accent); }
+  #batch tr[aria-selected="true"] td { font-weight: 600; }
 </style>
 </head>
 <body>
+<nav class="top"><a href="docs/index.html">Documentation and benchmarks</a><a href="https://github.com/ArhanChaudhary/egg-solver">Source code</a></nav>
 <h1>egg-solver</h1>
-<p class="note">Optimal Rubik's cube solutions (fewest moves, half-turn metric), computed in your browser. Enter one scramble or 54-sticker facelet string (URFDLB order) per line.</p>
+<p class="note">Find the shortest possible solution of any Rubik's Cube right here in your browser,
+from a scramble or from the colours of your cube. Hold the cube with U on top and F facing you:
+<code>X</code> turns face X a quarter turn clockwise as you look at that face, <code>X'</code>
+anticlockwise, <code>X2</code> half a turn. Every turn counts as one move.</p>
 
-<textarea id="cubes" rows="4" aria-label="Scrambles, one per line" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="R U R' U' F2 D L2 B'  (one scramble or facelet string per line)"></textarea>
+<fieldset id="choice">
+  <legend>Solving data</legend>
+  <label><input type="radio" name="tables" value="3"> <strong>Light</strong> — 243 MB, quick to prepare, slower on hard cubes</label>
+  <label><input type="radio" name="tables" value="4:8" checked> <strong>Standard</strong> — 486 MB, about ten seconds to prepare on a laptop</label>
+  <label><input type="radio" name="tables" value="4"> <strong>Faster</strong> — 486 MB, a minute or two to prepare on a laptop, then faster solving</label>
+  <div id="choice-note" class="note" hidden></div>
+</fieldset>
+
 <div class="row">
-  <button id="solve" class="primary" disabled>Solve</button>
-  <button id="random" disabled>Random cube</button>
-  <span id="status" class="note" role="status">Starting…</span>
+  <progress id="progress" hidden></progress>
+  <span id="status" role="status">Starting…</span>
 </div>
 
-<pre id="log"></pre>
+<div class="row switch" role="radiogroup" aria-label="What to solve">
+  <label><input type="radio" name="input" value="scramble" checked> a scramble (moves)</label>
+  <label><input type="radio" name="input" value="cube"> a cube (the colours you see)</label>
+</div>
+
+<div id="scramble-input">
+  <textarea id="cubes" rows="3" aria-label="Scrambles, one per line" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Paste a scramble, e.g. R U R' U' F2 D L2 B', or press Random cube (one scramble or 54-sticker string per line)"></textarea>
+  <div class="row">
+    <button id="random" disabled>Random cube</button>
+    <button id="show-colours" title="Paint the picture with the colours this scramble makes, to change them or check them against your cube">Show its colours</button>
+    <button id="invert" title="Moves reversed, each turned the other way: a solution becomes a scramble of the position it solves">Invert</button>
+  </div>
+</div>
+<div id="cube-help" class="note" hidden>Hold your cube with U on top and F facing you, and paint
+each face as you see it: pick a colour, then click or drag over stickers. In the picture L is to
+the left of F, R to its right, then B; U above and D below.</div>
+<div id="cube-picture"></div>
+<div id="cube-buttons" class="row" hidden>
+  <button id="cube-solved" type="button">Solved cube</button>
+  <button id="cube-blank" type="button">All blank</button>
+</div>
+
+<div class="row">
+  <button id="solve" class="primary" disabled>Solve</button>
+  <button id="stop" disabled>Stop</button>
+</div>
+
+<section id="result" hidden>
+  <div id="summary"></div>
+  <div id="moves" class="moves" role="group" aria-label="The solution: choose a move to see the cube after it"></div>
+  <div class="player" id="player" hidden>
+    <button id="first" title="The scrambled cube" aria-label="Back to the start">⏮</button>
+    <button id="back" title="One move back" aria-label="One move back">◀</button>
+    <button id="play" title="Play the solution">▶ Play</button>
+    <button id="next" title="One move on" aria-label="One move on">▶</button>
+    <button id="last" title="The solved cube" aria-label="To the end">⏭</button>
+    <span id="step-text" class="note"></span>
+  </div>
+  <div id="step-picture"></div>
+  <div id="stats" class="note"></div>
+  <table id="batch" hidden aria-label="Solutions, one per scramble"></table>
+</section>
 
 <details id="settings">
-  <summary>Settings</summary>
-  <p class="note">The page starts with every available core and builds the h4 table (464 MiB) on desktops, or h3 (232 MiB) on phones, tablets and devices with 4 GB of memory or less; both take about as long to build. Smaller tables make hard cubes much slower. For faster solves you can load a larger table file, such as h6 (1.8 GiB, fine for a desktop browser). Table files are made on a computer with egg-solver's command-line program: see <a href="docs/reference/USER_GUIDE.html#choose-and-generate-a-table">how to make a table</a>.</p>
+  <summary>More options and how it works</summary>
+  <p class="note">egg-solver proves that a solution is the shortest possible with a large table
+  of lower bounds on how many moves positions need, which it prepares here in your browser the
+  first time and then saves, so later visits start almost at once. <strong>Light</strong> (243 MB,
+  the first choice on phones, tablets and devices with little memory) is quick to prepare but
+  slower on hard cubes. <strong>Standard</strong> (486 MB) takes about ten seconds to prepare on a
+  laptop. <strong>Faster</strong> (also 486 MB) takes a minute or two to prepare, then solves hard
+  cubes faster. If one cannot be prepared (for example, without enough memory), the page goes
+  back to a smaller one. Each kind is saved separately, so you can switch between them.</p>
+  <p class="note">Random cubes mostly need 17 or 18 moves; with all of a laptop's processor cores
+  their shortest solution takes from under a second to some seconds, and short scrambles are
+  solved at once. Every solution is checked on a separate model of the cube in this page.</p>
   <div class="row">
-    <label>Threads <input id="threads" type="number" min="1" value="1" style="width:4rem"></label>
+    <label>Processor cores to use <input id="threads" type="number" min="1" value="1" style="width:4rem"></label>
+    <button id="apply" disabled>Apply</button>
     <span id="isolation" class="note"></span>
   </div>
+  <div class="row"><span id="tables" class="note"></span></div>
   <div class="row">
-    <label>Table <select id="k">
-      <option value="0">h0 (29 MiB; hard cubes take minutes)</option>
-      <option value="1">h1 (58 MiB)</option>
-      <option value="2">h2 (116 MiB)</option>
-      <option value="3">h3 (232 MiB)</option>
-      <option value="4:8" selected>h4, quick build (464 MiB)</option>
-      <option value="4">h4, slow build, ~1.4× faster solves (464 MiB)</option>
-    </select></label>
-    <button id="apply" disabled>Apply</button>
+    <button id="forget" disabled>Delete all saved solving data</button>
+    <label>Load a table file <input id="file" type="file" disabled></label>
   </div>
   <div class="row">
-    <label>Or load a table file <input id="file" type="file" disabled></label>
-  </div>
-  <div class="row">
-    <label>Or a table URL <input id="url" type="text" placeholder="/tables/h6" style="width:14rem"></label>
+    <label>or from a URL <input id="url" type="text" placeholder="tables/h6" style="width:12rem" autocomplete="off" spellcheck="false"></label>
     <button id="fetch" disabled>Load</button>
-    <label><input id="verify" type="checkbox"> verify checksum</label>
   </div>
-  <div class="row">
-    <label>Lanes per thread <input id="lanes" type="number" min="0" value="0" style="width:4rem"></label>
-    <span class="note">0: automatic</span>
-  </div>
+  <p class="note">For developers: instead of preparing the data here, you can load a table file
+  made by egg-solver's command-line program, from h0 (30 MB) up to h6 (2 GB); files are checked
+  against their checksum. See <a href="docs/reference/USER_GUIDE.html#choose-and-generate-a-table">how
+  to make a table</a>.</p>
 </details>
 
 <script type="module">
+import { FACES, SOLVED, applyMoves, formatMoves, invertMoves, isSolved, moveName, parseMoves } from './cube-model.mjs';
+import { CubeInput } from './cube-input.mjs';
+
 const $ = (id) => document.getElementById(id);
-const log = (text) => { $('log').textContent += text + '\n'; };
 const status = (text) => { $('status').textContent = text; };
-const worker = new Worker(new URL('./demo-worker.mjs', import.meta.url), { type: 'module' });
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const capital = (word) => word[0].toUpperCase() + word.slice(1);
+
+// --- The kinds of solving data: a table hk (with its base, for h4) ---
+// Light, Standard and Faster can be chosen; small and tiny are only fallbacks for devices that
+// cannot prepare Light.
+const KINDS = {
+  4: { name: 'faster', k: 4, base: 0 },
+  '4:8': { name: 'standard', k: 4, base: 8 },
+  3: { name: 'light', k: 3, base: 0 },
+  2: { name: 'small', k: 2, base: 0 },
+  0: { name: 'tiny', k: 0, base: 0 },
+};
+const SMALLER = { 4: '4:8', '4:8': '3', 3: '2', 2: '0' };
+const CHOICE = 'egg-solver-tables';
+// Phones, tablets and devices with little memory start with Light. (iPadOS Safari says it is a Mac.)
+const handheld = navigator.userAgentData?.mobile
+  || /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+  || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1)
+  || matchMedia('(pointer: coarse)').matches
+  || (navigator.deviceMemory ?? 8) <= 4;
+const DEFAULT = handheld ? '3' : '4:8';
+const savedChoice = () => {
+  try {
+    const t = localStorage.getItem(CHOICE);
+    return t in KINDS ? t : DEFAULT;
+  } catch {
+    return DEFAULT;
+  }
+};
+let kind = savedChoice();
+const choose = (t, remember = true) => {
+  kind = t;
+  for (const r of document.querySelectorAll('input[name=tables]')) r.checked = r.value === t;
+  if (remember) try { localStorage.setItem(CHOICE, t); } catch { /* (for this visit only) */ }
+};
+const choiceNote = (text) => {
+  $('choice-note').textContent = text;
+  $('choice-note').hidden = !text;
+};
+choose(kind, false);
+
+// --- The solver worker (demo-worker.mjs) ---
+let worker = null;
 let nextId = 0;
 const pending = new Map();
-worker.onmessage = ({ data }) => {
-  if (data.progress !== undefined) {
-    $('status').textContent = `Loading the table… ${Math.round(100 * data.progress)}%`;
-    return;
-  }
-  const { resolve, reject } = pending.get(data.id);
-  pending.delete(data.id);
-  data.error ? reject(new Error(data.error)) : resolve(data.result);
+const startWorker = () => {
+  worker = new Worker(new URL('./demo-worker.mjs', import.meta.url), { type: 'module' });
+  worker.onmessage = ({ data }) => {
+    if ('progress' in data) {
+      $('progress').value = data.progress;
+      return;
+    }
+    const p = pending.get(data.id);
+    if (!p) return;
+    pending.delete(data.id);
+    'error' in data ? p.reject(new Error(data.error)) : p.resolve(data.result);
+  };
+  worker.onerror = (e) => {
+    for (const p of pending.values()) p.reject(new Error(e.message || 'the solver worker failed'));
+    pending.clear();
+  };
+};
+const stopWorker = (reason) => {
+  worker?.terminate();
+  worker = null;
+  for (const p of pending.values()) p.reject(new Error(reason));
+  pending.clear();
 };
 const call = (cmd, args = {}) => new Promise((resolve, reject) => {
   const id = nextId++;
   pending.set(id, { resolve, reject });
   worker.postMessage({ id, cmd, ...args });
 });
-const busy = async (label, f) => {
-  for (const b of document.querySelectorAll('button, input[type=file]')) b.disabled = true;
-  const start = performance.now();
-  try {
-    return await f();
-  } catch (e) {
-    status(`${label} failed: ${e.message}`);
-    log(`${label}: ${e.message}`);
-  } finally {
-    for (const b of document.querySelectorAll('button, input[type=file]')) b.disabled = false;
-    $('solve').disabled = $('random').disabled = !tableReady;
-  }
-};
-let tableReady = false;
-let moduleThreads = 0;
-const tableLoaded = (t, seconds) => {
-  tableReady = true;
-  status(`Ready · h${t.k} table (${(t.bytes / 2 ** 20).toFixed(0)} MiB, ready in ${seconds.toFixed(1)} s) · ${moduleThreads} thread${moduleThreads === 1 ? '' : 's'}`);
-};
 
-// Default: every core the host offers (one thread without cross-origin isolation).
-const cores = crossOriginIsolated ? Math.max(1, navigator.hardwareConcurrency || 1) : 1;
-$('isolation').textContent = crossOriginIsolated
-  ? `threads available (${cores} cores)`
-  : 'one thread available on this host';
-$('threads').value = $('threads').max = cores;
-$('threads').disabled = !crossOriginIsolated;
-
-// Start the module; if the threads build cannot start (for example, the host
-// refuses its 4 GiB shared memory), fall back to one thread.
-const init = async (threads) => {
-  tableReady = false;
-  status(`Starting with ${threads} thread${threads === 1 ? '' : 's'}…`);
-  try {
-    ({ threads } = await call('init', { threads }));
-  } catch (e) {
-    if (threads <= 1) throw e;
-    log(`${threads} threads unavailable (${e.message}); using 1`);
-    $('threads').value = 1;
-    ({ threads } = await call('init', { threads: 1 }));
-  }
-  moduleThreads = threads;
+// --- Tables kept in IndexedDB, one entry per kind ---
+const DB = 'egg-solver';
+const STORE = 'tables';
+const key = (t) => `${t}-v1`;
+const db = () => new Promise((resolve, reject) => {
+  const r = indexedDB.open(DB, 1);
+  r.onupgradeneeded = () => r.result.createObjectStore(STORE);
+  r.onsuccess = () => resolve(r.result);
+  r.onerror = () => reject(r.error);
+});
+const store = async (mode, f) => {
+  const d = await db();
+  return new Promise((resolve, reject) => {
+    const r = f(d.transaction(STORE, mode).objectStore(STORE));
+    r.onsuccess = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+  });
 };
-// Generate the selected table: base 8 for the quick-build h4 option, else the
-// recommended base.
-const generate = async () => {
-  const [k, base] = $('k').value.split(':').map(Number);
-  tableReady = false;
-  status(`Generating the h${k} table…`);
-  const start = performance.now();
-  tableLoaded(await call('generate', { k, base: base || 0 }), (performance.now() - start) / 1000);
+const cached = (t) => store('readonly', (s) => s.get(key(t))).catch(() => undefined);
+const keep = (t, blob) => store('readwrite', (s) => s.put(blob, key(t)));
+const forget = (t) => store('readwrite', (s) => s.delete(key(t))).catch(() => undefined);
+
+// --- State and buttons ---
+let threads = 1;
+let wanted = 1;
+let ready = false;
+let solving = false;
+let table = null;
+const buttons = () => {
+  $('random').disabled = $('solve').disabled = !ready || solving;
+  $('stop').disabled = !solving;
+  $('apply').disabled = $('file').disabled = $('fetch').disabled = $('forget').disabled = !ready || solving;
+  for (const r of document.querySelectorAll('input[name=tables]')) r.disabled = solving;
 };
+const mb = (bytes) => `${Math.round(bytes / 1e6)} MB`;
+const readyText = () => `Ready · ${table.from ?? `${KINDS[kind].name} solving data`} · ${plural(threads, 'processor core')}`;
 
-// Settings: restart only if the thread count changed, then build the table.
-$('apply').onclick = () => busy('Apply', async () => {
-  const threads = Number($('threads').value);
-  if (threads !== moduleThreads) await init(threads);
-  await generate();
-});
-const load = (source) => busy('Load', async () => {
-  tableReady = false;
-  status('Loading the table…');
-  const start = performance.now();
-  tableLoaded(await call('load', { source, verify: $('verify').checked }), (performance.now() - start) / 1000);
-});
-$('file').onchange = () => $('file').files[0] && load($('file').files[0]);
-$('fetch').onclick = () => load(new URL($('url').value, location.href).href);
-$('random').onclick = () => busy('Random cube', async () => {
-  const cube = await call('random', { seed: Math.floor(Math.random() * 2 ** 31) });
-  $('cubes').value = ($('cubes').value.trim() + '\n' + cube).trim();
-});
-// Phone keyboards substitute curly or look-alike apostrophes (’ ‘ ′ ´ ` ʼ) for
-// the prime ' in moves like R'. Replace them as the user types (one character
-// for one, so the caret stays put) and again before solving.
-const primes = /[\u2018\u2019\u201b\u2032\u00b4\u0060\u02bc\u02b9]/g;
-const plain = (text) => text.replace(primes, "'").replace(/\u00a0/g, ' ');
-$('cubes').addEventListener('input', () => {
-  const box = $('cubes');
-  if (!primes.test(box.value)) return;
-  primes.lastIndex = 0;
-  const [start, end] = [box.selectionStart, box.selectionEnd];
-  box.value = plain(box.value);
-  box.setSelectionRange(start, end);
-});
-$('solve').onclick = () => busy('Solve', async () => {
-  $('cubes').value = plain($('cubes').value);
-  const cubes = $('cubes').value.split('\n').map((l) => l.trim()).filter(Boolean);
-  if (!cubes.length) {
-    status('Enter a scramble, or press Random cube.');
-    return;
-  }
-  for (const cube of cubes) {
-    const r = await call('solve', { cube, lanes: Number($('lanes').value) });
-    log(`${cube}\n  ${r.length} moves in ${r.wall.toFixed(3)} s (${(r.nodes / 1e6).toFixed(1)}M nodes): ${r.moves}`);
-  }
-});
-
-// The default, with no clicks: all cores, and the table by device. h4 built
-// with base 8 (464 MiB) builds about as fast as h2/h3 but solves 18-move cubes
-// several times faster than h2; phones, tablets and devices reporting 4 GB of
-// memory or less get h3 (232 MiB). If a table cannot be allocated, the next
-// smaller one is tried. (Set the table explicitly: browsers may restore an
-// earlier choice on reload.)
-const lowEnd = matchMedia('(pointer: coarse)').matches || (navigator.deviceMemory ?? 8) <= 4;
-const candidates = lowEnd ? ['3', '2', '0'] : ['4:8', '3', '0'];
-busy('Start', async () => {
-  await init(cores);
-  for (const [i, table] of candidates.entries()) {
-    $('k').value = table;
+/** Tables from IndexedDB, else generated (and then stored), for `boot`'s `session`. */
+const prepareTables = async (session) => {
+  const { name, k, base } = KINDS[kind];
+  const t0 = performance.now();
+  const seconds = () => ((performance.now() - t0) / 1000).toFixed(1);
+  const blob = await cached(kind);
+  current(session);
+  if (blob) {
+    status(`Loading the saved ${name} solving data…`);
+    $('progress').hidden = false;
+    $('progress').value = 0;
     try {
-      await generate();
-      return;
+      const loaded = await call('load', { source: blob, verify: true });
+      $('tables').textContent = `${capital(name)} solving data (h${loaded.k}, ${mb(loaded.bytes)}) loaded from this browser in ${seconds()} s.`;
+      return loaded;
     } catch (e) {
-      if (i === candidates.length - 1) throw e;
-      log(`h${table.split(':')[0]} unavailable (${e.message}); trying a smaller table`);
+      // (a stopped worker, or no room for the data: keep it; a damaged copy: prepare it again)
+      if (e.message === 'restarted' || /room|memory/i.test(e.message)) throw e;
+      await forget(kind);
+    } finally {
+      $('progress').hidden = true;
     }
   }
+  // (no value: the bar shows that work goes on, without a share done)
+  $('progress').removeAttribute('value');
+  $('progress').hidden = false;
+  const timer = setInterval(() => status(`Preparing the ${name} solving data (first time only)… ${seconds()} s`), 200);
+  let made;
+  try {
+    made = await call('generate', { k, base });
+    $('tables').textContent = `${capital(name)} solving data (h${made.k}, ${mb(made.bytes)}) prepared in ${made.seconds.toFixed(1)} s.`;
+  } finally {
+    clearInterval(timer);
+    $('progress').hidden = true;
+    $('progress').value = 0;
+  }
+  // Keep it for the next visit (in the background; a failure only costs preparing it again).
+  const t = kind;
+  call('export')
+    .then((file) => keep(t, file))
+    .then(() => { $('tables').textContent += ' Saved in this browser for later visits.'; })
+    .catch((e) => {
+      if (e.message === 'restarted' || e.message === 'stopped') return;
+      $('tables').textContent += ' It could not be saved in this browser (not enough storage space?),'
+        + ' so it will be prepared again next time.';
+    });
+  return made;
+};
+
+// Each `boot` starts a session; a start that a newer one replaced stops at its next step.
+let sessions = 0;
+const current = (session) => {
+  if (session !== sessions) throw new Error('restarted');
+};
+
+/** Start the solver worker with `n` threads (one if the threads module cannot start). */
+const boot = async (n) => {
+  const session = ++sessions;
+  stopWorker('restarted');
+  ready = false;
+  buttons();
+  status('Starting…');
+  startWorker();
+  try {
+    ({ threads } = await call('init', { threads: n }));
+  } catch (e) {
+    if (n <= 1 || e.message === 'restarted') throw e;
+    stopWorker('restarted');
+    startWorker();
+    ({ threads } = await call('init', { threads: 1 }));
+    console.warn(`could not use ${n} processor cores:`, e);
+  }
+  $('threads').value = threads;
+  return session;
+};
+
+/** `boot`, then the tables; if a kind cannot be prepared, the next smaller one. */
+const start = async (n) => {
+  wanted = n;
+  const session = await boot(n);
+  try {
+    table = await prepareTables(session);
+  } catch (e) {
+    const next = SMALLER[kind];
+    if (!next || e.message === 'restarted') throw e;
+    console.warn(`the ${KINDS[kind].name} solving data:`, e);
+    const failed = KINDS[kind].name;
+    choose(next, false);
+    choiceNote(`${capital(failed)} could not be prepared in this browser (it may not have enough`
+      + ` memory), so the page uses ${KINDS[next].name} solving data instead.`);
+    return start(n);
+  }
+  ready = true;
+  buttons();
+  status(readyText());
+};
+const run = (label, f) => f().catch((e) => {
+  // (a solve stopped by ending the worker, or a start replaced by a new one: the new one reports)
+  if (e.message === 'stopped' || e.message === 'restarted') return;
+  status(`${label} failed: ${e.message}`);
+  buttons();
 });
+
+// --- Reading the scramble box ---
+// Phone keyboards substitute curly or look-alike apostrophes for the prime.
+const primes = /[‘’‛′´`ʼʹ]/g;
+const plain = (text) => text.replace(primes, "'").replace(/ /g, ' ');
+
+/**
+ * A line of the box as a cube: { text (for the solver), stickers (54 face letters) }, or
+ * { error }. Sticker strings are read as egg-solver reads them: 54 symbols of six kinds, each
+ * centre's symbol standing for its face.
+ */
+const readCube = (line) => {
+  const chars = [...line].filter((c) => !/\s/.test(c));
+  if (chars.length === 54 && new Set(chars).size === 6 && !chars.some((c) => '123\''.includes(c))) {
+    const map = new Map(FACES.map((f, i) => [chars[9 * i + 4], f]));
+    if (map.size !== 6) return { error: 'two centres have the same colour' };
+    return { text: chars.join(''), stickers: chars.map((c) => map.get(c)).join('') };
+  }
+  const moves = parseMoves(line);
+  if (!moves) return { error: `not moves: ${line.trim()}` };
+  return { text: formatMoves(moves), stickers: applyMoves(SOLVED, moves) };
+};
+const lines = () => plain($('cubes').value).split('\n').map((l) => l.trim()).filter(Boolean);
+
+// --- The cube picture: painted in cube mode, the box's (first) cube in scramble mode ---
+// The turn buttons under the picture: in scramble mode they add the move to the (first) scramble,
+// in cube mode they turn the painted cube.
+const turn = (name) => {
+  if (cubeMode()) {
+    picture.paintAll(applyMoves(picture.codeText(), parseMoves(name)));
+    return;
+  }
+  const box = $('cubes');
+  const [first = '', ...rest] = plain(box.value).split('\n');
+  box.value = [`${first.trim()} ${name}`.trim(), ...rest].join('\n');
+  preview();
+};
+const picture = new CubeInput($('cube-picture'), { paint: true, remember: true, onTurn: turn });
+const cubeMode = () => document.querySelector('input[name=input]:checked').value === 'cube';
+const preview = () => {
+  if (cubeMode()) return;
+  const [first] = lines();
+  const cube = first ? readCube(first) : { stickers: SOLVED };
+  picture.setStickers(cube.stickers ?? '.'.repeat(54));
+};
+const setMode = (mode) => {
+  const cube = mode === 'cube';
+  document.querySelector(`input[name=input][value=${mode}]`).checked = true;
+  $('scramble-input').hidden = cube;
+  $('cube-help').hidden = $('cube-buttons').hidden = !cube;
+  picture.setPaintable(cube);
+  if (cube) picture.restore();
+  else preview();
+  try { localStorage.setItem('egg-solver-input', mode); } catch { /* (only a convenience) */ }
+};
+for (const r of document.querySelectorAll('input[name=input]')) r.onchange = () => setMode(r.value);
+try {
+  setMode(localStorage.getItem('egg-solver-input') === 'cube' ? 'cube' : 'scramble');
+} catch {
+  setMode('scramble');
+}
+$('cube-solved').onclick = () => picture.fillSolved();
+$('cube-blank').onclick = () => picture.clear();
+$('show-colours').onclick = () => {
+  const [first] = lines();
+  if (!first) { status('Enter a scramble first.'); return; }
+  const cube = readCube(first);
+  if (cube.error) { status(cube.error); return; }
+  picture.paintAll(cube.stickers);
+  setMode('cube');
+};
+$('cubes').addEventListener('input', () => {
+  const box = $('cubes');
+  if (primes.test(box.value)) {
+    primes.lastIndex = 0;
+    const [s, e] = [box.selectionStart, box.selectionEnd];
+    box.value = plain(box.value);
+    box.setSelectionRange(s, e);
+  }
+  preview();
+});
+
+// A solution from elsewhere, inverted, is a scramble of the position it solves.
+$('invert').onclick = () => {
+  const all = lines();
+  if (!all.length) return;
+  const out = [];
+  for (const line of all) {
+    const moves = parseMoves(line);
+    if (!moves) { status('Invert works on moves, not on sticker strings.'); return; }
+    out.push(formatMoves(invertMoves(moves)));
+  }
+  $('cubes').value = out.join('\n');
+  preview();
+  status('Inverted: these moves now scramble the position your moves solved');
+};
+
+$('random').onclick = () => run('Random cube', async () => {
+  const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+  $('cubes').value = await call('random', { seed });
+  preview();
+  status('A random cube, as its 54 stickers: press Solve');
+});
+
+// --- Solving and the solution player ---
+const stepPicture = new CubeInput($('step-picture'));
+let steps = null; // { start: stickers, moves: [{ face, turns }], at: moves done }
+let playing = null;
+const showStep = (at) => {
+  if (!steps) return;
+  steps.at = Math.max(0, Math.min(steps.moves.length, at));
+  const before = applyMoves(steps.start, steps.moves.slice(0, Math.max(0, steps.at - 1)));
+  const now = applyMoves(steps.start, steps.moves.slice(0, steps.at));
+  const moved = steps.at ? [...now].map((c, i) => (c !== before[i] ? i : -1)).filter((i) => i >= 0) : [];
+  stepPicture.setStickers(now, moved);
+  [...$('moves').querySelectorAll('button')].forEach((b, i) => {
+    b.classList.toggle('done', i < steps.at);
+    if (i === steps.at - 1) b.setAttribute('aria-current', 'step');
+    else b.removeAttribute('aria-current');
+  });
+  const n = steps.moves.length;
+  $('step-text').textContent = steps.at === 0 ? `the scrambled cube · ${plural(n, 'move')} to go`
+    : steps.at === n ? 'solved' : `after move ${steps.at} of ${n}: ${moveName(steps.moves[steps.at - 1])}`;
+};
+const stopPlaying = () => {
+  clearInterval(playing);
+  playing = null;
+  $('play').textContent = '▶ Play';
+};
+$('first').onclick = () => { stopPlaying(); showStep(0); };
+$('back').onclick = () => { stopPlaying(); showStep(steps.at - 1); };
+$('next').onclick = () => { stopPlaying(); showStep(steps.at + 1); };
+$('last').onclick = () => { stopPlaying(); showStep(steps.moves.length); };
+$('play').onclick = () => {
+  if (playing) { stopPlaying(); return; }
+  if (steps.at >= steps.moves.length) showStep(0);
+  $('play').textContent = '⏸ Pause';
+  playing = setInterval(() => {
+    if (steps.at >= steps.moves.length) { stopPlaying(); return; }
+    showStep(steps.at + 1);
+  }, 700);
+};
+
+/** Show one solved cube: the summary, its moves to step through, and the player. */
+const showSolution = (r) => {
+  stopPlaying();
+  $('result').hidden = false;
+  $('step-picture').hidden = false;
+  const moves = parseMoves(r.moves) ?? [];
+  const checked = isSolved(applyMoves(r.start, moves));
+  $('summary').innerHTML = `<strong>${plural(r.length, 'move')}</strong> · <span class="ok">shortest possible</span>`
+    + (checked ? ' · <span class="ok">checked</span>' : ' · <strong class="bad">check failed: please report this cube</strong>');
+  $('moves').replaceChildren(...moves.map((m, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = moveName(m);
+    b.title = `The cube after move ${i + 1}`;
+    b.onclick = () => { stopPlaying(); showStep(i + 1); };
+    return b;
+  }));
+  if (!moves.length) {
+    const s = document.createElement('span');
+    s.className = 'note';
+    s.textContent = '(already solved)';
+    $('moves').append(s);
+  }
+  $('player').hidden = !moves.length;
+  steps = { start: r.start, moves, at: 0 };
+  showStep(0);
+  const searched = r.nodes < 1e3 ? `${r.nodes}` : r.nodes < 1e6 ? `${Math.round(r.nodes / 1e3)} thousand` : `${(r.nodes / 1e6).toFixed(1)} million`;
+  $('stats').textContent = `Took ${r.wall.toFixed(2)} s and searched ${searched} positions.`;
+};
+
+/** A painted cube that cannot be solved: what is wrong, with the stickers concerned outlined. */
+const showProblem = (problem) => {
+  picture.highlight(problem.stickers);
+  let text;
+  if (problem.kind === 'blank') {
+    text = `Colour every sticker first: ${problem.message}.`;
+  } else if (problem.kind === 'counts') {
+    const parts = problem.counts.map(([c, n]) => `${picture.colourName(c)} is on ${n}`);
+    const list = parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts[0];
+    text = `Each colour should be on exactly 9 stickers, but ${list}.`;
+  } else {
+    text = `This cube cannot be solved: ${problem.message}.`;
+  }
+  if (problem.stickers.length) text += ' The stickers concerned are outlined.';
+  $('result').hidden = false;
+  $('summary').innerHTML = '<strong class="bad">This cube cannot be solved as painted</strong>';
+  $('moves').replaceChildren();
+  $('player').hidden = $('step-picture').hidden = $('batch').hidden = true;
+  $('stats').textContent = text;
+};
+
+/** The cubes to solve: from the picture (cube mode) or the box; null if there is a problem. */
+const cubesToSolve = () => {
+  if (cubeMode()) {
+    const { facelets, problem } = picture.facelets();
+    if (problem) {
+      showProblem(problem);
+      return null;
+    }
+    return [{ text: facelets, stickers: facelets }];
+  }
+  const all = lines();
+  if (!all.length) {
+    status('Enter a scramble, or press Random cube.');
+    return null;
+  }
+  const cubes = all.map(readCube);
+  const bad = cubes.findIndex((c) => c.error);
+  if (bad >= 0) {
+    status(`Line ${bad + 1}: ${cubes[bad].error}`);
+    return null;
+  }
+  return cubes;
+};
+
+$('solve').onclick = () => run('Solve', async () => {
+  const cubes = cubesToSolve();
+  if (!cubes) return;
+  $('cubes').value = plain($('cubes').value);
+  solving = true;
+  buttons();
+  stopPlaying();
+  $('result').hidden = true;
+  $('batch').hidden = true;
+  const t0 = performance.now();
+  let index = 0;
+  const timer = setInterval(() => status(`Solving${cubes.length > 1 ? ` ${index + 1} of ${cubes.length}` : ''}… ${((performance.now() - t0) / 1000).toFixed(1)} s`), 100);
+  const results = [];
+  try {
+    for (index = 0; index < cubes.length; index++) {
+      const r = await call('solve', { cube: cubes[index].text, lanes: 0 });
+      results.push({ ...r, start: cubes[index].stickers });
+      showBatch(results, cubes.length);
+    }
+    showSolution(results[0]);
+    if (results.length > 1) selectRow(0);
+    status(readyText());
+  } finally {
+    clearInterval(timer);
+    solving = false;
+    buttons();
+  }
+});
+
+/** Several cubes: a table of their solutions; choosing a row shows that one in the player. */
+const showBatch = (results, total) => {
+  const batch = $('batch');
+  batch.hidden = total < 2;
+  if (total < 2) return;
+  $('result').hidden = false;
+  const head = document.createElement('tr');
+  for (const h of ['', 'Moves', 'Solution', 'Time']) {
+    const th = document.createElement('th');
+    th.textContent = h;
+    head.append(th);
+  }
+  batch.replaceChildren(head, ...results.map((r, i) => {
+    const tr = document.createElement('tr');
+    tr.className = 'pick';
+    tr.title = 'Step through this solution';
+    tr.onclick = () => { showSolution(r); selectRow(i); };
+    for (const [text, cls] of [[`${i + 1}.`, 'num'], [`${r.length}`, 'num'], [r.moves || '(solved)', 'moves-cell'], [`${r.wall.toFixed(2)} s`, 'num']]) {
+      const td = document.createElement('td');
+      td.className = cls;
+      td.textContent = text;
+      tr.append(td);
+    }
+    return tr;
+  }));
+};
+const selectRow = (i) => {
+  [...$('batch').querySelectorAll('tr.pick')].forEach((tr, j) => tr.setAttribute('aria-selected', String(i === j)));
+};
+
+$('stop').onclick = () => {
+  // A solve cannot be interrupted inside the module: end the worker and start a new one (the
+  // solving data comes back from this browser's storage).
+  stopWorker('stopped');
+  solving = false;
+  status('Stopped');
+  run('Restart', () => start(threads));
+};
+
+// --- The choice of solving data: a change starts the solver again with the other kind ---
+for (const r of document.querySelectorAll('input[name=tables]')) {
+  r.addEventListener('change', () => {
+    if (!r.checked || r.value === kind) return;
+    choose(r.value);
+    choiceNote('');
+    run('Start', () => start(wanted));
+  });
+}
+
+// --- Settings ---
+const cores = crossOriginIsolated ? Math.max(1, navigator.hardwareConcurrency || 1) : 1;
+$('isolation').textContent = crossOriginIsolated
+  ? `This page can use up to ${cores} of your computer's processor cores.`
+  : 'This browser lets the page use only one processor core, so solving is slower.';
+$('threads').max = Math.max(cores, 1);
+$('threads').disabled = !crossOriginIsolated;
+$('apply').onclick = () => run('Restart', () => start(Math.max(1, Math.min(cores, Number($('threads').value) || 1))));
+$('forget').onclick = () => run('Forget', async () => {
+  await Promise.all(Object.keys(KINDS).map(forget));
+  $('tables').textContent = 'Saved solving data deleted; it will be prepared again on your next visit.';
+});
+/** Load a table file (a File or a URL) in place of the solving data, until the page is reloaded. */
+const loadTable = (source, label) => run('Load', async () => {
+  ready = false;
+  buttons();
+  status(`Loading ${label}…`);
+  $('progress').hidden = false;
+  $('progress').value = 0;
+  const t0 = performance.now();
+  try {
+    table = await call('load', { source, verify: true });
+  } catch (e) {
+    // (the module dropped its table to load this one: get the solving data back)
+    if (e.message !== 'restarted') await start(wanted);
+    throw e;
+  } finally {
+    $('progress').hidden = true;
+  }
+  table.from = `h${table.k} table from ${label}`;
+  $('tables').textContent = `Table ${label} (h${table.k}, ${mb(table.bytes)}) loaded in ${((performance.now() - t0) / 1000).toFixed(1)} s; it is used until the page is reloaded.`;
+  ready = true;
+  buttons();
+  status(readyText());
+});
+$('file').onchange = () => {
+  const [file] = $('file').files;
+  $('file').value = '';
+  if (file) loadTable(file, file.name);
+};
+$('fetch').onclick = () => {
+  const url = $('url').value.trim();
+  if (url) loadTable(new URL(url, location.href).href, url);
+};
+
+// The default, with no clicks: every core the page may use, and the chosen solving data.
+run('Start', () => start(cores));
 </script>
 </body>
 </html>

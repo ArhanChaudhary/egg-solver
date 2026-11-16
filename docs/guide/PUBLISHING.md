@@ -15,17 +15,22 @@ or site base path is hardcoded. See GitHub's [custom workflow documentation](htt
 
 The public site is <https://egg-solver.arhan.sh/>. It runs the solver in your
 browser: on load the demo starts with every core the browser reports and
-builds the h4 table (464 MiB) on desktops or h3 (232 MiB) on phones, tablets and low-memory devices, so **Solve** works without further setup.
-Generate a larger table there or select your own table file; large pruning
-tables are not uploaded to Pages.
+prepares the h4 table (464 MiB) on desktops or h3 (232 MiB) on phones, tablets
+and low-memory devices, then keeps it in the browser's IndexedDB for later
+visits, so **Solve** works without further setup. Visitors can solve a scramble
+or a cube painted from its colours and step through the solution
+([user guide](../reference/USER_GUIDE.md#browser)). Large pruning tables are not
+uploaded to Pages; a visitor can load their own table file.
 
 Browser threads need cross-origin isolation: every response must carry
 `Cross-Origin-Opener-Policy: same-origin` and
 `Cross-Origin-Embedder-Policy: require-corp`. GitHub Pages cannot set response
 headers, so egg-solver.arhan.sh is served through Cloudflare, which adds both
-headers; the public demo therefore uses multiple threads. A deployment without
-those headers, such as a plain `github.io` address, is not isolated and the
-demo falls back to one thread. Local `wasm/serve.mjs` sends the same headers.
+headers; the public demo therefore uses multiple threads. On a deployment
+without those headers, such as a plain `github.io` address, the page registers
+`coi-sw.js`, a service worker that adds them to the site's responses, and
+reloads once; a browser that refuses it runs the demo on one thread. Local
+`wasm/serve.mjs` sends the headers itself.
 
 To build the same site locally, install Bun 1.4.4 and the Rust targets:
 
@@ -36,8 +41,8 @@ python3 -m http.server 8000 --directory /tmp/egg-solver-pages
 ```
 
 Choose an output directory that does not already exist. Open
-`http://localhost:8000/`. This plain HTTP server exercises the one-thread
-hosting mode. WebAssembly binaries and staged site directories are generated locally and are not committed. The documentation HTML companions are committed for offline reading.
+`http://localhost:8000/`. This plain HTTP server sends no isolation headers,
+so it exercises the service-worker path (localhost counts as a secure context). WebAssembly binaries and staged site directories are generated locally and are not committed. The documentation HTML companions are committed for offline reading.
 
 After rendering, `python3 scripts/check-docs.py` checks local links, table/heading structure and the latest benchmark headline against its recorded analysis. The Pages build runs this check before building the browser module.
 

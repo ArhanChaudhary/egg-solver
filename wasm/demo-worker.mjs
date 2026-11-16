@@ -1,7 +1,8 @@
 // The browser demo's solver (index.html): runs the WebAssembly module in a
 // worker, so the page stays responsive and the threads build may block.
 // Messages in: { id, cmd, ... }; out: { id, result } or { id, error }, and
-// { progress } while a table loads.
+// { progress } while a table file loads. A solve cannot be interrupted: the
+// page stops one by ending the worker and starting a new one.
 
 import { EggSolver } from './egg-solver.mjs';
 
@@ -14,12 +15,18 @@ const commands = {
     solver = await EggSolver.create({ wasm, threads: threads > 1 ? threads : undefined });
     return { threads: solver.threads };
   },
-  generate({ k, base }) {
-    return solver.generateTable(k, base);
+  async generate({ k, base }) {
+    const start = performance.now();
+    const table = await solver.generateTable(k, base);
+    return { ...table, seconds: (performance.now() - start) / 1000 };
   },
   load({ source, verify }) {
     const onProgress = (done, size) => postMessage({ progress: done / size });
     return solver.loadTable(source, { verify, onProgress });
+  },
+  /** The table as a file (a Blob), to keep in IndexedDB. */
+  export() {
+    return solver.exportTable();
   },
   solve({ cube, lanes }) {
     const start = performance.now();

@@ -416,6 +416,22 @@ export class EggSolver {
   }
 
   /**
+   * The loaded table as a table file, the format `loadTable` reads (a page
+   * can keep it in IndexedDB): a `Blob` of the table's data and a trailer
+   * with its checksum, copied out of the module in 16 MiB pieces.
+   */
+  exportTable() {
+    const parts = this.call('egg_solver_table_export', this.threads);
+    const pieces = [];
+    const step = 1 << 24;
+    for (let at = 0; at < parts.data_bytes; at += step) {
+      pieces.push(copyOut(this.memory, parts.data + at, Math.min(step, parts.data_bytes - at)));
+    }
+    pieces.push(copyOut(this.memory, parts.trailer, parts.trailer_bytes));
+    return new Blob(pieces);
+  }
+
+  /**
    * Generate table hk in memory (base 0: the default for k). h0..h4 take
    * from seconds to a minute or two on one thread (more threads: faster).
    */
