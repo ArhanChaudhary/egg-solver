@@ -25,8 +25,33 @@
     )
 )]
 
+/// Whether this rustc links wasi-libc's `crt1-reactor` into a cdylib itself
+/// (Rust 1.100 and later), which then defines `_initialize` (see lib.rs).
+fn links_libc_reactor() -> bool {
+    let rustc = std::env::var("RUSTC").unwrap_or_else(|_| "rustc".to_string());
+    let Ok(output) = std::process::Command::new(rustc).arg("--version").output() else {
+        return false;
+    };
+    // "rustc 1.100.0 (...)": the major and minor versions.
+    let text = String::from_utf8_lossy(&output.stdout);
+    let mut numbers = text
+        .split_whitespace()
+        .nth(1)
+        .unwrap_or("")
+        .split('.')
+        .map(|n| n.parse::<u32>().ok());
+    match (numbers.next().flatten(), numbers.next().flatten()) {
+        (Some(major), Some(minor)) => (major, minor) >= (1, 100),
+        _ => false,
+    }
+}
+
 fn main() {
     println!("cargo::rustc-check-cfg=cfg(wasm_threads)");
+    println!("cargo::rustc-check-cfg=cfg(libc_reactor)");
+    if links_libc_reactor() {
+        println!("cargo::rustc-cfg=libc_reactor");
+    }
     if std::env::var("TARGET").is_ok_and(|target| target.ends_with("-threads")) {
         println!("cargo::rustc-cfg=wasm_threads");
         println!("cargo::rustc-cdylib-link-arg=--initial-memory=4294901760");

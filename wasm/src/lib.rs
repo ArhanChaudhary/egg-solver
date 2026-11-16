@@ -49,6 +49,15 @@ const THREADS: bool = cfg!(wasm_threads);
 /// instead of finishing its exit, so a `join` on it waited forever (the
 /// intermittent hang of `wasm/test.mjs`, at ~1 in 3 runs under load). It
 /// then installs the thread pool (`threads.rs`).
+///
+/// Rust 1.100 and later link wasi-libc's `crt1-reactor` into the module
+/// themselves (`cfg(libc_reactor)`, see build.rs). Its `_initialize` runs
+/// the constructors, and their wasi-libc (wasi-sdk 34) sets up a thread's
+/// pthread record on its first `pthread_self` instead of through
+/// `__wasi_init_tp`, which it no longer has. With those toolchains this
+/// function is not defined: the host calls wasi-libc's `_initialize`, then
+/// `egg_solver_after_initialize`.
+#[cfg(not(libc_reactor))]
 #[unsafe(no_mangle)]
 pub extern "C" fn _initialize() {
     static DONE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -66,6 +75,16 @@ pub extern "C" fn _initialize() {
         __wasi_init_tp();
         __wasm_call_ctors();
     }
+    #[cfg(wasm_threads)]
+    let _ = egg_solver::parallel::set_runner(threads::run);
+}
+
+/// With wasi-libc's own `_initialize` (`cfg(libc_reactor)`): what comes
+/// after it, the thread pool (`threads.rs`). The host calls it once, right
+/// after `_initialize`.
+#[cfg(libc_reactor)]
+#[unsafe(no_mangle)]
+pub extern "C" fn egg_solver_after_initialize() {
     #[cfg(wasm_threads)]
     let _ = egg_solver::parallel::set_runner(threads::run);
 }

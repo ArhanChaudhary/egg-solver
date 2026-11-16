@@ -314,6 +314,9 @@ export class EggSolver {
     const instance = await WebAssembly.instantiate(module, imports);
     instanceMemory = memory ?? instance.exports.memory;
     instance.exports._initialize?.();
+    // (Modules built with Rust 1.100 or later get wasi-libc's `_initialize`;
+    // the module's own setup then follows it: see wasm/src/lib.rs.)
+    instance.exports.egg_solver_after_initialize?.();
     if (needsThreads) {
       const slots = (control.length - 4) / 4;
       for (let slot = 0; slot < slots; slot++) {

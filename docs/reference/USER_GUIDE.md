@@ -171,7 +171,7 @@ The wasm32 build supports h0–h6. Each Rust allocation must fit below `isize::M
 
 Browser threads need `SharedArrayBuffer` and cross-origin isolation. The local server supplies the required COOP/COEP headers, and the public site, egg-solver.arhan.sh, receives them from Cloudflare because GitHub Pages cannot set headers. The solver runs in a Web Worker because its thread waits cannot run on a browser's main thread. On a host that cannot send the headers, such as a plain `github.io` deployment, the page registers `wasm/coi-sw.js`, a service worker that adds them, and reloads once; where a browser refuses it, the page uses one thread. Bun supports the threaded wrapper without those HTTP headers.
 
-The wrapper initializes the module and worker pool. Other hosts must perform the module's required initialization before calling its C ABI. See `wasm/src/lib.rs` and the JavaScript wrapper when embedding it directly.
+The wrapper initializes the module and worker pool. Other hosts must call the module's `_initialize` once before any other export, then `egg_solver_after_initialize` if the module exports it (modules built with Rust 1.100 or later, whose wasi-libc supplies `_initialize`). See `wasm/src/lib.rs` and the JavaScript wrapper when embedding it directly.
 
 ### Tests
 
