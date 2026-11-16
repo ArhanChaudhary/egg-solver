@@ -54,13 +54,17 @@ use crate::symstart::SymFilter;
 
 pub mod share;
 
-/// Stack depth limit (nodes per lane): searches go below 21 moves (27 in
-/// QTM).
-const MAXD: usize = 27;
-// (Targets are at most `MAX_TARGET` (`MAX_TARGET_QTM`), and the stack depth
-// stays below the target: the stack's unchecked indices are in range,
-// whatever the table.)
-const _: () = assert!((MAX_TARGET as usize) < MAXD && (MAX_TARGET_QTM as usize) < MAXD);
+/// Stack depth limit (nodes per lane): searches go below 21 moves. (Not 27
+/// for QTM's 26: that made `Lane` 128 bytes longer and moved the stream
+/// loop, -5% HTM stream throughput at 48T in one A/B. A QTM job with
+/// `MAXD` or more moves left is skipped instead, see `setup_job`; with any
+/// valid table none is: a target of 26 has jobs of 4 moves.)
+const MAXD: usize = 26;
+// (Targets are at most `MAX_TARGET`, and the stack depth stays below the
+// target: the stack's unchecked indices are in range, whatever the table.
+// In QTM the depth stays below the moves left at the job root, below MAXD
+// by `setup_job`.)
+const _: () = assert!((MAX_TARGET as usize) < MAXD);
 
 /// The last target of a search (God's number of the metric).
 #[inline(always)]
@@ -1282,9 +1286,13 @@ impl<const QTM: bool> Lane<QTM> {
             let remaining_depth = self.target - if QTM { job.cost } else { job.len };
             self.child_stats = [0.0; 18];
             let (cube, inverse) = self.job_cubes(&job);
+            // (QTM: a node of the stack has a move left and each move costs
+            // at least one, so the stack stays below `remaining_depth`: at
+            // most `MAXD` (see there). HTM targets are at most 20.)
             if job.normal_bound > remaining_depth
                 || job.inverse_bound > remaining_depth
                 || (job.len > 0 && cube.is_solved())
+                || (QTM && usize::from(remaining_depth) >= MAXD)
             {
                 // SAFETY: `job_pos < jobs.len()` (the loop condition), and
                 // with `full` `child_orders` has an entry per job.
