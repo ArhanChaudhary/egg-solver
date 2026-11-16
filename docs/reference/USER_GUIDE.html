@@ -66,7 +66,7 @@ svg { max-width:100%; height:auto; }
 <main id="docs-content"><h1 id="user-guide">User guide</h1>
 <p><a href="../index.html">Documentation</a> · <a href="../guide/QUICKSTART.html">Quick start</a> · <a href="../comparisons/index.html">Benchmarks</a></p>
 <p>Commands below run from the project root. The examples use the executables under <code>target/release/</code>. Every binary has <code>--help</code>; use it for the complete option list.</p>
-<details class="contents"><summary>On this page</summary><ul><li><a href="#build">Build</a></li><li><a href="#choose-and-generate-a-table">Choose and generate a table</a></li><li><a href="#solve-scrambles">Solve scrambles</a></li><li><a href="#tune-and-benchmark">Tune and benchmark</a></li><li><a href="#table-files">Table files</a></li><li><a href="#shared-memory-on-linux">Shared memory on Linux</a></li><li><a href="#portable-builds">Portable builds</a></li><li><a href="#webassembly">WebAssembly</a></li><li><a href="#library-use">Library use</a></li><li><a href="#historical-measurements">Historical measurements</a></li><li><a href="#development-and-publishing">Development and publishing</a></li></ul></details>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#build">Build</a></li><li><a href="#choose-and-generate-a-table">Choose and generate a table</a></li><li><a href="#solve-scrambles">Solve scrambles</a></li><li><a href="#quarter-turn-metric">Quarter-turn metric</a></li><li><a href="#tune-and-benchmark">Tune and benchmark</a></li><li><a href="#table-files">Table files</a></li><li><a href="#shared-memory-on-linux">Shared memory on Linux</a></li><li><a href="#portable-builds">Portable builds</a></li><li><a href="#webassembly">WebAssembly</a></li><li><a href="#library-use">Library use</a></li><li><a href="#historical-measurements">Historical measurements</a></li><li><a href="#development-and-publishing">Development and publishing</a></li></ul></details>
 <h2 id="build">Build</h2>
 <pre><code class="language-sh">cargo build --release --locked
 </code></pre>
@@ -101,11 +101,33 @@ target/release/solve --table tables/h7 -c 1 &lt; testdata/random_state.txt
 <tr><td><code>-c 1</code></td><td>Complete one input before starting the next; workers still cooperate within a cube</td></tr>
 <tr><td><code>-n N</code></td><td>Read at most N scrambles in batch mode</td></tr>
 <tr><td><code>--json</code></td><td>Per-cube JSON and a batch total; <code>--fast</code> emits one JSON result</td></tr>
+<tr><td><code>--metric qtm</code></td><td>Solve in the <a href="#quarter-turn-metric">quarter-turn metric</a>; the default <code>htm</code> counts every face turn as one move</td></tr>
 <tr><td><code>-v</code></td><td>Loading and configuration diagnostics on stderr</td></tr>
 </tbody>
 </table></div>
 <p>Batch mode also accepts a positional table path. <code>EGG_SOLVER_TABLE</code> can supply it in batch mode, and <code>EGG_SOLVER_THREADS</code> can supply the thread count. <code>--fast</code> still requires a command-line <code>--table</code>. Each <code>EGG_SOLVER_*</code> setting also accepts the matching <code>CUBEOPT_*</code> name from the project's earlier name as a fallback; an explicitly set <code>EGG_SOLVER_*</code> name takes precedence.</p>
 <p>Search timing excludes table loading. The batch total measures completion of the whole batch; individual cube durations can overlap. See <a href="../comparisons/METHODS.html">timing definitions</a> before interpreting them as throughput.</p>
+<h2 id="quarter-turn-metric">Quarter-turn metric</h2>
+<p>By default every face turn counts as one move: the half-turn metric (HTM). With <code>--metric qtm</code>, <code>solve</code> and <code>bench</code> count quarter turns instead (QTM): a half turn such as <code>U2</code> is two moves, and the solution is optimal in that metric.</p>
+<pre><code class="language-sh"># QTM with an HTM table (valid bounds, weaker):
+target/release/solve --fast --table tables/h7 --metric qtm &quot;R U R' U' F2&quot;
+# A QTM table gives tighter bounds for QTM solves:
+target/release/gen 7 auto tables/h7q --metric qtm
+target/release/solve --table tables/h7q --metric qtm &lt; testdata/random_state.txt
+</code></pre>
+<div class="table-wrap" role="region" aria-label="Quarter-turn metric" tabindex="0"><table id="docs-table-2"><caption>Quarter-turn metric</caption>
+<thead>
+<tr><th>Table</th><th><code>--metric htm</code> (default)</th><th><code>--metric qtm</code></th></tr>
+</thead>
+<tbody>
+<tr><td>HTM table (<code>gen K BASE OUT</code>)</td><td>Yes</td><td>Yes: an HTM distance is at most the QTM distance</td></tr>
+<tr><td>QTM table (<code>gen K BASE OUT --metric qtm</code>)</td><td>Refused</td><td>Yes</td></tr>
+</tbody>
+</table></div>
+<p>A QTM table is generated with the same tools and has the same size as the HTM table of its k. <code>auto</code> picks a base two above the HTM one for the same k (h0: 9, h7: 11), from the QTM depth distributions; it was not tuned by solve speed. Its trailer records the metric as the layout <code>h48-qtm</code>, so a build without QTM support refuses the table instead of treating its values as HTM bounds. A metadata sidecar for a QTM table reads <code>k base qtm</code>. <code>gen check</code>, <code>gen derive</code> and <code>gen compare</code> keep and compare the metric.</p>
+<p>In QTM, each <code>solved</code> line reports the QTM length and ends with it, for example <code>(22q)</code>, and the summary line ends with <code>metric qtm</code>; <code>--fast</code> prints the length as <code>22q</code>. JSON output reports <code>length</code> in the search's metric and adds a <code>metric</code> field (<code>&quot;htm&quot;</code> or <code>&quot;qtm&quot;</code>) in both metrics. The search keeps the 18 face turns in canonical order, charges a half turn two moves, and tries only lengths of the parity of the cube's corner permutation. A solution is printed in canonical form: two equal quarter turns where the two search directions meet become one half turn of the same QTM length.</p>
+<p>God's number is 20 in HTM and 26 in QTM: the superflip needs 24 quarter turns, and the superflip composed with the four-spot pattern needs 26.</p>
+<p>Measured on the 48-core server (2026-11-16, h7 tables copied into RAM with transparent huge pages, <code>solve -c 1 -t 48</code>, the first 50 states of <code>testdata/random_state.txt</code>): QTM on a QTM h7 (base 11) took 29.1 ms per cube on average (median 18.5 ms, 79 M nodes per cube), against 19.6 ms (median 11.0 ms) for HTM on the HTM h7. QTM on the HTM h7 took 549 ms per cube on the first 10 states, 19 times as long as with the QTM table. The states were 18 to 22 quarter turns from solved (21 for 27 of them). With the QTM h7, the superflip took 0.87 s (24 quarter turns) and the superflip composed with the four-spot 56 s (26). These are single runs on a machine shared with other work, not benchmarks.</p>
 <h2 id="tune-and-benchmark">Tune and benchmark</h2>
 <pre><code class="language-sh">target/release/bench tables/h7 tune
 target/release/bench --help
@@ -113,8 +135,8 @@ target/release/bench --help
 <p>The tune command writes a <code>&lt;TABLE&gt;.tune</code> record for its measured configurations. A table on hugetlbfs (any mount, not only <code>/mnt/huge</code>) cannot hold small files, so its record goes to <code>tables/&lt;NAME&gt;.hugemeta.tune</code> in the build checkout, beside the optional <code>tables/&lt;NAME&gt;.hugemeta</code> metadata sidecar; rebuild on each machine so that path is local, and keep table names distinct across hugetlbfs mounts. <code>solve</code> and <code>bench</code> use a matching record unless <code>-l</code> is explicit. The built-in lane candidates end at 48, but explicit larger lane values are supported. Tuning a stream does not guarantee the best finite-batch or single-cube setting. The <a href="../performance/PARALLELISM.html">measured lane study</a> explains that distinction.</p>
 <p>The historical positional benchmark syntax remains supported. Use <code>bench --help</code> and each subcommand's help for named syntax, warm-up and measurement windows. Record the actual command with benchmark output.</p>
 <h2 id="table-files">Table files</h2>
-<p>A table has pruning data and a 4 KiB metadata trailer containing k, base, distribution and checksum. Padding can separate data and trailer. <code>gen check TABLE</code> verifies stored integrity; a checksum alone does not prove that every bound is admissible.</p>
-<div class="table-wrap" role="region" aria-label="Table files" tabindex="0"><table id="docs-table-2"><caption>Table files</caption>
+<p>A table has pruning data and a 4 KiB metadata trailer containing k, base, distribution and checksum (and, for a <a href="#quarter-turn-metric">QTM table</a>, the metric). Padding can separate data and trailer. <code>gen check TABLE</code> verifies stored integrity; a checksum alone does not prove that every bound is admissible.</p>
+<div class="table-wrap" role="region" aria-label="Table files" tabindex="0"><table id="docs-table-3"><caption>Table files</caption>
 <thead>
 <tr><th>Load mode</th><th>Storage used during search</th><th>Notes</th></tr>
 </thead>
@@ -135,7 +157,7 @@ target/release/solve --shm-remove tables/h7
 </code></pre>
 <p>A segment persists until removal or reboot. An existing matching segment avoids reloading the table into a fresh private allocation. Metadata is checked on attachment; a mismatched segment is rejected by explicit shared mode. Keep the segment and table immutable during use.</p>
 <p>A segment holds the table file's bytes, with the file's trailer (k, base, size, distribution and checksum) in its last 4 KiB. The trailer is written last, after the copied data's checksum is checked, so a segment without one is still loading or was interrupted. <code>--load auto</code> passes over a segment that does not match the table file and loads the file instead. A loaded segment is read-only: <code>ipcs -m</code> shows perms <code>400</code> (<code>600</code> while loading).</p>
-<p>The segment key is the ASCII bytes &quot;co&quot; (<code>0x636f</code>, a legacy prefix kept for compatibility), then the table's k and base, one byte each: <code>ipcs -m</code> shows h7 base 9 as <code>0x636f0709</code> and h11 base 10 as <code>0x636f0b0a</code>. <code>--shm-key</code> (or <code>EGG_SOLVER_SHM_KEY</code>) selects another key, for example for two tables with the same k and base.</p>
+<p>The segment key is the ASCII bytes &quot;co&quot; (<code>0x636f</code>, a legacy prefix kept for compatibility), then the table's k and base, one byte each: <code>ipcs -m</code> shows h7 base 9 as <code>0x636f0709</code> and h11 base 10 as <code>0x636f0b0a</code>. A QTM table's key has the top bit of the k byte set (<code>0x636f870b</code> for QTM h7 base 11), so tables of both metrics can be loaded at once. <code>--shm-key</code> (or <code>EGG_SOLVER_SHM_KEY</code>) selects another key, for example for two tables with the same k and base.</p>
 <p><code>--shm-pages 1g</code> requests only 1 GiB pages and fails if unavailable. The default page preference is <code>1g,2m,4k</code>; <code>-v</code> reports the selected size and fallback reasons. Huge-page allocation needs both permission (the configured huge-page group or <code>CAP_IPC_LOCK</code>) and enough free reserved pages. The program's preflight reports relevant limits: <code>kernel.shmmax</code>, <code>kernel.shmall</code> and <code>kernel.shmmni</code>, then the huge-page permission and free pool pages, or free memory for 4 KiB pages. Attaching an existing segment needs no free memory.</p>
 <p>On a typical Linux host, the one-time root setup for huge-page segments looks like this; adapt it to the host and the loader's diagnostic:</p>
 <pre><code class="language-sh"># Permission: a group of yours as the huge-page shared-memory group
@@ -165,7 +187,7 @@ await solver.loadTable('h6');
 // await solver.generateTable(4);
 solver.solve(&quot;R U R' U' F2&quot;);
 </code></pre>
-<p><code>solve</code> puts the selected workers on one cube and returns <code>{ moves, length, nodes, lookups, seconds }</code>; <code>solveMany</code> uses independent cube lanes. <code>loadTable</code> accepts a path (Bun), a URL, a <code>File</code> or <code>Blob</code>, or the file's bytes. Inputs can be scrambles or 54-sticker facelet strings in U R F D L B face order, each face viewed from outside and read row by row (U with B at the top, D with F at the top, the side faces with U at the top); any six symbols can stand for the colors. The wrapper's facelet parser checks the representation.</p>
+<p><code>solve</code> puts the selected workers on one cube and returns <code>{ moves, length, metric, nodes, lookups, seconds }</code>; <code>solveMany</code> uses independent cube lanes. Both take <code>{ metric: 'qtm' }</code> for the <a href="#quarter-turn-metric">quarter-turn metric</a> (by default the table's metric: HTM for HTM tables), and <code>generateTable(k, base, { metric: 'qtm' })</code> makes a QTM table; <code>length</code> is in the solve's metric. <code>loadTable</code> accepts a path (Bun), a URL, a <code>File</code> or <code>Blob</code>, or the file's bytes. Inputs can be scrambles or 54-sticker facelet strings in U R F D L B face order, each face viewed from outside and read row by row (U with B at the top, D with F at the top, the side faces with U at the top); any six symbols can stand for the colors. The wrapper's facelet parser checks the representation.</p>
 <h3 id="bun">Bun</h3>
 <pre><code class="language-sh">bun wasm/demo.mjs --table tables/h6 &lt; testdata/random_state.txt
 bun wasm/demo.mjs --gen 4:8 --random 5:1
@@ -193,7 +215,7 @@ bun wasm/demo.mjs --table tables/h6 --threads 8 --batch &lt; scrambles.txt
 <p>These records were measured during development on the project's Zen 5 server and were previously kept in an earlier edition of this guide (dated 2026-11-07). Each block links the record of the commit that introduced the figures. Later source changes, lane defaults and engines can give different results; they are not predictions for another machine.</p>
 <details>
 <summary>Native table sizes, generation times and solve rates (recorded 2026-11-04)</summary>
-<div class="table-wrap" role="region" aria-label="Historical measurements" tabindex="0"><table id="docs-table-3"><caption>Historical measurements</caption>
+<div class="table-wrap" role="region" aria-label="Historical measurements" tabindex="0"><table id="docs-table-4"><caption>Historical measurements</caption>
 <thead>
 <tr><th>RAM</th><th>table</th><th align="right">size</th><th align="right">generation</th><th align="right">cubes/s, 1 core</th><th align="right">cubes/s, 8 cores</th></tr>
 </thead>
@@ -223,7 +245,7 @@ key        shmid      owner      perms      bytes      nattch     status
 <summary>WebAssembly timings (recorded 2026-11-04 and 2026-11-05)</summary>
 <p><a id="speed"></a></p>
 <p>Time per random-state cube, one at a time, mean and median of 10 cubes (h4: 5), on Zen 5 cores (8 threads: one L3 domain), in V8 (Chrome's engine; measured in Node 26) and in Bun (JavaScriptCore, Safari's engine):</p>
-<div class="table-wrap" role="region" aria-label="Historical measurements" tabindex="0"><table id="docs-table-4"><caption>Historical measurements</caption>
+<div class="table-wrap" role="region" aria-label="Historical measurements" tabindex="0"><table id="docs-table-5"><caption>Historical measurements</caption>
 <thead>
 <tr><th>table</th><th align="right">size</th><th>runs in</th><th>made by</th><th>1 thread: V8</th><th>1 thread: Bun</th><th>8 threads: V8</th><th>8 threads: Bun</th></tr>
 </thead>
@@ -236,7 +258,7 @@ key        shmid      owner      perms      bytes      nattch     status
 </table></div>
 <p>Loading from a file took seconds (from a local server into headless Chromium: h6 3-13 s; <code>verify</code> adds a checksum pass).</p>
 <p>100 depth-17 cubes on h6 (14.8M nodes each), one thread, <code>solveMany</code> / <code>bench</code> batch mode, on one Zen 5 core:</p>
-<div class="table-wrap" role="region" aria-label="Historical measurements" tabindex="0"><table id="docs-table-5"><caption>Historical measurements</caption>
+<div class="table-wrap" role="region" aria-label="Historical measurements" tabindex="0"><table id="docs-table-6"><caption>Historical measurements</caption>
 <thead>
 <tr><th>build</th><th align="right">time</th><th align="right">Mnodes/s</th></tr>
 </thead>

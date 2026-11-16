@@ -55,6 +55,11 @@ target/release/gen check tables/h7
 `--json` emits JSON. `--fast` requires `--table` and one scramble from
 arguments or stdin. Empty input is an error. `--warmup SCRAMBLE` is optional.
 
+`--metric qtm` solves in the quarter-turn metric, where a half turn counts as
+two moves. It works with any table; a QTM table (`gen 7 auto tables/h7q
+--metric qtm`) gives it tighter bounds. See the
+[user guide](docs/reference/USER_GUIDE.md#quarter-turn-metric).
+
 `--load copy` loads the table into private RAM before searching. With
 `--load map` or shared memory, keep the backing storage unchanged while
 running. See `solve --help` and the [user guide](docs/reference/USER_GUIDE.md).

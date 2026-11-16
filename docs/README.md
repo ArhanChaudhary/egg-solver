@@ -9,6 +9,7 @@ Use the native solver with a table you generate once and keep in RAM. The comman
 | Build and solve your first cube | [Quick start](guide/QUICKSTART.md) |
 | Choose a table and understand memory use | [Tables and memory](guide/OVERVIEW.md) |
 | Find a command or option | [User guide](reference/USER_GUIDE.md) |
+| Solve in the quarter-turn metric (a half turn is two moves) | [User guide: quarter-turn metric](reference/USER_GUIDE.md#quarter-turn-metric) |
 | Compare measured solver performance | [Benchmarks](comparisons/README.md) |
 | Understand lanes and parallel search | [How it works](guide/HOW_IT_WORKS.md) and [parallelism measurements](performance/PARALLELISM.md) |
 | Review correctness and safety checks | [Safety](safety/README.md) |

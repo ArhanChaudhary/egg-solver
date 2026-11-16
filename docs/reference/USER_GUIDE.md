@@ -49,11 +49,37 @@ target/release/solve --table tables/h7 -c 1 < testdata/random_state.txt
 | `-c 1` | Complete one input before starting the next; workers still cooperate within a cube |
 | `-n N` | Read at most N scrambles in batch mode |
 | `--json` | Per-cube JSON and a batch total; `--fast` emits one JSON result |
+| `--metric qtm` | Solve in the [quarter-turn metric](#quarter-turn-metric); the default `htm` counts every face turn as one move |
 | `-v` | Loading and configuration diagnostics on stderr |
 
 Batch mode also accepts a positional table path. `EGG_SOLVER_TABLE` can supply it in batch mode, and `EGG_SOLVER_THREADS` can supply the thread count. `--fast` still requires a command-line `--table`. Each `EGG_SOLVER_*` setting also accepts the matching `CUBEOPT_*` name from the project's earlier name as a fallback; an explicitly set `EGG_SOLVER_*` name takes precedence.
 
 Search timing excludes table loading. The batch total measures completion of the whole batch; individual cube durations can overlap. See [timing definitions](../comparisons/METHODS.md) before interpreting them as throughput.
+
+## Quarter-turn metric
+
+By default every face turn counts as one move: the half-turn metric (HTM). With `--metric qtm`, `solve` and `bench` count quarter turns instead (QTM): a half turn such as `U2` is two moves, and the solution is optimal in that metric.
+
+```sh
+# QTM with an HTM table (valid bounds, weaker):
+target/release/solve --fast --table tables/h7 --metric qtm "R U R' U' F2"
+# A QTM table gives tighter bounds for QTM solves:
+target/release/gen 7 auto tables/h7q --metric qtm
+target/release/solve --table tables/h7q --metric qtm < testdata/random_state.txt
+```
+
+| Table | `--metric htm` (default) | `--metric qtm` |
+|---|---|---|
+| HTM table (`gen K BASE OUT`) | Yes | Yes: an HTM distance is at most the QTM distance |
+| QTM table (`gen K BASE OUT --metric qtm`) | Refused | Yes |
+
+A QTM table is generated with the same tools and has the same size as the HTM table of its k. `auto` picks a base two above the HTM one for the same k (h0: 9, h7: 11), from the QTM depth distributions; it was not tuned by solve speed. Its trailer records the metric as the layout `h48-qtm`, so a build without QTM support refuses the table instead of treating its values as HTM bounds. A metadata sidecar for a QTM table reads `k base qtm`. `gen check`, `gen derive` and `gen compare` keep and compare the metric.
+
+In QTM, each `solved` line reports the QTM length and ends with it, for example `(22q)`, and the summary line ends with `metric qtm`; `--fast` prints the length as `22q`. JSON output reports `length` in the search's metric and adds a `metric` field (`"htm"` or `"qtm"`) in both metrics. The search keeps the 18 face turns in canonical order, charges a half turn two moves, and tries only lengths of the parity of the cube's corner permutation. A solution is printed in canonical form: two equal quarter turns where the two search directions meet become one half turn of the same QTM length.
+
+God's number is 20 in HTM and 26 in QTM: the superflip needs 24 quarter turns, and the superflip composed with the four-spot pattern needs 26.
+
+Measured on the 48-core server (2026-11-16, h7 tables copied into RAM with transparent huge pages, `solve -c 1 -t 48`, the first 50 states of `testdata/random_state.txt`): QTM on a QTM h7 (base 11) took 29.1 ms per cube on average (median 18.5 ms, 79 M nodes per cube), against 19.6 ms (median 11.0 ms) for HTM on the HTM h7. QTM on the HTM h7 took 549 ms per cube on the first 10 states, 19 times as long as with the QTM table. The states were 18 to 22 quarter turns from solved (21 for 27 of them). With the QTM h7, the superflip took 0.87 s (24 quarter turns) and the superflip composed with the four-spot 56 s (26). These are single runs on a machine shared with other work, not benchmarks.
 
 ## Tune and benchmark
 
@@ -68,7 +94,7 @@ The historical positional benchmark syntax remains supported. Use `bench --help`
 
 ## Table files
 
-A table has pruning data and a 4 KiB metadata trailer containing k, base, distribution and checksum. Padding can separate data and trailer. `gen check TABLE` verifies stored integrity; a checksum alone does not prove that every bound is admissible.
+A table has pruning data and a 4 KiB metadata trailer containing k, base, distribution and checksum (and, for a [QTM table](#quarter-turn-metric), the metric). Padding can separate data and trailer. `gen check TABLE` verifies stored integrity; a checksum alone does not prove that every bound is admissible.
 
 | Load mode | Storage used during search | Notes |
 |---|---|---|
@@ -95,7 +121,7 @@ A segment persists until removal or reboot. An existing matching segment avoids 
 
 A segment holds the table file's bytes, with the file's trailer (k, base, size, distribution and checksum) in its last 4 KiB. The trailer is written last, after the copied data's checksum is checked, so a segment without one is still loading or was interrupted. `--load auto` passes over a segment that does not match the table file and loads the file instead. A loaded segment is read-only: `ipcs -m` shows perms `400` (`600` while loading).
 
-The segment key is the ASCII bytes "co" (`0x636f`, a legacy prefix kept for compatibility), then the table's k and base, one byte each: `ipcs -m` shows h7 base 9 as `0x636f0709` and h11 base 10 as `0x636f0b0a`. `--shm-key` (or `EGG_SOLVER_SHM_KEY`) selects another key, for example for two tables with the same k and base.
+The segment key is the ASCII bytes "co" (`0x636f`, a legacy prefix kept for compatibility), then the table's k and base, one byte each: `ipcs -m` shows h7 base 9 as `0x636f0709` and h11 base 10 as `0x636f0b0a`. A QTM table's key has the top bit of the k byte set (`0x636f870b` for QTM h7 base 11), so tables of both metrics can be loaded at once. `--shm-key` (or `EGG_SOLVER_SHM_KEY`) selects another key, for example for two tables with the same k and base.
 
 `--shm-pages 1g` requests only 1 GiB pages and fails if unavailable. The default page preference is `1g,2m,4k`; `-v` reports the selected size and fallback reasons. Huge-page allocation needs both permission (the configured huge-page group or `CAP_IPC_LOCK`) and enough free reserved pages. The program's preflight reports relevant limits: `kernel.shmmax`, `kernel.shmall` and `kernel.shmmni`, then the huge-page permission and free pool pages, or free memory for 4 KiB pages. Attaching an existing segment needs no free memory.
 
@@ -143,7 +169,7 @@ await solver.loadTable('h6');
 solver.solve("R U R' U' F2");
 ```
 
-`solve` puts the selected workers on one cube and returns `{ moves, length, nodes, lookups, seconds }`; `solveMany` uses independent cube lanes. `loadTable` accepts a path (Bun), a URL, a `File` or `Blob`, or the file's bytes. Inputs can be scrambles or 54-sticker facelet strings in U R F D L B face order, each face viewed from outside and read row by row (U with B at the top, D with F at the top, the side faces with U at the top); any six symbols can stand for the colors. The wrapper's facelet parser checks the representation.
+`solve` puts the selected workers on one cube and returns `{ moves, length, metric, nodes, lookups, seconds }`; `solveMany` uses independent cube lanes. Both take `{ metric: 'qtm' }` for the [quarter-turn metric](#quarter-turn-metric) (by default the table's metric: HTM for HTM tables), and `generateTable(k, base, { metric: 'qtm' })` makes a QTM table; `length` is in the solve's metric. `loadTable` accepts a path (Bun), a URL, a `File` or `Blob`, or the file's bytes. Inputs can be scrambles or 54-sticker facelet strings in U R F D L B face order, each face viewed from outside and read row by row (U with B at the top, D with F at the top, the side faces with U at the top); any six symbols can stand for the colors. The wrapper's facelet parser checks the representation.
 
 ### Bun
 
