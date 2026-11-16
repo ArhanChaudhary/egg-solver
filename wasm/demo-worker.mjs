@@ -15,9 +15,9 @@ const commands = {
     solver = await EggSolver.create({ wasm, threads: threads > 1 ? threads : undefined });
     return { threads: solver.threads };
   },
-  async generate({ k, base }) {
+  async generate({ k, base, metric }) {
     const start = performance.now();
-    const table = await solver.generateTable(k, base);
+    const table = await solver.generateTable(k, base, { metric });
     return { ...table, seconds: (performance.now() - start) / 1000 };
   },
   load({ source, verify }) {
@@ -28,9 +28,9 @@ const commands = {
   export() {
     return solver.exportTable();
   },
-  solve({ cube, lanes }) {
+  solve({ cube, lanes, metric }) {
     const start = performance.now();
-    const result = solver.solve(cube, { lanes });
+    const result = solver.solve(cube, { lanes, metric });
     return { ...result, wall: (performance.now() - start) / 1000 };
   },
   random({ seed }) {

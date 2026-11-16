@@ -79,14 +79,21 @@
 <p class="note">Find the shortest possible solution of any Rubik's Cube right here in your browser,
 from a scramble or from the colours of your cube. Hold the cube with U on top and F facing you:
 <code>X</code> turns face X a quarter turn clockwise as you look at that face, <code>X'</code>
-anticlockwise, <code>X2</code> half a turn. Every turn counts as one move.</p>
+anticlockwise, <code>X2</code> half a turn. Every turn counts as one move, unless you choose to
+count quarter turns, where a half turn is two.</p>
 
 <fieldset id="choice">
   <legend>Solving data</legend>
-  <label><input type="radio" name="tables" value="3"> <strong>Light</strong> — 243 MB, quick to prepare, slower on hard cubes</label>
-  <label><input type="radio" name="tables" value="4:8" checked> <strong>Standard</strong> — 486 MB, about ten seconds to prepare on a laptop</label>
-  <label><input type="radio" name="tables" value="4"> <strong>Faster</strong> — 486 MB, a minute or two to prepare on a laptop, then faster solving</label>
+  <label><input type="radio" name="tables" value="3"> <strong>Light</strong> — <span class="about" data-kind="3">243 MB, quick to prepare, slower on hard cubes</span></label>
+  <label><input type="radio" name="tables" value="4:8" checked> <strong>Standard</strong> — <span class="about" data-kind="4:8">486 MB, about ten seconds to prepare on a laptop</span></label>
+  <label><input type="radio" name="tables" value="4"> <strong>Faster</strong> — <span class="about" data-kind="4">486 MB, a minute or two to prepare on a laptop, then faster solving</span></label>
   <div id="choice-note" class="note" hidden></div>
+</fieldset>
+
+<fieldset id="metric-choice">
+  <legend>Counting moves</legend>
+  <label><input type="radio" name="metric" value="htm" checked> <strong>Every turn is one move</strong> — the half-turn metric, the usual count</label>
+  <label><input type="radio" name="metric" value="qtm"> <strong>Quarter turns</strong> — a half turn such as U2 counts as two moves (the quarter-turn metric; it has its own solving data)</label>
 </fieldset>
 
 <div class="row">
@@ -123,7 +130,7 @@ the left of F, R to its right, then B; U above and D below.</div>
 
 <section id="result" hidden>
   <div id="summary"></div>
-  <div id="moves" class="moves" role="group" aria-label="The solution: choose a move to see the cube after it"></div>
+  <div id="moves" class="moves" role="group" aria-label="The solution: choose a turn to see the cube after it"></div>
   <div class="player" id="player" hidden>
     <button id="first" title="The scrambled cube" aria-label="Back to the start">⏮</button>
     <button id="back" title="One move back" aria-label="One move back">◀</button>
@@ -146,7 +153,9 @@ the left of F, R to its right, then B; U above and D below.</div>
   slower on hard cubes. <strong>Standard</strong> (486 MB) takes about ten seconds to prepare on a
   laptop. <strong>Faster</strong> (also 486 MB) takes a minute or two to prepare, then solves hard
   cubes faster. If one cannot be prepared (for example, without enough memory), the page goes
-  back to a smaller one. Each kind is saved separately, so you can switch between them.</p>
+  back to a smaller one. Each kind is saved separately, so you can switch between them. Counting
+  quarter turns needs solving data of its own (about a minute and a half to prepare on a laptop,
+  and Faster takes 973 MB there), which is saved separately too.</p>
   <p class="note">Random cubes mostly need 17 or 18 moves; with all of a laptop's processor cores
   their shortest solution takes from under a second to some seconds, and short scrambles are
   solved at once. Every solution is checked on a separate model of the cube in this page.</p>
@@ -182,12 +191,29 @@ const capital = (word) => word[0].toUpperCase() + word.slice(1);
 // --- The kinds of solving data: a table hk (with its base, for h4) ---
 // Light, Standard and Faster can be chosen; small and tiny are only fallbacks for devices that
 // cannot prepare Light.
+// The quarter-turn metric has tables of its own (`qk`, `qbase`; base 0 is the default for k).
+// Measured in Bun on an 8-core Apple M2 (2026-11-16): a QTM table of base 10 took 85-91 s to
+// generate for h3, h4 and h5 alike (base 11 took over 7 minutes for h4), and h5 solved random
+// states about twice as fast as h4; so Faster is h5 there.
 const KINDS = {
-  4: { name: 'faster', k: 4, base: 0 },
-  '4:8': { name: 'standard', k: 4, base: 8 },
-  3: { name: 'light', k: 3, base: 0 },
-  2: { name: 'small', k: 2, base: 0 },
-  0: { name: 'tiny', k: 0, base: 0 },
+  4: { name: 'faster', k: 4, base: 0, qk: 5, qbase: 10 },
+  '4:8': { name: 'standard', k: 4, base: 8, qk: 4, qbase: 10 },
+  3: { name: 'light', k: 3, base: 0, qk: 3, qbase: 10 },
+  2: { name: 'small', k: 2, base: 0, qk: 2, qbase: 10 },
+  0: { name: 'tiny', k: 0, base: 0, qk: 0, qbase: 0 },
+};
+/** What each kind costs, in each metric (the labels of the choice). */
+const ABOUT = {
+  htm: {
+    3: '243 MB, quick to prepare, slower on hard cubes',
+    '4:8': '486 MB, about ten seconds to prepare on a laptop',
+    4: '486 MB, a minute or two to prepare on a laptop, then faster solving',
+  },
+  qtm: {
+    3: '243 MB, about a minute and a half to prepare on a laptop, slower on hard cubes',
+    '4:8': '486 MB, about a minute and a half to prepare on a laptop',
+    4: '973 MB, about a minute and a half to prepare on a laptop, then faster solving (needs plenty of free memory)',
+  },
 };
 const SMALLER = { 4: '4:8', '4:8': '3', 3: '2', 2: '0' };
 const CHOICE = 'egg-solver-tables';
@@ -217,6 +243,21 @@ const choiceNote = (text) => {
   $('choice-note').hidden = !text;
 };
 choose(kind, false);
+
+// --- How moves are counted: 'htm' (every turn is one move) or 'qtm' (quarter turns) ---
+const METRIC = 'egg-solver-metric';
+let metric = 'htm';
+try { metric = localStorage.getItem(METRIC) === 'qtm' ? 'qtm' : 'htm'; } catch { /* (the usual count) */ }
+const chooseMetric = (m, remember = true) => {
+  metric = m;
+  for (const r of document.querySelectorAll('input[name=metric]')) r.checked = r.value === m;
+  for (const span of document.querySelectorAll('#choice .about')) span.textContent = ABOUT[m][span.dataset.kind];
+  if (remember) try { localStorage.setItem(METRIC, m); } catch { /* (for this visit only) */ }
+};
+chooseMetric(metric, false);
+/** "N moves", or "N quarter turns" for a quarter-turn-metric length. */
+const lengthText = (n, m) => plural(n, m === 'qtm' ? 'quarter turn' : 'move');
+const dataName = (t) => `${KINDS[t].name} solving data${metric === 'qtm' ? ' for quarter turns' : ''}`;
 
 // --- The solver worker (demo-worker.mjs) ---
 let worker = null;
@@ -254,7 +295,7 @@ const call = (cmd, args = {}) => new Promise((resolve, reject) => {
 // --- Tables kept in IndexedDB, one entry per kind ---
 const DB = 'egg-solver';
 const STORE = 'tables';
-const key = (t) => `${t}-v1`;
+const key = (t, m = metric) => (m === 'qtm' ? `${t}-qtm-v1` : `${t}-v1`);
 const db = () => new Promise((resolve, reject) => {
   const r = indexedDB.open(DB, 1);
   r.onupgradeneeded = () => r.result.createObjectStore(STORE);
@@ -271,7 +312,7 @@ const store = async (mode, f) => {
 };
 const cached = (t) => store('readonly', (s) => s.get(key(t))).catch(() => undefined);
 const keep = (t, blob) => store('readwrite', (s) => s.put(blob, key(t)));
-const forget = (t) => store('readwrite', (s) => s.delete(key(t))).catch(() => undefined);
+const forget = (t, m = metric) => store('readwrite', (s) => s.delete(key(t, m))).catch(() => undefined);
 
 // --- State and buttons ---
 let threads = 1;
@@ -283,25 +324,26 @@ const buttons = () => {
   $('random').disabled = $('solve').disabled = !ready || solving;
   $('stop').disabled = !solving;
   $('apply').disabled = $('file').disabled = $('fetch').disabled = $('forget').disabled = !ready || solving;
-  for (const r of document.querySelectorAll('input[name=tables]')) r.disabled = solving;
+  for (const r of document.querySelectorAll('input[name=tables], input[name=metric]')) r.disabled = solving;
 };
 const mb = (bytes) => `${Math.round(bytes / 1e6)} MB`;
-const readyText = () => `Ready · ${table.from ?? `${KINDS[kind].name} solving data`} · ${plural(threads, 'processor core')}`;
+const readyText = () => `Ready · ${table.from ?? dataName(kind)} · ${plural(threads, 'processor core')}`;
 
 /** Tables from IndexedDB, else generated (and then stored), for `boot`'s `session`. */
 const prepareTables = async (session) => {
-  const { name, k, base } = KINDS[kind];
+  const { k, base } = metric === 'qtm' ? { k: KINDS[kind].qk, base: KINDS[kind].qbase } : KINDS[kind];
+  const name = dataName(kind);
   const t0 = performance.now();
   const seconds = () => ((performance.now() - t0) / 1000).toFixed(1);
   const blob = await cached(kind);
   current(session);
   if (blob) {
-    status(`Loading the saved ${name} solving data…`);
+    status(`Loading the saved ${name}…`);
     $('progress').hidden = false;
     $('progress').value = 0;
     try {
       const loaded = await call('load', { source: blob, verify: true });
-      $('tables').textContent = `${capital(name)} solving data (h${loaded.k}, ${mb(loaded.bytes)}) loaded from this browser in ${seconds()} s.`;
+      $('tables').textContent = `${capital(name)} (h${loaded.k}, ${mb(loaded.bytes)}) loaded from this browser in ${seconds()} s.`;
       return loaded;
     } catch (e) {
       // (a stopped worker, or no room for the data: keep it; a damaged copy: prepare it again)
@@ -314,11 +356,11 @@ const prepareTables = async (session) => {
   // (no value: the bar shows that work goes on, without a share done)
   $('progress').removeAttribute('value');
   $('progress').hidden = false;
-  const timer = setInterval(() => status(`Preparing the ${name} solving data (first time only)… ${seconds()} s`), 200);
+  const timer = setInterval(() => status(`Preparing the ${name} (first time only)… ${seconds()} s`), 200);
   let made;
   try {
-    made = await call('generate', { k, base });
-    $('tables').textContent = `${capital(name)} solving data (h${made.k}, ${mb(made.bytes)}) prepared in ${made.seconds.toFixed(1)} s.`;
+    made = await call('generate', { k, base, metric });
+    $('tables').textContent = `${capital(name)} (h${made.k}, ${mb(made.bytes)}) prepared in ${made.seconds.toFixed(1)} s.`;
   } finally {
     clearInterval(timer);
     $('progress').hidden = true;
@@ -511,8 +553,8 @@ const showStep = (at) => {
     else b.removeAttribute('aria-current');
   });
   const n = steps.moves.length;
-  $('step-text').textContent = steps.at === 0 ? `the scrambled cube · ${plural(n, 'move')} to go`
-    : steps.at === n ? 'solved' : `after move ${steps.at} of ${n}: ${moveName(steps.moves[steps.at - 1])}`;
+  $('step-text').textContent = steps.at === 0 ? `the scrambled cube · ${plural(n, 'turn')} to go`
+    : steps.at === n ? 'solved' : `after turn ${steps.at} of ${n}: ${moveName(steps.moves[steps.at - 1])}`;
 };
 const stopPlaying = () => {
   clearInterval(playing);
@@ -540,13 +582,13 @@ const showSolution = (r) => {
   $('step-picture').hidden = false;
   const moves = parseMoves(r.moves) ?? [];
   const checked = isSolved(applyMoves(r.start, moves));
-  $('summary').innerHTML = `<strong>${plural(r.length, 'move')}</strong> · <span class="ok">shortest possible</span>`
+  $('summary').innerHTML = `<strong>${lengthText(r.length, r.metric)}</strong> · <span class="ok">shortest possible</span>`
     + (checked ? ' · <span class="ok">checked</span>' : ' · <strong class="bad">check failed: please report this cube</strong>');
   $('moves').replaceChildren(...moves.map((m, i) => {
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = moveName(m);
-    b.title = `The cube after move ${i + 1}`;
+    b.title = `The cube after turn ${i + 1}`;
     b.onclick = () => { stopPlaying(); showStep(i + 1); };
     return b;
   }));
@@ -623,7 +665,7 @@ $('solve').onclick = () => run('Solve', async () => {
   const results = [];
   try {
     for (index = 0; index < cubes.length; index++) {
-      const r = await call('solve', { cube: cubes[index].text, lanes: 0 });
+      const r = await call('solve', { cube: cubes[index].text, lanes: 0, metric });
       results.push({ ...r, start: cubes[index].stickers });
       showBatch(results, cubes.length);
     }
@@ -644,7 +686,7 @@ const showBatch = (results, total) => {
   if (total < 2) return;
   $('result').hidden = false;
   const head = document.createElement('tr');
-  for (const h of ['', 'Moves', 'Solution', 'Time']) {
+  for (const h of ['', results[0]?.metric === 'qtm' ? 'Quarter turns' : 'Moves', 'Solution', 'Time']) {
     const th = document.createElement('th');
     th.textContent = h;
     head.append(th);
@@ -686,6 +728,16 @@ for (const r of document.querySelectorAll('input[name=tables]')) {
   });
 }
 
+// --- Counting moves: a change starts the solver again with that metric's solving data ---
+for (const r of document.querySelectorAll('input[name=metric]')) {
+  r.addEventListener('change', () => {
+    if (!r.checked || r.value === metric) return;
+    chooseMetric(r.value);
+    choiceNote('');
+    run('Start', () => start(wanted));
+  });
+}
+
 // --- Settings ---
 const cores = crossOriginIsolated ? Math.max(1, navigator.hardwareConcurrency || 1) : 1;
 $('isolation').textContent = crossOriginIsolated
@@ -695,7 +747,7 @@ $('threads').max = Math.max(cores, 1);
 $('threads').disabled = !crossOriginIsolated;
 $('apply').onclick = () => run('Restart', () => start(Math.max(1, Math.min(cores, Number($('threads').value) || 1))));
 $('forget').onclick = () => run('Forget', async () => {
-  await Promise.all(Object.keys(KINDS).map(forget));
+  await Promise.all(Object.keys(KINDS).flatMap((t) => [forget(t, 'htm'), forget(t, 'qtm')]));
   $('tables').textContent = 'Saved solving data deleted; it will be prepared again on your next visit.';
 });
 /** Load a table file (a File or a URL) in place of the solving data, until the page is reloaded. */
@@ -715,7 +767,9 @@ const loadTable = (source, label) => run('Load', async () => {
   } finally {
     $('progress').hidden = true;
   }
-  table.from = `h${table.k} table from ${label}`;
+  table.from = `h${table.k}${table.metric === 'qtm' ? ' quarter-turn' : ''} table from ${label}`;
+  // (a quarter-turn table solves only in that metric; an HTM table, in the usual count)
+  chooseMetric(table.metric === 'qtm' ? 'qtm' : 'htm', false);
   $('tables').textContent = `Table ${label} (h${table.k}, ${mb(table.bytes)}) loaded in ${((performance.now() - t0) / 1000).toFixed(1)} s; it is used until the page is reloaded.`;
   ready = true;
   buttons();
