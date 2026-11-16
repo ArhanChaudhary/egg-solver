@@ -1,7 +1,8 @@
 //! A fast optimal solver for the 3x3x3 Rubik's cube.
 //!
 //! It finds a shortest move sequence (in the half-turn metric: any turn of
-//! a face is one move) with IDA*: depth-first searches with an increasing
+//! a face is one move; or in the quarter-turn metric, where a half turn is
+//! two, see `metric`) with IDA*: depth-first searches with an increasing
 //! depth limit, pruned by lower bounds on the distance to solved read from
 //! precomputed tables. Each search runs on the cube and on its inverse at
 //! once, moving whichever side has fewer moves to try.
@@ -13,6 +14,8 @@
 //! * `coord`: coordinates, the table indices of a cube.
 //! * `tables`: the corner table and the big H48 table (and its files,
 //!   `tables::file`); `gen` builds the latter, for any k.
+//! * `metric`: the half-turn (HTM, default) and quarter-turn (QTM)
+//!   metrics.
 //! * `solver`: a plain recursive IDA*, the reference search.
 //! * `lanes`: the fast search: many cubes per thread, interleaved so that
 //!   table loads overlap; `lanes::share` lets all threads work on a few
@@ -48,6 +51,7 @@ pub mod env;
 pub mod gen;
 pub mod hot;
 pub mod lanes;
+pub mod metric;
 pub mod parallel;
 pub mod prefetch;
 /// The cube type and the hot path's small tables: AVX2 on x86 (`simd.rs`),
@@ -68,11 +72,32 @@ pub mod tables;
 #[allow(dead_code)]
 mod portable_check;
 
+use metric::Metric;
 use tables::{h48_bytes, h48_rows, Cocsep, H48Meta, H48Table, Memory, TableError};
 
-/// Generate a table by BFS on h0 or h11, plus derived tables (each
-/// `(k, base, file)`). Returns the main table and the derived tables (each
-/// with its own memory); tables with a file are written to it.
+/// Generate an HTM table by BFS on h0 or h11, plus derived tables (each
+/// `(k, base, file)`): `generate_metric` in HTM.
+///
+/// # Errors
+/// As `generate_metric`.
+/// # Safety
+/// As `generate_metric`.
+pub unsafe fn generate(
+    corners: &Cocsep,
+    k: u32,
+    base: u8,
+    out: Option<&str>,
+    derived: &[(u32, u8, Option<String>)],
+    threads: usize,
+) -> Result<(H48Table, Vec<H48Table>), TableError> {
+    // SAFETY: the caller's contract.
+    unsafe { generate_metric(corners, k, base, Metric::Htm, out, derived, threads) }
+}
+
+/// Generate a table of `metric` by BFS on h0 or h11, plus derived tables
+/// (each `(k, base, file)`, of the same metric). Returns the main table and
+/// the derived tables (each with its own memory); tables with a file are
+/// written to it.
 ///
 /// # Errors
 /// If `k` is not 0 or 11, a derived `k` is above `k`, memory cannot be
@@ -81,10 +106,11 @@ use tables::{h48_bytes, h48_rows, Cocsep, H48Meta, H48Table, Memory, TableError}
 /// Output files must not be accessed through other handles or mappings during
 /// generation, or changed or truncated while any returned table uses them.
 /// Calls with no output files use private anonymous memory and are unrestricted.
-pub unsafe fn generate(
+pub unsafe fn generate_metric(
     corners: &Cocsep,
     k: u32,
     base: u8,
+    metric: Metric,
     out: Option<&str>,
     derived: &[(u32, u8, Option<String>)],
     threads: usize,
@@ -136,17 +162,19 @@ pub unsafe fn generate(
                     H48Meta {
                         k: *dk,
                         base: *dbase,
+                        metric,
                     },
                     words,
                 )
             })
             .collect(),
+        metric,
     };
     // SAFETY: fresh writable memory, not exposed to readers before this ends.
     let _counts = unsafe { generator.run(&memory)? };
     let table = H48Table {
         memory,
-        meta: H48Meta { k, base },
+        meta: H48Meta { k, base, metric },
     };
     if let Some(path) = out {
         // SAFETY: output storage is exclusively owned; no trailer view is live.
@@ -161,6 +189,7 @@ pub unsafe fn generate(
                 meta: H48Meta {
                     k: *dk,
                     base: *dbase,
+                    metric,
                 },
             };
             if let Some(path) = path {
@@ -173,12 +202,11 @@ pub unsafe fn generate(
     Ok((table, derived_tables))
 }
 
-/// Generate hk of any k (0..=11) in anonymous memory: by BFS for the true
-/// coordinates h0 and h11, else by `gen::dfs`.
+/// Generate HTM hk of any k (0..=11) in anonymous memory:
+/// `generate_table_metric` in HTM.
 ///
 /// # Errors
-/// If `k` is above 11 or `base` above 12, memory cannot be allocated, or a
-/// thread panicked.
+/// As `generate_table_metric`.
 pub fn generate_table(
     corners: &Cocsep,
     k: u32,
@@ -186,16 +214,34 @@ pub fn generate_table(
     threads: usize,
     verbose: bool,
 ) -> Result<H48Table, TableError> {
+    generate_table_metric(corners, k, base, Metric::Htm, threads, verbose)
+}
+
+/// Generate hk of any k (0..=11) of `metric` in anonymous memory: by BFS
+/// for the true coordinates h0 and h11, else by `gen::dfs`.
+///
+/// # Errors
+/// If `k` is above 11 or `base` above 12, memory cannot be allocated, or a
+/// thread panicked.
+pub fn generate_table_metric(
+    corners: &Cocsep,
+    k: u32,
+    base: u8,
+    metric: Metric,
+    threads: usize,
+    verbose: bool,
+) -> Result<H48Table, TableError> {
     if k == 0 || k == 11 {
         // SAFETY: no output files; all memory is privately owned.
-        return Ok(unsafe { generate(corners, k, base, None, &[], threads) }?.0);
+        return Ok(unsafe { generate_metric(corners, k, base, metric, None, &[], threads) }?.0);
     }
     let settings = gen::dfs::Settings {
         k,
         base,
         threads,
-        prefix_depth: gen::dfs::PREFIX_DEPTH.min(base.saturating_add(2)),
+        prefix_depth: gen::dfs::Settings::default_prefix_depth(metric, base),
         verbose,
+        metric,
     };
     let generator = gen::dfs::Generator::new(corners, settings)?;
     let len = usize::try_from(h48_bytes(k)).map_err(|_| TableError::TooLarge(k))?;
@@ -210,7 +256,7 @@ pub fn generate_table(
     generator.generate(&rows, &part)?;
     Ok(H48Table {
         memory,
-        meta: H48Meta { k, base },
+        meta: H48Meta { k, base, metric },
     })
 }
 
@@ -268,9 +314,21 @@ mod safe_api_tests {
     fn safe_api_checks_table_memory_and_metadata() {
         assert!(Memory::anonymous(usize::MAX).is_err());
         for meta in [
-            H48Meta { k: 12, base: 2 },
-            H48Meta { k: 0, base: 13 },
-            H48Meta { k: 0, base: 2 },
+            H48Meta {
+                k: 12,
+                base: 2,
+                metric: Metric::Htm,
+            },
+            H48Meta {
+                k: 0,
+                base: 13,
+                metric: Metric::Htm,
+            },
+            H48Meta {
+                k: 0,
+                base: 2,
+                metric: Metric::Htm,
+            },
         ] {
             assert!(H48Table::from_memory(Memory::anonymous(4096).unwrap(), meta).is_err());
         }
@@ -278,7 +336,11 @@ mod safe_api_tests {
         // allocation check. External code cannot construct this table.
         let table = H48Table {
             memory: Memory::anonymous(4096).unwrap(),
-            meta: H48Meta { k: 0, base: 2 },
+            meta: H48Meta {
+                k: 0,
+                base: 2,
+                metric: Metric::Htm,
+            },
         };
         assert_eq!(table.get(0), Some((0, 0)));
         assert_eq!(table.get(16383), Some((0, 0)));

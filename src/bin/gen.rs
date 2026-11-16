@@ -43,6 +43,7 @@ use clap::{Args, Parser, Subcommand};
 use egg_solver::cli::{self, preflight, BadInput, Verbosity};
 use egg_solver::gen::progress;
 use egg_solver::gen::{collapse, dfs};
+use egg_solver::metric::Metric;
 use egg_solver::tables::file::{self, LoadMode, LoadOptions, Trailer};
 use egg_solver::tables::{default_base, distribution, h48_bytes, h48_rows, Cocsep};
 use egg_solver::tables::{H48Meta, H48Table, Memory, ROW_BYTES};
@@ -429,6 +430,7 @@ fn generate_dfs(
         threads,
         prefix_depth: dfs::PREFIX_DEPTH.min(base.saturating_add(2)),
         verbose: true,
+        metric: Metric::Htm,
     };
     let generator = dfs::Generator::new(corners, settings)?;
     let rows = h48_rows(k);
@@ -474,6 +476,7 @@ fn generate_dfs(
         data_bytes,
         distribution: Some(dist),
         checksum: Some(file::combine_hashes(data_bytes, &hashes)),
+        metric: Metric::Htm,
     };
     // SAFETY: output storage is exclusively owned; no trailer view is live.
     unsafe { file::write_trailer(out, &trailer) }?;
@@ -620,7 +623,14 @@ fn stamp(path: &str, k: u32, base: u8) -> anyhow::Result<ExitCode> {
     // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
     let data = unsafe { Memory::map_read_only(path, usize::try_from(data_bytes)?, true) }
         .with_context(|| format!("cannot map {path}"))?;
-    let table = H48Table::from_memory(data, H48Meta { k, base })?;
+    let table = H48Table::from_memory(
+        data,
+        H48Meta {
+            k,
+            base,
+            metric: Metric::Htm,
+        },
+    )?;
     let trailer = table.trailer(egg_solver::thread_count())?;
     drop(table);
     // SAFETY: output storage is exclusively owned; no trailer view is live.

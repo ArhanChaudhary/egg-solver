@@ -9,7 +9,7 @@
 //! trailer is written last, after the data is in and its checksum checked:
 //! a segment without one is still loading, or its load was interrupted. The
 //! key is legacy ASCII "co" (retained for compatibility), then k, then base (`key`: 0x636f0b0a for h11
-//! base 10), so every run of a table finds the same segment; every attach
+//! base 10; a QTM table's k byte has its top bit set: `metric_key`), so every run of a table finds the same segment; every attach
 //! compares the segment's trailer with the table file's (k, base, size,
 //! distribution, checksum), so a segment of another table under that key is
 //! never used.
@@ -32,6 +32,7 @@
 
 use super::file::{self, LoadOptions, TableError};
 use super::Memory;
+use crate::metric::Metric;
 
 /// Copy a trailer only after its one-time publication. The caller provides
 /// live storage whose first byte is atomic; the writer publishes once with
@@ -61,6 +62,20 @@ pub const KEY_PREFIX: u32 = 0x636f_0000;
 #[must_use]
 pub fn key(k: u32, base: u8) -> u32 {
     KEY_PREFIX | (k & 0xFF) << 8 | u32::from(base)
+}
+
+/// The segment key of table hk with `base` of `metric`: `key`, with the top
+/// bit of the k byte set for QTM (0x636f8709 for a QTM h7 of base 9), so
+/// that the tables of both metrics can be loaded at once.
+#[must_use]
+pub fn metric_key(k: u32, base: u8, metric: Metric) -> u32 {
+    key(k, base) | if metric.is_qtm() { 0x8000 } else { 0 }
+}
+
+/// The segment key of the table of `trailer`.
+#[cfg_attr(not(all(target_os = "linux", not(miri))), allow(dead_code))]
+fn trailer_key(trailer: &file::Trailer) -> u32 {
+    metric_key(trailer.k, trailer.base, trailer.metric)
 }
 
 /// A key as `ipcs` shows it (`0x636f0709`) or in decimal; not 0
@@ -258,8 +273,8 @@ mod linux {
 #[cfg(all(target_os = "linux", not(miri)))]
 mod linux {
     use super::{
-        file, key, page_name, segment_bytes, LoadOptions, Memory, Removed, Segment, TableError,
-        NORMAL_PAGE,
+        file, page_name, segment_bytes, trailer_key, LoadOptions, Memory, Removed, Segment,
+        TableError, NORMAL_PAGE,
     };
     use crate::tables::file::Trailer;
     use std::io;
@@ -313,9 +328,13 @@ mod linux {
 
     /// A table for messages: "h7 base 9, checksum a8f0d2657a36a775".
     fn describe(trailer: &Trailer) -> String {
+        let qtm = if trailer.metric.is_qtm() { " qtm" } else { "" };
         match trailer.checksum {
-            Some(c) => format!("h{} base {}, checksum {c:016x}", trailer.k, trailer.base),
-            None => format!("h{} base {}, no checksum", trailer.k, trailer.base),
+            Some(c) => format!(
+                "h{} base {}{qtm}, checksum {c:016x}",
+                trailer.k, trailer.base
+            ),
+            None => format!("h{} base {}{qtm}, no checksum", trailer.k, trailer.base),
         }
     }
 
@@ -515,9 +534,7 @@ mod linux {
                 Ok(None)
             };
         };
-        let key = options
-            .shm_key
-            .unwrap_or_else(|| key(trailer.k, trailer.base));
+        let key = options.shm_key.unwrap_or_else(|| trailer_key(&trailer));
         // (A few rounds: other processes may make or remove it meanwhile.)
         for _ in 0..4 {
             let id = match shmget(key, 0, 0) {
@@ -595,9 +612,7 @@ mod linux {
         let Ok(Some(trailer)) = file::read_trailer(path) else {
             return false;
         };
-        let key = options
-            .shm_key
-            .unwrap_or_else(|| key(trailer.k, trailer.base));
+        let key = options.shm_key.unwrap_or_else(|| trailer_key(&trailer));
         trailer.checksum.is_some()
             && shmget(key, 0, 0)
                 .and_then(|id| Attachment::new(id, true))
@@ -931,14 +946,17 @@ mod linux {
 
 #[cfg(test)]
 mod tests {
-    use super::{key, parse_key, segment_bytes, ShmPages, NORMAL_PAGE};
+    use super::{key, metric_key, parse_key, segment_bytes, ShmPages, NORMAL_PAGE};
+    use crate::metric::Metric;
 
-    /// Keys are "co", k and base; `ShmPages` lists are any order of 1g, 2m
-    /// and 4k, tried largest first.
+    /// Keys are "co", k and base (the k byte's top bit for QTM); `ShmPages`
+    /// lists are any order of 1g, 2m and 4k, tried largest first.
     #[test]
     fn keys_and_page_lists() {
         assert_eq!(key(11, 10), 0x636f_0b0a);
         assert_eq!(key(7, 9), 0x636f_0709);
+        assert_eq!(metric_key(7, 9, Metric::Htm), 0x636f_0709);
+        assert_eq!(metric_key(7, 9, Metric::Qtm), 0x636f_8709);
         assert_eq!(parse_key("0x636f0709"), Some(0x636f_0709));
         assert_eq!(parse_key("1668220681"), Some(0x636f_0709));
         for bad in ["0", "0x0", "x", "0x100000000", "-1", ""] {
@@ -1033,6 +1051,7 @@ mod segment_tests {
                 data_bytes: len as u64,
                 distribution: None,
                 checksum: Some(file::checksum(&data, 4).unwrap()),
+                metric: crate::metric::Metric::Htm,
             };
             let path = scratch_path(name).to_string_lossy().into_owned();
             std::fs::write(&path, [&data[..], &trailer.to_bytes()].concat()).unwrap();
@@ -1293,6 +1312,7 @@ mod segment_tests {
             data_bytes: h48_bytes(7),
             distribution: Some([1, 2, 3, 4]),
             checksum: Some(0xa8f0_d265_7a36_a775),
+            metric: crate::metric::Metric::Htm,
         };
         let bytes = header_bytes(&trailer, 1 << 21, "/mnt/huge/h7\nx");
         assert_eq!(bytes.len(), 4096);

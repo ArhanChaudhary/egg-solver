@@ -91,6 +91,7 @@ pub fn derive(source: &H48Table, k: u32, threads: usize) -> Result<H48Table, Tab
         meta: H48Meta {
             k,
             base: source.meta.base,
+            metric: source.meta.metric,
         },
     })
 }
@@ -113,9 +114,15 @@ pub struct Diff {
 /// table if the ks are equal).
 ///
 /// # Errors
-/// If the bases differ, `table`'s k is above `larger`'s, a table is larger
+/// If the metrics or bases differ, `table`'s k is above `larger`'s, a table is larger
 /// than its memory or a slice can be, or a thread panicked.
 pub fn compare(table: &H48Table, larger: &H48Table, threads: usize) -> Result<Diff, TableError> {
+    if table.meta.metric != larger.meta.metric {
+        return Err(TableError::Generate(format!(
+            "tables of different metrics ({} and {})",
+            table.meta.metric, larger.meta.metric
+        )));
+    }
     if table.meta.base != larger.meta.base {
         return Err(TableError::Generate(format!(
             "tables of different bases ({} and {})",

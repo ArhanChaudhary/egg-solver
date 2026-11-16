@@ -16,6 +16,7 @@ pub use file::TableError;
 
 use crate::coord::{cocsep, h11_key, reduce_key, N_CLASSES, N_COCSEP, N_MSPLIT, N_SLOTS};
 use crate::cubie::Move;
+use crate::metric::Metric;
 use crate::simd::Cube;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -48,6 +49,9 @@ pub struct Cocsep {
     /// on a transparent huge page (one TLB entry instead of ~113). (+2.8% at
     /// 48T when added, with the direct index, packed-cocsep.)
     packed: Memory,
+    /// The metric of the depths (the classes and symmetries are the same in
+    /// both: those of the HTM BFS order).
+    metric: Metric,
 }
 
 /// Bytes of memory for the packed entries (3 per coordinate, and the 4-byte
@@ -116,6 +120,19 @@ impl Cocsep {
     #[must_use]
     pub fn distribution(&self) -> &[u64] {
         &self.distribution
+    }
+
+    /// The metric of the depths.
+    #[must_use]
+    pub fn metric(&self) -> Metric {
+        self.metric
+    }
+
+    /// The largest depth.
+    #[must_use]
+    pub fn max_depth(&self) -> u8 {
+        let deepest = self.distribution.iter().rposition(|&n| n > 0);
+        u8::try_from(deepest.unwrap_or(0)).unwrap_or(u8::MAX)
     }
 
     /// Build the table: a breadth-first search (BFS) over the cocsep
@@ -226,7 +243,58 @@ impl Cocsep {
             self_symmetries,
             distribution,
             packed,
+            metric: Metric::Htm,
         })
+    }
+
+    /// The table with the depths of `metric`: `generate` for HTM; for QTM
+    /// the same classes and symmetries (which index the H48 tables of both
+    /// metrics) with the depths of a BFS over the 12 quarter turns (up to
+    /// 10, against 9 in HTM; the packed entries hold up to 15).
+    ///
+    /// # Errors
+    /// As `generate`, or if a QTM depth is above 15 or some coordinate is
+    /// not reached (a bug in the cube model).
+    pub fn generate_metric(metric: Metric) -> Result<Cocsep, TableError> {
+        let mut table = Cocsep::generate()?;
+        if metric.is_qtm() {
+            table.set_depths(&quarter_turn_depths()?, metric)?;
+        }
+        Ok(table)
+    }
+
+    /// Replace the depths (of the entries, the packed entries and the
+    /// distribution) by `depths` (one per coordinate) of `metric`.
+    fn set_depths(&mut self, depths: &[u8], metric: Metric) -> Result<(), TableError> {
+        let model_error = |what, found, expected| TableError::CocsepModel {
+            what,
+            found,
+            expected,
+        };
+        if depths.len() != N_COCSEP {
+            return Err(model_error("coordinates", depths.len(), N_COCSEP));
+        }
+        let mut distribution = vec![0u64; 16].into_boxed_slice();
+        for &d in depths {
+            *distribution.get_mut(usize::from(d)).ok_or(model_error(
+                "a depth of",
+                usize::from(d),
+                15,
+            ))? += 1;
+        }
+        for (entry, &d) in self.entries.iter_mut().zip(depths) {
+            *entry = (*entry & !0xFF) | u32::from(d);
+        }
+        // SAFETY: `3 * N_COCSEP + 1` bytes of our own 2 MiB (`PACKED_LEN`);
+        // no reference into them is live (`&mut self`).
+        let bytes = unsafe { std::slice::from_raw_parts_mut(self.packed.ptr(), 3 * N_COCSEP + 1) };
+        for (slot, &d) in bytes.as_chunks_mut::<3>().0.iter_mut().zip(depths) {
+            // (The depth is the low 4 bits of the first byte.)
+            slot[0] = (slot[0] & 0xF0) | d;
+        }
+        self.distribution = distribution;
+        self.metric = metric;
+        Ok(())
     }
 
     /// A cheap stand-in for unit tests: corner depths from a BFS cut after
@@ -266,6 +334,7 @@ impl Cocsep {
             self_symmetries: vec![1; N_CLASSES].into_boxed_slice(),
             distribution,
             packed,
+            metric: Metric::Htm,
         }
     }
 
@@ -300,6 +369,42 @@ impl Cocsep {
     pub fn index(&self, cube: Cube, k: u32) -> u64 {
         reduce_key(self.full_key(cube), k)
     }
+}
+
+/// The QTM depth of each cocsep coordinate: a BFS over the 12 quarter
+/// turns.
+///
+/// # Errors
+/// If some coordinate is not reached (a bug in the cube model).
+fn quarter_turn_depths() -> Result<Vec<u8>, TableError> {
+    let mut depth = vec![0xFFu8; N_COCSEP];
+    let mut cube_of = vec![Cube::solved(); N_COCSEP];
+    let mut order = Vec::with_capacity(N_COCSEP);
+    let solved = cocsep(Cube::solved());
+    depth[solved] = 0;
+    order.push(solved);
+    let mut head = 0;
+    while head < order.len() {
+        let i = order[head];
+        head += 1;
+        for mv in Move::ALL.into_iter().filter(|mv| mv.index() % 3 != 1) {
+            let next = cube_of[i].apply_move(mv);
+            let j = cocsep(next);
+            if depth[j] == 0xFF {
+                depth[j] = depth[i] + 1;
+                cube_of[j] = next;
+                order.push(j);
+            }
+        }
+    }
+    if order.len() != N_COCSEP {
+        return Err(TableError::CocsepModel {
+            what: "coordinates reached by quarter turns",
+            found: order.len(),
+            expected: N_COCSEP,
+        });
+    }
+    Ok(depth)
 }
 
 // ---------------------------------------------------------------------------
@@ -758,6 +863,22 @@ pub fn default_base(k: u32) -> u8 {
     [7, 8, 8, 8, 9, 9, 9, 9, 10, 10, 10, 10][k as usize]
 }
 
+/// `default_base` of a table of `metric` (`gen <k> auto --metric qtm`).
+/// QTM distances are longer: two more than HTM's base for every k. The QTM
+/// h0 cosets have depths 9 (4.6M entries), 10 (25.2M), 11 (61.7M), 12
+/// (25.0M), 13 (0.3M) and 14 (18): base 9 gives each depth from 10 to 12
+/// its own code, as base 7 does for HTM h0. QTM h7 of base 11 has 3.8% of
+/// its entries at most 11, 21.8% at 12, 58.5% at 13 and 16.3% at 14 or
+/// more (HTM h7 of base 9: 0.6%, 6.0%, 40.8%, 52.8%). Not tuned by solve
+/// speed as the HTM bases were.
+#[must_use]
+pub fn default_base_metric(k: u32, metric: Metric) -> u8 {
+    match metric {
+        Metric::Htm => default_base(k),
+        Metric::Qtm => [9, 10, 10, 10, 11, 11, 11, 11, 12, 12, 12, 12][k as usize],
+    }
+}
+
 /// u64 word index and bit shift of an entry.
 #[must_use]
 #[inline(always)]
@@ -780,11 +901,13 @@ pub fn entry_low_bits(w: u64) -> u64 {
     mask
 }
 
-/// Which table a file holds: `k` (of hk) and the `base` of its codes.
+/// Which table a file holds: `k` (of hk), the `base` of its codes and the
+/// metric of its distances.
 #[derive(Clone, Copy, Debug)]
 pub struct H48Meta {
     pub k: u32,
     pub base: u8,
+    pub metric: Metric,
 }
 
 /// An H48 table: 2-bit codes, 0 = "at most `base`" (then the group minimum
@@ -833,7 +956,10 @@ impl H48Table {
     /// Invalid metadata or insufficient memory for the declared table.
     pub fn from_memory(memory: Memory, meta: H48Meta) -> Result<Self, TableError> {
         if meta.k > 11 || meta.base > 12 {
-            return Err(TableError::BadMeta(format!("{} {}", meta.k, meta.base)));
+            return Err(TableError::BadMeta(format!(
+                "{} {} {}",
+                meta.k, meta.base, meta.metric
+            )));
         }
         let needed = h48_bytes(meta.k);
         if (memory.len() as u64) < needed {
@@ -978,22 +1104,23 @@ pub fn meta_path(path: &str) -> String {
 
 /// `k` and `base` if usable: the search relies on bounds below 16 (`base +
 /// 3` and 4-bit group minima) and on the index layout of `k`.
-fn checked_meta(k: u32, base: u32) -> Option<H48Meta> {
+fn checked_meta(k: u32, base: u32, metric: Metric) -> Option<H48Meta> {
     match (k, u8::try_from(base)) {
-        (0..=11, Ok(base @ 0..=12)) => Some(H48Meta { k, base }),
+        (0..=11, Ok(base @ 0..=12)) => Some(H48Meta { k, base, metric }),
         _ => None,
     }
 }
 
-/// Read a table's `k` and `base`: from the file's trailer (`file`), else
-/// from its sidecar meta file (`meta_path`).
+/// Read a table's `k`, `base` and metric: from the file's trailer (`file`),
+/// else from its sidecar meta file (`meta_path`: `k base`, or `k base qtm`
+/// for a QTM table).
 ///
 /// # Errors
 /// If neither can be read, or they do not hold `k <= 11` and a base of at
 /// most 12, or the trailer's data size is not that of `k`.
 pub fn read_meta(path: &str) -> Result<H48Meta, TableError> {
     if let Some(trailer) = file::read_trailer(path)? {
-        return match checked_meta(trailer.k, u32::from(trailer.base)) {
+        return match checked_meta(trailer.k, u32::from(trailer.base), trailer.metric) {
             Some(meta) if trailer.data_bytes == h48_bytes(meta.k) => Ok(meta),
             _ => Err(TableError::BadTrailer {
                 path: path.to_string(),
@@ -1007,14 +1134,15 @@ pub fn read_meta(path: &str) -> Result<H48Meta, TableError> {
         source,
     })?;
     let invalid = || TableError::BadMeta(text.clone());
-    let numbers: Vec<u32> = text
-        .split_whitespace()
-        .map(|x| x.parse().map_err(|_| invalid()))
-        .collect::<Result<_, _>>()?;
-    let [k, base] = numbers[..] else {
-        return Err(invalid());
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let (numbers, metric) = match words[..] {
+        [k, base] => ([k, base], Metric::Htm),
+        // (Readers before QTM refuse a third word: not a number.)
+        [k, base, metric] => ([k, base], Metric::parse(metric).ok_or_else(invalid)?),
+        _ => return Err(invalid()),
     };
-    checked_meta(k, base).ok_or_else(invalid)
+    let [k, base] = numbers.map(|x| x.parse::<u32>().map_err(|_| invalid()));
+    checked_meta(k?, base?, metric).ok_or_else(invalid)
 }
 
 /// How `H48Table::open_reporting` loaded a table.
@@ -1161,7 +1289,7 @@ impl H48Table {
         };
         let trailer = file::Trailer::parse(piece(trailer_start, file::TRAILER_BYTES))?
             .ok_or(TableError::NoTrailer)?;
-        let meta = checked_meta(trailer.k, u32::from(trailer.base))
+        let meta = checked_meta(trailer.k, u32::from(trailer.base), trailer.metric)
             .filter(|meta| trailer.data_bytes == h48_bytes(meta.k))
             .ok_or(TableError::UnusableTrailer(trailer))?;
         // (As in `open_with`; hugetlbfs files have up to a page of slack.)
@@ -1199,7 +1327,11 @@ impl H48Table {
     pub(crate) fn zeroed(k: u32, base: u8) -> H48Table {
         H48Table {
             memory: Memory::anonymous(usize::try_from(h48_bytes(k)).unwrap()).unwrap(),
-            meta: H48Meta { k, base },
+            meta: H48Meta {
+                k,
+                base,
+                metric: Metric::Htm,
+            },
         }
     }
 
@@ -1217,6 +1349,7 @@ impl H48Table {
             data_bytes: data.len() as u64,
             distribution: Some(self.distribution()?),
             checksum: Some(file::checksum(data, threads)?),
+            metric: self.meta.metric,
         })
     }
 
@@ -1388,9 +1521,23 @@ mod tests {
             unsafe { H48Table::open(&path) }.map(|t| (t.meta.k, t.meta.base))
         };
         assert_eq!(open_with("0 8\n").unwrap(), (0, 8));
-        for bad in ["0 13", "12 8", "0", "0 8 1", "x 8", "0 -1", ""] {
+        for bad in [
+            "0 13",
+            "12 8",
+            "0",
+            "0 8 1",
+            "x 8",
+            "0 -1",
+            "",
+            "0 8 stm",
+            "0 8 qtm x",
+        ] {
             assert!(open_with(bad).is_err(), "meta {bad:?}");
         }
+        assert_eq!(open_with("0 9 qtm\n").unwrap(), (0, 9));
+        assert_eq!(read_meta(&path).unwrap().metric, Metric::Qtm);
+        assert_eq!(open_with("0 9 htm").unwrap(), (0, 9));
+        assert_eq!(read_meta(&path).unwrap().metric, Metric::Htm);
         // The file of an h0 table is too small for h1.
         assert!(open_with("1 8").is_err());
         std::fs::remove_dir_all(&dir).unwrap();
@@ -1422,6 +1569,7 @@ mod tests {
             data_bytes: data_len as u64,
             distribution: None,
             checksum: Some(file::checksum(&reference, 3).unwrap()),
+            metric: Metric::Htm,
         };
         let table = H48Table::from_file_memory(file_of(&pattern, &trailer, 0), true, 2).unwrap();
         assert_eq!((table.meta.k, table.meta.base), (0, 8));

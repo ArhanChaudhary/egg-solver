@@ -35,19 +35,80 @@
 //! (job, root child) pairs across jobs by per-child statistics
 //! (`Lane::start_iteration`), and full-length job roots branch on the
 //! normal side.
+//!
+//! The quarter-turn metric is the lanes' `QTM` parameter (`Lane<true>`):
+//! a half turn takes two moves of the target, targets step by 2, and the
+//! sibling pruning and node bounds use the moves between siblings
+//! (`qtm_siblings`), as in `solver`. QTM runs whole jobs in every iteration
+//! (no split iterations: their roots may be pruned or masked in QTM, which
+//! those runs do not allow for). The HTM code is the same as without the
+//! parameter (`QTM` is a constant: its branches fold away).
 
 use crate::cubie::{inverse_move, CubieCube, Move};
+use crate::metric::move_cost;
 use crate::simd::{Cube, HOT_TABLES};
-use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES, MAX_TARGET, QUARTER_TURNS};
+use crate::solver::{
+    Solver, Stats, ALLOWED_AFTER, ALL_MOVES, MAX_TARGET, MAX_TARGET_QTM, QUARTER_TURNS,
+};
 use crate::symstart::SymFilter;
 
 pub mod share;
 
-/// Stack depth limit (nodes per lane): searches go below 21 moves.
-const MAXD: usize = 26;
-// (Targets are at most `MAX_TARGET`, and the stack depth stays below the
-// target: the stack's unchecked indices are in range, whatever the table.)
-const _: () = assert!((MAX_TARGET as usize) < MAXD);
+/// Stack depth limit (nodes per lane): searches go below 21 moves (27 in
+/// QTM).
+const MAXD: usize = 27;
+// (Targets are at most `MAX_TARGET` (`MAX_TARGET_QTM`), and the stack depth
+// stays below the target: the stack's unchecked indices are in range,
+// whatever the table.)
+const _: () = assert!((MAX_TARGET as usize) < MAXD && (MAX_TARGET_QTM as usize) < MAXD);
+
+/// The last target of a search (God's number of the metric).
+#[inline(always)]
+const fn max_target(qtm: bool) -> u8 {
+    if qtm {
+        MAX_TARGET_QTM
+    } else {
+        MAX_TARGET
+    }
+}
+
+/// The step between targets: 2 in QTM (they keep the parity of the cube's
+/// corner permutation), else 1.
+#[inline(always)]
+const fn target_step(qtm: bool) -> u8 {
+    1 + qtm as u8
+}
+
+/// Whether half turns on one side are left out, the other side's bound
+/// being `bound` with `remaining` moves left after the move: HTM when the
+/// bound is tight (`bound == remaining`; it is at most `remaining`), QTM
+/// when it is within one (a half turn costs two moves and keeps the other
+/// side's bound).
+#[inline(always)]
+fn tight<const QTM: bool>(bound: u8, remaining: u8) -> bool {
+    if QTM {
+        bound + 1 >= remaining
+    } else {
+        bound == remaining
+    }
+}
+
+/// QTM sibling pruning: the later same-face siblings of the child of move
+/// `mv` (X, X2, X' in move order) that a lower bound `value` on that child
+/// prunes, at a node with `remaining` moves left. X and X2, and X2 and X',
+/// are one quarter turn apart, X and X' two; X and X' leave `remaining - 1`
+/// moves, X2 `remaining - 2`. So a value `v` of X prunes X2 if `v - 1 >
+/// remaining - 2` and X' if `v - 2 > remaining - 1`; one of X2 prunes X' if
+/// `v - 1 > remaining - 1`. (HTM drops the whole face when `v > remaining`.)
+#[inline(always)]
+#[expect(clippy::cast_sign_loss, reason = "clamped to 0..=3")]
+fn qtm_siblings(mv: usize, value: u8, remaining: u8) -> u32 {
+    /// By kind of the move (X, X2, X'), then by `value - remaining + 1`
+    /// clamped to 0..=3: the siblings pruned, as bits above `mv`.
+    const PRUNED: [[u32; 4]; 3] = [[0, 2, 2, 6], [0, 0, 2, 2], [0; 4]];
+    let excess = (i32::from(value) - i32::from(remaining) + 1).clamp(0, 3) as usize;
+    PRUNED[mv % 3][excess] << mv
+}
 
 /// Job length at which jobs stop being extended (`Solver::job_len`).
 const MAX_JOB_LEN: usize = 4;
@@ -113,6 +174,8 @@ struct Node {
 struct Job {
     moves: [u8; 4],
     len: u8,
+    /// The moves' length in the search's metric (`len` in HTM).
+    cost: u8,
     normal_bound: u8,
     inverse_bound: u8,
     stat: f32,
@@ -473,8 +536,8 @@ struct RunState {
 }
 
 /// One lane: the search of one cube, as an explicit stack that can stop at
-/// any table lookup and resume later.
-pub struct Lane {
+/// any table lookup and resume later; in QTM if `QTM`.
+pub struct Lane<const QTM: bool = false> {
     /// The cube's index in the input.
     pub cube_index: usize,
     /// When the current cube was started.
@@ -547,8 +610,8 @@ enum Start {
     Unsolved,
 }
 
-impl Lane {
-    fn new() -> Lane {
+impl<const QTM: bool> Lane<QTM> {
+    fn new() -> Self {
         let node = Node {
             moved: Cube::solved(),
             other: Cube::solved(),
@@ -650,11 +713,16 @@ impl Lane {
         self.jobs.push(Job {
             moves: [0; 4],
             len: 0,
+            cost: 0,
             normal_bound,
             inverse_bound,
             stat: 0.0,
         });
-        self.target = normal_bound.max(inverse_bound).max(1);
+        self.target = if QTM {
+            solver.first_target(root, normal_bound, inverse_bound)
+        } else {
+            normal_bound.max(inverse_bound).max(1)
+        };
         self.run_state.full = false;
         if self.start_iteration(solver) {
             Start::Searching
@@ -706,6 +774,7 @@ impl Lane {
                 let mut child = *job;
                 child.moves[child.len as usize] = mv as u8;
                 child.len += 1;
+                child.cost += move_cost(QTM, mv as u8);
                 if filtered && !filter.keep(&child.moves[..usize::from(child.len)]) {
                     continue;
                 }
@@ -765,9 +834,9 @@ impl Lane {
     fn start_iteration(&mut self, solver: &Solver) -> bool {
         loop {
             // The stack depth stays below the target (relied on by the
-            // unchecked indexing in `advance`): at most `MAX_TARGET`, below
-            // `MAXD`.
-            if self.target > MAX_TARGET {
+            // unchecked indexing in `advance`): at most `MAX_TARGET`
+            // (`MAX_TARGET_QTM`), below `MAXD`.
+            if self.target > max_target(QTM) {
                 return false;
             }
             let job_len = solver.job_len(self.target);
@@ -780,7 +849,8 @@ impl Lane {
                 extended = true;
             }
             let was_full = self.run_state.full;
-            self.run_state.full = job_len == MAX_JOB_LEN && !self.shared;
+            // (Not in QTM: see the module docs.)
+            self.run_state.full = !QTM && job_len == MAX_JOB_LEN && !self.shared;
             if self.run_state.full && was_full && !extended {
                 self.build_first();
                 self.run_state.part = 1;
@@ -802,7 +872,7 @@ impl Lane {
                 return true;
             }
             debug_assert!(self.iteration_covered());
-            self.target += 1;
+            self.target += target_step(QTM);
         }
     }
 
@@ -1086,7 +1156,7 @@ impl Lane {
             return true;
         }
         debug_assert!(self.iteration_covered());
-        self.target += 1;
+        self.target += target_step(QTM);
         self.start_iteration(solver)
     }
 
@@ -1160,6 +1230,8 @@ impl Lane {
             let unknown = unknown_twins(&order.twin_values);
             children |= (children & unknown) >> 2 & !done;
             let job = *unsafe { self.jobs.get_unchecked(job_index) };
+            // (Split runs are HTM only: `start_iteration`.)
+            debug_assert!(!QTM);
             let remaining_depth = self.target - job.len;
             debug_assert!(
                 job.normal_bound < remaining_depth && job.inverse_bound < remaining_depth
@@ -1206,7 +1278,8 @@ impl Lane {
                     crate::prefetch::write(self.run_state.child_orders.as_ptr().add(ahead));
                 }
             }
-            let remaining_depth = self.target - job.len;
+            // (In QTM at least 1: `Solver::job_len`.)
+            let remaining_depth = self.target - if QTM { job.cost } else { job.len };
             self.child_stats = [0.0; 18];
             let (cube, inverse) = self.job_cubes(&job);
             if job.normal_bound > remaining_depth
@@ -1229,10 +1302,10 @@ impl Lane {
             self.run_state.current_children = ALL_MOVES;
             let mut normal_moves = moves_after(&job);
             let mut inverse_moves = ALL_MOVES;
-            if job.inverse_bound == remaining_depth {
+            if tight::<QTM>(job.inverse_bound, remaining_depth) {
                 normal_moves &= QUARTER_TURNS;
             }
-            if job.normal_bound == remaining_depth {
+            if tight::<QTM>(job.normal_bound, remaining_depth) {
                 inverse_moves &= QUARTER_TURNS;
             }
             self.depth = 0;
@@ -1295,7 +1368,11 @@ impl Lane {
     )]
     #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
     fn advance(&mut self, solver: &Solver) -> Step {
-        let max_value = solver.base + 3;
+        let max_value = if QTM {
+            solver.max_value
+        } else {
+            solver.base + 3
+        };
         let mut depth = self.depth;
         // SAFETY (every `get_unchecked(depth)` of `stack` below): the depth
         // stays below the target, and `start_iteration` asserts that the
@@ -1359,17 +1436,26 @@ impl Lane {
                 depth -= 1;
                 self.depth = depth;
                 let parent = unsafe { self.stack.get_unchecked_mut(depth) };
-                // Sibling-face pruning on the child's bound (see `note_value`),
-                // with the face's mask by move (no division; part of m7's µop
-                // stack: +1.5% at 1T averaged over code offsets, even at 48T).
-                // SAFETY: moves are below 18.
-                let face_keep = unsafe { *HOT_TABLES.move_keep.get_unchecked(usize::from(mv)) };
-                let keep = std::hint::select_unpredictable(
-                    lower_bound > parent.remaining_depth,
-                    face_keep,
-                    !0,
-                );
-                lower_bound = max_child_bound(parent.lower_bound, lower_bound);
+                let keep;
+                if QTM {
+                    // (See `note_value_qtm`.)
+                    keep = !qtm_siblings(usize::from(mv), lower_bound, parent.remaining_depth);
+                    lower_bound =
+                        max_child_bound_cost(parent.lower_bound, lower_bound, move_cost(true, mv));
+                } else {
+                    // Sibling-face pruning on the child's bound (see
+                    // `note_value`), with the face's mask by move (no
+                    // division; part of m7's µop stack: +1.5% at 1T averaged
+                    // over code offsets, even at 48T).
+                    // SAFETY: moves are below 18.
+                    let face_keep = unsafe { *HOT_TABLES.move_keep.get_unchecked(usize::from(mv)) };
+                    keep = std::hint::select_unpredictable(
+                        lower_bound > parent.remaining_depth,
+                        face_keep,
+                        !0,
+                    );
+                    lower_bound = max_child_bound(parent.lower_bound, lower_bound);
+                }
                 parent.lower_bound = lower_bound;
                 remaining_depth = parent.remaining_depth;
                 todo = parent.todo & keep;
@@ -1392,7 +1478,9 @@ impl Lane {
                 std::hint::assert_unchecked(face < 6 && kind < 3);
                 (face, kind)
             };
-            let child_remaining = remaining_depth - 1;
+            // (QTM: a half turn takes two moves; one is masked out with one
+            // move left, `tight`.)
+            let child_remaining = remaining_depth - 1 - u8::from(QTM && kind == 1);
             // (No sibling-face check: such faces were removed from `todo`.)
             let (moved, other, other_side_bound) = (node.moved, node.other, node.other_side_bound);
             // One test for the rare kinds: `child_remaining == 0` (wraps)
@@ -1403,7 +1491,10 @@ impl Lane {
             // m4-micro's +7.7% at 48T.)
             if child_remaining.wrapping_sub(1) >= max_value {
                 if child_remaining == 0 {
-                    // (nodes with one move left always move the normal cube)
+                    // (Nodes with one move left always move the normal cube.
+                    // In QTM a half turn can also end a node with two left,
+                    // on either side: a half turn is its own inverse, so
+                    // `reconstruct` puts it where the two sides meet.)
                     // SAFETY: `mv < 18` (and in the two calls below).
                     if unsafe { moved.apply_move_unchecked(mv) }.is_solved() {
                         self.pending_move = mv as u8;
@@ -1499,10 +1590,10 @@ impl Lane {
                 // SAFETY: as written above.
                 unsafe { std::hint::assert_unchecked(mv < 18 && face < 6) };
                 if mv.is_multiple_of(3) {
-                    self.note_value(face, corner_bound);
+                    self.note(mv, face, corner_bound);
                     self.skip_xprime(mv);
                 } else {
-                    self.note_value(face, corner_bound.max(other_bound));
+                    self.note(mv, face, corner_bound.max(other_bound));
                 }
                 let top = unsafe { self.stack.get_unchecked(depth) };
                 (todo, lower_bound) = (top.todo, top.lower_bound);
@@ -1541,6 +1632,30 @@ impl Lane {
         node.todo &= std::hint::select_unpredictable(value > node.remaining_depth, face_keep, !0);
     }
 
+    /// `note_value` in QTM, for the child of move `mv`: the node's bound
+    /// becomes at least `value` less the move's cost, and the later
+    /// same-face siblings that `value` prunes are dropped (`qtm_siblings`).
+    #[inline(always)]
+    fn note_value_qtm(&mut self, mv: usize, value: u8) {
+        // SAFETY: the depth is below MAXD (see `advance`).
+        let node = unsafe { self.stack.get_unchecked_mut(self.depth) };
+        #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
+        let cost = move_cost(true, mv as u8);
+        node.lower_bound = max_child_bound_cost(node.lower_bound, value, cost);
+        node.todo &= !qtm_siblings(mv, value, node.remaining_depth);
+    }
+
+    /// `note_value`, or `note_value_qtm` in QTM, for the child of move `mv`
+    /// on face `face`.
+    #[inline(always)]
+    fn note(&mut self, mv: usize, face: usize, value: u8) {
+        if QTM {
+            self.note_value_qtm(mv, value);
+        } else {
+            self.note_value(face, value);
+        }
+    }
+
     /// The X child `mv` was pruned by its other-side value, which its X'
     /// sibling shares (its twin value): mark the X' child as pruned.
     #[inline(always)]
@@ -1571,10 +1686,11 @@ impl Lane {
             );
         }
         self.stats.lookups += 1;
+        // (An X move: one move in either metric.)
         let child_remaining = self.stack[self.depth].remaining_depth - 1;
         let face = self.pending_face as usize;
         if other_bound > child_remaining {
-            self.note_value(face, other_bound);
+            self.note(self.pending_move as usize, face, other_bound);
             self.skip_xprime(self.pending_move as usize);
             return false;
         }
@@ -1591,7 +1707,11 @@ impl Lane {
         self.pending_cube = moved_child;
         let (index, corner_bound) = solver.index(moved_child);
         if corner_bound > child_remaining {
-            self.note_value(face, corner_bound.max(other_bound));
+            self.note(
+                self.pending_move as usize,
+                face,
+                corner_bound.max(other_bound),
+            );
             return false;
         }
         self.pending_other_bound = other_bound;
@@ -1617,9 +1737,14 @@ impl Lane {
                 *HOT_TABLES.stat_pairs.get_unchecked(pair);
         }
         // SAFETY: the depth is below MAXD (see `advance`).
-        let child_remaining = unsafe { self.stack.get_unchecked(self.depth) }.remaining_depth - 1;
+        let child_remaining = unsafe { self.stack.get_unchecked(self.depth) }.remaining_depth
+            - move_cost(QTM, self.pending_move);
         let face = self.pending_face as usize;
-        self.note_value(face, moved_bound.max(other_bound));
+        self.note(
+            self.pending_move as usize,
+            face,
+            moved_bound.max(other_bound),
+        );
         // (Only a cube with bound 0 can be solved: part of m6-micro's resolve
         // patch.)
         if moved_bound > child_remaining || (moved_bound == 0 && self.pending_cube.is_solved()) {
@@ -1663,7 +1788,12 @@ impl Lane {
         let child_remaining = node.remaining_depth.wrapping_sub(1);
         // (Rare kinds as in `advance`: `child_remaining` 0 or above the
         // largest table value.)
-        if todo == 0 || child_remaining.wrapping_sub(1) >= solver.base + 3 {
+        let max_value = if QTM {
+            solver.max_value
+        } else {
+            solver.base + 3
+        };
+        if todo == 0 || child_remaining.wrapping_sub(1) >= max_value {
             // SAFETY: the child's depth is at most the target, below MAXD.
             unsafe { *self.stack.get_unchecked_mut(self.depth) = node };
             return self.advance_cold(solver);
@@ -1689,7 +1819,7 @@ impl Lane {
         // SAFETY: as above.
         unsafe { *self.stack.get_unchecked_mut(self.depth) = node };
         if corner_bound > child_remaining {
-            self.note_value(face, corner_bound);
+            self.note(mv, face, corner_bound);
             self.skip_xprime(mv);
             return self.advance_cold(solver);
         }
@@ -1726,7 +1856,7 @@ impl Lane {
     fn child_node(&self, moved: Cube, other: Cube, moved_bound: u8, other_bound: u8) -> Node {
         // SAFETY: the depth is below MAXD (see `advance`).
         let parent = unsafe { self.stack.get_unchecked(self.depth) };
-        let child_remaining = parent.remaining_depth - 1;
+        let child_remaining = parent.remaining_depth - move_cost(QTM, self.pending_move);
         let parent_normal = parent.normal;
         // Allowed moves on the moved side and on the other side.
         // SAFETY: the pending face is below 6.
@@ -1736,10 +1866,10 @@ impl Lane {
                 .get_unchecked(self.pending_face as usize)
         };
         let mut other_side_moves = parent.other_moves;
-        if other_bound == child_remaining {
+        if tight::<QTM>(other_bound, child_remaining) {
             moved_moves &= QUARTER_TURNS;
         }
-        if moved_bound == child_remaining {
+        if tight::<QTM>(moved_bound, child_remaining) {
             other_side_moves &= QUARTER_TURNS;
         }
         // Whether the child generates its children on the moved side, as
@@ -1794,10 +1924,10 @@ impl Lane {
                         allowed,
                     )
                 };
-            if inverse_bound == child_remaining {
+            if tight::<QTM>(inverse_bound, child_remaining) {
                 normal_moves &= QUARTER_TURNS;
             }
-            if normal_bound == child_remaining {
+            if tight::<QTM>(normal_bound, child_remaining) {
                 inverse_moves &= QUARTER_TURNS;
             }
             let reference = make_node(
@@ -1843,6 +1973,10 @@ impl Lane {
         moves.push(self.pending_move);
         let premoves = path.iter().rev().filter(|node| !node.mv_normal);
         moves.extend(premoves.map(|node| inverse_move(node.mv)));
+        if QTM {
+            // (`X X` where the sides meet: `X2`.)
+            return crate::metric::simplify(&moves);
+        }
         moves
     }
 }
@@ -1862,6 +1996,17 @@ fn max_child_bound(lower_bound: u8, value: u8) -> u8 {
     lower_bound
         .cast_signed()
         .max(value.cast_signed() - 1)
+        .cast_unsigned()
+}
+
+/// `max_child_bound` for a child `cost` moves away (QTM: 2 for a half
+/// turn).
+#[inline(always)]
+fn max_child_bound_cost(lower_bound: u8, value: u8, cost: u8) -> u8 {
+    debug_assert!(lower_bound < 128 && value < 128 && cost <= 2);
+    lower_bound
+        .cast_signed()
+        .max(value.cast_signed() - cost.cast_signed())
         .cast_unsigned()
 }
 
@@ -1967,12 +2112,32 @@ unsafe fn sort_runs(runs: &mut Vec<u32>, unsorted: &[u32], counts: &mut [u32; 25
 }
 
 /// Solve cubes `cubes(i)` for i taken from the shared counter `next`, with
-/// `n_lanes` interleaved lanes on this thread. Calls `done(index, solution,
-/// stats, seconds)` for every cube: its solution, or `None` if it has none
-/// within `MAX_TARGET` moves (an unsolvable cube, or a table whose bounds
-/// are too high). Stops when `cubes` returns None for all lanes or when
-/// `stop` is set.
+/// `n_lanes` interleaved lanes on this thread, in the solver's metric
+/// (`run_lanes_metric`). Calls `done(index, solution, stats, seconds)` for
+/// every cube: its solution, or `None` if it has none within `MAX_TARGET`
+/// moves (`MAX_TARGET_QTM` in QTM; an unsolvable cube, or a table whose
+/// bounds are too high). Stops when `cubes` returns None for all lanes or
+/// when `stop` is set.
 pub fn run_lanes(
+    solver: &Solver,
+    cubes: &(dyn Fn(usize) -> Option<CubieCube> + Sync),
+    next: &std::sync::atomic::AtomicUsize,
+    stop: &std::sync::atomic::AtomicBool,
+    n_lanes: usize,
+    done: impl FnMut(usize, Option<Vec<u8>>, Stats, f64),
+) {
+    if solver.metric().is_qtm() {
+        run_lanes_metric::<true>(solver, cubes, next, stop, n_lanes, done);
+    } else {
+        run_lanes_metric::<false>(solver, cubes, next, stop, n_lanes, done);
+    }
+}
+
+/// `run_lanes` in QTM if `QTM`, else in HTM: for a solver of that metric
+/// (`Solver::metric`; else the solutions are optimal in `QTM`'s metric only
+/// if its tables bound it, and no other). (`bench` calls the HTM one from
+/// its fixed code section: see `crate::hot`.)
+pub fn run_lanes_metric<const QTM: bool>(
     solver: &Solver,
     cubes: &(dyn Fn(usize) -> Option<CubieCube> + Sync),
     next: &std::sync::atomic::AtomicUsize,
@@ -1982,10 +2147,10 @@ pub fn run_lanes(
 ) {
     use std::sync::atomic::Ordering::Relaxed;
     use std::time::Instant;
-    let mut lanes: Vec<Lane> = (0..n_lanes).map(|_| Lane::new()).collect();
+    let mut lanes: Vec<Lane<QTM>> = (0..n_lanes).map(|_| Lane::new()).collect();
     // Give `lane` a new cube; returns false if there are none left.
     let fetch =
-        |lane: &mut Lane, done: &mut dyn FnMut(usize, Option<Vec<u8>>, Stats, f64)| -> bool {
+        |lane: &mut Lane<QTM>, done: &mut dyn FnMut(usize, Option<Vec<u8>>, Stats, f64)| -> bool {
             loop {
                 let i = next.fetch_add(1, Relaxed);
                 let Some(cube) = cubes(i) else {
@@ -2005,7 +2170,7 @@ pub fn run_lanes(
     // Give `lane` a new cube and advance it to its first lookup (past
     // solutions found on the way); returns false if there are no cubes left.
     let refill =
-        |lane: &mut Lane, done: &mut dyn FnMut(usize, Option<Vec<u8>>, Stats, f64)| -> bool {
+        |lane: &mut Lane<QTM>, done: &mut dyn FnMut(usize, Option<Vec<u8>>, Stats, f64)| -> bool {
             loop {
                 if !fetch(lane, done) {
                     return false;
@@ -2038,7 +2203,7 @@ pub fn run_lanes(
     // lane has one miss in flight with a whole round of slack. (+15.9% at
     // 48T over the 3-phase lockstep when added, single-pass.)
     while n_active > 0 && !stop.load(Relaxed) {
-        let mut gone: Option<*const Lane> = None;
+        let mut gone: Option<*const Lane<QTM>> = None;
         // SAFETY: `n_active <= lanes.len()`.
         for lane in unsafe { lanes.get_unchecked_mut(..n_active) } {
             let value = lane.pending_value(solver);
@@ -2088,7 +2253,7 @@ mod tests {
     fn split_runs_cover_each_child_once() {
         let mut rng = crate::cubie::Rng(11);
         for trial in 0..40 {
-            let mut lane = Lane::new();
+            let mut lane = Lane::<false>::new();
             let n_jobs = [1usize, 7, 300, 2000][trial % 4];
             lane.jobs = (0..n_jobs)
                 .map(|_| {
@@ -2113,6 +2278,7 @@ mod tests {
                     Job {
                         moves,
                         len: 4,
+                        cost: 4,
                         normal_bound: bound(rng.next_u64()),
                         inverse_bound: bound(rng.next_u64()),
                         stat: 0.0,
@@ -2239,6 +2405,7 @@ mod tests {
                     Job {
                         moves: [(r >> 32) as u8 % 18, 0, 0, (i % 251) as u8],
                         len: 1,
+                        cost: 1,
                         normal_bound: (i / 251) as u8,
                         inverse_bound: 0,
                         stat,

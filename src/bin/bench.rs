@@ -119,6 +119,8 @@ fn run(
                 };
                 if let Some(pool) = &pool {
                     share_thread(pool, solver, lanes, &stop, record);
+                } else if lanes > 0 && solver.metric().is_qtm() {
+                    stream_thread_qtm(solver, cubes, &next, &stop, lanes, record);
                 } else if lanes > 0 {
                     stream_thread(solver, cubes, &next, &stop, lanes, record);
                 } else {
@@ -192,7 +194,7 @@ core::arch::global_asm!(
 );
 egg_solver::hot_section!(".text.hot_stream", egg_solver::hot::STREAM_PAD);
 
-/// A thread of a stream-mode run (`run_lanes`).
+/// A thread of a stream-mode run (`run_lanes`) in HTM.
 #[inline(never)]
 #[cfg_attr(
     all(target_arch = "x86_64", target_os = "linux"),
@@ -206,7 +208,20 @@ fn stream_thread(
     lanes: usize,
     record: impl FnMut(usize, Option<Vec<u8>>, Stats, f64),
 ) {
-    egg_solver::lanes::run_lanes(solver, cubes, next, stop, lanes, record);
+    egg_solver::lanes::run_lanes_metric::<false>(solver, cubes, next, stop, lanes, record);
+}
+
+/// `stream_thread` in QTM (outside the HTM loop's section).
+#[inline(never)]
+fn stream_thread_qtm(
+    solver: &Solver,
+    cubes: &(dyn Fn(usize) -> Option<CubieCube> + Sync),
+    next: &AtomicUsize,
+    stop: &AtomicBool,
+    lanes: usize,
+    record: impl FnMut(usize, Option<Vec<u8>>, Stats, f64),
+) {
+    egg_solver::lanes::run_lanes_metric::<true>(solver, cubes, next, stop, lanes, record);
 }
 
 /// Stream throughput (solves/s) of `threads` x `lanes` lanes, over a

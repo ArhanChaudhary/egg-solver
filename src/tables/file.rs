@@ -6,16 +6,21 @@
 //! a magic line, then `key value` lines (`layout`, `k`, `base`, `bytes`, and
 //! the code `distribution` and `checksum` of the data when known), padded
 //! with NUL bytes. Unknown keys are ignored, except that a `layout` other
-//! than `h48` (the index layout of `coord`) is refused: a variant table (say
-//! with a parity bit in place of an eo bit) must not be read as an h48 one. Files on hugetlbfs are whole 1 GiB pages; their trailer sits in the
+//! than `h48` (the index layout of `coord`) or `h48-qtm` is refused: a
+//! variant table (say with a parity bit in place of an eo bit) must not be
+//! read as an h48 one. `h48-qtm` is the same layout with quarter-turn-metric
+//! distances (`metric`): a distinct layout, so that readers without QTM
+//! refuse those tables (their values are not lower bounds on HTM distances).
+//! Files on hugetlbfs are whole 1 GiB pages; their trailer sits in the
 //! slack after the data, so tables made before trailers existed can be
 //! stamped in place (`gen stamp`). Tables without a trailer are described by
-//! a `<path>.meta` sidecar (`k base`), or, for tables on hugetlbfs (and
+//! a `<path>.meta` sidecar (`k base`, or `k base qtm`), or, for tables on hugetlbfs (and
 //! legacy `/mnt/huge` paths), by `tables/<name>.hugemeta` in the build folder. A table can
 //! also be loaded into a shared memory segment that outlives the process
 //! (`LoadMode::Shm`, see `tables::shm`).
 
 pub use super::shm::ShmPages;
+use crate::metric::Metric;
 use std::io::{Read, Seek, SeekFrom, Write};
 
 /// Size of the trailer at the end of a table file.
@@ -27,6 +32,8 @@ const MAGIC: &str = "egg-solver h48 table v1\n";
 const LEGACY_MAGIC: &str = "cubeopt h48 table v1\n";
 /// The index layout of the tables this code reads and writes.
 pub const LAYOUT: &str = "h48";
+/// `LAYOUT` with QTM distances (see the module docs).
+pub const LAYOUT_QTM: &str = "h48-qtm";
 
 /// Page size of hugetlbfs mounts used for tables (files there are whole pages).
 pub const HUGE_PAGE: u64 = 1 << 30;
@@ -170,6 +177,13 @@ pub enum TableError {
     /// Table generation asked for something out of range.
     #[error("table generation: {0}")]
     Generate(String),
+    /// A search in a metric whose distances the table's values do not bound
+    /// (QTM tables cannot bound an HTM search).
+    #[error("{table} table values are not lower bounds on {search} distances")]
+    WrongMetric {
+        search: crate::metric::Metric,
+        table: crate::metric::Metric,
+    },
 }
 
 /// `TableError::Io` of the file at `path`.
@@ -191,6 +205,8 @@ pub struct Trailer {
     pub distribution: Option<[u64; 4]>,
     /// `checksum` of the data, if recorded.
     pub checksum: Option<u64>,
+    /// The metric of the distances (`layout`).
+    pub metric: Metric,
 }
 
 impl Trailer {
@@ -201,7 +217,12 @@ impl Trailer {
         use std::fmt::Write as _;
         let mut text = String::with_capacity(TRAILER_LEN);
         text.push_str(MAGIC);
-        let _ = writeln!(text, "layout {LAYOUT}");
+        let layout = if self.metric.is_qtm() {
+            LAYOUT_QTM
+        } else {
+            LAYOUT
+        };
+        let _ = writeln!(text, "layout {layout}");
         let _ = writeln!(text, "k {}", self.k);
         let _ = writeln!(text, "base {}", self.base);
         let _ = writeln!(text, "bytes {}", self.data_bytes);
@@ -234,6 +255,7 @@ impl Trailer {
         let text = std::str::from_utf8(&rest[..end]).map_err(|_| invalid("not text"))?;
         let (mut k, mut base, mut data_bytes) = (None, None, None);
         let (mut distribution, mut checksum) = (None, None);
+        let mut metric = Metric::Htm;
         for line in text.lines() {
             let mut words = line.split_whitespace();
             let key = words.next().unwrap_or("");
@@ -245,7 +267,9 @@ impl Trailer {
                     .ok_or_else(|| invalid(line))
             };
             match key {
-                "layout" if values != [LAYOUT] => {
+                "layout" if values == [LAYOUT] => metric = Metric::Htm,
+                "layout" if values == [LAYOUT_QTM] => metric = Metric::Qtm,
+                "layout" => {
                     return Err(invalid(&format!("unsupported layout {values:?}")));
                 }
                 "k" => k = Some(number(0)?),
@@ -273,6 +297,7 @@ impl Trailer {
             data_bytes,
             distribution,
             checksum,
+            metric,
         }))
     }
 }
@@ -686,6 +711,7 @@ mod tests {
             data_bytes: crate::tables::h48_bytes(0),
             distribution: None,
             checksum: Some(123),
+            metric: Metric::Htm,
         };
         let modern = trailer.to_bytes();
         let mut previous = super::LEGACY_MAGIC.as_bytes().to_vec();
@@ -705,6 +731,7 @@ mod tests {
             data_bytes: 3_891_363_840,
             distribution: Some([88_529_771, 897_323_586, 6_126_261_227, 7_936_519_016]),
             checksum: Some(0x0123_4567_89ab_cdef),
+            metric: Metric::Htm,
         };
         let bytes = t.to_bytes();
         assert_eq!(bytes.len() as u64, TRAILER_BYTES);
@@ -727,6 +754,23 @@ mod tests {
             Trailer::parse(extra.as_bytes()).unwrap().map(|t| t.k),
             Some(7)
         );
+        // QTM tables: their own layout, which round-trips; HTM tables keep
+        // the bytes they had.
+        let qtm = Trailer {
+            metric: Metric::Qtm,
+            ..t
+        };
+        let text = qtm.to_bytes();
+        assert!(String::from_utf8_lossy(&text).contains("\nlayout h48-qtm\n"));
+        assert_eq!(Trailer::parse(&text).unwrap(), Some(qtm));
+        assert!(String::from_utf8_lossy(&t.to_bytes()).contains("\nlayout h48\n"));
+        let qtm_text = format!("{MAGIC}layout h48-qtm\nk 7\nbase 9\nbytes 1\n");
+        assert_eq!(
+            Trailer::parse(qtm_text.as_bytes())
+                .unwrap()
+                .map(|t| t.metric),
+            Some(Metric::Qtm)
+        );
     }
 
     #[test]
@@ -742,6 +786,7 @@ mod tests {
             data_bytes: data.len() as u64,
             distribution: None,
             checksum: Some(checksum(&data, 3).unwrap()),
+            metric: Metric::Htm,
         };
         // Too small for data plus trailer: refused, file untouched.
         std::fs::write(&path, &data).unwrap();

@@ -343,7 +343,7 @@ impl LoadArgs {
             let meta = crate::tables::read_meta(path).map_err(|error| {
                 anyhow::Error::new(error).context(BadInput(format!("cannot read table {path}")))
             })?;
-            shm::key(meta.k, meta.base)
+            shm::metric_key(meta.k, meta.base, meta.metric)
         };
         // SAFETY: required by this method.
         match unsafe { shm::remove(key) }? {

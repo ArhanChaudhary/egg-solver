@@ -94,6 +94,15 @@ impl SymFilter {
         filter
     }
 
+    /// The filter without `dedup` (only `keep`): for the QTM search, whose
+    /// jobs of one length can differ in cost, where the module's argument
+    /// for `dedup` does not hold.
+    #[must_use]
+    pub fn without_dedup(mut self) -> SymFilter {
+        self.antisymmetric = false;
+        self
+    }
+
     /// Whether the filter drops anything (the cube has a symmetry).
     #[must_use]
     pub fn is_active(&self) -> bool {

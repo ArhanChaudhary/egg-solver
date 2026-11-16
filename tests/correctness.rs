@@ -6,6 +6,7 @@
 use egg_solver::coord::cocsep;
 use egg_solver::coord::N_SLOTS;
 use egg_solver::cubie::{conjugate, parse_moves, symmetries, CubieCube, Move, Rng};
+use egg_solver::metric::Metric;
 use egg_solver::simd::Cube;
 use egg_solver::solver::Solver;
 use egg_solver::tables::{
@@ -514,6 +515,7 @@ fn dfs_table_in_parts(k: u32, prefix_depth: u8, parts: u64) -> H48Table {
         threads: egg_solver::thread_count(),
         prefix_depth,
         verbose: false,
+        metric: Metric::Htm,
     };
     let generator = egg_solver::gen::dfs::Generator::new(corners(), settings).unwrap();
     let memory = Memory::anonymous(usize::try_from(h48_bytes(k)).unwrap()).unwrap();
@@ -541,7 +543,15 @@ fn dfs_table_in_parts(k: u32, prefix_depth: u8, parts: u64) -> H48Table {
             );
         }
     }
-    H48Table::from_memory(memory, H48Meta { k, base: 3 }).unwrap()
+    H48Table::from_memory(
+        memory,
+        H48Meta {
+            k,
+            base: 3,
+            metric: Metric::Htm,
+        },
+    )
+    .unwrap()
 }
 
 fn dfs_table(k: u32, prefix_depth: u8) -> H48Table {

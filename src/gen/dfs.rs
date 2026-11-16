@@ -30,10 +30,22 @@
 //! Cost: about `13.3^(base + 2 - prefix_depth)` leaves per root, 2.6e11 for
 //! base 10, 1/13 of that for base 9: it depends on the base, not on k.
 //! Memory: the table plus ~200 MB (prefix levels and the hash set).
+//!
+//! QTM tables (`Settings::metric`): the prefix BFS takes the 12 quarter
+//! turns, and the passes walk canonical sequences of the 18 moves whose QTM
+//! length (a half turn is two) is `L - prefix_depth`. A shortest QTM path
+//! written as quarter turns has a prefix of exactly `prefix_depth` moves;
+//! the rest, from that prefix's coset, is a shortest path too, and so is
+//! its canonical form (`metric::simplify`), whose first move leaves the
+//! last two prefix levels (a half turn reaches `prefix_depth + 2`): the
+//! same pruning holds. About `9.4^(base + 2 - prefix_depth)` leaves per
+//! root; QTM distances being longer, the prefix is deeper
+//! (`PREFIX_DEPTH_QTM`).
 
 use super::decode_index;
 use crate::coord::{cocsep, h11_key, index_sym, reduce_key, N_MSPLIT, N_SLOTS};
 use crate::cubie::Move;
+use crate::metric::{move_cost, Metric};
 use crate::parallel::WorkerPanicked;
 use crate::simd::Cube;
 use crate::solver::{ALLOWED_AFTER, ALL_MOVES};
@@ -48,6 +60,9 @@ use std::time::Instant;
 /// Depth of the BFS prefix (see the module docs). Deeper costs memory (depth
 /// 9 has 86M entries), shallower costs more redundant DFS paths.
 pub const PREFIX_DEPTH: u8 = 8;
+/// `PREFIX_DEPTH` of QTM tables (QTM depth 10 has about as many entries as
+/// HTM depth 8).
+pub const PREFIX_DEPTH_QTM: u8 = 10;
 
 /// Settings of a generation run.
 #[derive(Clone, Debug)]
@@ -59,6 +74,21 @@ pub struct Settings {
     pub prefix_depth: u8,
     /// Print progress to stderr.
     pub verbose: bool,
+    /// The metric of the distances.
+    pub metric: Metric,
+}
+
+impl Settings {
+    /// The default prefix depth of `metric` for `base`: at most `base + 2`.
+    #[must_use]
+    pub fn default_prefix_depth(metric: Metric, base: u8) -> u8 {
+        let depth = if metric.is_qtm() {
+            PREFIX_DEPTH_QTM
+        } else {
+            PREFIX_DEPTH
+        };
+        depth.min(base.saturating_add(2))
+    }
 }
 
 /// Entries of h11 cosets, as a sorted vector per depth.
@@ -101,9 +131,11 @@ impl Prefix {
     fn build(
         corners: &Cocsep,
         depth: u8,
+        metric: Metric,
         threads: usize,
         verbose: bool,
     ) -> Result<Prefix, WorkerPanicked> {
+        let moves = super::bfs_moves(metric);
         let mut start = Vec::new();
         for_each_entry(corners, Cube::solved(), |e| start.push(e));
         start.sort_unstable();
@@ -123,7 +155,7 @@ impl Prefix {
                     }
                     for &e in &last[i..(i + chunk).min(last.len())] {
                         let c = decode_index(corners, 11, e);
-                        for m in Move::ALL {
+                        for &m in moves {
                             for_each_entry(corners, c.apply_move(m), |x| out.push(x));
                         }
                     }
@@ -286,22 +318,35 @@ impl Run<'_, '_> {
     }
 
     /// Depth-first walk over canonical sequences of `remaining` more moves
-    /// from `c` (`allowed`: the moves allowed next); marks the leaves.
-    fn walk(&self, c: Cube, allowed: u32, remaining: u8, prune_prefix: bool, marker: &mut Marker) {
+    /// from `c` (`allowed`: the moves allowed next); marks the leaves. (In
+    /// QTM a half turn is two moves.)
+    fn walk<const QTM: bool>(
+        &self,
+        c: Cube,
+        allowed: u32,
+        remaining: u8,
+        prune_prefix: bool,
+        marker: &mut Marker,
+    ) {
         let mut moves = allowed;
         while let Some(m) = Move::lowest(moves) {
             moves ^= moves.isolate_lowest_one();
+            #[expect(clippy::cast_possible_truncation, reason = "moves are below 18")]
+            let cost = move_cost(QTM, m.index() as u8);
+            if cost > remaining {
+                continue;
+            }
             let child = c.apply_move(m);
             if prune_prefix && self.prefix.last_two.contains(&entry(self.corners, child)) {
                 continue;
             }
-            if remaining == 1 {
+            if remaining == cost {
                 self.mark_leaf(child, marker);
             } else {
-                self.walk(
+                self.walk::<QTM>(
                     child,
                     ALLOWED_AFTER[m.index() / 3],
-                    remaining - 1,
+                    remaining - cost,
                     false,
                     marker,
                 );
@@ -371,7 +416,11 @@ impl Run<'_, '_> {
                             continue;
                         }
                         let remaining = depth - self.settings.prefix_depth;
-                        self.walk(c, ALL_MOVES, remaining, true, &mut marker);
+                        if self.settings.metric.is_qtm() {
+                            self.walk::<true>(c, ALL_MOVES, remaining, true, &mut marker);
+                        } else {
+                            self.walk::<false>(c, ALL_MOVES, remaining, true, &mut marker);
+                        }
                     }
                     done.fetch_add(chunk, Relaxed);
                     super::progress::advance(chunk as u64);
@@ -408,6 +457,7 @@ impl<'c> Generator<'c> {
             prefix_depth,
             threads,
             verbose,
+            metric,
         } = settings;
         if !(k <= 11 && base <= 12 && (1..=base + 2).contains(&prefix_depth)) {
             return Err(TableError::Generate(format!(
@@ -416,7 +466,7 @@ impl<'c> Generator<'c> {
             )));
         }
         let t0 = Instant::now();
-        let prefix = Prefix::build(corners, prefix_depth, threads, verbose)?;
+        let prefix = Prefix::build(corners, prefix_depth, metric, threads, verbose)?;
         if verbose {
             super::progress::line(format_args!(
                 "[gen h{k}] prefix in {:.1}s",
@@ -443,6 +493,7 @@ impl<'c> Generator<'c> {
             prefix_depth,
             threads,
             verbose,
+            metric: _,
         } = self.settings;
         let t0 = Instant::now();
         let n_slots = rows.end.saturating_sub(rows.start) * N_SLOTS as u64;

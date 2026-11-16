@@ -46,6 +46,10 @@
 //! of a `Lane::shared` lane only differs in returning at the end of a job,
 //! and everything here runs at job boundaries or once per round.
 //!
+//! In QTM (`Worker<true>`, chosen by the solver's metric) the iterations
+//! and a first pass's phases step by 2, and no iteration is split or records
+//! leads (as stream mode's split iterations, see `lanes`).
+//!
 //! Gains, 48 threads, h11, `random_state`: the mode itself (l5) took a batch
 //! from 7.86 ms to 1.26 ms per cube (bench random:1000 from 187 to 795
 //! solves/s), and one cube at a time from 306 ms (one lane) to 3.6 ms.
@@ -54,10 +58,13 @@
 //! iterations) and m8 (unsafe pass, lanes by pointer) to ~1.6 ms. The
 //! comments at each optimization give its own measured gain.
 
-use super::{job_weight, moves_after, Job, Lane, Node, Phase, Step, MAXD, MAX_JOB_LEN};
+use super::{
+    job_weight, max_target, moves_after, target_step, Job, Lane, Node, Phase, Step, MAXD,
+    MAX_JOB_LEN,
+};
 use crate::cubie::CubieCube;
 use crate::simd::Cube;
-use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES, MAX_TARGET};
+use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES};
 use crate::symstart::SymFilter;
 use crossbeam_utils::CachePadded;
 // parking_lot's Mutex instead of std's for the share mode's mutexes (native
@@ -303,6 +310,7 @@ fn touched<T: Clone>(capacity: usize, value: T) -> Vec<T> {
 const EMPTY_JOB: Job = Job {
     moves: [0; 4],
     len: 0,
+    cost: 0,
     normal_bound: 0,
     inverse_bound: 0,
     stat: 0.0,
@@ -816,7 +824,7 @@ impl<'a> Pool<'a> {
                             job: 0,
                             phase: 0,
                             depth: 0,
-                            nodes: [Lane::new().stack[0]; MAXD],
+                            nodes: [Lane::<false>::new().stack[0]; MAXD],
                         }),
                     })
                 })
@@ -845,7 +853,24 @@ impl<'a> Pool<'a> {
     /// Work on the pool with `nlanes` interleaved lanes until all cubes are
     /// solved or `stop` is set. Calls `done(index, solution, stats,
     /// seconds)` (see `Done`) for the cubes whose last worker is this thread.
+    /// The search is in the solver's metric (all threads of a pool use the
+    /// same solver).
     pub fn run(
+        &self,
+        solver: &Solver,
+        nlanes: usize,
+        stop: &AtomicBool,
+        done: impl FnMut(usize, Option<Vec<u8>>, Stats, f64),
+    ) {
+        if solver.metric().is_qtm() {
+            self.run_metric::<true>(solver, nlanes, stop, done);
+        } else {
+            self.run_metric::<false>(solver, nlanes, stop, done);
+        }
+    }
+
+    /// `run` in QTM if `QTM`, else in HTM.
+    fn run_metric<const QTM: bool>(
         &self,
         solver: &Solver,
         nlanes: usize,
@@ -864,7 +889,7 @@ impl<'a> Pool<'a> {
         // stack frame by 320 bytes, with `rounds` unchanged, and took solve
         // -c 1 on 17-move scrambles from 0.59 to 0.64 ms at 48T, depth-17
         // states from 0.65 to 0.72 ms (r8, 4 paired holds).)
-        let mut worker = Worker {
+        let mut worker = Worker::<QTM> {
             pool: self,
             solver,
             id,
@@ -1083,8 +1108,8 @@ struct Local {
 }
 
 /// A lane of a worker, and the job it runs.
-struct SharedLane {
-    lane: Lane,
+struct SharedLane<const QTM: bool> {
+    lane: Lane<QTM>,
     /// `Worker::locals` slot of the cube of the current job (`NO_SLOT` if
     /// idle).
     slot: usize,
@@ -1107,13 +1132,14 @@ struct SharedLane {
     started: Instant,
 }
 
-impl SharedLane {
-    fn new() -> SharedLane {
+impl<const QTM: bool> SharedLane<QTM> {
+    fn new() -> Self {
         let mut lane = Lane::new();
         lane.shared = true;
         lane.jobs.push(Job {
             moves: [0; 4],
             len: 0,
+            cost: 0,
             normal_bound: 0,
             inverse_bound: 0,
             stat: 0.0,
@@ -1133,20 +1159,21 @@ impl SharedLane {
     }
 }
 
-/// A thread of a pool: its lanes, and its share of the cubes it works on.
-struct Worker<'w, 'a> {
+/// A thread of a pool: its lanes, and its share of the cubes it works on;
+/// in QTM if `QTM`.
+struct Worker<'w, 'a, const QTM: bool> {
     pool: &'w Pool<'a>,
     solver: &'w Solver<'w>,
     /// Mailbox index (none if beyond `Pool::nthreads`).
     id: usize,
     done: &'w mut Done<'w>,
     /// The active lanes are `lanes[..active_lanes]`.
-    lanes: Vec<SharedLane>,
+    lanes: Vec<SharedLane<QTM>>,
     active_lanes: usize,
     /// The cubes this thread works on, by slot (`SharedLane::slot`).
     locals: Vec<Option<Local>>,
     /// Builds iterations (its job buffers), and the buffers of serial builds.
-    scratch: Box<Lane>,
+    scratch: Box<Lane<QTM>>,
     bufs: Bufs,
     /// `Pool::epoch` when idle lanes last looked for work.
     epoch: u64,
@@ -1166,8 +1193,8 @@ struct Worker<'w, 'a> {
 /// `scratch`'s extension, and publish it. If threads are waiting for work, a
 /// long job list is extended and sorted by all of them instead
 /// (`build_task`): returns true if that was started (the caller then helps).
-fn build(
-    scratch: &mut Lane,
+fn build<const QTM: bool>(
+    scratch: &mut Lane<QTM>,
     own_bufs: &mut Bufs,
     solver: &Solver,
     pool: &Pool,
@@ -1184,30 +1211,12 @@ fn build(
     inner.build_started = now;
     inner.extended = now;
     // (The next target, after the first.)
-    inner.target += u8::from(!first);
-    // The iterations up to the first one with jobs of `FIRST_PASS_JOB_LEN`
-    // moves (from a target at most `first_pass_span` below) run as one pass
-    // on its jobs, without barriers (`Inner::phases`): the ones below it
-    // are cheap and nearly never the last (17 of 1000 random states end in
-    // them), but their barriers, tails and builds each took ~0.03-0.12 ms of
-    // -c 1 at 48 threads. As one pass: -7.4% -c 1, -7.1% -c 0, +2.0% bench
-    // share at 48T (8 paired holds); 15/16/17-move scrambles -18/-43/-22%.
-    // (A job prefix cannot solve the cube: the target is a lower bound above
-    // the prefix length.)
-    let pass_target = solver.base + 3 + FIRST_PASS_JOB_LEN;
-    inner.phases = 1;
-    if inner.target < pass_target
-        && pass_target <= MAX_TARGET
-        && inner.target + pool.first_pass_span >= pass_target
-        && usize::from(inner.target) > solver.job_len(pass_target)
-    {
-        inner.phases = u32::from(pass_target - inner.target) + 1;
-        inner.target = pass_target;
-    }
+    inner.target += if first { 0 } else { target_step(QTM) };
+    plan_first_pass::<QTM>(inner, solver, pool.first_pass_span);
     inner.sort_by_bounds = first;
     // The stack depth stays below the target, at most `MAX_TARGET` (< `MAXD`; only
     // a first bound above it is lowered: nothing is found, `settle` gives up).
-    inner.target = inner.target.min(MAX_TARGET);
+    inner.target = inner.target.min(max_target(QTM));
     let target = inner.target;
     // Stream mode's prefixes: 4-move prefixes from iteration 15 on cost +8%
     // -c 1 latency at 48T (l6-share-2).
@@ -1222,11 +1231,12 @@ fn build(
     // latency at 48T, not measured alone.)
     let from_atomics =
         !first && len >= job_len && job_len > 0 && parallel && inner.jobs.len() >= SORT_MIN;
+    // (No leads and no split iterations in QTM: see the module docs.)
     plan_leads(
         inner,
         first,
-        job_len == MAX_JOB_LEN && parallel,
-        from_atomics,
+        !QTM && job_len == MAX_JOB_LEN && parallel,
+        !QTM && from_atomics,
     );
     if !first && !from_atomics {
         copy_stats(inner);
@@ -1309,6 +1319,35 @@ fn build(
     };
     finish_build(pool, ctx);
     false
+}
+
+/// Make the iteration of `inner` (target `inner.target`) a cube's first
+/// pass if it is one (`Inner::phases`, else 1 phase): the iterations up to
+/// the first one with jobs of `FIRST_PASS_JOB_LEN` moves (from a target at
+/// most `span` iterations below) run as one pass on its jobs, without
+/// barriers. The ones below it are cheap and nearly never the last (17 of
+/// 1000 random states end in them), but their barriers, tails and builds
+/// each took ~0.03-0.12 ms of -c 1 at 48 threads. As one pass: -7.4% -c 1,
+/// -7.1% -c 0, +2.0% bench share at 48T (8 paired holds); 15/16/17-move
+/// scrambles -18/-43/-22%. (A job prefix cannot solve the cube: the target
+/// is a lower bound above the prefix length. In QTM the pass's targets step
+/// by 2 from the first, of the cube's parity, and a job of half turns must
+/// not solve the cube: its cost is at most twice its length.)
+fn plan_first_pass<const QTM: bool>(inner: &mut Inner, solver: &Solver, span: u8) {
+    let mut pass_target = solver.base + 3 + FIRST_PASS_JOB_LEN;
+    if QTM {
+        pass_target += (pass_target ^ inner.target) & 1;
+    }
+    let step = target_step(QTM);
+    inner.phases = 1;
+    if inner.target < pass_target
+        && pass_target <= max_target(QTM)
+        && inner.target + step * span >= pass_target
+        && usize::from(inner.target) > usize::from(step) * solver.job_len(pass_target)
+    {
+        inner.phases = u32::from((pass_target - inner.target) / step) + 1;
+        inner.target = pass_target;
+    }
 }
 
 /// (trace) The end of `ctx`'s current iteration (`now`): when its threads
@@ -1708,8 +1747,9 @@ fn sort_key(jobs: &[Job], stats: &[AtomicU32], from_atomics: bool, target: u8, i
     } else {
         job.stat
     };
-    let infeasible =
-        u32::from(job.normal_bound.max(job.inverse_bound)) + u32::from(job.len) > u32::from(target);
+    // (`cost` is the length in HTM.)
+    let infeasible = u32::from(job.normal_bound.max(job.inverse_bound)) + u32::from(job.cost)
+        > u32::from(target);
     u64::from(infeasible) << 63
         | u64::from(!(stat * job_weight(job)).to_bits()) << KEY_SHIFT
         | i as u64
@@ -1828,7 +1868,7 @@ fn lead_threshold(inner: &Inner, n: usize) -> u8 {
 /// except in a split job), and whether it records its job's lead (whole
 /// runs and first-part runs do).
 #[inline(never)]
-fn lead_run(sl: &mut SharedLane, inner: &Inner, entry: u32, children: u32) {
+fn lead_run<const QTM: bool>(sl: &mut SharedLane<QTM>, inner: &Inner, entry: u32, children: u32) {
     if children != ALL_MOVES {
         // (The children are normal-side moves: a lead is recorded on the
         // normal side, and the next iteration has the root there too, its
@@ -2062,8 +2102,8 @@ fn sort_stage_done(inner: &mut Inner, stage: usize) -> Option<(usize, usize)> {
 /// the last task of a stage opens the next one or publishes the iteration.
 // Builds in stages by all waiting threads: l5 (not measured alone); on all
 // threads and without page faults since l6-share-a (-38.8% -c 1 at 48T).
-fn build_task(
-    scratch: &mut Lane,
+fn build_task<const QTM: bool>(
+    scratch: &mut Lane<QTM>,
     solver: &Solver,
     pool: &Pool,
     ctx: &Arc<CubeCtx>,
@@ -2280,7 +2320,13 @@ fn trace_build(pool: &Pool, ctx: &CubeCtx, inner: &Inner, sorted: Instant) {
 /// allocation, and untraced runs at 48T were slower: -c 1 +3.7%, -c 0
 /// +4.1%, bench share -4.2%; c10.)
 #[cold]
-fn trace_found(pool: &Pool, ctx: &CubeCtx, sl: &SharedLane, active_lanes: usize, seconds: f64) {
+fn trace_found<const QTM: bool>(
+    pool: &Pool,
+    ctx: &CubeCtx,
+    sl: &SharedLane<QTM>,
+    active_lanes: usize,
+    seconds: f64,
+) {
     // SAFETY: (trace) the iteration is still on.
     let inner = unsafe { &*ctx.inner.get() };
     let (_, next) = claim_fields(ctx.claim.load(Relaxed));
@@ -2308,7 +2354,7 @@ fn trace_found(pool: &Pool, ctx: &CubeCtx, sl: &SharedLane, active_lanes: usize,
 /// first pass, `Inner::phases`; else 0).
 #[inline(always)]
 #[expect(clippy::cast_possible_truncation, reason = "phases <= MAX_PHASES")]
-fn entry_job(inner: &Inner, entry: u32) -> (u32, u8, u8) {
+fn entry_job<const QTM: bool>(inner: &Inner, entry: u32) -> (u32, u8, u8) {
     if inner.phases == 1 {
         return (entry, inner.target, 0);
     }
@@ -2317,14 +2363,19 @@ fn entry_job(inner: &Inner, entry: u32) -> (u32, u8, u8) {
     unsafe { std::hint::assert_unchecked(inner.phase_entries != 0) };
     let phase = entry / inner.phase_entries;
     let job = entry - phase * inner.phase_entries;
-    (job, phase_target(inner, phase as u8), phase as u8)
+    (job, phase_target::<QTM>(inner, phase as u8), phase as u8)
 }
 
-/// The target of phase `phase` of the current iteration (`Inner::phases`).
+/// The target of phase `phase` of the current iteration (`Inner::phases`;
+/// in QTM the phases' targets step by 2).
 #[inline(always)]
 #[expect(clippy::cast_possible_truncation, reason = "phases <= MAX_PHASES")]
-fn phase_target(inner: &Inner, phase: u8) -> u8 {
-    inner.target - (inner.phases as u8 - 1) + phase
+fn phase_target<const QTM: bool>(inner: &Inner, phase: u8) -> u8 {
+    if QTM {
+        inner.target - 2 * (inner.phases as u8 - 1 - phase)
+    } else {
+        inner.target - (inner.phases as u8 - 1) + phase
+    }
 }
 
 #[inline(always)]
@@ -2395,14 +2446,50 @@ fn split_moves(todo: u32, current_face: u8) -> Option<u32> {
 // `Worker::rounds`'s section (see `crate::hot`).
 crate::hot_section!(".text.hot_share", crate::hot::SHARE_PAD);
 
-impl Worker<'_, '_> {
+impl Worker<'_, '_, false> {
+    /// `round_loop` in HTM, alone in its section (see `crate::hot`).
+    #[inline(never)]
+    #[cfg_attr(
+        all(target_arch = "x86_64", target_os = "linux"),
+        unsafe(link_section = ".text.hot_share")
+    )]
+    fn rounds(&mut self, solver: &Solver, stop: &AtomicBool, round: &mut u32) -> bool {
+        self.round_loop(solver, stop, round)
+    }
+}
+
+impl Worker<'_, '_, true> {
+    /// `round_loop` in QTM (outside the HTM loop's section).
+    #[inline(never)]
+    fn rounds(&mut self, solver: &Solver, stop: &AtomicBool, round: &mut u32) -> bool {
+        self.round_loop(solver, stop, round)
+    }
+}
+
+impl<'w, 'a, const QTM: bool> Worker<'w, 'a, QTM> {
+    /// The round loop of this worker's metric: `rounds` of
+    /// `Worker<false>` or `Worker<true>`, which differ only in placement.
+    #[inline(always)]
+    fn rounds_of_metric(&mut self, stop: &AtomicBool, round: &mut u32) -> bool {
+        let solver = self.solver;
+        let this = std::ptr::from_mut(self);
+        if QTM {
+            // SAFETY: with `QTM` true, `Self` is `Worker<'w, 'a, true>`:
+            // the cast is the identity.
+            unsafe { &mut *this.cast::<Worker<'w, 'a, true>>() }.rounds(solver, stop, round)
+        } else {
+            // SAFETY: as above, with `QTM` false.
+            unsafe { &mut *this.cast::<Worker<'w, 'a, false>>() }.rounds(solver, stop, round)
+        }
+    }
+
     fn run(&mut self, stop: &AtomicBool) {
         let mut round = 0u32;
         loop {
             if self.active_lanes == 0 && !self.idle_wait(stop) {
                 break;
             }
-            if !self.rounds(self.solver, stop, &mut round) {
+            if !self.rounds_of_metric(stop, &mut round) {
                 break;
             }
         }
@@ -2422,13 +2509,10 @@ impl Worker<'_, '_> {
     /// placed at a fixed offset of a 64-byte line: see `crate::hot`.)
     // The solver is a parameter (noalias: the table pointer stays in a
     // register): -3.0% -c 0, -2.6% -c 1, +3.8% bench share at 48T, -2.0% -c 0
-    // at 1T (l6-share-2).
-    #[inline(never)]
-    #[cfg_attr(
-        all(target_arch = "x86_64", target_os = "linux"),
-        unsafe(link_section = ".text.hot_share")
-    )]
-    fn rounds(&mut self, solver: &Solver, stop: &AtomicBool, round: &mut u32) -> bool {
+    // at 1T (l6-share-2). (Inlined into `rounds`, which has the HTM one's
+    // section.)
+    #[inline(always)]
+    fn round_loop(&mut self, solver: &Solver, stop: &AtomicBool, round: &mut u32) -> bool {
         while self.active_lanes > 0 {
             let mut active = self.active_lanes;
             // The lanes by pointer (`next` to `end`), as in `run_lanes`: an
@@ -2864,7 +2948,7 @@ impl Worker<'_, '_> {
             loc.next += 1;
             let ctx = &*loc.ctx;
             let inner = ctx.inner();
-            let (job, target, phase) = entry_job(inner, entry);
+            let (job, target, phase) = entry_job::<QTM>(inner, entry);
             // (A split iteration's run: a job and its root children.)
             let (job, children) = if inner.split {
                 // SAFETY: a split iteration's claim entries are its runs.
@@ -2883,8 +2967,9 @@ impl Worker<'_, '_> {
             // (A first pass's entries that are infeasible in their phase are
             // skipped before the job's cubes are made, and those as long as
             // a solution found are of no use.)
+            let job_cost = if QTM { job_entry.cost } else { job_entry.len };
             let skip = phases > 1
-                && (job_entry.normal_bound.max(job_entry.inverse_bound) + job_entry.len > target
+                && (job_entry.normal_bound.max(job_entry.inverse_bound) + job_cost > target
                     || target >= ctx.rarely_written.pass_limit.load(Relaxed));
             // SAFETY: `li < lanes.len()` (see `restart`).
             let sl = unsafe { self.lanes.get_unchecked_mut(li) };
@@ -3073,8 +3158,9 @@ impl Worker<'_, '_> {
             if self.pass_solution(&ctx) {
                 return;
             }
-            // No iteration past `MAX_TARGET` (see `build`): no solution.
-            if ctx.inner().target >= MAX_TARGET {
+            // No iteration past `MAX_TARGET` (`MAX_TARGET_QTM`; see
+            // `build`): no solution.
+            if ctx.inner().target + target_step(QTM) > max_target(QTM) {
                 self.give_up(&ctx);
                 return;
             }
@@ -3207,7 +3293,11 @@ impl Worker<'_, '_> {
             let bound_inverse = solver.lower_bound(root_inverse);
             let spare = pool.spare.lock().pop();
             let mut inner = spare.unwrap_or_else(Inner::touched);
-            inner.target = bound.max(bound_inverse).max(1);
+            inner.target = if QTM {
+                solver.first_target(root, bound, bound_inverse)
+            } else {
+                bound.max(bound_inverse).max(1)
+            };
             inner.tag_base = u32::try_from(index % 64).unwrap_or(0) * 4;
             let ctx = Arc::new(CubeCtx {
                 index,
@@ -3240,6 +3330,7 @@ impl Worker<'_, '_> {
                 inner.jobs.push(Job {
                     moves: [0; 4],
                     len: 0,
+                    cost: 0,
                     normal_bound: bound,
                     inverse_bound: bound_inverse,
                     stat: 0.0,
@@ -3338,7 +3429,7 @@ impl Worker<'_, '_> {
         // (A shared lane has its one job slot: `SharedLane::new`.)
         unsafe { *lane.jobs.get_unchecked_mut(0) = *inner.jobs.get_unchecked(job as usize) };
         lane.job_pos = 0;
-        lane.target = phase_target(inner, phase);
+        lane.target = phase_target::<QTM>(inner, phase);
         lane.root = ctx.root;
         lane.root_inverse = ctx.root_inverse;
         lane.child_stats = [0.0; 18];
@@ -3714,9 +3805,9 @@ const WORKER_DEPTH: usize = 384;
 /// The `Worker` at byte `WORKER_OFFSET` of a page-aligned stack slot.
 #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
 #[repr(C, align(4096))]
-struct PinnedWorker<'w, 'a> {
+struct PinnedWorker<'w, 'a, const QTM: bool> {
     _pad: [std::mem::MaybeUninit<u8>; WORKER_OFFSET],
-    worker: Worker<'w, 'a>,
+    worker: Worker<'w, 'a, QTM>,
 }
 
 /// Calls `f` from a frame about `WORKER_DEPTH` bytes deeper.
@@ -3741,6 +3832,21 @@ impl Pool<'_> {
         solver: &Solver,
         nlanes: usize,
         stop: &AtomicBool,
+        done: impl FnMut(usize, Option<Vec<u8>>, Stats, f64),
+    ) {
+        if solver.metric().is_qtm() {
+            self.run_pinned_metric::<true>(solver, nlanes, stop, done);
+        } else {
+            self.run_pinned_metric::<false>(solver, nlanes, stop, done);
+        }
+    }
+
+    /// `run_pinned` in QTM if `QTM`, else in HTM.
+    fn run_pinned_metric<const QTM: bool>(
+        &self,
+        solver: &Solver,
+        nlanes: usize,
+        stop: &AtomicBool,
         mut done: impl FnMut(usize, Option<Vec<u8>>, Stats, f64),
     ) {
         let id = self.next_thread_id.fetch_add(1, Relaxed);
@@ -3751,7 +3857,7 @@ impl Pool<'_> {
             self.spare.lock().push(inner);
             self.bufs.lock().push(bufs);
         }
-        let worker = Worker {
+        let worker = Worker::<QTM> {
             pool: self,
             solver,
             id,
@@ -4125,6 +4231,7 @@ mod tests {
                 Job {
                     moves: [0, 3, 6, (r % 18) as u8],
                     len: 4,
+                    cost: 4,
                     normal_bound: (i % 13) as u8,
                     inverse_bound: ((r >> 8) % 12) as u8,
                     stat: 0.0,
@@ -4217,7 +4324,7 @@ mod tests {
         id: usize,
         nlanes: usize,
         done: &'w mut Done<'w>,
-    ) -> Worker<'w, 'a> {
+    ) -> Worker<'w, 'a, false> {
         Worker {
             pool,
             solver,
@@ -4259,7 +4366,7 @@ mod tests {
 
     /// Start the next entry of `slot` in lane `li`, claiming more if needed
     /// (false: none is left to claim).
-    fn take_next(worker: &mut Worker, li: usize, slot: usize) -> bool {
+    fn take_next(worker: &mut Worker<'_, '_, false>, li: usize, slot: usize) -> bool {
         loop {
             if worker.take(li, slot) {
                 return true;
@@ -4273,7 +4380,12 @@ mod tests {
     /// Run the entries of `slot` in lane `li` (from the one it runs), each
     /// ended at once as if its search found nothing, up to the first of
     /// phase `phase` or later, which is left running (false if none is).
-    fn run_up_to_phase(worker: &mut Worker, li: usize, slot: usize, phase: u8) -> bool {
+    fn run_up_to_phase(
+        worker: &mut Worker<'_, '_, false>,
+        li: usize,
+        slot: usize,
+        phase: u8,
+    ) -> bool {
         loop {
             if worker.lanes[li].slot != NO_SLOT {
                 if worker.lanes[li].phase >= phase {
@@ -4401,6 +4513,7 @@ mod tests {
                     Job {
                         moves: [(r >> 40) as u8 % 18, 0, 0, (i % 251) as u8],
                         len: 1,
+                        cost: 1,
                         normal_bound: (i / 251) as u8,
                         inverse_bound: 0,
                         stat,

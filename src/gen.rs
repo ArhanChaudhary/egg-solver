@@ -14,6 +14,11 @@
 //! frontier is small, and backward (search each unvisited entry's
 //! neighbors for a frontier entry) once most entries are reached (not
 //! measured separately).
+//!
+//! A QTM table (`Generator::metric`) is the same BFS over the 12 quarter
+//! turns only: a half turn is two quarter turns, so the levels are the QTM
+//! distances of the cosets. (The move set is closed under inverses in both
+//! metrics, as the backward steps need.)
 
 pub mod collapse;
 pub mod dfs;
@@ -21,6 +26,7 @@ pub mod progress;
 
 use crate::coord::{cocsep, cube_from_edge_key_internal, h11_key, reduce_key, split_index};
 use crate::cubie::Move;
+use crate::metric::Metric;
 use crate::simd::Cube;
 use crate::tables::{
     entry_class, entry_low_bits, entry_position, entry_sym_to_rep, h48_bytes, h48_rows, Cocsep,
@@ -40,6 +46,35 @@ pub struct Generator<'a> {
     /// Derived tables (`k` < the main table's) and their memory (as words:
     /// `Memory::words`).
     pub derived: Vec<(H48Meta, &'a [AtomicU64])>,
+    /// The metric of the distances (the derived tables' too).
+    pub metric: Metric,
+}
+
+/// The 12 quarter turns.
+pub const QUARTER_MOVES: [Move; 12] = [
+    Move::U,
+    Move::U3,
+    Move::D,
+    Move::D3,
+    Move::R,
+    Move::R3,
+    Move::L,
+    Move::L3,
+    Move::F,
+    Move::F3,
+    Move::B,
+    Move::B3,
+];
+
+/// The moves of a step of a BFS in `metric`: all 18, or the 12 quarter
+/// turns in QTM.
+#[must_use]
+pub fn bfs_moves(metric: Metric) -> &'static [Move] {
+    if metric.is_qtm() {
+        &QUARTER_MOVES
+    } else {
+        &Move::ALL
+    }
 }
 
 /// A cube of table entry `index`.
@@ -206,6 +241,7 @@ impl Generator<'_> {
             let unvisited = entries - total;
             // Forward costs ~18 neighbors per frontier entry, backward up
             // to 18 lookups per unvisited one, but stops at the first hit.
+            // (12 of each in QTM.)
             let forward = frontier.saturating_mul(18) < unvisited.saturating_mul(4);
             let level_start = Instant::now();
             if forward {
@@ -261,7 +297,7 @@ impl Generator<'_> {
                 let bit = u64::from(frontier.trailing_zeros());
                 frontier ^= frontier.isolate_lowest_one();
                 let cube = decode_index(self.corners, self.k, w * 32 + bit / 2);
-                for mv in Move::ALL {
+                for &mv in bfs_moves(self.metric) {
                     let neighbor = cube.apply_move(mv);
                     self.for_each_index(neighbor, |i| mark_new(words, i));
                 }
@@ -277,10 +313,11 @@ impl Generator<'_> {
         let mut pending: [u64; BATCH] = [0; BATCH];
         let mut n_pending = 0;
         let mut neighbors = [[0u64; 18]; BATCH];
+        let moves = bfs_moves(self.metric);
         let flush = |pending: &[u64], neighbors: &mut [[u64; 18]; BATCH]| {
             for (p, &index) in pending.iter().enumerate() {
                 let cube = decode_index(self.corners, self.k, index);
-                for (&mv, slot) in Move::ALL.iter().zip(neighbors[p].iter_mut()) {
+                for (&mv, slot) in moves.iter().zip(neighbors[p].iter_mut()) {
                     let i = self.index(cube.apply_move(mv));
                     *slot = i;
                     let (w, _) = entry_position(i);
@@ -288,7 +325,10 @@ impl Generator<'_> {
                 }
             }
             for (p, &index) in pending.iter().enumerate() {
-                if neighbors[p].iter().any(|&i| code_at(words, i) == 1) {
+                if neighbors[p][..moves.len()]
+                    .iter()
+                    .any(|&i| code_at(words, i) == 1)
+                {
                     let (w, shift) = entry_position(index);
                     words[w].fetch_and(!(1u64 << shift), Relaxed); // 3 -> 2
                 }
