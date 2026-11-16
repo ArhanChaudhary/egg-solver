@@ -51,6 +51,40 @@ impl Verbosity {
     }
 }
 
+/// `--metric`: how solution lengths are counted.
+#[derive(clap::Args, Clone, Copy, Debug)]
+pub struct MetricArgs {
+    /// The metric of the search: `htm` (any face turn is one move) or `qtm`
+    /// (quarter-turn metric: a half turn is two moves). QTM searches can
+    /// use HTM tables (weaker bounds) or QTM tables (`gen --metric qtm`);
+    /// an HTM search cannot use a QTM table.
+    #[arg(
+        long,
+        value_name = "htm|qtm",
+        default_value = "htm",
+        value_parser = parse_metric,
+        display_order = 80
+    )]
+    pub metric: crate::metric::Metric,
+}
+
+/// `--metric`.
+///
+/// # Errors
+/// If `text` is not `htm` or `qtm`.
+pub fn parse_metric(text: &str) -> Result<crate::metric::Metric, String> {
+    text.parse()
+}
+
+/// A solution's length in `metric`, as printed: `18` in HTM, `22q` in QTM.
+#[must_use]
+pub fn length_label(metric: crate::metric::Metric, moves: &[u8]) -> String {
+    match metric {
+        crate::metric::Metric::Htm => moves.len().to_string(),
+        crate::metric::Metric::Qtm => format!("{}q", crate::metric::Metric::Qtm.length(moves)),
+    }
+}
+
 /// The value parser of a count of at least 1 (threads, lanes).
 #[must_use]
 pub fn positive() -> clap::builder::RangedU64ValueParser<usize> {

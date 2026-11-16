@@ -25,6 +25,10 @@
 //! `BAD <index>` and makes the exit status 1. With `--json`, the same as
 //! JSON lines (`Line`).
 //!
+//! `--metric qtm` solves in the quarter-turn metric (a half turn is two
+//! moves; `metric`): lengths are QTM lengths, and each solution is followed
+//! by its length marked as such, e.g. `(22q)`.
+//!
 //! `solve --fast --table TABLE [SCRAMBLE]...` uses all selected threads on
 //! one cube. Without arguments it reads one scramble from stdin. Warm-up
 //! solves are optional; see `run_fast`.
@@ -49,9 +53,10 @@
 
 use anyhow::Context as _;
 use clap::{parser::ValueSource, CommandFactory as _, FromArgMatches as _, Parser};
-use egg_solver::cli::{self, BadInput, LoadArgs, Verbosity};
+use egg_solver::cli::{self, BadInput, LoadArgs, MetricArgs, Verbosity};
 use egg_solver::cubie::{format_moves, parse_moves, CubieCube};
 use egg_solver::lanes::share::Pool;
+use egg_solver::metric::Metric;
 use egg_solver::solver::{Solver, Stats};
 use egg_solver::tables::Cocsep;
 use std::io::{BufRead, IsTerminal as _, Write};
@@ -118,8 +123,9 @@ fn solve_all_pinned(
     })
 }
 
-/// Solve Rubik's cube scrambles from stdin optimally (fewest moves, any
-/// face turn is one move).
+/// Solve Rubik's cube scrambles from stdin optimally (fewest moves: any
+/// face turn is one move, or with --metric qtm a quarter turn is one and a
+/// half turn two).
 #[derive(Parser, Debug)]
 #[command(name = "solve", version, after_long_help = OUTPUT_HELP)]
 struct Args {
@@ -180,6 +186,8 @@ struct Args {
     #[arg(long, value_name = "SCRAMBLE", requires = "fast")]
     warmup: Option<String>,
     #[command(flatten)]
+    metric: MetricArgs,
+    #[command(flatten)]
     load: LoadArgs,
     /// Load TABLE into its shared memory segment (as `--shm` does, if it is
     /// not there yet), print the segment and exit: later runs on TABLE
@@ -213,9 +221,11 @@ Output, one line per cube in completion order, then a summary:
   total <cubes> cubes wall <s> wall/cube <s> nodes/cube <n> threads <t> lanes <l> concurrency <c>
 <seconds> is the cube's time from its start to its solution (with -c 1, its
 latency). Every solution is verified: a wrong one is reported as BAD <index>
-and makes the exit status 1. With --json, the same as JSON lines:
-  {\"type\":\"solved\",\"index\":..,\"moves\":..,\"length\":..,\"nodes\":..,\"lookups\":..,\"seconds\":..,\"ok\":true}
-  {\"type\":\"total\",\"cubes\":..,\"wall\":..,\"wall_per_cube\":..,\"nodes_per_cube\":..,\"threads\":..,\"lanes\":..,\"concurrency\":..}
+and makes the exit status 1. With --metric qtm, <length> is the QTM length,
+each solution is followed by it as (<length>q), and the summary ends with
+metric qtm. With --json, the same as JSON lines (\"length\" in the metric):
+  {\"type\":\"solved\",\"index\":..,\"moves\":..,\"length\":..,\"metric\":\"htm\",\"nodes\":..,\"lookups\":..,\"seconds\":..,\"ok\":true}
+  {\"type\":\"total\",\"cubes\":..,\"wall\":..,\"wall_per_cube\":..,\"nodes_per_cube\":..,\"threads\":..,\"lanes\":..,\"concurrency\":..,\"metric\":\"htm\"}
 
 With --fast:
   table    <path>
@@ -224,8 +234,9 @@ With --fast:
   solution <moves>
   length   <n> moves (optimal, verified)
   time     <ms> ms   (<n> M nodes, <rate> M nodes/s)
-(with --json one object: table, threads, lanes, scramble, solution, length,
-nodes, lookups, seconds, ms, nodes_per_second).";
+(with --metric qtm: length <n>q; with --json one object: table, threads,
+lanes, scramble, solution, length, metric, nodes, lookups, seconds, ms,
+nodes_per_second).";
 
 /// A line of `--json` output.
 #[derive(serde::Serialize)]
@@ -235,7 +246,9 @@ enum Line {
     Solved {
         index: usize,
         moves: String,
+        /// In the metric of the search.
         length: usize,
+        metric: Metric,
         nodes: u64,
         lookups: u64,
         seconds: f64,
@@ -251,6 +264,7 @@ enum Line {
         threads: usize,
         lanes: usize,
         concurrency: usize,
+        metric: Metric,
     },
 }
 
@@ -320,17 +334,18 @@ fn run(args: &Args) -> anyhow::Result<ExitCode> {
     if cubes.is_empty() {
         return Err(BadInput("no scrambles on stdin".into()).into());
     }
-    let corners = Cocsep::generate()?;
+    let metric = args.metric.metric;
+    let corners = Cocsep::generate_metric(metric)?;
     // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
     let table = unsafe { args.load.open(path) }?;
     let threads = args.threads;
     let lanes = cli::lanes(args.lanes, path, table.meta().k, threads);
     let concurrency = args.concurrency;
     log::info!(
-        "{} cubes, at most {concurrency} at once (0: all)",
+        "{} cubes, at most {concurrency} at once (0: all), {metric}",
         cubes.len()
     );
-    let solver = Solver::new(&corners, &table);
+    let solver = solver_of(&corners, &table, metric, path)?;
     let get = |i: usize| cubes.get(i).copied();
     let max_active = if concurrency == 0 {
         usize::MAX
@@ -359,7 +374,8 @@ fn run(args: &Args) -> anyhow::Result<ExitCode> {
             let line = Line::Solved {
                 index: i,
                 moves: format_moves(&solution),
-                length: solution.len(),
+                length: metric.length(&solution),
+                metric,
                 nodes: stats.nodes,
                 lookups: stats.lookups,
                 seconds,
@@ -373,10 +389,11 @@ fn run(args: &Args) -> anyhow::Result<ExitCode> {
             }
             let _ = writeln!(
                 out,
-                "solved {i} {} {} {seconds:.6} {}",
-                solution.len(),
+                "solved {i} {} {} {seconds:.6} {}{}",
+                metric.length(&solution),
                 stats.nodes,
-                format_moves(&solution)
+                format_moves(&solution),
+                length_mark(metric, &solution)
             );
         }
         let _ = out.flush();
@@ -398,10 +415,12 @@ fn run(args: &Args) -> anyhow::Result<ExitCode> {
             threads,
             lanes,
             concurrency,
+            metric,
         })?;
     } else {
+        let metric_note = if metric.is_qtm() { " metric qtm" } else { "" };
         println!(
-            "total {n} cubes wall {wall:.6} wall/cube {wall_per_cube:.6} nodes/cube {nodes_per_cube:.0} threads {threads} lanes {lanes} concurrency {concurrency}"
+            "total {n} cubes wall {wall:.6} wall/cube {wall_per_cube:.6} nodes/cube {nodes_per_cube:.0} threads {threads} lanes {lanes} concurrency {concurrency}{metric_note}"
         );
     }
     Ok(if bad.load(Ordering::Relaxed) {
@@ -446,6 +465,33 @@ fn fast_scramble(args: &Args) -> anyhow::Result<String> {
     })
 }
 
+/// What follows a solution in the text output: nothing in HTM (the output
+/// before QTM), its length marked as QTM in QTM (` (22q)`).
+fn length_mark(metric: Metric, solution: &[u8]) -> String {
+    if metric.is_qtm() {
+        format!(" ({})", cli::length_label(metric, solution))
+    } else {
+        String::new()
+    }
+}
+
+/// The solver of `metric` on `table` (at `path`), with `corners` (of that
+/// metric): an error for an HTM search on a QTM table.
+fn solver_of<'a>(
+    corners: &'a Cocsep,
+    table: &'a egg_solver::tables::H48Table,
+    metric: Metric,
+    path: &str,
+) -> anyhow::Result<Solver<'a>> {
+    Solver::with_metric(corners, table, metric).map_err(|error| {
+        BadInput(format!(
+            "{path}: {error}; use --metric {}",
+            table.meta().metric
+        ))
+        .into()
+    })
+}
+
 /// `--fast`'s JSON object.
 #[derive(serde::Serialize)]
 struct FastReport<'a> {
@@ -454,7 +500,9 @@ struct FastReport<'a> {
     lanes: usize,
     scramble: &'a str,
     solution: String,
+    /// In the metric of the search.
     length: usize,
+    metric: Metric,
     nodes: u64,
     lookups: u64,
     seconds: f64,
@@ -488,11 +536,12 @@ fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
         println!("threads  {threads} (all on this one cube)");
         println!("scramble {scramble}");
     }
-    let corners = Cocsep::generate()?;
+    let metric = args.metric.metric;
+    let corners = Cocsep::generate_metric(metric)?;
     // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
     let table = unsafe { args.load.open(path) }?;
     let lanes = cli::lanes(args.lanes, path, table.meta().k, threads);
-    let solver = Solver::new(&corners, &table);
+    let solver = solver_of(&corners, &table, metric, path)?;
     let get = |i: usize| cubes.get(i).copied();
     // (The scramble, after the warm-up cube if any.)
     let (last, &cube) = cubes
@@ -510,7 +559,12 @@ fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
     solve_all_pinned(&solver, &get, threads, lanes, 1, &done)?;
     let result = result.into_inner().unwrap_or_else(PoisonError::into_inner);
     let (solution, stats, seconds) = result.context("not solved")?;
-    let solution = solution.context("no solution within 20 moves: is the table damaged?")?;
+    let solution = solution.with_context(|| {
+        format!(
+            "no solution within {} moves ({metric}): is the table damaged?",
+            metric.max_target()
+        )
+    })?;
     anyhow::ensure!(
         cube.apply_moves(&solution) == Some(CubieCube::SOLVED),
         "BAD: {} does not solve the scramble",
@@ -530,7 +584,8 @@ fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
             lanes,
             scramble: &scramble,
             solution: format_moves(&solution),
-            length: solution.len(),
+            length: metric.length(&solution),
+            metric,
             nodes: stats.nodes,
             lookups: stats.lookups,
             seconds,
@@ -539,7 +594,14 @@ fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
         })?;
     } else {
         println!("solution {}", format_moves(&solution));
-        println!("length   {} moves (optimal, verified)", solution.len());
+        if metric.is_qtm() {
+            println!(
+                "length   {} (quarter-turn metric; optimal, verified)",
+                cli::length_label(metric, &solution)
+            );
+        } else {
+            println!("length   {} moves (optimal, verified)", solution.len());
+        }
         println!(
             "time     {:.3} ms   ({:.1} M nodes, {:.0} M nodes/s)",
             seconds * 1000.0,

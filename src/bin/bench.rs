@@ -9,7 +9,8 @@
 //!   bench tune <table> [--window S]
 //!       Short stream runs at 1 thread and at all threads over lane counts;
 //!       prints the best and saves it next to the table (`<table>.tune`).
-//! lanes = 0 uses the recursive single-cube solver; the default is
+//! `--metric qtm` solves in the quarter-turn metric (lengths are QTM
+//! lengths). lanes = 0 uses the recursive single-cube solver; the default is
 //! `<table>.tune`'s if `tune` made one, else `tables::file::untuned_lanes`.
 //! `--share[=C]` uses the work-sharing mode (`lanes::share`) with at most C
 //! cubes in progress at once (default: threads * lanes; 1 solves one cube
@@ -36,9 +37,10 @@
 
 use anyhow::Context as _;
 use clap::{Args, Parser, Subcommand};
-use egg_solver::cli::{self, BadInput, LoadArgs, Verbosity};
+use egg_solver::cli::{self, BadInput, LoadArgs, MetricArgs, Verbosity};
 use egg_solver::cubie::{parse_moves, CubieCube, Rng};
 use egg_solver::lanes::share::Pool;
+use egg_solver::metric::Metric;
 use egg_solver::solver::{Solver, Stats};
 use egg_solver::tables::Cocsep;
 use std::collections::BTreeMap;
@@ -54,6 +56,7 @@ struct Record {
     finished: f64,
     /// Its solve time (seconds from its start).
     seconds: f64,
+    /// In the solver's metric.
     length: usize,
     stats: Stats,
 }
@@ -88,6 +91,7 @@ fn run(
     let records = Mutex::new(Vec::new());
     let bad = AtomicU64::new(0);
     let t0 = Instant::now();
+    let metric = solver.metric();
     // (Each mode's thread code is a function of its own, not inlined here:
     // `share_thread`, and `stream_thread`, which is the stream's hot loop.)
     let duration = duration
@@ -113,7 +117,7 @@ fn run(
                         .push(Record {
                             finished: t0.elapsed().as_secs_f64(),
                             seconds,
-                            length: solution.map_or(0, |moves| moves.len()),
+                            length: solution.map_or(0, |moves| metric.length(&moves)),
                             stats,
                         });
                 };
@@ -294,6 +298,8 @@ struct TableArgs {
     table: String,
     #[command(flatten)]
     load: LoadArgs,
+    #[command(flatten)]
+    metric: MetricArgs,
 }
 
 /// Threads, lanes and the mode of a run.
@@ -430,13 +436,14 @@ fn legacy(args: Vec<OsString>) -> Vec<OsString> {
 struct Summary {
     nodes_per_cube: f64,
     lookups_per_cube: f64,
-    /// Cubes per solution length.
+    /// Cubes per solution length (in `metric`).
     lengths: BTreeMap<usize, usize>,
+    metric: Metric,
 }
 
 impl Summary {
     #[expect(clippy::cast_precision_loss, reason = "statistics")]
-    fn of(records: &[Record]) -> Summary {
+    fn of(records: &[Record], metric: Metric) -> Summary {
         let n = records.len().max(1) as f64;
         let nodes: u64 = records.iter().map(|r| r.stats.nodes).sum();
         let lookups: u64 = records.iter().map(|r| r.stats.lookups).sum();
@@ -448,6 +455,7 @@ impl Summary {
             nodes_per_cube: nodes as f64 / n,
             lookups_per_cube: lookups as f64 / n,
             lengths,
+            metric,
         }
     }
 
@@ -462,7 +470,11 @@ impl Summary {
             "nodes/cube {:.0} lookups/cube {:.0}",
             self.nodes_per_cube, self.lookups_per_cube
         );
-        println!("lengths {}", histogram.join(" "));
+        if self.metric.is_qtm() {
+            println!("lengths (qtm) {}", histogram.join(" "));
+        } else {
+            println!("lengths {}", histogram.join(" "));
+        }
     }
 }
 
@@ -590,7 +602,7 @@ fn stream(solver: &Solver, args: &StreamArgs, lanes: usize, json: bool) -> anyho
         .filter(|r| r.finished >= warmup && r.finished < warmup + window)
         .collect();
     let throughput = in_window.len() as f64 / window;
-    let summary = Summary::of(&in_window);
+    let summary = Summary::of(&in_window, solver.metric());
     if json {
         return print_json(&Report::Stream {
             threads,
@@ -651,7 +663,7 @@ fn batch(
     let mut times: Vec<f64> = records.iter().map(|r| r.seconds).collect();
     times.sort_by(f64::total_cmp);
     let (max, p50) = (times[times.len() - 1], times[times.len() / 2]);
-    let summary = Summary::of(&records);
+    let summary = Summary::of(&records, solver.metric());
     if json {
         return print_json(&Report::Batch {
             cubes: cubes.len(),
@@ -721,17 +733,28 @@ fn run_command(command: &Command, json: bool) -> anyhow::Result<()> {
         _ => Vec::new(),
     };
     let path = &table_args.table;
-    let corners = Cocsep::generate()?;
+    let metric = table_args.metric.metric;
+    let corners = Cocsep::generate_metric(metric)?;
     let load_start = Instant::now();
     // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
     let table = unsafe { table_args.load.open(path) }?;
     eprintln!(
-        "table h{} base {} loaded in {:.1}s",
+        "table h{} base {}{} loaded in {:.1}s",
         table.meta().k,
         table.meta().base,
+        if table.meta().metric.is_qtm() {
+            " (qtm)"
+        } else {
+            ""
+        },
         load_start.elapsed().as_secs_f64()
     );
-    let solver = Solver::new(&corners, &table);
+    let solver = Solver::with_metric(&corners, &table, metric).map_err(|error| {
+        BadInput(format!(
+            "{path}: {error}; use --metric {}",
+            table.meta().metric
+        ))
+    })?;
     let lanes = |run: &RunArgs| cli::lanes(run.lanes, path, table.meta().k, run.threads);
     match command {
         Command::Tune(args) => tune(&solver, path, args.window, json),

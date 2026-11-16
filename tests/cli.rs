@@ -789,3 +789,95 @@ fn previous_environment_names_remain_fallbacks() {
     );
     assert!(ok(&modern).contains("threads 1"));
 }
+
+/// `--metric qtm`: `gen` makes a QTM table (its trailer's layout is
+/// `h48-qtm`; check, stamp), `solve` solves in QTM on HTM and QTM tables
+/// with the same lengths (`(Nq)` after each solution, `metric qtm` in the
+/// summary and in JSON), and an HTM solve refuses a QTM table (status 2).
+#[test]
+fn qtm_metric() {
+    let gen = env!("CARGO_BIN_EXE_gen");
+    let solve = env!("CARGO_BIN_EXE_solve");
+    let qtm_table = scratch_file("h0-qtm");
+    let out = run(
+        gen,
+        &["0", "auto", &qtm_table, "-t", "4", "--metric", "qtm"],
+        "",
+    );
+    ok(&out);
+    let base = egg_solver::tables::default_base_metric(0, egg_solver::metric::Metric::Qtm);
+    let log = text(&out.stderr);
+    let head = format!("[gen] h0 base {base} qtm: 0.03 GiB, 4 threads\n");
+    assert!(log.starts_with(&head), "{log}");
+    let bytes = std::fs::read(&qtm_table).unwrap();
+    let trailer = text(&bytes[bytes.len() - 4096..]);
+    assert!(trailer.contains("\nlayout h48-qtm\n"), "{trailer}");
+    let checked = ok(&run(gen, &["check", &qtm_table], ""));
+    assert!(
+        checked.starts_with(&format!("{qtm_table}: h0 base {base} qtm\n")),
+        "{checked}"
+    );
+    // stamp: the QTM table without its trailer gets it back.
+    let stripped = scratch_file("h0-qtm-stripped");
+    let data_len = bytes.len() - 4096;
+    std::fs::write(&stripped, [&bytes[..data_len], &[0; 4096]].concat()).unwrap();
+    let base_text = base.to_string();
+    ok(&run(
+        gen,
+        &["stamp", &stripped, "0", &base_text, "--metric", "qtm"],
+        "",
+    ));
+    assert_eq!(std::fs::read(&stripped).unwrap(), bytes);
+    // QTM solves on both tables.
+    let qtm_length = |moves: &[&str]| -> usize {
+        moves
+            .iter()
+            .map(|m| if m.ends_with('2') { 2 } else { 1 })
+            .sum()
+    };
+    let mut lengths = Vec::new();
+    for table in [h0(), qtm_table.as_str()] {
+        let args = ["--table", table, "--metric", "qtm", "-t", "2"];
+        let output = ok(&run(solve, &args, SCRAMBLES));
+        let rows: Vec<&str> = output.lines().collect();
+        assert_eq!(rows.len(), 5, "{output}");
+        let mut by_index = vec![0; 4];
+        for line in &rows[..4] {
+            assert!(matches(line, "solved # # # # *"), "{line}");
+            let words: Vec<&str> = line.split(' ').collect();
+            let length: usize = words[2].parse().unwrap();
+            let (moves, mark) = words[5..].split_at(words.len() - 6);
+            assert_eq!(mark, [format!("({length}q)").as_str()], "{line}");
+            assert_eq!(qtm_length(moves), length, "{line}");
+            by_index[words[1].parse::<usize>().unwrap()] = length;
+        }
+        assert!(
+            rows[4].ends_with(" concurrency 0 metric qtm"),
+            "{}",
+            rows[4]
+        );
+        lengths.push(by_index);
+    }
+    assert_eq!(lengths[0], lengths[1]);
+    assert_eq!(lengths[0][0], 4, "R U R' U' is 4q");
+    // JSON, --fast.
+    let args = [
+        "--fast", "--table", &qtm_table, "--metric", "qtm", "--json", "-t", "2", "U2",
+    ];
+    let report: serde_json::Value =
+        serde_json::from_str(ok(&run(solve, &args, "")).trim()).unwrap();
+    assert_eq!(
+        (report["metric"].as_str(), report["length"].as_u64()),
+        (Some("qtm"), Some(2))
+    );
+    let args = ["--fast", "--table", h0(), "-t", "2", "U2"];
+    assert!(ok(&run(solve, &args, "")).contains("length   1 moves"));
+    // An HTM solve on the QTM table: refused, with a hint.
+    let out = run(solve, &["--table", &qtm_table, "-t", "2"], SCRAMBLES);
+    assert_eq!(out.status.code(), Some(2));
+    assert!(
+        text(&out.stderr).contains("use --metric qtm"),
+        "{}",
+        text(&out.stderr)
+    );
+}
