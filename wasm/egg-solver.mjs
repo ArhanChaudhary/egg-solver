@@ -4,6 +4,7 @@
 //   const solver = await EggSolver.create({ wasm: 'dist/egg-solver.wasm' });
 //   await solver.loadTable('/path/to/h6');        // or await generateTable(4)
 //   solver.solve("R U R' U' F2 D L2");             // { moves, length, nodes, ... }
+//   solver.solve("R U R' U'", { metric: 'qtm' });  // quarter-turn metric
 //
 // The module is built for WASI (wasm32-wasip1, or wasm32-wasip1-threads for
 // several threads): this file provides the few WASI functions it imports
@@ -28,6 +29,18 @@ const SLOT_IDLE = 1;
 const SLOT_CLAIMED = 2;
 const SLOT_RUN = 3;
 const slotBase = (i) => 4 + 4 * i;
+
+/**
+ * The module's `metric` argument for a metric option: undefined for the
+ * table's metric (HTM for HTM tables), 'htm' or 'qtm' (the quarter-turn
+ * metric: a half turn is two moves).
+ */
+function metricCode(metric) {
+  if (metric === undefined) return 0;
+  const code = { htm: 1, qtm: 2 }[String(metric).toLowerCase()];
+  if (code === undefined) throw new Error(`egg-solver: unknown metric ${metric}: 'htm' or 'qtm'`);
+  return code;
+}
 
 /** A copy of wasm memory bytes (TextDecoder and others refuse shared views). */
 function copyOut(memory, ptr, len) {
@@ -332,7 +345,7 @@ export class EggSolver {
     /** Threads used by `solve` and `solveMany` (1 for the single-thread build). */
     this.threads = threads;
     this.workers = workers;
-    /** The loaded table's `{ k, base, bytes }`, or null. */
+    /** The loaded table's `{ k, base, bytes, metric }`, or null. */
     this.table = null;
   }
 
@@ -377,7 +390,8 @@ export class EggSolver {
    * path (Bun), a URL (fetched), a `Blob`/`File` (browsers), or its bytes.
    * The file is copied straight into the module's memory (no second copy).
    * `verify` checks the data against the checksum in the file's trailer.
-   * Returns `{ k, base, bytes }`.
+   * Returns `{ k, base, bytes, metric }` (metric 'qtm' for a table made by
+   * `gen --metric qtm`).
    */
   async loadTable(source, { verify = false, onProgress } = {}) {
     let size;
@@ -435,12 +449,14 @@ export class EggSolver {
   }
 
   /**
-   * Generate table hk in memory (base 0: the default for k). h0..h4 take
-   * from seconds to a minute or two on one thread (more threads: faster).
+   * Generate table hk in memory (base 0: the default for k and the
+   * metric). h0..h4 take from seconds to a minute or two on one thread
+   * (more threads: faster). `metric: 'qtm'` makes a quarter-turn-metric
+   * table (tighter bounds for QTM solves; it cannot serve HTM solves).
    */
-  async generateTable(k, base = 0) {
+  async generateTable(k, base = 0, { metric = 'htm' } = {}) {
     this.table = null;
-    this.table = this.call('egg_solver_generate', k, base, this.threads);
+    this.table = this.call('egg_solver_generate', k, base, this.threads, metricCode(metric));
     await this.warmUp();
     return this.table;
   }
@@ -448,25 +464,36 @@ export class EggSolver {
   /**
    * Solve one cube: a scramble ("R U2 F' ...") or a facelet string (54
    * stickers in the order U R F D L B, any six symbols). All lanes of all
-   * threads work on it. Returns `{ moves, length, nodes, lookups, seconds }`.
+   * threads work on it. `metric`: 'htm' (any face turn is one move) or
+   * 'qtm' (a half turn is two), by default the table's (HTM for HTM tables).
+   * A QTM solve can use an HTM table; an HTM solve cannot use a QTM table.
+   * Returns `{ moves, length, metric, nodes, lookups, seconds }` (`length`
+   * in that metric).
    */
-  solve(cube, { lanes = 0 } = {}) {
-    return this.withText(cube, (ptr, len) => this.call('egg_solver_solve', ptr, len, lanes, this.threads));
+  solve(cube, { lanes = 0, metric } = {}) {
+    const code = metricCode(metric);
+    return this.withText(cube, (ptr, len) =>
+      this.call('egg_solver_solve', ptr, len, lanes, this.threads, code));
   }
 
-  /** Solve many cubes for throughput (each lane solves its own cube); results in input order. */
-  solveMany(cubes, { lanes = 0 } = {}) {
+  /**
+   * Solve many cubes for throughput (each lane solves its own cube); results
+   * in input order. `metric` as for `solve`.
+   */
+  solveMany(cubes, { lanes = 0, metric } = {}) {
+    const code = metricCode(metric);
     return this.withText(cubes.join('\n'), (ptr, len) =>
-      this.call('egg_solver_solve_batch', ptr, len, lanes, this.threads));
+      this.call('egg_solver_solve_batch', ptr, len, lanes, this.threads, code));
   }
 
   /**
    * Stream throughput, as the native `bench <table> stream`: random cubes
-   * solved for `window` seconds after `warmup`. Returns
-   * `{ solves_per_second, nodes_per_cube, lookups_per_cube, cubes, threads, lanes }`.
+   * solved for `window` seconds after `warmup` (`metric` as for `solve`).
+   * Returns `{ solves_per_second, nodes_per_cube, lookups_per_cube, cubes,
+   * threads, lanes, metric }`.
    */
-  bench({ seed = 2026, warmup = 5, window = 20, lanes = 0 } = {}) {
-    return this.call('egg_solver_bench', seed, warmup, window, lanes, this.threads);
+  bench({ seed = 2026, warmup = 5, window = 20, lanes = 0, metric } = {}) {
+    return this.call('egg_solver_bench', seed, warmup, window, lanes, this.threads, metricCode(metric));
   }
 
   /**
@@ -477,11 +504,13 @@ export class EggSolver {
    * slowly: 187.7 s instead of 129.5 s for 100 depth-17 cubes on h6 (V8 in
    * Node 26, one thread: +45% with the warm-up). Solves short scrambles
    * (cheap with any table) for about `seconds`, then gives the background
-   * compiler time to finish. `loadTable` and `generateTable` call it. Not
-   * in Bun: JavaScriptCore moves a running loop to optimized code (126.5 s
-   * without, 127.0 s with the warm-up, same set).
+   * compiler time to finish. `loadTable` and `generateTable` call it (for
+   * the table's metric; `warmUp({ metric: 'qtm' })` warms QTM solves on an
+   * HTM table, which run other code). Not in Bun: JavaScriptCore moves a
+   * running loop to optimized code (126.5 s without, 127.0 s with the
+   * warm-up, same set).
    */
-  async warmUp({ seconds = 0.3 } = {}) {
+  async warmUp({ seconds = 0.3, metric } = {}) {
     if (typeof Bun !== 'undefined') return;
     const faces = 'UDRLFB';
     let seed = 1;
@@ -496,11 +525,11 @@ export class EggSolver {
     const start = performance.now();
     while (performance.now() - start < seconds * 1000) {
       const cubes = Array.from({ length: 8 }, () => scramble(7));
-      this.solveMany(cubes, { lanes: 8 });
-      this.solve(cubes[0]);
+      this.solveMany(cubes, { lanes: 8, metric });
+      this.solve(cubes[0], { metric });
     }
     await new Promise((resolve) => setTimeout(resolve, 300));
-    this.solve(scramble(6));
+    this.solve(scramble(6), { metric });
   }
 
   /** `count` random cube states (facelet strings): those of the native `bench random:count:seed`. */

@@ -8,6 +8,11 @@
 // page in IndexedDB) must load back. The demo page's sticker model
 // (cube-model.mjs) must agree with the module: its stickers of a scramble
 // are that scramble's cube, and the module's solutions solve its cubes.
+// Then the quarter-turn metric: QTM solves on the HTM table and on a QTM h0
+// must agree, replay, be no shorter than the HTM ones and have the corner
+// permutation's parity (known: R U R' U' 4q, the checkerboard 12q); an HTM
+// solve on the QTM table is refused, and the QTM table exports and loads back
+// as one.
 
 import { EggSolver } from './egg-solver.mjs';
 import * as model from './cube-model.mjs';
@@ -68,6 +73,42 @@ for (const [name, threads] of [['egg-solver.wasm', undefined], ['egg-solver-thre
   for (const text of solver.randomCubes(7, 20)) {
     if (model.checkStickers([...text])) fail(`${name}: model rejects the random cube ${text}`);
   }
+  // Quarter-turn metric.
+  const qtmLength = (moves) =>
+    moves ? moves.split(' ').reduce((n, m) => n + (m.endsWith('2') ? 2 : 1), 0) : 0;
+  const parity = (scramble) => qtmLength(scramble) % 2;
+  const known = [["R U R' U'", 4], ['U2 D2 F2 B2 L2 R2', 12]];
+  const qtmScrambles = [...scrambles, ...known.map(([s]) => s)];
+  const onHtm = qtmScrambles.map((s) => solver.solve(s, { metric: 'qtm' }));
+  const onHtmMany = solver.solveMany(qtmScrambles, { lanes: 4, metric: 'qtm' });
+  const qtmTable = await solver.generateTable(0, 0, { metric: 'qtm' });
+  if (qtmTable.metric !== 'qtm') fail(`${name}: generated a ${qtmTable.metric} table`);
+  const onQtm = qtmScrambles.map((s) => solver.solve(s));
+  qtmScrambles.forEach((scramble, i) => {
+    const { moves, length, metric } = onQtm[i];
+    if (metric !== 'qtm' || onHtm[i].metric !== 'qtm') fail(`${name}: ${scramble}: metric ${metric}`);
+    if (length !== qtmLength(moves)) fail(`${name}: ${scramble}: ${moves} is not ${length}q`);
+    if (onHtm[i].length !== length || onHtmMany[i].length !== length) {
+      fail(`${name}: ${scramble}: ${onHtm[i].length}q / ${onHtmMany[i].length}q on h0, ${length}q on qtm h0`);
+    }
+    if (i < scrambles.length && length < single[i].length) fail(`${name}: ${scramble}: ${length}q < HTM`);
+    if (length % 2 !== parity(scramble)) fail(`${name}: ${scramble}: ${length}q has the wrong parity`);
+    const want = known.find(([s]) => s === scramble)?.[1];
+    if (want !== undefined && length !== want) fail(`${name}: ${scramble}: ${length}q, not ${want}q`);
+    if (solver.solve(`${scramble} ${moves}`).length !== 0) fail(`${name}: ${moves} does not solve ${scramble}`);
+  });
+  let htmOnQtm = false;
+  try {
+    solver.solve(scrambles[0], { metric: 'htm' });
+  } catch {
+    htmOnQtm = true;
+  }
+  if (!htmOnQtm) fail(`${name}: an HTM solve on a QTM table was accepted`);
+  // A QTM table exported as a file loads back as a QTM table.
+  const qtmFile = solver.exportTable();
+  const qtmLoaded = await solver.loadTable(new Uint8Array(await qtmFile.arrayBuffer()), { verify: true });
+  if (qtmLoaded.metric !== 'qtm') fail(`${name}: an exported QTM table loads as ${JSON.stringify(qtmLoaded)}`);
+  if (solver.solve(qtmScrambles[1]).length !== onQtm[1].length) fail(`${name}: exported QTM table solves differently`);
   solver.close();
   console.log(`wasm test: ${name} (${solver.threads} thread(s)) ok in ${((performance.now() - start) / 1000).toFixed(1)} s`);
 }

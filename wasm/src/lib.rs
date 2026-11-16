@@ -11,6 +11,12 @@
 //! Built for `wasm32-wasip1` (one thread) or `wasm32-wasip1-threads` (std
 //! threads through wasi-threads: the share and stream modes run on several
 //! threads as natively). See README.md, "WebAssembly".
+//!
+//! The solving and generating exports take a last `metric` argument: 0 the
+//! table's metric (HTM for HTM tables, the default and the behaviour before
+//! QTM; for `egg_solver_generate`: HTM), 1 HTM, 2 QTM (the quarter-turn
+//! metric, on an HTM or a QTM table). Callers that pass fewer arguments get
+//! 0 (wasm fills missing arguments with zeros).
 
 // No intentional panics in shipped code (user request; asserts, which no
 // lint covers, are checked by tests/no_runtime_panics.rs).
@@ -28,8 +34,9 @@
 
 use egg_solver::cubie::{format_moves, parse_moves, CubieCube, Rng};
 use egg_solver::lanes::share::Pool;
+use egg_solver::metric::Metric;
 use egg_solver::solver::{Solver, Stats};
-use egg_solver::tables::{default_base, h48_bytes, Cocsep, H48Table, Memory};
+use egg_solver::tables::{default_base_metric, h48_bytes, Cocsep, H48Table, Memory};
 use std::fmt::Write as _;
 use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Mutex, MutexGuard, PoisonError};
@@ -91,8 +98,9 @@ pub extern "C" fn egg_solver_after_initialize() {
 
 /// The module's state between calls.
 struct State {
-    /// The cocsep table, made on first use (`corners`).
+    /// The cocsep tables of HTM and QTM, each made on first use (`corners`).
     corners: Option<Cocsep>,
+    corners_qtm: Option<Cocsep>,
     table: Option<H48Table>,
     /// A table file being copied in by the caller (`egg_solver_table_buffer`).
     incoming: Option<Memory>,
@@ -104,6 +112,7 @@ struct State {
 
 static STATE: Mutex<State> = Mutex::new(State {
     corners: None,
+    corners_qtm: None,
     table: None,
     incoming: None,
     output: String::new(),
@@ -122,6 +131,42 @@ fn corners(corners: &mut Option<Cocsep>) -> Result<&Cocsep, String> {
         Some(corners) => Ok(corners),
         None => Ok(corners.insert(Cocsep::generate().map_err(|e| e.to_string())?)),
     }
+}
+
+/// The metric of argument `metric` (see the module docs) for a search on
+/// `table` (none: generating).
+fn metric_of(metric: u32, table: Option<&H48Table>) -> Result<Metric, String> {
+    match metric {
+        0 => Ok(table.map_or(Metric::Htm, |table| table.meta().metric)),
+        1 => Ok(Metric::Htm),
+        2 => Ok(Metric::Qtm),
+        _ => Err(format!(
+            "metric {metric}: 0 (the table's), 1 (htm) or 2 (qtm)"
+        )),
+    }
+}
+
+/// The solver of `metric` on the state's table, with the corner table of
+/// that metric (made on first use).
+fn solver_of(state: &mut State, metric: Metric) -> Result<Solver<'_>, String> {
+    let State {
+        corners,
+        corners_qtm,
+        table,
+        ..
+    } = state;
+    let table = table.as_ref().ok_or("no table loaded")?;
+    let corners = if metric.is_qtm() {
+        match corners_qtm {
+            Some(corners) => &*corners,
+            None => {
+                corners_qtm.insert(Cocsep::generate_metric(Metric::Qtm).map_err(|e| e.to_string())?)
+            }
+        }
+    } else {
+        self::corners(corners)?
+    };
+    Solver::with_metric(corners, table, metric).map_err(|e| e.to_string())
 }
 
 /// Run `f` on the state; its `Ok` text or `Err` message becomes the output.
@@ -171,22 +216,33 @@ fn parse_cube(text: &str) -> Result<CubieCube, String> {
 }
 
 /// A solved cube as JSON (`{"index":..,"error":..}` if it has no
-/// solution).
-fn result_json(index: usize, solution: Option<&[u8]>, stats: Stats, seconds: f64) -> String {
+/// solution); its length in `metric`.
+fn result_json(
+    index: usize,
+    solution: Option<&[u8]>,
+    stats: Stats,
+    seconds: f64,
+    metric: Metric,
+) -> String {
     let Some(solution) = solution else {
-        return format!(r#"{{"index":{index},"error":"{NO_SOLUTION}"}}"#);
+        return format!(r#"{{"index":{index},"error":"{}"}}"#, no_solution(metric));
     };
     format!(
-        r#"{{"index":{index},"moves":"{}","length":{},"nodes":{},"lookups":{},"seconds":{seconds:.6}}}"#,
+        r#"{{"index":{index},"moves":"{}","length":{},"metric":"{metric}","nodes":{},"lookups":{},"seconds":{seconds:.6}}}"#,
         format_moves(solution),
-        solution.len(),
+        metric.length(solution),
         stats.nodes,
         stats.lookups
     )
 }
 
 /// Why a cube has no solution (see `solver::MAX_TARGET`).
-const NO_SOLUTION: &str = "no solution within 20 moves: is the table damaged?";
+fn no_solution(metric: Metric) -> String {
+    format!(
+        "no solution within {} moves ({metric}): is the table damaged?",
+        metric.max_target()
+    )
+}
 
 /// Threads to use: as asked (0: all the host offers), 1 without threads.
 fn threads_for(asked: u32) -> usize {
@@ -257,7 +313,7 @@ pub extern "C" fn egg_solver_table_buffer(len: usize) -> *mut u8 {
 
 /// Install the table file copied into the `egg_solver_table_buffer`: checks
 /// its trailer and size, and if `verify` is not 0 its checksum. Output: the
-/// table's `{"k":..,"base":..,"bytes":..}`.
+/// table's `{"k":..,"base":..,"bytes":..,"metric":..}`.
 #[unsafe(no_mangle)]
 pub extern "C" fn egg_solver_table_load(verify: u32) -> i32 {
     with_state(|state| {
@@ -299,22 +355,25 @@ pub extern "C" fn egg_solver_table_export(threads: u32) -> i32 {
     })
 }
 
-/// `{"k":..,"base":..,"bytes":..}` of a table.
+/// `{"k":..,"base":..,"bytes":..,"metric":..}` of a table.
 fn table_json(table: &H48Table) -> String {
     format!(
-        r#"{{"k":{},"base":{},"bytes":{}}}"#,
+        r#"{{"k":{},"base":{},"bytes":{},"metric":"{}"}}"#,
         table.meta().k,
         table.meta().base,
-        h48_bytes(table.meta().k)
+        h48_bytes(table.meta().k),
+        table.meta().metric
     )
 }
 
-/// Generate table hk (k = 0..6) in memory (`base` 0: the default for `k`)
-/// on `threads` threads (0: all), replacing the current table. Output: as
+/// Generate table hk (k = 0..6) of `metric` (module docs: 0 or 1 HTM, 2
+/// QTM) in memory (`base` 0: the default for `k` and the metric) on
+/// `threads` threads (0: all), replacing the current table. Output: as
 /// `egg_solver_table_load`.
 #[unsafe(no_mangle)]
-pub extern "C" fn egg_solver_generate(k: u32, base: u32, threads: u32) -> i32 {
+pub extern "C" fn egg_solver_generate(k: u32, base: u32, threads: u32, metric: u32) -> i32 {
     with_state(|state| {
+        let metric = metric_of(metric, None)?;
         // h7 exceeds the isize::MAX limit for one table allocation on wasm32.
         if k > 6 {
             return Err(format!(
@@ -322,7 +381,7 @@ pub extern "C" fn egg_solver_generate(k: u32, base: u32, threads: u32) -> i32 {
             ));
         }
         let base = match base {
-            0 => default_base(k),
+            0 => default_base_metric(k, metric),
             b => u8::try_from(b)
                 .ok()
                 .filter(|&b| (1..=12).contains(&b))
@@ -335,8 +394,15 @@ pub extern "C" fn egg_solver_generate(k: u32, base: u32, threads: u32) -> i32 {
         let bytes = usize::try_from(h48_bytes(k)).map_err(|_| format!("h{k} is too big"))?;
         drop(Memory::try_anonymous(bytes).ok_or(format!("no room for h{k} ({bytes} bytes)"))?);
         let corners = corners(&mut state.corners)?;
-        let table = egg_solver::generate_table(corners, k, base, threads_for(threads), false)
-            .map_err(|e| e.to_string())?;
+        let table = egg_solver::generate_table_metric(
+            corners,
+            k,
+            base,
+            metric,
+            threads_for(threads),
+            false,
+        )
+        .map_err(|e| e.to_string())?;
         let info = table_json(&table);
         state.table = Some(table);
         Ok(info)
@@ -346,8 +412,9 @@ pub extern "C" fn egg_solver_generate(k: u32, base: u32, threads: u32) -> i32 {
 /// Solve one cube (a scramble or facelets, see `parse_cube`) with all lanes
 /// of all threads on it (the share mode with one cube in progress: the
 /// lowest latency). `lanes` per thread (0: 16, see `lanes_for`), `threads`
-/// (0: all). Output: `{"index":0,"moves":..,"length":..,"nodes":..,
-/// "lookups":..,"seconds":..}`.
+/// (0: all), `metric` (module docs). Output: `{"index":0,"moves":..,
+/// "length":..,"metric":..,"nodes":..,"lookups":..,"seconds":..}`, the
+/// length in that metric.
 ///
 /// # Safety
 /// If `len` is nonzero, `text` points into one live allocation containing
@@ -358,21 +425,22 @@ pub unsafe extern "C" fn egg_solver_solve(
     len: usize,
     lanes: u32,
     threads: u32,
+    metric: u32,
 ) -> i32 {
     // SAFETY: as the caller promises.
     let text = unsafe { text_argument(text, len) };
     with_state(|state| {
         let cube = parse_cube(text?)?;
-        let corners = corners(&mut state.corners)?;
-        let table = state.table.as_ref().ok_or("no table loaded")?;
-        let solver = Solver::new(corners, table);
+        let metric = metric_of(metric, state.table.as_ref())?;
+        let solver = solver_of(state, metric)?;
         let lanes = lanes_for(lanes);
         let threads = threads_for(threads);
         let get = |i: usize| (i == 0).then_some(cube);
         let result = Mutex::new(None);
         let done = |i: usize, solution: Option<Vec<u8>>, stats: Stats, seconds: f64| {
-            *result.lock().unwrap_or_else(PoisonError::into_inner) =
-                Some(solution.map(|solution| result_json(i, Some(&solution), stats, seconds)));
+            *result.lock().unwrap_or_else(PoisonError::into_inner) = Some(
+                solution.map(|solution| result_json(i, Some(&solution), stats, seconds, metric)),
+            );
         };
         // (`share::solve_all`, on `on_threads`: the pool's threads in the
         // threads build, this thread alone in the other.)
@@ -387,13 +455,14 @@ pub unsafe extern "C" fn egg_solver_solve(
         let result = result.into_inner().unwrap_or_else(PoisonError::into_inner);
         result
             .ok_or("not solved")?
-            .ok_or_else(|| NO_SOLUTION.to_string())
+            .ok_or_else(|| no_solution(metric))
     })
 }
 
 /// Solve many cubes, one per line, for throughput: the stream mode (each
-/// lane solves its own cube) on `threads` threads of `lanes` lanes. Output:
-/// a JSON array of the results (as `egg_solver_solve`) in input order.
+/// lane solves its own cube) on `threads` threads of `lanes` lanes, in
+/// `metric` (module docs). Output: a JSON array of the results (as
+/// `egg_solver_solve`) in input order.
 ///
 /// # Safety
 /// If `len` is nonzero, `text` points into one live allocation containing
@@ -404,6 +473,7 @@ pub unsafe extern "C" fn egg_solver_solve_batch(
     len: usize,
     lanes: u32,
     threads: u32,
+    metric: u32,
 ) -> i32 {
     // SAFETY: as the caller promises.
     let text = unsafe { text_argument(text, len) };
@@ -413,9 +483,8 @@ pub unsafe extern "C" fn egg_solver_solve_batch(
             .filter(|l| !l.trim().is_empty())
             .map(parse_cube)
             .collect::<Result<_, _>>()?;
-        let corners = corners(&mut state.corners)?;
-        let table = state.table.as_ref().ok_or("no table loaded")?;
-        let solver = Solver::new(corners, table);
+        let metric = metric_of(metric, state.table.as_ref())?;
+        let solver = solver_of(state, metric)?;
         let lanes = lanes_for(lanes);
         let get = |i: usize| cubes.get(i).copied();
         let results = Mutex::new(vec![String::new(); cubes.len()]);
@@ -423,7 +492,7 @@ pub unsafe extern "C" fn egg_solver_solve_batch(
             // (`i` is the index of a cube: `get` has no others.)
             let mut results = results.lock().unwrap_or_else(PoisonError::into_inner);
             if let Some(slot) = results.get_mut(i) {
-                *slot = result_json(i, solution.as_deref(), stats, seconds);
+                *slot = result_json(i, solution.as_deref(), stats, seconds, metric);
             }
         };
         stream(
@@ -442,9 +511,9 @@ pub unsafe extern "C" fn egg_solver_solve_batch(
 /// Stream throughput, as the native `bench <table> stream <warmup> <window>
 /// <threads> <lanes> <seed>`: an endless stream of random cubes (cube i
 /// from its own seed, the same cubes as `bench`), solves counted during
-/// `window` seconds after `warmup`. Output: `{"solves_per_second":..,
-/// "nodes_per_cube":..,"lookups_per_cube":..,"cubes":..,"threads":..,
-/// "lanes":..}`.
+/// `window` seconds after `warmup`, in `metric` (module docs). Output:
+/// `{"solves_per_second":..,"nodes_per_cube":..,"lookups_per_cube":..,
+/// "cubes":..,"threads":..,"lanes":..,"metric":..}`.
 #[unsafe(no_mangle)]
 pub extern "C" fn egg_solver_bench(
     seed: u32,
@@ -452,11 +521,11 @@ pub extern "C" fn egg_solver_bench(
     window: f64,
     lanes: u32,
     threads: u32,
+    metric: u32,
 ) -> i32 {
     with_state(|state| {
-        let corners = corners(&mut state.corners)?;
-        let table = state.table.as_ref().ok_or("no table loaded")?;
-        let solver = Solver::new(corners, table);
+        let metric = metric_of(metric, state.table.as_ref())?;
+        let solver = solver_of(state, metric)?;
         let lanes = lanes_for(lanes);
         let threads = threads_for(threads);
         let seed = u64::from(seed);
@@ -488,7 +557,7 @@ pub extern "C" fn egg_solver_bench(
         #[expect(clippy::cast_precision_loss, reason = "statistics")]
         let rate = cubes_counted as f64 / window;
         Ok(format!(
-            r#"{{"solves_per_second":{rate:.4},"nodes_per_cube":{:.0},"lookups_per_cube":{:.0},"cubes":{cubes_counted},"threads":{threads},"lanes":{lanes}}}"#,
+            r#"{{"solves_per_second":{rate:.4},"nodes_per_cube":{:.0},"lookups_per_cube":{:.0},"cubes":{cubes_counted},"threads":{threads},"lanes":{lanes},"metric":"{metric}"}}"#,
             per_cube(nodes),
             per_cube(lookups)
         ))
