@@ -33,6 +33,12 @@ const commands = {
     const result = solver.solve(cube, { lanes, metric });
     return { ...result, wall: (performance.now() - start) / 1000 };
   },
+  /** Every solution of at most `plus` moves more than the shortest (0: every shortest one). */
+  solveAll({ cube, plus, maxSolutions, metric }) {
+    const start = performance.now();
+    const result = solver.solveAll(cube, { plus, maxSolutions, metric });
+    return { ...result, wall: (performance.now() - start) / 1000 };
+  },
   random({ seed }) {
     return solver.randomCubes(seed, 1)[0];
   },

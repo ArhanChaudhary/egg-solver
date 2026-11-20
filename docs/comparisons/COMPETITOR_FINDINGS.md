@@ -127,6 +127,22 @@ Exact locations for the entries above (code as read; harness = cube_solver_test 
   - vcube's README ("Shared memory") mentions removing a segment "which is corrupt because it was interrupted while loading", but nothing detects it. Users have to know to run `ipcrm`.
 - **Fix:** write a small header after the data, last (the table's size and a checksum or generator version), and check it on every attach; remove the segment (IPC_RMID) when the load fails. egg-solver's `--shm` writes the file's trailer last and compares it on every attach, and removes a segment whose loader died.
 
+## nissy-core solution limit (found while cross-checking lists of all solutions, 2026-11-20)
+
+Source read: nissy-core branch `benchmark-egg` at 8e30889 (2026-11).
+
+| # | project | severity | summary |
+|---|---|---|---|
+| 12 | nissy-core (H48 solve) | correctness (silent truncation) | the solution limit is cast to 8 bits: at most 255 solutions per cube, and a larger limit wraps (999999 becomes 63) |
+
+### 12. nissy-core: the solution limit is truncated to 8 bits
+
+- **Where:** `src/solvers/h48/solve.h:117-118`. `solve_h48_dispatch` passes `(uint8_t)maxsols` to `solve_h48`, whose parameter is a `uint64_t`.
+- **Effect:** a request for up to N solutions is served with N mod 256. `999999`, the limit that `benchmarks/run-h48-benchmarks.sh` passes for "all solutions", becomes 63, and 256 becomes 0. Nothing reports that a list was cut.
+- **Repro:** `tools/301_solve_file` with h48h7 on `benchmarks/scrambles/scrambles-18.txt`, asking for every solution of at most one move more than optimal (`h48h7 FILE 999999 1`): no scramble gets more than 63 solutions (1,359 in all). With the limit 255 it lists 1,900. egg-solver's `--plus 1` lists 1,914: 24 scrambles agree exactly, and the other has 269 solutions, of which nissy lists 255.
+- **Impact:** lists are silently incomplete, and a timing of "all solutions" stops each cube's search early once 63 are found. For optimal solutions only, the 16-, 17- and 18-move sets are not affected (no scramble has more than 20, and nissy's lists equal egg-solver's there). The 19- and 20-move sets and the superflip were not checked.
+- **Suggested fix:** pass `maxsols` at its full width (drop the cast). The same call casts `threads` to `uint8_t`.
+
 ## Source recheck (2026-11-05)
 
 The source mechanisms for #1–#3 and #5–#11 were checked again against the exact commits named above, using `git show` rather than the harness's modified working files. Source excerpts with full commit IDs are retained in [competitor-source-evidence.txt](../reference/competitor-source-evidence.txt). The performance numbers and the large-table numerical proof remain the original recorded measurements; this source review does not claim to have rerun those experiments. #4's harness invocation was rechecked; the binary option-switch evidence remains the original disassembly.

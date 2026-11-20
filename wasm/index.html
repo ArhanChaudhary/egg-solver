@@ -96,6 +96,15 @@ count quarter turns, where a half turn is two.</p>
   <label><input type="radio" name="metric" value="qtm"> <strong>Quarter turns</strong> — a half turn such as U2 counts as two moves (the quarter-turn metric; it has its own solving data)</label>
 </fieldset>
 
+<fieldset id="list-choice">
+  <legend>Solutions</legend>
+  <label><input type="radio" name="list" value="one" checked> <strong>One shortest solution</strong></label>
+  <label><input type="radio" name="list" value="all"> <strong>Every shortest solution</strong> — takes several times longer</label>
+  <label><input type="radio" name="list" value="plus"> <strong>Longer ones too</strong> — every solution of up to
+    <select id="extra" aria-label="Moves more than the shortest"><option>1</option><option>2</option><option>3</option></select>
+    more than the shortest; each extra move takes about 13 times longer</label>
+</fieldset>
+
 <div class="row">
   <progress id="progress" hidden></progress>
   <span id="status" role="status">Starting…</span>
@@ -159,6 +168,10 @@ the left of F, R to its right, then B; U above and D below.</div>
   <p class="note">Random cubes mostly need 17 or 18 moves; with all of a laptop's processor cores
   their shortest solution takes from under a second to some seconds, and short scrambles are
   solved at once. Every solution is checked on a separate model of the cube in this page.</p>
+  <p class="note">Under <strong>Solutions</strong> you can ask for every shortest solution, or
+  for longer ones too: the shortest is not always the easiest to turn. Two solutions that differ
+  only in the order of turns of opposite faces (U D and D U) count as one, and a solution with a
+  detour that undoes itself is left out. A list shows up to 2000 solutions.</p>
   <div class="row">
     <label>Processor cores to use <input id="threads" type="number" min="1" value="1" style="width:4rem"></label>
     <button id="apply" disabled>Apply</button>
@@ -324,7 +337,8 @@ const buttons = () => {
   $('random').disabled = $('solve').disabled = !ready || solving;
   $('stop').disabled = !solving;
   $('apply').disabled = $('file').disabled = $('fetch').disabled = $('forget').disabled = !ready || solving;
-  for (const r of document.querySelectorAll('input[name=tables], input[name=metric]')) r.disabled = solving;
+  for (const r of document.querySelectorAll('input[name=tables], input[name=metric], input[name=list]')) r.disabled = solving;
+  $('extra').disabled = solving;
 };
 const mb = (bytes) => `${Math.round(bytes / 1e6)} MB`;
 const readyText = () => `Ready · ${table.from ?? dataName(kind)} · ${plural(threads, 'processor core')}`;
@@ -582,7 +596,10 @@ const showSolution = (r) => {
   $('step-picture').hidden = false;
   const moves = parseMoves(r.moves) ?? [];
   const checked = isSolved(applyMoves(r.start, moves));
-  $('summary').innerHTML = `<strong>${lengthText(r.length, r.metric)}</strong> · <span class="ok">shortest possible</span>`
+  const shortest = '<span class="ok">shortest possible</span>';
+  const what = !r.list ? shortest
+    : `solution ${r.rank} of ${r.list.count} · ${r.length === r.list.optimal ? shortest : `${r.length - r.list.optimal} more than the shortest`}`;
+  $('summary').innerHTML = `<strong>${lengthText(r.length, r.metric)}</strong> · ${what}`
     + (checked ? ' · <span class="ok">checked</span>' : ' · <strong class="bad">check failed: please report this cube</strong>');
   $('moves').replaceChildren(...moves.map((m, i) => {
     const b = document.createElement('button');
@@ -602,7 +619,8 @@ const showSolution = (r) => {
   steps = { start: r.start, moves, at: 0 };
   showStep(0);
   const searched = r.nodes < 1e3 ? `${r.nodes}` : r.nodes < 1e6 ? `${Math.round(r.nodes / 1e3)} thousand` : `${(r.nodes / 1e6).toFixed(1)} million`;
-  $('stats').textContent = `Took ${r.wall.toFixed(2)} s and searched ${searched} positions.`;
+  $('stats').textContent = r.list ? r.list.about(searched)
+    : `Took ${r.wall.toFixed(2)} s and searched ${searched} positions.`;
 };
 
 /** A painted cube that cannot be solved: what is wrong, with the stickers concerned outlined. */
@@ -664,6 +682,14 @@ $('solve').onclick = () => run('Solve', async () => {
   const timer = setInterval(() => status(`Solving${cubes.length > 1 ? ` ${index + 1} of ${cubes.length}` : ''}… ${((performance.now() - t0) / 1000).toFixed(1)} s`), 100);
   const results = [];
   try {
+    const plus = listMode();
+    if (plus !== null) {
+      // A list is made for one cube: the painted one, or the first line of the box.
+      const r = await call('solveAll', { cube: cubes[0].text, plus, maxSolutions: MAX_LIST, metric });
+      showList(r, cubes[0].stickers, cubes.length);
+      status(readyText());
+      return;
+    }
     for (index = 0; index < cubes.length; index++) {
       const r = await call('solve', { cube: cubes[index].text, lanes: 0, metric });
       results.push({ ...r, start: cubes[index].stickers });
@@ -678,6 +704,56 @@ $('solve').onclick = () => run('Solve', async () => {
     buttons();
   }
 });
+
+// --- Lists: every shortest solution, or also longer ones (the module's `solveAll`) ---
+// Solutions that differ only in the order of two turns of opposite faces (U D and D U) are one.
+const MAX_LIST = 2000;
+/** null for one shortest solution, else how many moves more than the shortest to list. */
+const listMode = () => {
+  const mode = document.querySelector('input[name=list]:checked').value;
+  return mode === 'one' ? null : mode === 'all' ? 0 : Number($('extra').value);
+};
+/** A list of solutions of one cube: a table of them; choosing a row shows it in the player. */
+const showList = (r, start, lines) => {
+  const about = (searched) => `Listing took ${r.wall.toFixed(2)} s and searched ${searched} positions.`
+    + (r.truncated ? ` There are more than ${r.count} solutions: this list has every one of up to ${lengthText(r.complete_length, r.metric)}, and some longer ones.` : '')
+    + (lines > 1 ? ' A list is made for one cube: this is the first line.' : '');
+  const list = { count: r.count, optimal: r.optimal, about };
+  const items = r.solutions.map((x, i) => ({
+    moves: x.moves, length: x.length, metric: r.metric, start, nodes: r.nodes, wall: r.wall, list, rank: i + 1,
+  }));
+  const batch = $('batch');
+  batch.hidden = items.length < 2;
+  const head = document.createElement('tr');
+  for (const h of ['', r.metric === 'qtm' ? 'Quarter turns' : 'Moves', 'Solution']) {
+    const th = document.createElement('th');
+    th.textContent = h;
+    head.append(th);
+  }
+  const wrong = items.filter((x) => !isSolved(applyMoves(start, parseMoves(x.moves) ?? []))).length;
+  batch.replaceChildren(head, ...items.map((x, i) => {
+    const tr = document.createElement('tr');
+    tr.className = 'pick';
+    tr.title = 'Step through this solution';
+    tr.onclick = () => { showSolution(x); selectRow(i); };
+    for (const [text, cls] of [[`${i + 1}.`, 'num'], [`${x.length}`, 'num'], [x.moves || '(solved)', 'moves-cell']]) {
+      const td = document.createElement('td');
+      td.className = cls;
+      td.textContent = text;
+      tr.append(td);
+    }
+    return tr;
+  }));
+  if (!items.length) {
+    // (cannot happen for a cube that can be solved: its shortest solutions are always listed)
+    $('result').hidden = false;
+    $('summary').textContent = 'No solution was listed.';
+    return;
+  }
+  showSolution(items[0]);
+  selectRow(0);
+  if (wrong) $('summary').innerHTML += ` · <strong class="bad">${wrong} listed solutions failed the check: please report this cube</strong>`;
+};
 
 /** Several cubes: a table of their solutions; choosing a row shows that one in the player. */
 const showBatch = (results, total) => {
