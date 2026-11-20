@@ -33,6 +33,10 @@
 //! one cube. Without arguments it reads one scramble from stdin. Warm-up
 //! solves are optional; see `run_fast`.
 //!
+//! `--max-length N` lists every distinct solution of each cube of at most
+//! N moves instead of one optimal solution (`egg_solver::solutions`;
+//! `list_batch`, `list_fast`), at most `--max-solutions` of them.
+//!
 //! `solve --shm-load TABLE` loads a table into a shared memory segment that
 //! later runs attach at once (`--shm`; `docs/reference/USER_GUIDE.md` "Shared memory"), `solve
 //! --shm-remove TABLE` removes it.
@@ -57,6 +61,7 @@ use egg_solver::cli::{self, BadInput, LoadArgs, MetricArgs, Verbosity};
 use egg_solver::cubie::{format_moves, parse_moves, CubieCube};
 use egg_solver::lanes::share::Pool;
 use egg_solver::metric::Metric;
+use egg_solver::solutions::{Options, Solutions, DEFAULT_MAX_SOLUTIONS};
 use egg_solver::solver::{Solver, Stats};
 use egg_solver::tables::Cocsep;
 use std::io::{BufRead, IsTerminal as _, Write};
@@ -185,6 +190,21 @@ struct Args {
     /// TLBs. No warm-up solve by default.
     #[arg(long, value_name = "SCRAMBLE", requires = "fast")]
     warmup: Option<String>,
+    /// List every distinct solution of at most N moves of each cube, not
+    /// just one optimal solution. At most 20 (with --metric qtm: 26).
+    #[arg(long, value_name = "N", display_order = 72)]
+    max_length: Option<u8>,
+    /// With --max-length: list at most M solutions per cube. If a cube has
+    /// more, its search stops and its list is marked truncated.
+    #[arg(
+        long,
+        value_name = "M",
+        requires = "max_length",
+        default_value_t = DEFAULT_MAX_SOLUTIONS,
+        value_parser = cli::positive(),
+        display_order = 73
+    )]
+    max_solutions: usize,
     #[command(flatten)]
     metric: MetricArgs,
     #[command(flatten)]
@@ -236,7 +256,24 @@ With --fast:
   time     <ms> ms   (<n> M nodes, <rate> M nodes/s)
 (with --metric qtm: length <n>q; with --json one object: table, threads,
 lanes, scramble, solution, length, metric, nodes, lookups, seconds, ms,
-nodes_per_second).";
+nodes_per_second).
+
+With --max-length N, every distinct solution of each cube of at most N
+moves (commuting moves in one order, U D not D U; no sequence that only adds
+a loop to a shorter solution), by length:
+  solutions <index> <count> <optimal> <max> <nodes> <seconds>
+  solution <index> <length> <solution>
+  total <cubes> cubes wall <s> ... (as above)
+<count> solutions follow; <max> is the length limit N and <optimal> the
+optimal length (- if the cube has no solution of <max> moves).
+A cube with more than --max-solutions M solutions gets, after its first line,
+  truncated <index> <M> <complete>
+and M solutions: all of at most <complete> moves, some of the longer ones.
+With --json: {\"type\":\"solutions\",\"index\":..,\"count\":..,\"optimal\":..,
+\"max_length\":..,\"truncated\":false,\"complete_length\":..,\"metric\":\"htm\",
+\"by_length\":[{\"length\":..,\"count\":..}],\"solutions\":[{\"moves\":..,\"length\":..}],
+\"nodes\":..,\"lookups\":..,\"seconds\":..,\"ok\":true}. With --fast: optimal, listed
+and (if so) truncated lines, then the solutions under a line per length.";
 
 /// A line of `--json` output.
 #[derive(serde::Serialize)]
@@ -253,6 +290,17 @@ enum Line {
         lookups: u64,
         seconds: f64,
         /// Whether the solution solves the cube (always, unless a bug).
+        ok: bool,
+    },
+    /// Every distinct solution of a cube up to a length (`--max-length`).
+    Solutions {
+        index: usize,
+        #[serde(flatten)]
+        listing: Listing,
+        nodes: u64,
+        lookups: u64,
+        seconds: f64,
+        /// Whether every solution solves the cube (always, unless a bug).
         ok: bool,
     },
     /// The summary, after all cubes.
@@ -294,6 +342,12 @@ fn main() -> ExitCode {
     } else if let Some(path) = &args.shm_remove {
         // SAFETY: the table segment follows the documented storage contract.
         unsafe { args.load.shm_remove(path) }
+    } else if let Some(options) = args.listing() {
+        if args.fast {
+            list_fast(&args, &options)
+        } else {
+            list_batch(&args, &options)
+        }
     } else if args.fast {
         run_fast(&args)
     } else {
@@ -610,4 +664,379 @@ fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
         );
     }
     Ok(ExitCode::SUCCESS)
+}
+
+impl Args {
+    /// What to list, if all solutions up to a length are asked for
+    /// (`--max-length`): `None` for one optimal solution per cube.
+    fn listing(&self) -> Option<Options> {
+        let max_length = self.max_length?;
+        Some(Options::max_length(max_length).with_max_solutions(self.max_solutions))
+    }
+}
+
+/// A solution of a list, in JSON.
+#[derive(serde::Serialize)]
+struct Listed {
+    moves: String,
+    /// In the metric of the search.
+    length: usize,
+}
+
+/// The number of solutions of a length, in JSON.
+#[derive(serde::Serialize)]
+struct LengthCount {
+    length: usize,
+    count: usize,
+}
+
+/// A cube's solutions up to a length, in JSON (`Line::Solutions`,
+/// `FastListing`); lengths in the metric of the search.
+#[derive(serde::Serialize)]
+struct Listing {
+    count: usize,
+    /// The optimal length (null: no solution of at most `max_length`).
+    optimal: Option<u8>,
+    /// The length limit, N.
+    max_length: u8,
+    /// More solutions than `--max-solutions`: `count` of them are listed,
+    /// all of at most `complete_length` moves and some longer ones.
+    truncated: bool,
+    complete_length: u8,
+    metric: Metric,
+    by_length: Vec<LengthCount>,
+    solutions: Vec<Listed>,
+}
+
+impl Listing {
+    fn new(list: &Solutions, metric: Metric) -> Listing {
+        let listed = |moves: &Vec<u8>| Listed {
+            moves: format_moves(moves),
+            length: metric.length(moves),
+        };
+        Listing {
+            count: list.solutions.len(),
+            optimal: list.optimal,
+            max_length: list.max_length,
+            truncated: list.truncated,
+            complete_length: list.complete_length,
+            metric,
+            by_length: (list.counts(metric).into_iter())
+                .map(|(length, count)| LengthCount { length, count })
+                .collect(),
+            solutions: list.solutions.iter().map(listed).collect(),
+        }
+    }
+}
+
+/// The limits of a listing checked against the metric: `--max-length`
+/// above God's number is refused (no search goes further).
+fn check_listing(options: &Options, metric: Metric) -> anyhow::Result<()> {
+    let longest = metric.max_target();
+    if options.max_length.is_some_and(|n| n > longest) {
+        return Err(BadInput(format!(
+            "--max-length is at most {longest} ({metric}: no position needs more moves, and \
+             searches go no further)"
+        ))
+        .into());
+    }
+    Ok(())
+}
+
+/// Whether a list is right as far as can be checked here: every solution
+/// solves `cube`, and a cube searched up to God's number has a solution.
+fn list_ok(cube: Option<&CubieCube>, list: &Solutions, metric: Metric) -> bool {
+    let solves =
+        |moves: &Vec<u8>| cube.and_then(|cube| cube.apply_moves(moves)) == Some(CubieCube::SOLVED);
+    let none_possible = list.max_length < metric.max_target();
+    list.solutions.iter().all(solves) && (list.optimal.is_some() || none_possible)
+}
+
+/// A length as `--fast`'s text names it: `18 moves`, in QTM `22q`.
+fn length_text(metric: Metric, length: usize) -> String {
+    if metric.is_qtm() {
+        format!("{length}q")
+    } else {
+        format!("{length} moves")
+    }
+}
+
+/// `solve` with `--max-length`: every distinct solution of each scramble
+/// on stdin up to that length (`run` for lists).
+#[expect(clippy::cast_precision_loss, reason = "statistics")]
+fn list_batch(args: &Args, options: &Options) -> anyhow::Result<ExitCode> {
+    let path = (args.table.as_deref())
+        .or(args.table_flag.as_deref())
+        .context("no table")?;
+    let metric = args.metric.metric;
+    check_listing(options, metric)?;
+    let cubes = read_scrambles(args.count.unwrap_or(usize::MAX))?;
+    if cubes.is_empty() {
+        return Err(BadInput("no scrambles on stdin".into()).into());
+    }
+    let corners = Cocsep::generate_metric(metric)?;
+    // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
+    let table = unsafe { args.load.open(path) }?;
+    let threads = args.threads;
+    let lanes = cli::lanes(args.lanes, path, table.meta().k, threads);
+    let concurrency = args.concurrency;
+    log::info!(
+        "{} cubes, at most {concurrency} at once (0: all), {metric}, {options:?}",
+        cubes.len()
+    );
+    let solver = solver_of(&corners, &table, metric, path)?;
+    let get = |i: usize| cubes.get(i).copied();
+    let max_active = if concurrency == 0 {
+        usize::MAX
+    } else {
+        concurrency
+    };
+    let json = args.json;
+    let stdout = Mutex::new(std::io::stdout());
+    let nodes = AtomicU64::new(0);
+    let bad = AtomicBool::new(false);
+    let n_done = AtomicUsize::new(0);
+    let done = |i: usize, list: Solutions, stats: Stats, seconds: f64| {
+        let ok = list_ok(cubes.get(i), &list, metric);
+        nodes.fetch_add(stats.nodes, Ordering::Relaxed);
+        n_done.fetch_add(1, Ordering::Relaxed);
+        if !ok {
+            bad.store(true, Ordering::Relaxed);
+        }
+        // (A cube's lines together.)
+        let mut out = stdout.lock().unwrap_or_else(PoisonError::into_inner);
+        if json {
+            let line = Line::Solutions {
+                index: i,
+                listing: Listing::new(&list, metric),
+                nodes: stats.nodes,
+                lookups: stats.lookups,
+                seconds,
+                ok,
+            };
+            let _ = serde_json::to_writer(&mut *out, &line);
+            let _ = writeln!(out);
+        } else {
+            if !ok {
+                let _ = writeln!(out, "BAD {i}");
+            }
+            let _ = write_list(&mut *out, i, &list, stats, seconds, metric, options);
+        }
+        let _ = out.flush();
+    };
+    let start = Instant::now();
+    egg_solver::lanes::share::all_solutions(
+        &solver, &get, threads, lanes, max_active, options, &done,
+    )
+    .context("a thread panicked")?;
+    let wall = start.elapsed().as_secs_f64();
+    let n = cubes.len();
+    let reported = n_done.load(Ordering::Relaxed);
+    anyhow::ensure!(reported == n, "{reported} of {n} cubes reported");
+    let wall_per_cube = wall / n.max(1) as f64;
+    let nodes_per_cube = nodes.load(Ordering::Relaxed) as f64 / n.max(1) as f64;
+    if json {
+        print_json(&Line::Total {
+            cubes: n,
+            wall,
+            wall_per_cube,
+            nodes_per_cube,
+            threads,
+            lanes,
+            concurrency,
+            metric,
+        })?;
+    } else {
+        let metric_note = if metric.is_qtm() { " metric qtm" } else { "" };
+        println!(
+            "total {n} cubes wall {wall:.6} wall/cube {wall_per_cube:.6} nodes/cube {nodes_per_cube:.0} threads {threads} lanes {lanes} concurrency {concurrency}{metric_note}"
+        );
+    }
+    Ok(if bad.load(Ordering::Relaxed) {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    })
+}
+
+/// The text lines of cube `i`'s list (`OUTPUT_HELP`): `solutions`,
+/// `truncated` if it is, and a `solution` line each.
+fn write_list(
+    out: &mut impl Write,
+    i: usize,
+    list: &Solutions,
+    stats: Stats,
+    seconds: f64,
+    metric: Metric,
+    options: &Options,
+) -> std::io::Result<()> {
+    let optimal = list
+        .optimal
+        .map_or_else(|| "-".to_string(), |optimal| optimal.to_string());
+    writeln!(
+        out,
+        "solutions {i} {} {optimal} {} {} {seconds:.6}",
+        list.solutions.len(),
+        list.max_length,
+        stats.nodes
+    )?;
+    if list.truncated {
+        writeln!(
+            out,
+            "truncated {i} {} {}",
+            options.max_solutions, list.complete_length
+        )?;
+    }
+    for solution in &list.solutions {
+        writeln!(
+            out,
+            "solution {i} {} {}{}",
+            metric.length(solution),
+            format_moves(solution),
+            length_mark(metric, solution)
+        )?;
+    }
+    Ok(())
+}
+
+/// `--fast`'s JSON object with a listing.
+#[derive(serde::Serialize)]
+struct FastListing<'a> {
+    table: &'a str,
+    threads: usize,
+    lanes: usize,
+    scramble: &'a str,
+    #[serde(flatten)]
+    listing: Listing,
+    nodes: u64,
+    lookups: u64,
+    seconds: f64,
+    ms: f64,
+    nodes_per_second: f64,
+}
+
+/// `solve --fast` with `--max-length`: every distinct solution of the
+/// supplied scramble up to that length, with all selected threads
+/// (`run_fast` for a list).
+#[expect(clippy::cast_precision_loss, reason = "statistics")]
+fn list_fast(args: &Args, options: &Options) -> anyhow::Result<ExitCode> {
+    let path = args
+        .table_flag
+        .as_deref()
+        .context("--fast requires --table PATH")?;
+    let metric = args.metric.metric;
+    check_listing(options, metric)?;
+    let scramble = fast_scramble(args)?;
+    let parse = |text: &str| {
+        parse_moves(text)
+            .and_then(|moves| CubieCube::SOLVED.apply_moves(&moves))
+            .ok_or_else(|| BadInput(format!("cannot parse {text:?}")))
+    };
+    let mut cubes = Vec::new();
+    let warmup = args.warmup.as_deref().unwrap_or("");
+    if !warmup.trim().is_empty() {
+        cubes.push(parse(warmup)?);
+    }
+    cubes.push(parse(&scramble)?);
+    let threads = args.threads;
+    if !args.json {
+        println!("table    {path}");
+        println!("threads  {threads} (all on this one cube)");
+        println!("scramble {scramble}");
+    }
+    let corners = Cocsep::generate_metric(metric)?;
+    // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
+    let table = unsafe { args.load.open(path) }?;
+    let lanes = cli::lanes(args.lanes, path, table.meta().k, threads);
+    let solver = solver_of(&corners, &table, metric, path)?;
+    let get = |i: usize| cubes.get(i).copied();
+    // (The scramble, after the warm-up cube if any.)
+    let (index, cube) = cubes
+        .iter()
+        .enumerate()
+        .next_back()
+        .context("no scramble")?;
+    let result = Mutex::new(None);
+    let done = |i: usize, list: Solutions, stats: Stats, seconds: f64| {
+        if i == index {
+            *result.lock().unwrap_or_else(PoisonError::into_inner) = Some((list, stats, seconds));
+        }
+    };
+    egg_solver::lanes::share::all_solutions(&solver, &get, threads, lanes, 1, options, &done)
+        .context("a thread panicked")?;
+    let result = result.into_inner().unwrap_or_else(PoisonError::into_inner);
+    let (list, stats, seconds) = result.context("not solved")?;
+    anyhow::ensure!(
+        list.optimal.is_some() || list.max_length < metric.max_target(),
+        "no solution within {} moves ({metric}): is the table damaged?",
+        metric.max_target()
+    );
+    anyhow::ensure!(
+        list_ok(Some(cube), &list, metric),
+        "BAD: a listed solution does not solve the scramble"
+    );
+    // Match the precision of the plain-text solve output.
+    let seconds: f64 = format!("{seconds:.6}").parse()?;
+    let rate = if seconds > 0.0 {
+        stats.nodes as f64 / seconds
+    } else {
+        0.0
+    };
+    if args.json {
+        print_json(&FastListing {
+            table: path,
+            threads,
+            lanes,
+            scramble: &scramble,
+            listing: Listing::new(&list, metric),
+            nodes: stats.nodes,
+            lookups: stats.lookups,
+            seconds,
+            ms: seconds * 1000.0,
+            nodes_per_second: rate,
+        })?;
+        return Ok(ExitCode::SUCCESS);
+    }
+    print_fast_list(&list, metric, options);
+    println!(
+        "time     {:.3} ms   ({:.1} M nodes, {:.0} M nodes/s)",
+        seconds * 1000.0,
+        stats.nodes as f64 / 1e6,
+        rate / 1e6
+    );
+    Ok(ExitCode::SUCCESS)
+}
+
+/// `--fast`'s text lines of a list (`OUTPUT_HELP`): the optimal length,
+/// how many solutions are listed up to which length (and whether there are
+/// more), then the solutions under a line per length.
+fn print_fast_list(list: &Solutions, metric: Metric, options: &Options) {
+    let limit = length_text(metric, usize::from(list.max_length));
+    match list.optimal {
+        Some(optimal) => println!("optimal  {}", length_text(metric, usize::from(optimal))),
+        None => println!("optimal  more than {limit}"),
+    }
+    let count = list.solutions.len();
+    println!(
+        "listed   {count} solution{} of at most {limit} (verified)",
+        if count == 1 { "" } else { "s" }
+    );
+    if list.truncated {
+        println!(
+            "truncated: there are more than {} (--max-solutions); complete up to {}",
+            options.max_solutions,
+            length_text(metric, usize::from(list.complete_length))
+        );
+    }
+    let mut solutions = list.solutions.iter();
+    for (length, count) in list.counts(metric) {
+        println!(
+            "{}: {count} solution{}",
+            length_text(metric, length),
+            if count == 1 { "" } else { "s" }
+        );
+        for solution in solutions.by_ref().take(count) {
+            println!("  {}", format_moves(solution));
+        }
+    }
 }
