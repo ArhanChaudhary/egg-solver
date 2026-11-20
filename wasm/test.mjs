@@ -12,7 +12,10 @@
 // must agree, replay, be no shorter than the HTM ones and have the corner
 // permutation's parity (known: R U R' U' 4q, the checkerboard 12q); an HTM
 // solve on the QTM table is refused, and the QTM table exports and loads back
-// as one.
+// as one. And all solutions up to a length (`solveAll`): the known lists of
+// the 6-half-turn checkerboard (6 optimal solutions, 12 more of 8 moves),
+// each solution replayed, in order and once; the limits and the cap
+// (`truncated`); QTM lengths; what no search reaches is refused.
 
 import { EggSolver } from './egg-solver.mjs';
 import * as model from './cube-model.mjs';
@@ -72,6 +75,67 @@ for (const [name, threads] of [['egg-solver.wasm', undefined], ['egg-solver-thre
   // (Random states are too deep for h0 here: the model only checks that they are cubes.)
   for (const text of solver.randomCubes(7, 20)) {
     if (model.checkStickers([...text])) fail(`${name}: model rejects the random cube ${text}`);
+  }
+  // All solutions up to a length.
+  const checkerboard = 'U2 D2 R2 L2 F2 B2';
+  const lengths = (list) => list.solutions.map((solution) => solution.length).join(' ');
+  const lengthOf = (moves, metric) =>
+    moves ? moves.split(' ').reduce((n, m) => n + (metric === 'qtm' && m.endsWith('2') ? 2 : 1), 0) : 0;
+  const replays = (scramble, list, options) => {
+    const seen = new Set();
+    for (const { moves, length } of list.solutions) {
+      if (seen.has(moves)) fail(`${name}: solveAll ${scramble}: ${moves} twice`);
+      seen.add(moves);
+      if (length !== lengthOf(moves, options?.metric)) fail(`${name}: solveAll ${scramble}: ${moves} is not ${length} moves`);
+      if (length > list.max_length) fail(`${name}: solveAll ${scramble}: ${moves} is longer than ${list.max_length}`);
+      if (solver.solve(`${scramble} ${moves}`, options).length !== 0) fail(`${name}: solveAll: ${moves} does not solve ${scramble}`);
+    }
+    if (list.count !== list.solutions.length) fail(`${name}: solveAll ${scramble}: count ${list.count}`);
+    const counted = list.by_length.reduce((n, entry) => n + entry.count, 0);
+    if (counted !== list.count) fail(`${name}: solveAll ${scramble}: by_length ${JSON.stringify(list.by_length)}`);
+  };
+  const optimal = solver.solveAll(checkerboard);
+  replays(checkerboard, optimal);
+  if (optimal.count !== 6 || optimal.optimal !== 6 || optimal.max_length !== 6 || optimal.truncated) {
+    fail(`${name}: solveAll ${checkerboard}: ${JSON.stringify(optimal)}`);
+  }
+  if (optimal.solutions[0].moves !== checkerboard || optimal.metric !== 'htm') fail(`${name}: solveAll: ${JSON.stringify(optimal.solutions[0])}`);
+  if (lengths(solver.solveAll(checkerboard, { plus: 0 })) !== lengths(optimal)) fail(`${name}: solveAll plus 0`);
+  const plus = solver.solveAll(checkerboard, { plus: 2, lanes: 4 });
+  replays(checkerboard, plus);
+  if (lengths(plus) !== [...Array(6).fill(6), ...Array(12).fill(8)].join(' ') || plus.max_length !== 8) {
+    fail(`${name}: solveAll plus 2: ${lengths(plus)}`);
+  }
+  if (JSON.stringify(plus.by_length) !== '[{"length":6,"count":6},{"length":8,"count":12}]') fail(`${name}: solveAll: ${JSON.stringify(plus.by_length)}`);
+  if (lengths(solver.solveAll(checkerboard, { maxLength: 8 })) !== lengths(plus)) fail(`${name}: solveAll maxLength 8`);
+  if (solver.solveAll(checkerboard, { plus: 2, maxLength: 7 }).count !== 6) fail(`${name}: solveAll plus 2, maxLength 7`);
+  const none = solver.solveAll(checkerboard, { maxLength: 5 });
+  if (none.count !== 0 || none.optimal !== null || none.max_length !== 5) fail(`${name}: solveAll maxLength 5: ${JSON.stringify(none)}`);
+  const cut = solver.solveAll(checkerboard, { plus: 2, maxSolutions: 7 });
+  replays(checkerboard, cut);
+  if (!cut.truncated || cut.count !== 7 || cut.complete_length !== 7 || cut.optimal !== 6) {
+    fail(`${name}: solveAll maxSolutions 7: ${JSON.stringify({ ...cut, solutions: undefined })}`);
+  }
+  for (const scramble of scrambles.slice(0, 4)) {
+    const list = solver.solveAll(scramble, { plus: 1 });
+    replays(scramble, list);
+    if (list.optimal !== solver.solve(scramble).length || list.count < 1) fail(`${name}: solveAll ${scramble}: optimal ${list.optimal}`);
+  }
+  const solved = solver.solveAll('', { maxLength: 9 });
+  if (solved.count !== 1 || solved.solutions[0].moves !== '' || solved.optimal !== 0) fail(`${name}: solveAll of the solved cube: ${JSON.stringify(solved)}`);
+  const quarter = solver.solveAll('U2 D2 R2 L2', { metric: 'qtm' });
+  replays('U2 D2 R2 L2', quarter, { metric: 'qtm' });
+  if (quarter.count !== 2 || quarter.optimal !== 8 || quarter.metric !== 'qtm' || lengths(quarter) !== '8 8') {
+    fail(`${name}: solveAll in QTM: ${JSON.stringify(quarter)}`);
+  }
+  for (const options of [{ maxLength: 21 }, { metric: 'qtm', maxLength: 27 }, { plus: -1 }, { plus: 1.5 }, { maxSolutions: 0 }]) {
+    let refused = false;
+    try {
+      solver.solveAll(checkerboard, options);
+    } catch {
+      refused = true;
+    }
+    if (!refused) fail(`${name}: solveAll accepted ${JSON.stringify(options)}`);
   }
   // Quarter-turn metric.
   const qtmLength = (moves) =>

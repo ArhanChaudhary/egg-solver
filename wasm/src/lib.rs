@@ -12,7 +12,7 @@
 //! threads through wasi-threads: the share and stream modes run on several
 //! threads as natively). See README.md, "WebAssembly".
 //!
-//! The solving and generating exports take a last `metric` argument: 0 the
+//! The solving and generating exports take a `metric` argument: 0 the
 //! table's metric (HTM for HTM tables, the default and the behaviour before
 //! QTM; for `egg_solver_generate`: HTM), 1 HTM, 2 QTM (the quarter-turn
 //! metric, on an HTM or a QTM table). Callers that pass fewer arguments get
@@ -35,6 +35,7 @@
 use egg_solver::cubie::{format_moves, parse_moves, CubieCube, Rng};
 use egg_solver::lanes::share::Pool;
 use egg_solver::metric::Metric;
+use egg_solver::solutions::{Options, Solutions, DEFAULT_MAX_SOLUTIONS};
 use egg_solver::solver::{Solver, Stats};
 use egg_solver::tables::{default_base_metric, h48_bytes, Cocsep, H48Table, Memory};
 use std::fmt::Write as _;
@@ -457,6 +458,127 @@ pub unsafe extern "C" fn egg_solver_solve(
             .ok_or("not solved")?
             .ok_or_else(|| no_solution(metric))
     })
+}
+
+/// List every distinct solution of one cube (a scramble or facelets, see
+/// `parse_cube`) up to a length, instead of one optimal solution
+/// (`egg_solver::solutions`), with all lanes of all threads on it. The
+/// length limit: `plus` is 1 + K for "at most K moves more than an optimal
+/// solution" (0: no such limit), `max_length` is N for "at most N moves"
+/// (0: no such limit; at most God's number of the metric); with both the
+/// smaller, with neither the optimal solutions. `max_solutions`: at most so
+/// many are listed (0: 100000); if the cube has more, the search stops and
+/// the list is marked truncated. `lanes`, `threads` and `metric` as for
+/// `egg_solver_solve`. Output: `{"index":0,"count":..,"optimal":..,
+/// "max_length":..,"truncated":false,"complete_length":..,"metric":..,
+/// "by_length":[{"length":..,"count":..}],"solutions":[{"moves":..,
+/// "length":..}],"nodes":..,"lookups":..,"seconds":..}`: the solutions by
+/// length (in that metric), each in canonical form; `optimal` is null if
+/// there is no solution of at most `max_length` moves, and a truncated
+/// list holds all solutions of at most `complete_length` moves and some
+/// longer ones.
+///
+/// # Safety
+/// If `len` is nonzero, `text` points into one live allocation containing
+/// `len <= isize::MAX` bytes, immutable until this call returns.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn egg_solver_solve_all(
+    text: *const u8,
+    len: usize,
+    lanes: u32,
+    threads: u32,
+    metric: u32,
+    plus: u32,
+    max_length: u32,
+    max_solutions: u32,
+) -> i32 {
+    // SAFETY: as the caller promises.
+    let text = unsafe { text_argument(text, len) };
+    with_state(|state| {
+        let cube = parse_cube(text?)?;
+        let metric = metric_of(metric, state.table.as_ref())?;
+        let longest = metric.max_target();
+        if max_length > u32::from(longest) {
+            return Err(format!(
+                "max_length {max_length}: at most {longest} ({metric})"
+            ));
+        }
+        let limit = |value: u32| u8::try_from(value).ok();
+        let plus = plus.checked_sub(1).map(|k| limit(k).unwrap_or(u8::MAX));
+        let max_length = limit(max_length).filter(|&n| n > 0);
+        let options = Options {
+            // (Neither limit: the optimal solutions.)
+            plus: plus.or(max_length.is_none().then_some(0)),
+            max_length,
+            max_solutions: match max_solutions {
+                0 => DEFAULT_MAX_SOLUTIONS,
+                n => n as usize,
+            },
+        };
+        let solver = solver_of(state, metric)?;
+        let get = |i: usize| (i == 0).then_some(cube);
+        let result = Mutex::new(None);
+        let done = |i: usize, list: Solutions, stats: Stats, seconds: f64| {
+            *result.lock().unwrap_or_else(PoisonError::into_inner) =
+                Some(solutions_json(i, &list, stats, seconds, metric));
+        };
+        egg_solver::lanes::share::all_solutions(
+            &solver,
+            &get,
+            threads_for(threads),
+            lanes_for(lanes),
+            1,
+            &options,
+            &done,
+        )
+        .map_err(|e| e.to_string())?;
+        let result = result.into_inner().unwrap_or_else(PoisonError::into_inner);
+        result.ok_or("not solved")?
+    })
+}
+
+/// A cube's solutions up to a length as JSON (see `egg_solver_solve_all`),
+/// or the error of a cube without a solution within God's number.
+fn solutions_json(
+    index: usize,
+    list: &Solutions,
+    stats: Stats,
+    seconds: f64,
+    metric: Metric,
+) -> Result<String, String> {
+    if list.optimal.is_none() && list.max_length >= metric.max_target() {
+        return Err(no_solution(metric));
+    }
+    let optimal = list
+        .optimal
+        .map_or_else(|| "null".to_string(), |optimal| optimal.to_string());
+    let mut json = format!(
+        r#"{{"index":{index},"count":{},"optimal":{optimal},"max_length":{},"truncated":{},"complete_length":{},"metric":"{metric}","by_length":["#,
+        list.solutions.len(),
+        list.max_length,
+        list.truncated,
+        list.complete_length
+    );
+    for (i, (length, count)) in list.counts(metric).into_iter().enumerate() {
+        let separator = if i == 0 { "" } else { "," };
+        let _ = write!(json, r#"{separator}{{"length":{length},"count":{count}}}"#);
+    }
+    json.push_str(r#"],"solutions":["#);
+    for (i, solution) in list.solutions.iter().enumerate() {
+        let separator = if i == 0 { "" } else { "," };
+        let _ = write!(
+            json,
+            r#"{separator}{{"moves":"{}","length":{}}}"#,
+            format_moves(solution),
+            metric.length(solution)
+        );
+    }
+    let _ = write!(
+        json,
+        r#"],"nodes":{},"lookups":{},"seconds":{seconds:.6}}}"#,
+        stats.nodes, stats.lookups
+    );
+    Ok(json)
 }
 
 /// Solve many cubes, one per line, for throughput: the stream mode (each

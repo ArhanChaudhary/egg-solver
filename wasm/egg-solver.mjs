@@ -5,6 +5,7 @@
 //   await solver.loadTable('/path/to/h6');        // or await generateTable(4)
 //   solver.solve("R U R' U' F2 D L2");             // { moves, length, nodes, ... }
 //   solver.solve("R U R' U'", { metric: 'qtm' });  // quarter-turn metric
+//   solver.solveAll("R U R' U' F2", { plus: 1 });  // every solution up to optimal + 1
 //
 // The module is built for WASI (wasm32-wasip1, or wasm32-wasip1-threads for
 // several threads): this file provides the few WASI functions it imports
@@ -474,6 +475,40 @@ export class EggSolver {
     const code = metricCode(metric);
     return this.withText(cube, (ptr, len) =>
       this.call('egg_solver_solve', ptr, len, lanes, this.threads, code));
+  }
+
+  /**
+   * Every distinct solution of one cube up to a length, instead of one
+   * optimal solution; all lanes of all threads work on it. `plus: K` lists
+   * the solutions of at most K moves more than an optimal one, `maxLength:
+   * N` those of at most N moves (with both: the smaller limit; with
+   * neither: the optimal solutions, as `plus: 0`). Lengths are in `metric`
+   * (as for `solve`); searches go up to 20 moves (26 in QTM). Two sequences
+   * that differ only in the order of adjacent moves of opposite faces are
+   * one solution (listed with U before D, R before L, F before B), and a
+   * sequence that only adds a loop to a shorter solution is not listed. At
+   * most `maxSolutions` (default 100000) are listed: if the cube has more,
+   * the search stops and `truncated` is true.
+   * Returns `{ solutions: [{ moves, length }], count, optimal, max_length,
+   * truncated, complete_length, by_length: [{ length, count }], metric,
+   * nodes, lookups, seconds }`: the solutions by length; `optimal` is null
+   * if none has at most `maxLength` moves; a truncated list has all
+   * solutions of at most `complete_length` moves and some longer ones.
+   */
+  solveAll(cube, { plus, maxLength, maxSolutions, lanes = 0, metric } = {}) {
+    const code = metricCode(metric);
+    const count = (name, value, least) => {
+      if (value === undefined || value === null) return 0;
+      if (!Number.isInteger(value) || value < least || value > 0xfffffffe) {
+        throw new Error(`egg-solver: ${name} ${value}: an integer from ${least}`);
+      }
+      return value;
+    };
+    // (The module takes 1 + plus: 0 means no such limit.)
+    const plusCode = plus === undefined || plus === null ? 0 : count('plus', plus, 0) + 1;
+    const [length, most] = [count('maxLength', maxLength, 1), count('maxSolutions', maxSolutions, 1)];
+    return this.withText(cube, (ptr, len) =>
+      this.call('egg_solver_solve_all', ptr, len, lanes, this.threads, code, plusCode, length, most));
   }
 
   /**
