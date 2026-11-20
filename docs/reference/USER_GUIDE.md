@@ -50,6 +50,7 @@ target/release/solve --table tables/h7 -c 1 < testdata/random_state.txt
 | `-n N` | Read at most N scrambles in batch mode |
 | `--json` | Per-cube JSON and a batch total; `--fast` emits one JSON result |
 | `--metric qtm` | Solve in the [quarter-turn metric](#quarter-turn-metric); the default `htm` counts every face turn as one move |
+| `--all-optimal`, `--plus K`, `--max-length N` | List [every distinct solution](#all-solutions) up to a length instead of one optimal solution |
 | `-v` | Loading and configuration diagnostics on stderr |
 
 Batch mode also accepts a positional table path. `EGG_SOLVER_TABLE` can supply it in batch mode, and `EGG_SOLVER_THREADS` can supply the thread count. `--fast` still requires a command-line `--table`. Each `EGG_SOLVER_*` setting also accepts the matching `CUBEOPT_*` name from the project's earlier name as a fallback; an explicitly set `EGG_SOLVER_*` name takes precedence.
@@ -80,6 +81,99 @@ In QTM, each `solved` line reports the QTM length and ends with it, for example 
 God's number is 20 in HTM and 26 in QTM: the superflip needs 24 quarter turns, and the superflip composed with the four-spot pattern needs 26.
 
 Measured on the 48-core server (2026-11-16, h7 tables copied into RAM with transparent huge pages, `solve -c 1 -t 48`, the first 50 states of `testdata/random_state.txt`): QTM on a QTM h7 (base 11) took 29.1 ms per cube on average (median 18.5 ms, 79 M nodes per cube), against 19.6 ms (median 11.0 ms) for HTM on the HTM h7. QTM on the HTM h7 took 549 ms per cube on the first 10 states, 19 times as long as with the QTM table. The states were 18 to 22 quarter turns from solved (21 for 27 of them). With the QTM h7, the superflip took 0.87 s (24 quarter turns) and the superflip composed with the four-spot 56 s (26). These are single runs on a machine shared with other work, not benchmarks.
+
+## All solutions
+
+By default `solve` prints one optimal solution per cube. The shortest algorithm is not always the easiest to execute, so `solve` can also list every distinct solution up to a length:
+
+```sh
+# Every optimal solution:
+target/release/solve --fast --table tables/h7 --all-optimal "R U R' U' F2 D L2 B"
+# Every solution of at most one move more than optimal:
+target/release/solve --fast --table tables/h7 --plus 1 "R U R' U' F2 D L2 B"
+# Every solution of at most 12 moves, for each scramble of a file:
+target/release/solve --table tables/h7 --max-length 12 < scrambles.txt
+```
+
+| Option | Lists |
+|---|---|
+| `--all-optimal` | Every optimal solution; the same as `--plus 0` |
+| `--plus K` | Every solution of at most K moves more than an optimal one |
+| `--max-length N` | Every solution of at most N moves. With `--plus K`, the smaller of the two limits |
+| `--max-solutions M` | At most M solutions per cube; the default is 100000 |
+
+The options work in batch mode and with `--fast`, with `-t`, `-c`, `--json` and `--metric qtm`. Without them the output is what it was before.
+
+### What a distinct solution is
+
+- Two sequences that differ only in the order of adjacent moves of opposite faces are one solution, since such moves commute: `U D` and `D U`. It is listed once, with U before D, R before L and F before B.
+- No two moves of one face follow each other, also after reordering commuting moves: `U D U'` is the one move `D`, not a solution of three moves.
+- A sequence with a part that does nothing is left out: it is a shorter solution with a loop added. A sequence that solves the cube before its end is one example. Such a part is a contiguous run of moves equal to the identity, in any order of its commuting moves. The shortest have 8 moves (`U2 D2 R2 L2 U2 D2 R2 L2`), so this only matters from 8 moves above optimal.
+- Everything else within the limit is listed, non-optimal solutions included. Among solutions of one length there is no ranking: they are sorted by length, then by their moves.
+
+The solved cube has one solution, the empty one. Symmetric variants of a solution are different solutions and are all listed.
+
+### Output
+
+In batch mode each cube gets a `solutions` line, then one `solution` line per solution, shortest first:
+
+```text
+solutions <index> <count> <optimal> <max> <nodes> <seconds>
+solution <index> <length> <solution>
+total <cubes> cubes wall <s> wall/cube <s> nodes/cube <n> threads <t> lanes <l> concurrency <c>
+```
+
+`<max>` is the length limit that was searched: the optimal length plus K, or N. `<optimal>` is `-` when the cube has no solution of at most `<max>` moves, which can only happen with `--max-length`. `<seconds>` runs from the cube's start to the end of its search. Every listed solution is replayed; a wrong one is reported as `BAD <index>` and makes the exit status 1.
+
+With `--fast` the solutions are grouped under one line per length:
+
+```text
+optimal  6 moves
+listed   18 solutions of at most 8 moves (verified)
+6 moves: 6 solutions
+  U2 D2 R2 L2 F2 B2
+  ...
+8 moves: 12 solutions
+  U D' R2 L2 F2 B2 U D'
+  ...
+time     1.636 ms   (0.2 M nodes, 100 M nodes/s)
+```
+
+With `--json`, each cube is one object; `--fast --json` prints the same fields with `table`, `threads`, `lanes`, `scramble`, `ms` and `nodes_per_second`, without `type`, `index` and `ok`:
+
+```json
+{"type":"solutions","index":0,"count":2,"optimal":4,"max_length":4,"truncated":false,"complete_length":4,"metric":"htm","by_length":[{"length":4,"count":2}],"solutions":[{"moves":"U2 D2 R2 L2","length":4},{"moves":"R2 L2 U2 D2","length":4}],"nodes":1380,"lookups":192,"seconds":0.000451741,"ok":true}
+```
+
+### The limit on the number of solutions
+
+The number of solutions grows about 13 times per extra move, so a list is capped at `--max-solutions` solutions. A cube with more is never cut silently: its search stops, and the output says so.
+
+| Output | A truncated list |
+|---|---|
+| Batch text | A line `truncated <index> <M> <complete>` after the cube's `solutions` line |
+| `--fast` text | A line `truncated: there are more than M (--max-solutions); complete up to L moves` |
+| JSON | `"truncated":true` and `"complete_length":L` |
+
+A truncated list holds M solutions: all those of at most `<complete>` moves, and some of the next length. Raise `--max-solutions` or lower the length limit to get a complete list.
+
+### Limits and cost
+
+Searches go up to 20 moves, God's number, and to 26 quarter turns with `--metric qtm`; `--max-length` above that is refused, and `--plus K` stops there. In QTM the lengths are QTM lengths, all solutions of a cube have the same parity, and a half turn is written as one move (`U2`, never `U U`).
+
+A list costs more than one solution, because the search cannot stop at the first solution: it must finish the optimal length, and then each further length takes about 13 times the nodes of the one before. The table shows the 25 scrambles of each optimal length from the nissy benchmark sets on h7: nodes per cube, and the solutions of all 25 cubes together.
+
+| Optimal length | One solution | `--all-optimal` | `--plus 1` | `--plus 2` |
+|---|---|---|---|---|
+| 16 moves | 0.7 M nodes | 2.0 M nodes, 27 solutions | 27 M nodes, 67 solutions | 373 M nodes, 453 solutions |
+| 17 moves | 8.4 M nodes | 26 M nodes, 36 solutions | 362 M nodes, 278 solutions | not run |
+| 18 moves | 63 M nodes | 344 M nodes, 140 solutions | 4,661 M nodes, 1,914 solutions | not run |
+
+Single runs with 16 threads (`-c 1`) on the 48-core server while other work ran on it, so indicative only: per cube, the 16-move scrambles took 1.5 ms for one solution, 5 ms for all optimal ones, 33 ms with `--plus 1` and 0.37 s with `--plus 2`; the 17-move scrambles 12 ms, 35 ms and 0.34 s; the 18-move scrambles 69 ms, 0.34 s and 4.3 s.
+
+All threads work on one cube, as for a single solution (`-c 1`, `--fast`), or on the cubes of a batch. A search for a list does not use the symmetric-start filter or the solution-first job order, which only serve to find one solution sooner; pruning by table bounds is unchanged.
+
+The lists were checked against brute force on short scrambles (`tests/all_solutions.rs`) and against nissy-core's lists on these sets (`solve_file h48h7 FILE 999999 K`, each solution put in the same order of commuting moves). Both programs list the same solutions: the 27, 36 and 140 optimal ones of the 16-, 17- and 18-move sets, the 67 and 278 up to one move above optimal of the 16- and 17-move sets, and the 453 up to two above of the 16-move set.
 
 ## Tune and benchmark
 
@@ -169,7 +263,7 @@ await solver.loadTable('h6');
 solver.solve("R U R' U' F2");
 ```
 
-`solve` puts the selected workers on one cube and returns `{ moves, length, metric, nodes, lookups, seconds }`; `solveMany` uses independent cube lanes. Both take `{ metric: 'qtm' }` for the [quarter-turn metric](#quarter-turn-metric) (by default the table's metric: HTM for HTM tables), and `generateTable(k, base, { metric: 'qtm' })` makes a QTM table; `length` is in the solve's metric. `loadTable` accepts a path (Bun), a URL, a `File` or `Blob`, or the file's bytes. Inputs can be scrambles or 54-sticker facelet strings in U R F D L B face order, each face viewed from outside and read row by row (U with B at the top, D with F at the top, the side faces with U at the top); any six symbols can stand for the colors. The wrapper's facelet parser checks the representation.
+`solve` puts the selected workers on one cube and returns `{ moves, length, metric, nodes, lookups, seconds }`; `solveMany` uses independent cube lanes. `solveAll(cube, { plus, maxLength, maxSolutions, metric })` lists [every distinct solution](#all-solutions) up to a length (by default the optimal ones) and returns `{ solutions: [{ moves, length }], count, optimal, max_length, truncated, complete_length, by_length, metric, nodes, lookups, seconds }`. Both take `{ metric: 'qtm' }` for the [quarter-turn metric](#quarter-turn-metric) (by default the table's metric: HTM for HTM tables), and `generateTable(k, base, { metric: 'qtm' })` makes a QTM table; `length` is in the solve's metric. `loadTable` accepts a path (Bun), a URL, a `File` or `Blob`, or the file's bytes. Inputs can be scrambles or 54-sticker facelet strings in U R F D L B face order, each face viewed from outside and read row by row (U with B at the top, D with F at the top, the side faces with U at the top); any six symbols can stand for the colors. The wrapper's facelet parser checks the representation.
 
 ### Bun
 
@@ -214,6 +308,8 @@ Historical V8/Bun timings, generation times and engine warm-up experiments are k
 `H48Table::open_copy` loads the table into private RAM and is safe. APIs that map files or attach shared segments are `unsafe`: the backing storage must remain unchanged and untruncated while the table exists, including changes by other processes. The command-line mapped and shared modes require the same condition; `--load copy` avoids that dependence after loading. File-backed generation requires exclusive access to its output paths. [Safety](../safety/README.md) describes the undefined-behavior evidence and its scope.
 
 The packed-coordinate and table encodings require a little-endian target; big-endian builds are rejected at compile time.
+
+[Every distinct solution](#all-solutions) of a cube up to a length comes from `Solver::all_solutions` (one thread, the reference search) or `lanes::share::all_solutions` (all threads on one cube, or a batch), with the limits in `solutions::Options` and the list in `solutions::Solutions`.
 
 ## Historical measurements
 

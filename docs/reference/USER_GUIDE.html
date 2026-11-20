@@ -66,7 +66,7 @@ svg { max-width:100%; height:auto; }
 <main id="docs-content"><h1 id="user-guide">User guide</h1>
 <p><a href="../index.html">Documentation</a> · <a href="../guide/QUICKSTART.html">Quick start</a> · <a href="../comparisons/index.html">Benchmarks</a></p>
 <p>Commands below run from the project root. The examples use the executables under <code>target/release/</code>. Every binary has <code>--help</code>; use it for the complete option list.</p>
-<details class="contents"><summary>On this page</summary><ul><li><a href="#build">Build</a></li><li><a href="#choose-and-generate-a-table">Choose and generate a table</a></li><li><a href="#solve-scrambles">Solve scrambles</a></li><li><a href="#quarter-turn-metric">Quarter-turn metric</a></li><li><a href="#tune-and-benchmark">Tune and benchmark</a></li><li><a href="#table-files">Table files</a></li><li><a href="#shared-memory-on-linux">Shared memory on Linux</a></li><li><a href="#portable-builds">Portable builds</a></li><li><a href="#webassembly">WebAssembly</a></li><li><a href="#library-use">Library use</a></li><li><a href="#historical-measurements">Historical measurements</a></li><li><a href="#development-and-publishing">Development and publishing</a></li></ul></details>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#build">Build</a></li><li><a href="#choose-and-generate-a-table">Choose and generate a table</a></li><li><a href="#solve-scrambles">Solve scrambles</a></li><li><a href="#quarter-turn-metric">Quarter-turn metric</a></li><li><a href="#all-solutions">All solutions</a></li><li><a href="#tune-and-benchmark">Tune and benchmark</a></li><li><a href="#table-files">Table files</a></li><li><a href="#shared-memory-on-linux">Shared memory on Linux</a></li><li><a href="#portable-builds">Portable builds</a></li><li><a href="#webassembly">WebAssembly</a></li><li><a href="#library-use">Library use</a></li><li><a href="#historical-measurements">Historical measurements</a></li><li><a href="#development-and-publishing">Development and publishing</a></li></ul></details>
 <h2 id="build">Build</h2>
 <pre><code class="language-sh">cargo build --release --locked
 </code></pre>
@@ -102,6 +102,7 @@ target/release/solve --table tables/h7 -c 1 &lt; testdata/random_state.txt
 <tr><td><code>-n N</code></td><td>Read at most N scrambles in batch mode</td></tr>
 <tr><td><code>--json</code></td><td>Per-cube JSON and a batch total; <code>--fast</code> emits one JSON result</td></tr>
 <tr><td><code>--metric qtm</code></td><td>Solve in the <a href="#quarter-turn-metric">quarter-turn metric</a>; the default <code>htm</code> counts every face turn as one move</td></tr>
+<tr><td><code>--all-optimal</code>, <code>--plus K</code>, <code>--max-length N</code></td><td>List <a href="#all-solutions">every distinct solution</a> up to a length instead of one optimal solution</td></tr>
 <tr><td><code>-v</code></td><td>Loading and configuration diagnostics on stderr</td></tr>
 </tbody>
 </table></div>
@@ -128,6 +129,85 @@ target/release/solve --table tables/h7q --metric qtm &lt; testdata/random_state.
 <p>In QTM, each <code>solved</code> line reports the QTM length and ends with it, for example <code>(22q)</code>, and the summary line ends with <code>metric qtm</code>; <code>--fast</code> prints the length as <code>22q</code>. JSON output reports <code>length</code> in the search's metric and adds a <code>metric</code> field (<code>&quot;htm&quot;</code> or <code>&quot;qtm&quot;</code>) in both metrics. The search keeps the 18 face turns in canonical order, charges a half turn two moves, and tries only lengths of the parity of the cube's corner permutation. A solution is printed in canonical form: two equal quarter turns where the two search directions meet become one half turn of the same QTM length.</p>
 <p>God's number is 20 in HTM and 26 in QTM: the superflip needs 24 quarter turns, and the superflip composed with the four-spot pattern needs 26.</p>
 <p>Measured on the 48-core server (2026-11-16, h7 tables copied into RAM with transparent huge pages, <code>solve -c 1 -t 48</code>, the first 50 states of <code>testdata/random_state.txt</code>): QTM on a QTM h7 (base 11) took 29.1 ms per cube on average (median 18.5 ms, 79 M nodes per cube), against 19.6 ms (median 11.0 ms) for HTM on the HTM h7. QTM on the HTM h7 took 549 ms per cube on the first 10 states, 19 times as long as with the QTM table. The states were 18 to 22 quarter turns from solved (21 for 27 of them). With the QTM h7, the superflip took 0.87 s (24 quarter turns) and the superflip composed with the four-spot 56 s (26). These are single runs on a machine shared with other work, not benchmarks.</p>
+<h2 id="all-solutions">All solutions</h2>
+<p>By default <code>solve</code> prints one optimal solution per cube. The shortest algorithm is not always the easiest to execute, so <code>solve</code> can also list every distinct solution up to a length:</p>
+<pre><code class="language-sh"># Every optimal solution:
+target/release/solve --fast --table tables/h7 --all-optimal &quot;R U R' U' F2 D L2 B&quot;
+# Every solution of at most one move more than optimal:
+target/release/solve --fast --table tables/h7 --plus 1 &quot;R U R' U' F2 D L2 B&quot;
+# Every solution of at most 12 moves, for each scramble of a file:
+target/release/solve --table tables/h7 --max-length 12 &lt; scrambles.txt
+</code></pre>
+<div class="table-wrap" role="region" aria-label="All solutions" tabindex="0"><table id="docs-table-3"><caption>All solutions</caption>
+<thead>
+<tr><th>Option</th><th>Lists</th></tr>
+</thead>
+<tbody>
+<tr><td><code>--all-optimal</code></td><td>Every optimal solution; the same as <code>--plus 0</code></td></tr>
+<tr><td><code>--plus K</code></td><td>Every solution of at most K moves more than an optimal one</td></tr>
+<tr><td><code>--max-length N</code></td><td>Every solution of at most N moves. With <code>--plus K</code>, the smaller of the two limits</td></tr>
+<tr><td><code>--max-solutions M</code></td><td>At most M solutions per cube; the default is 100000</td></tr>
+</tbody>
+</table></div>
+<p>The options work in batch mode and with <code>--fast</code>, with <code>-t</code>, <code>-c</code>, <code>--json</code> and <code>--metric qtm</code>. Without them the output is what it was before.</p>
+<h3 id="what-a-distinct-solution-is">What a distinct solution is</h3>
+<ul>
+<li>Two sequences that differ only in the order of adjacent moves of opposite faces are one solution, since such moves commute: <code>U D</code> and <code>D U</code>. It is listed once, with U before D, R before L and F before B.</li>
+<li>No two moves of one face follow each other, also after reordering commuting moves: <code>U D U'</code> is the one move <code>D</code>, not a solution of three moves.</li>
+<li>A sequence with a part that does nothing is left out: it is a shorter solution with a loop added. A sequence that solves the cube before its end is one example. Such a part is a contiguous run of moves equal to the identity, in any order of its commuting moves. The shortest have 8 moves (<code>U2 D2 R2 L2 U2 D2 R2 L2</code>), so this only matters from 8 moves above optimal.</li>
+<li>Everything else within the limit is listed, non-optimal solutions included. Among solutions of one length there is no ranking: they are sorted by length, then by their moves.</li>
+</ul>
+<p>The solved cube has one solution, the empty one. Symmetric variants of a solution are different solutions and are all listed.</p>
+<h3 id="output">Output</h3>
+<p>In batch mode each cube gets a <code>solutions</code> line, then one <code>solution</code> line per solution, shortest first:</p>
+<pre><code class="language-text">solutions &lt;index&gt; &lt;count&gt; &lt;optimal&gt; &lt;max&gt; &lt;nodes&gt; &lt;seconds&gt;
+solution &lt;index&gt; &lt;length&gt; &lt;solution&gt;
+total &lt;cubes&gt; cubes wall &lt;s&gt; wall/cube &lt;s&gt; nodes/cube &lt;n&gt; threads &lt;t&gt; lanes &lt;l&gt; concurrency &lt;c&gt;
+</code></pre>
+<p><code>&lt;max&gt;</code> is the length limit that was searched: the optimal length plus K, or N. <code>&lt;optimal&gt;</code> is <code>-</code> when the cube has no solution of at most <code>&lt;max&gt;</code> moves, which can only happen with <code>--max-length</code>. <code>&lt;seconds&gt;</code> runs from the cube's start to the end of its search. Every listed solution is replayed; a wrong one is reported as <code>BAD &lt;index&gt;</code> and makes the exit status 1.</p>
+<p>With <code>--fast</code> the solutions are grouped under one line per length:</p>
+<pre><code class="language-text">optimal  6 moves
+listed   18 solutions of at most 8 moves (verified)
+6 moves: 6 solutions
+  U2 D2 R2 L2 F2 B2
+  ...
+8 moves: 12 solutions
+  U D' R2 L2 F2 B2 U D'
+  ...
+time     1.636 ms   (0.2 M nodes, 100 M nodes/s)
+</code></pre>
+<p>With <code>--json</code>, each cube is one object; <code>--fast --json</code> prints the same fields with <code>table</code>, <code>threads</code>, <code>lanes</code>, <code>scramble</code>, <code>ms</code> and <code>nodes_per_second</code>, without <code>type</code>, <code>index</code> and <code>ok</code>:</p>
+<pre><code class="language-json">{&quot;type&quot;:&quot;solutions&quot;,&quot;index&quot;:0,&quot;count&quot;:2,&quot;optimal&quot;:4,&quot;max_length&quot;:4,&quot;truncated&quot;:false,&quot;complete_length&quot;:4,&quot;metric&quot;:&quot;htm&quot;,&quot;by_length&quot;:[{&quot;length&quot;:4,&quot;count&quot;:2}],&quot;solutions&quot;:[{&quot;moves&quot;:&quot;U2 D2 R2 L2&quot;,&quot;length&quot;:4},{&quot;moves&quot;:&quot;R2 L2 U2 D2&quot;,&quot;length&quot;:4}],&quot;nodes&quot;:1380,&quot;lookups&quot;:192,&quot;seconds&quot;:0.000451741,&quot;ok&quot;:true}
+</code></pre>
+<h3 id="the-limit-on-the-number-of-solutions">The limit on the number of solutions</h3>
+<p>The number of solutions grows about 13 times per extra move, so a list is capped at <code>--max-solutions</code> solutions. A cube with more is never cut silently: its search stops, and the output says so.</p>
+<div class="table-wrap" role="region" aria-label="The limit on the number of solutions" tabindex="0"><table id="docs-table-4"><caption>The limit on the number of solutions</caption>
+<thead>
+<tr><th>Output</th><th>A truncated list</th></tr>
+</thead>
+<tbody>
+<tr><td>Batch text</td><td>A line <code>truncated &lt;index&gt; &lt;M&gt; &lt;complete&gt;</code> after the cube's <code>solutions</code> line</td></tr>
+<tr><td><code>--fast</code> text</td><td>A line <code>truncated: there are more than M (--max-solutions); complete up to L moves</code></td></tr>
+<tr><td>JSON</td><td><code>&quot;truncated&quot;:true</code> and <code>&quot;complete_length&quot;:L</code></td></tr>
+</tbody>
+</table></div>
+<p>A truncated list holds M solutions: all those of at most <code>&lt;complete&gt;</code> moves, and some of the next length. Raise <code>--max-solutions</code> or lower the length limit to get a complete list.</p>
+<h3 id="limits-and-cost">Limits and cost</h3>
+<p>Searches go up to 20 moves, God's number, and to 26 quarter turns with <code>--metric qtm</code>; <code>--max-length</code> above that is refused, and <code>--plus K</code> stops there. In QTM the lengths are QTM lengths, all solutions of a cube have the same parity, and a half turn is written as one move (<code>U2</code>, never <code>U U</code>).</p>
+<p>A list costs more than one solution, because the search cannot stop at the first solution: it must finish the optimal length, and then each further length takes about 13 times the nodes of the one before. The table shows the 25 scrambles of each optimal length from the nissy benchmark sets on h7: nodes per cube, and the solutions of all 25 cubes together.</p>
+<div class="table-wrap" role="region" aria-label="Limits and cost" tabindex="0"><table id="docs-table-5"><caption>Limits and cost</caption>
+<thead>
+<tr><th>Optimal length</th><th>One solution</th><th><code>--all-optimal</code></th><th><code>--plus 1</code></th><th><code>--plus 2</code></th></tr>
+</thead>
+<tbody>
+<tr><td>16 moves</td><td>0.7 M nodes</td><td>2.0 M nodes, 27 solutions</td><td>27 M nodes, 67 solutions</td><td>373 M nodes, 453 solutions</td></tr>
+<tr><td>17 moves</td><td>8.4 M nodes</td><td>26 M nodes, 36 solutions</td><td>362 M nodes, 278 solutions</td><td>not run</td></tr>
+<tr><td>18 moves</td><td>63 M nodes</td><td>344 M nodes, 140 solutions</td><td>4,661 M nodes, 1,914 solutions</td><td>not run</td></tr>
+</tbody>
+</table></div>
+<p>Single runs with 16 threads (<code>-c 1</code>) on the 48-core server while other work ran on it, so indicative only: per cube, the 16-move scrambles took 1.5 ms for one solution, 5 ms for all optimal ones, 33 ms with <code>--plus 1</code> and 0.37 s with <code>--plus 2</code>; the 17-move scrambles 12 ms, 35 ms and 0.34 s; the 18-move scrambles 69 ms, 0.34 s and 4.3 s.</p>
+<p>All threads work on one cube, as for a single solution (<code>-c 1</code>, <code>--fast</code>), or on the cubes of a batch. A search for a list does not use the symmetric-start filter or the solution-first job order, which only serve to find one solution sooner; pruning by table bounds is unchanged.</p>
+<p>The lists were checked against brute force on short scrambles (<code>tests/all_solutions.rs</code>) and against nissy-core's lists on these sets (<code>solve_file h48h7 FILE 999999 K</code>, each solution put in the same order of commuting moves). Both programs list the same solutions: the 27, 36 and 140 optimal ones of the 16-, 17- and 18-move sets, the 67 and 278 up to one move above optimal of the 16- and 17-move sets, and the 453 up to two above of the 16-move set.</p>
 <h2 id="tune-and-benchmark">Tune and benchmark</h2>
 <pre><code class="language-sh">target/release/bench tables/h7 tune
 target/release/bench --help
@@ -136,7 +216,7 @@ target/release/bench --help
 <p>The historical positional benchmark syntax remains supported. Use <code>bench --help</code> and each subcommand's help for named syntax, warm-up and measurement windows. Record the actual command with benchmark output.</p>
 <h2 id="table-files">Table files</h2>
 <p>A table has pruning data and a 4 KiB metadata trailer containing k, base, distribution and checksum (and, for a <a href="#quarter-turn-metric">QTM table</a>, the metric). Padding can separate data and trailer. <code>gen check TABLE</code> verifies stored integrity; a checksum alone does not prove that every bound is admissible.</p>
-<div class="table-wrap" role="region" aria-label="Table files" tabindex="0"><table id="docs-table-3"><caption>Table files</caption>
+<div class="table-wrap" role="region" aria-label="Table files" tabindex="0"><table id="docs-table-6"><caption>Table files</caption>
 <thead>
 <tr><th>Load mode</th><th>Storage used during search</th><th>Notes</th></tr>
 </thead>
@@ -187,7 +267,7 @@ await solver.loadTable('h6');
 // await solver.generateTable(4);
 solver.solve(&quot;R U R' U' F2&quot;);
 </code></pre>
-<p><code>solve</code> puts the selected workers on one cube and returns <code>{ moves, length, metric, nodes, lookups, seconds }</code>; <code>solveMany</code> uses independent cube lanes. Both take <code>{ metric: 'qtm' }</code> for the <a href="#quarter-turn-metric">quarter-turn metric</a> (by default the table's metric: HTM for HTM tables), and <code>generateTable(k, base, { metric: 'qtm' })</code> makes a QTM table; <code>length</code> is in the solve's metric. <code>loadTable</code> accepts a path (Bun), a URL, a <code>File</code> or <code>Blob</code>, or the file's bytes. Inputs can be scrambles or 54-sticker facelet strings in U R F D L B face order, each face viewed from outside and read row by row (U with B at the top, D with F at the top, the side faces with U at the top); any six symbols can stand for the colors. The wrapper's facelet parser checks the representation.</p>
+<p><code>solve</code> puts the selected workers on one cube and returns <code>{ moves, length, metric, nodes, lookups, seconds }</code>; <code>solveMany</code> uses independent cube lanes. <code>solveAll(cube, { plus, maxLength, maxSolutions, metric })</code> lists <a href="#all-solutions">every distinct solution</a> up to a length (by default the optimal ones) and returns <code>{ solutions: [{ moves, length }], count, optimal, max_length, truncated, complete_length, by_length, metric, nodes, lookups, seconds }</code>. Both take <code>{ metric: 'qtm' }</code> for the <a href="#quarter-turn-metric">quarter-turn metric</a> (by default the table's metric: HTM for HTM tables), and <code>generateTable(k, base, { metric: 'qtm' })</code> makes a QTM table; <code>length</code> is in the solve's metric. <code>loadTable</code> accepts a path (Bun), a URL, a <code>File</code> or <code>Blob</code>, or the file's bytes. Inputs can be scrambles or 54-sticker facelet strings in U R F D L B face order, each face viewed from outside and read row by row (U with B at the top, D with F at the top, the side faces with U at the top); any six symbols can stand for the colors. The wrapper's facelet parser checks the representation.</p>
 <h3 id="bun">Bun</h3>
 <pre><code class="language-sh">bun wasm/demo.mjs --table tables/h6 &lt; testdata/random_state.txt
 bun wasm/demo.mjs --gen 4:8 --random 5:1
@@ -211,11 +291,12 @@ bun wasm/demo.mjs --table tables/h6 --threads 8 --batch &lt; scrambles.txt
 <p><code>Cube::from_bytes</code>, symmetry-coordinate lookups and <code>cube_from_edge_key</code> return <code>Option</code> for invalid input. Table and solver internals are exposed through read-only accessors. <code>H48Table::from_memory</code> checks the metadata and allocation size; <code>get</code> returns <code>None</code> for an invalid index.</p>
 <p><code>H48Table::open_copy</code> loads the table into private RAM and is safe. APIs that map files or attach shared segments are <code>unsafe</code>: the backing storage must remain unchanged and untruncated while the table exists, including changes by other processes. The command-line mapped and shared modes require the same condition; <code>--load copy</code> avoids that dependence after loading. File-backed generation requires exclusive access to its output paths. <a href="../safety/index.html">Safety</a> describes the undefined-behavior evidence and its scope.</p>
 <p>The packed-coordinate and table encodings require a little-endian target; big-endian builds are rejected at compile time.</p>
+<p><a href="#all-solutions">Every distinct solution</a> of a cube up to a length comes from <code>Solver::all_solutions</code> (one thread, the reference search) or <code>lanes::share::all_solutions</code> (all threads on one cube, or a batch), with the limits in <code>solutions::Options</code> and the list in <code>solutions::Solutions</code>.</p>
 <h2 id="historical-measurements">Historical measurements</h2>
 <p>These records were measured during development on the project's Zen 5 server and were previously kept in an earlier edition of this guide (dated 2026-11-07). Each block links the record of the commit that introduced the figures. Later source changes, lane defaults and engines can give different results; they are not predictions for another machine.</p>
 <details>
 <summary>Native table sizes, generation times and solve rates (recorded 2026-11-04)</summary>
-<div class="table-wrap" role="region" aria-label="Historical measurements" tabindex="0"><table id="docs-table-4"><caption>Historical measurements</caption>
+<div class="table-wrap" role="region" aria-label="Historical measurements" tabindex="0"><table id="docs-table-7"><caption>Historical measurements</caption>
 <thead>
 <tr><th>RAM</th><th>table</th><th align="right">size</th><th align="right">generation</th><th align="right">cubes/s, 1 core</th><th align="right">cubes/s, 8 cores</th></tr>
 </thead>
@@ -245,7 +326,7 @@ key        shmid      owner      perms      bytes      nattch     status
 <summary>WebAssembly timings (recorded 2026-11-04 and 2026-11-05)</summary>
 <p><a id="speed"></a></p>
 <p>Time per random-state cube, one at a time, mean and median of 10 cubes (h4: 5), on Zen 5 cores (8 threads: one L3 domain), in V8 (Chrome's engine; measured in Node 26) and in Bun (JavaScriptCore, Safari's engine):</p>
-<div class="table-wrap" role="region" aria-label="Historical measurements" tabindex="0"><table id="docs-table-5"><caption>Historical measurements</caption>
+<div class="table-wrap" role="region" aria-label="Historical measurements" tabindex="0"><table id="docs-table-8"><caption>Historical measurements</caption>
 <thead>
 <tr><th>table</th><th align="right">size</th><th>runs in</th><th>made by</th><th>1 thread: V8</th><th>1 thread: Bun</th><th>8 threads: V8</th><th>8 threads: Bun</th></tr>
 </thead>
@@ -258,7 +339,7 @@ key        shmid      owner      perms      bytes      nattch     status
 </table></div>
 <p>Loading from a file took seconds (from a local server into headless Chromium: h6 3-13 s; <code>verify</code> adds a checksum pass).</p>
 <p>100 depth-17 cubes on h6 (14.8M nodes each), one thread, <code>solveMany</code> / <code>bench</code> batch mode, on one Zen 5 core:</p>
-<div class="table-wrap" role="region" aria-label="Historical measurements" tabindex="0"><table id="docs-table-6"><caption>Historical measurements</caption>
+<div class="table-wrap" role="region" aria-label="Historical measurements" tabindex="0"><table id="docs-table-9"><caption>Historical measurements</caption>
 <thead>
 <tr><th>build</th><th align="right">time</th><th align="right">Mnodes/s</th></tr>
 </thead>

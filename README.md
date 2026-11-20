@@ -60,6 +60,12 @@ two moves. It works with any table; a QTM table (`gen 7 auto tables/h7q
 --metric qtm`) gives it tighter bounds. See the
 [user guide](docs/reference/USER_GUIDE.md#quarter-turn-metric).
 
+`--all-optimal` lists every distinct optimal solution instead of one,
+`--plus K` every solution of at most K moves more than optimal, and
+`--max-length N` every solution of at most N moves; `--max-solutions M` caps
+a list, and a capped list says so. See the
+[user guide](docs/reference/USER_GUIDE.md#all-solutions).
+
 `--load copy` loads the table into private RAM before searching. With
 `--load map` or shared memory, keep the backing storage unchanged while
 running. See `solve --help` and the [user guide](docs/reference/USER_GUIDE.md).
