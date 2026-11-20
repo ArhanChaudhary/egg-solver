@@ -882,7 +882,8 @@ fn qtm_metric() {
     );
 }
 
-/// The lists of `solve`'s text output with `--max-length`: per cube (in input order) its `solutions` line's words,
+/// The lists of `solve`'s text output with `--all-optimal`, `--plus` or
+/// `--max-length`: per cube (in input order) its `solutions` line's words,
 /// its `truncated` line's (if any) and its solutions as (length, moves);
 /// then the total line. Each cube's lines are together, and its
 /// `solutions` line counts its `solution` lines.
@@ -938,6 +939,11 @@ const LISTED: &str = "U2 D2 R2 L2 F2 B2\nR U R' U'\n\nU2 D2 R2 L2\n";
 fn lists(args: &[&str]) -> (Lists, String) {
     let args = [&[h0(), "-t", "2"], args].concat();
     parse_lists(&ok(&run(env!("CARGO_BIN_EXE_solve"), &args, LISTED)), 3)
+}
+
+/// The solutions of each cube of some lists.
+fn listed(lists: &Lists) -> Vec<Vec<(usize, String)>> {
+    lists.iter().map(|list| list.2.clone()).collect()
 }
 
 /// `--max-length N`: every distinct solution of each cube of at most N
@@ -1140,4 +1146,107 @@ fn solve_max_length_fast() {
     let quarter =
         "\noptimal  2q\nlisted   1 solution of at most 4q (verified)\n2q: 1 solution\n  U2\n";
     assert!(out.contains(quarter), "{out}");
+}
+
+/// `--all-optimal` and `--plus K`: every distinct optimal solution of each
+/// cube, and those of at most K moves more; with `--max-length` the
+/// smaller limit.
+#[test]
+fn solve_all_optimal_and_plus() {
+    let table = h0();
+    let solve = env!("CARGO_BIN_EXE_solve");
+    let (optimal, total) = lists(&["--all-optimal"]);
+    assert!(
+        matches(
+            &total,
+            "total 3 cubes wall # wall/cube # nodes/cube # threads 2 lanes 40 concurrency 0"
+        ),
+        "{total}"
+    );
+    let counts: Vec<usize> = optimal.iter().map(|list| list.2.len()).collect();
+    assert_eq!(counts, [6, 1, 2]);
+    assert_eq!(optimal[0].0[3..5], ["6", "6"], "optimal and limit");
+    assert_eq!(optimal[1].0[3..5], ["4", "4"]);
+    assert!(optimal.iter().all(|list| list.1.is_none()));
+    // The one solution of the default solve is among them.
+    let one = ok(&run(solve, &[table, "-t", "2", "-n", "1"], LISTED));
+    let one: Vec<&str> = one.lines().next().unwrap().split(' ').skip(5).collect();
+    assert!(optimal[0].2.contains(&(6, one.join(" "))), "{one:?}");
+    // --plus 0 is the same, and --max-length <optimal> for each cube.
+    assert_eq!(listed(&lists(&["--plus", "0"]).0), listed(&optimal));
+    assert_eq!(
+        listed(&lists(&["--max-length", "4"]).0)[1..],
+        listed(&optimal)[1..]
+    );
+    assert_eq!(
+        listed(&lists(&["--max-length", "6"]).0)[0],
+        listed(&optimal)[0]
+    );
+    // --plus 2: what --max-length <optimal + 2> lists.
+    let (plus, _) = lists(&["--plus", "2"]);
+    assert_eq!(plus[0].0[3..5], ["6", "8"]);
+    assert_eq!(plus[1].0[3..5], ["4", "6"]);
+    assert_eq!(
+        listed(&plus)[0],
+        listed(&lists(&["--max-length", "8"]).0)[0]
+    );
+    assert_eq!(
+        listed(&plus)[1..],
+        listed(&lists(&["--max-length", "6"]).0)[1..]
+    );
+    assert_eq!(plus[0].2[..6], optimal[0].2[..]);
+    // Both limits: the smaller.
+    let both = lists(&["--plus", "2", "--max-length", "7"]).0;
+    assert_eq!(listed(&both)[0], optimal[0].2);
+    assert_eq!(both[0].0[3..5], ["6", "7"]);
+    assert_eq!(
+        listed(&lists(&["--plus", "0", "--max-length", "9"]).0),
+        listed(&optimal)
+    );
+    // Truncated within the optimal solutions: complete below them.
+    let (cut, _) = lists(&["--all-optimal", "--max-solutions", "4"]);
+    let truncated = ["truncated", "0", "4", "5"].map(str::to_string).to_vec();
+    assert_eq!(cut[0].1, Some(truncated));
+    assert_eq!(cut[0].2.len(), 4);
+    // JSON and --fast.
+    let fast = ["--fast", "--table", table, "-t", "2"];
+    let args = [&fast[..], &["--all-optimal", "--json", "U2 D2 R2 L2"]].concat();
+    let report: serde_json::Value =
+        serde_json::from_str(ok(&run(solve, &args, "")).trim()).unwrap();
+    assert_eq!(
+        (report["count"].as_u64(), report["max_length"].as_u64()),
+        (Some(2), Some(4))
+    );
+    let args = [&fast[..], &["--plus", "2", "U2 D2 R2 L2 F2 B2"]].concat();
+    let out = ok(&run(solve, &args, ""));
+    let listing = "\noptimal  6 moves\nlisted   18 solutions of at most 8 moves (verified)\n";
+    assert!(out.contains(listing), "{out}");
+    // The quarter-turn metric.
+    let args = [table, "-t", "2", "--metric", "qtm", "--all-optimal"];
+    let (qtm, _) = parse_lists(&ok(&run(solve, &args, "U2 D2 R2 L2\nR U2\n")), 2);
+    assert_eq!(qtm[0].0[2..5], ["2", "8", "8"]);
+    assert_eq!(qtm[1].2, [(3, "U2 R'".to_string())]);
+    // (God's number as --max-length is accepted; with --plus the search
+    // ends early.)
+    let args = [
+        table,
+        "-t",
+        "2",
+        "--metric",
+        "qtm",
+        "--max-length",
+        "26",
+        "--plus",
+        "0",
+    ];
+    assert!(ok(&run(solve, &args, "U2\n")).starts_with("solutions 0 1 2 2 "));
+    // Refused: two limits above the optimum at once.
+    let args = [table, "-t", "2", "--all-optimal", "--plus", "1"];
+    let out = run(solve, &args, LISTED);
+    assert_eq!(out.status.code(), Some(2));
+    assert!(
+        text(&out.stderr).contains("--plus"),
+        "{}",
+        text(&out.stderr)
+    );
 }

@@ -33,9 +33,10 @@
 //! one cube. Without arguments it reads one scramble from stdin. Warm-up
 //! solves are optional; see `run_fast`.
 //!
-//! `--max-length N` lists every distinct solution of each cube of at most
-//! N moves instead of one optimal solution (`egg_solver::solutions`;
-//! `list_batch`, `list_fast`), at most `--max-solutions` of them.
+//! `--all-optimal`, `--plus K` and `--max-length N` list every distinct
+//! solution of each cube up to a length instead of one optimal solution
+//! (`egg_solver::solutions`; `list_batch`, `list_fast`), at most
+//! `--max-solutions` of them.
 //!
 //! `solve --shm-load TABLE` loads a table into a shared memory segment that
 //! later runs attach at once (`--shm`; `docs/reference/USER_GUIDE.md` "Shared memory"), `solve
@@ -132,7 +133,13 @@ fn solve_all_pinned(
 /// face turn is one move, or with --metric qtm a quarter turn is one and a
 /// half turn two).
 #[derive(Parser, Debug)]
-#[command(name = "solve", version, after_long_help = OUTPUT_HELP)]
+#[command(
+    name = "solve",
+    version,
+    after_long_help = OUTPUT_HELP,
+    // (--all-optimal, --plus, --max-length: any of them asks for a list.)
+    group = clap::ArgGroup::new("listing").multiple(true)
+)]
 struct Args {
     /// The table file (made by `gen`, e.g. `gen 8 auto h8`). With --fast,
     /// this position starts the scramble instead; supply --table explicitly.
@@ -190,16 +197,25 @@ struct Args {
     /// TLBs. No warm-up solve by default.
     #[arg(long, value_name = "SCRAMBLE", requires = "fast")]
     warmup: Option<String>,
-    /// List every distinct solution of at most N moves of each cube, not
-    /// just one optimal solution. At most 20 (with --metric qtm: 26).
-    #[arg(long, value_name = "N", display_order = 72)]
+    /// List every distinct optimal solution of each cube, not just one (the
+    /// same as --plus 0).
+    #[arg(long, group = "listing", conflicts_with = "plus", display_order = 70)]
+    all_optimal: bool,
+    /// List every distinct solution of at most K moves more than an optimal
+    /// one (0: the optimal ones).
+    #[arg(long, value_name = "K", group = "listing", display_order = 71)]
+    plus: Option<u8>,
+    /// List every distinct solution of at most N moves (with --plus K: of at
+    /// most K above optimal and at most N). At most 20 (with --metric qtm:
+    /// 26).
+    #[arg(long, value_name = "N", group = "listing", display_order = 72)]
     max_length: Option<u8>,
-    /// With --max-length: list at most M solutions per cube. If a cube has
-    /// more, its search stops and its list is marked truncated.
+    /// With the three options above: list at most M solutions per cube. If
+    /// a cube has more, its search stops and its list is marked truncated.
     #[arg(
         long,
         value_name = "M",
-        requires = "max_length",
+        requires = "listing",
         default_value_t = DEFAULT_MAX_SOLUTIONS,
         value_parser = cli::positive(),
         display_order = 73
@@ -258,14 +274,14 @@ With --fast:
 lanes, scramble, solution, length, metric, nodes, lookups, seconds, ms,
 nodes_per_second).
 
-With --max-length N, every distinct solution of each cube of at most N
-moves (commuting moves in one order, U D not D U; no sequence that only adds
-a loop to a shorter solution), by length:
+With --all-optimal, --plus K or --max-length N, every distinct solution of
+each cube up to that length (commuting moves in one order, U D not D U; no
+sequence that only adds a loop to a shorter solution), by length:
   solutions <index> <count> <optimal> <max> <nodes> <seconds>
   solution <index> <length> <solution>
   total <cubes> cubes wall <s> ... (as above)
-<count> solutions follow; <max> is the length limit N and <optimal> the
-optimal length (- if the cube has no solution of <max> moves).
+<count> solutions follow; <max> is the length limit (optimal + K, or N) and
+<optimal> the optimal length (- if the cube has no solution of <max> moves).
 A cube with more than --max-solutions M solutions gets, after its first line,
   truncated <index> <M> <complete>
 and M solutions: all of at most <complete> moves, some of the longer ones.
@@ -292,7 +308,8 @@ enum Line {
         /// Whether the solution solves the cube (always, unless a bug).
         ok: bool,
     },
-    /// Every distinct solution of a cube up to a length (`--max-length`).
+    /// Every distinct solution of a cube up to a length (`--all-optimal`,
+    /// `--plus`, `--max-length`).
     Solutions {
         index: usize,
         #[serde(flatten)]
@@ -668,10 +685,18 @@ fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
 
 impl Args {
     /// What to list, if all solutions up to a length are asked for
-    /// (`--max-length`): `None` for one optimal solution per cube.
+    /// (`--all-optimal`, `--plus`, `--max-length`): `None` for one optimal
+    /// solution per cube.
     fn listing(&self) -> Option<Options> {
-        let max_length = self.max_length?;
-        Some(Options::max_length(max_length).with_max_solutions(self.max_solutions))
+        if !self.all_optimal && self.plus.is_none() && self.max_length.is_none() {
+            return None;
+        }
+        Some(Options {
+            // (`--max-length` alone: any number of moves above optimal.)
+            plus: self.plus.or(self.all_optimal.then_some(0)),
+            max_length: self.max_length,
+            max_solutions: self.max_solutions,
+        })
     }
 }
 
@@ -697,7 +722,7 @@ struct Listing {
     count: usize,
     /// The optimal length (null: no solution of at most `max_length`).
     optimal: Option<u8>,
-    /// The length limit, N.
+    /// The length limit: optimal + K, or N.
     max_length: u8,
     /// More solutions than `--max-solutions`: `count` of them are listed,
     /// all of at most `complete_length` moves and some longer ones.
@@ -761,8 +786,9 @@ fn length_text(metric: Metric, length: usize) -> String {
     }
 }
 
-/// `solve` with `--max-length`: every distinct solution of each scramble
-/// on stdin up to that length (`run` for lists).
+/// `solve` with `--all-optimal`, `--plus` or `--max-length`: every
+/// distinct solution of each scramble on stdin up to that length (`run`
+/// for lists).
 #[expect(clippy::cast_precision_loss, reason = "statistics")]
 fn list_batch(args: &Args, options: &Options) -> anyhow::Result<ExitCode> {
     let path = (args.table.as_deref())
@@ -915,9 +941,9 @@ struct FastListing<'a> {
     nodes_per_second: f64,
 }
 
-/// `solve --fast` with `--max-length`: every distinct solution of the
-/// supplied scramble up to that length, with all selected threads
-/// (`run_fast` for a list).
+/// `solve --fast` with `--all-optimal`, `--plus` or `--max-length`: every
+/// distinct solution of the supplied scramble up to that length, with all
+/// selected threads (`run_fast` for a list).
 #[expect(clippy::cast_precision_loss, reason = "statistics")]
 fn list_fast(args: &Args, options: &Options) -> anyhow::Result<ExitCode> {
     let path = args
