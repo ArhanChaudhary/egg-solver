@@ -541,7 +541,13 @@ struct RunState {
 
 /// One lane: the search of one cube, as an explicit stack that can stop at
 /// any table lookup and resume later; in QTM if `QTM`.
-pub struct Lane<const QTM: bool = false> {
+///
+/// `ALL` marks the lanes of a search for all solutions (`share`'s
+/// `Worker<_, true>`, see `crate::solutions`). Their code is this code:
+/// the parameter only gives them machine code of their own, so that the
+/// lanes of a search for one solution (`ALL` false, the default) compile
+/// as without that mode, whatever calls the others add.
+pub struct Lane<const QTM: bool = false, const ALL: bool = false> {
     /// The cube's index in the input.
     pub cube_index: usize,
     /// When the current cube was started.
@@ -614,7 +620,7 @@ enum Start {
     Unsolved,
 }
 
-impl<const QTM: bool> Lane<QTM> {
+impl<const QTM: bool, const ALL: bool> Lane<QTM, ALL> {
     fn new() -> Self {
         let node = Node {
             moved: Cube::solved(),

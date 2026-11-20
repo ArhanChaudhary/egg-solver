@@ -50,6 +50,16 @@
 //! and a first pass's phases step by 2, and no iteration is split or records
 //! leads (as stream mode's split iterations, see `lanes`).
 //!
+//! All solutions of each cube up to a length (`all_solutions`,
+//! `crate::solutions`) are a mode of the same pool: workers `Worker<_,
+//! true>`, whose lanes record a solution and go on with their job
+//! (`Worker::found_all`), and whose cubes run every iteration to its end, up
+//! to the limit (`Worker::iteration_done_all`). What only serves to find one
+//! solution sooner is off there: the first pass, split iterations, the
+//! symmetric-start filter. The mode has machine code of its own (the `ALL`
+//! parameter of `Worker` and `Lane`): the search for one solution compiles
+//! as without it, and its types have no field for it.
+//!
 //! Gains, 48 threads, h11, `random_state`: the mode itself (l5) took a batch
 //! from 7.86 ms to 1.26 ms per cube (bench random:1000 from 187 to 795
 //! solves/s), and one cube at a time from 306 ms (one lane) to 3.6 ms.
@@ -64,6 +74,7 @@ use super::{
 };
 use crate::cubie::CubieCube;
 use crate::simd::Cube;
+use crate::solutions::{Collector, Options, Solutions};
 use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES};
 use crate::symstart::SymFilter;
 use crossbeam_utils::CachePadded;
@@ -74,6 +85,7 @@ use crossbeam_utils::CachePadded;
 #[cfg(not(target_family = "wasm"))]
 use parking_lot::Mutex;
 use std::cell::UnsafeCell;
+use std::collections::BTreeMap;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Relaxed, Release};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicU8, AtomicUsize};
 use std::sync::Arc;
@@ -130,6 +142,55 @@ const NO_SLOT: usize = usize::MAX;
 /// `MAX_TARGET` moves (an unsolvable cube, or a table whose bounds are too
 /// high).
 pub type Done<'d> = dyn FnMut(usize, Option<Vec<u8>>, Stats, f64) + 'd;
+
+/// Called once per cube of a search for all solutions (`all_solutions`),
+/// from any thread: (index, its solutions, stats, seconds from its start to
+/// the end of its search).
+pub type AllDone<'d> = dyn Fn(usize, Solutions, Stats, f64) + Sync + 'd;
+
+/// A search for all solutions (`crate::solutions`) on a pool: what to
+/// list, the lists so far and where they go. Its workers have it
+/// (`Worker::all`); the pool's and the cubes' state is that of a search for
+/// one solution, whose types and code this mode leaves as they are. (A
+/// cube's list is touched when a solution is found, when an iteration ends
+/// and when the cube is reported: rarely. A B-tree, as `Collector`'s set:
+/// hash tables share code with those of the search for one solution.)
+struct AllMode<'a> {
+    options: Options,
+    done: &'a AllDone<'a>,
+    /// By cube index: the solutions of each cube in progress.
+    lists: Mutex<BTreeMap<usize, Collector>>,
+}
+
+/// What a worker keeps of its search for all solutions, by its `ALL`
+/// (`WorkerMode`): `ModeOf<true>` the `AllMode`, `ModeOf<false>` nothing,
+/// so that a worker for one solution is as without the mode, field for
+/// field.
+struct ModeOf<const ALL: bool>;
+
+/// See `ModeOf`.
+trait WorkerMode {
+    /// `Worker::all`.
+    type All<'w>: Copy;
+    /// The mode of a worker for all solutions.
+    fn mode(all: Self::All<'_>) -> Option<&AllMode<'_>>;
+}
+
+impl WorkerMode for ModeOf<false> {
+    type All<'w> = ();
+    #[inline(always)]
+    fn mode((): Self::All<'_>) -> Option<&AllMode<'_>> {
+        None
+    }
+}
+
+impl WorkerMode for ModeOf<true> {
+    type All<'w> = &'w AllMode<'w>;
+    #[inline(always)]
+    fn mode(all: Self::All<'_>) -> Option<&AllMode<'_>> {
+        Some(all)
+    }
+}
 
 /// Iteration data, written only by the thread that builds an iteration, while
 /// no job of the cube is outstanding (nobody else reads it then).
@@ -850,6 +911,55 @@ impl<'a> Pool<'a> {
         }
     }
 
+    /// `run` for all solutions of each cube (`mode`; all threads of a pool
+    /// with the same one), in the solver's metric: the lists go to
+    /// `AllMode::done`.
+    fn run_all(&self, solver: &Solver, nlanes: usize, stop: &AtomicBool, mode: &AllMode) {
+        if solver.metric().is_qtm() {
+            self.run_all_metric::<true>(solver, nlanes, stop, mode);
+        } else {
+            self.run_all_metric::<false>(solver, nlanes, stop, mode);
+        }
+    }
+
+    /// `run_all` in QTM if `QTM`, else in HTM: `run_metric` with a worker
+    /// for all solutions.
+    fn run_all_metric<const QTM: bool>(
+        &self,
+        solver: &Solver,
+        nlanes: usize,
+        stop: &AtomicBool,
+        mode: &AllMode,
+    ) {
+        let id = self.next_thread_id.fetch_add(1, Relaxed);
+        // (Never called: the lists go to `AllMode::done`.)
+        let mut done = |_: usize, _: Option<Vec<u8>>, _: Stats, _: f64| {};
+        let mut worker = Worker::<QTM, true> {
+            pool: self,
+            solver,
+            id,
+            done: &mut done,
+            lanes: (0..nlanes.max(1)).map(|_| SharedLane::new()).collect(),
+            active_lanes: 0,
+            locals: Vec::new(),
+            scratch: Box::new(Lane::new()),
+            bufs: Bufs::own(),
+            epoch: 0,
+            solved: 0,
+            split_wait: 0,
+            split_backoff: 0,
+            donate_wait: 0,
+            donate_backoff: 0,
+            counts: [0; NCOUNT],
+            all: mode,
+        };
+        worker.run(stop);
+        let mut counters = self.counters.lock();
+        for (sum, count) in counters.iter_mut().zip(worker.counts) {
+            *sum += count;
+        }
+    }
+
     /// Work on the pool with `nlanes` interleaved lanes until all cubes are
     /// solved or `stop` is set. Calls `done(index, solution, stats,
     /// seconds)` (see `Done`) for the cubes whose last worker is this thread.
@@ -906,6 +1016,7 @@ impl<'a> Pool<'a> {
             donate_wait: 0,
             donate_backoff: 0,
             counts: [0; NCOUNT],
+            all: (),
         };
         worker.run(stop);
         let mut counters = self.counters.lock();
@@ -1085,6 +1196,40 @@ pub fn solve_all(
     })
 }
 
+/// List every distinct solution of each cube of `cubes` (until it returns
+/// None) within the limits of `options` (`crate::solutions`: all optimal
+/// ones, or up to some moves more), with `threads` threads of `nlanes`
+/// lanes and at most `max_active` cubes at a time (1: all threads on one
+/// cube); `done` is called once per cube (from any thread; see `AllDone`).
+/// In the solver's metric.
+///
+/// The share mode's search, with these differences: a solution is recorded
+/// and its job goes on; every iteration runs to its end, up to the limit;
+/// each iteration runs alone, on whole jobs (no first pass, no split
+/// iterations); no symmetric-start filter.
+///
+/// # Errors
+/// If a worker thread panicked.
+pub fn all_solutions(
+    solver: &Solver,
+    cubes: &(dyn Fn(usize) -> Option<CubieCube> + Sync),
+    threads: usize,
+    nlanes: usize,
+    max_active: usize,
+    options: &Options,
+    done: &AllDone,
+) -> Result<(), crate::parallel::WorkerPanicked> {
+    let mode = AllMode {
+        options: *options,
+        done,
+        lists: Mutex::new(BTreeMap::new()),
+    };
+    let pool = Pool::new(cubes, max_active, threads);
+    let stop = AtomicBool::new(false);
+    crate::parallel::on_threads(threads, |_| pool.run_all(solver, nlanes, &stop, &mode))?;
+    Ok(())
+}
+
 /// A thread's share of a cube: jobs claimed and the stats of its lanes.
 struct Local {
     ctx: Arc<CubeCtx>,
@@ -1108,8 +1253,8 @@ struct Local {
 }
 
 /// A lane of a worker, and the job it runs.
-struct SharedLane<const QTM: bool> {
-    lane: Lane<QTM>,
+struct SharedLane<const QTM: bool, const ALL: bool = false> {
+    lane: Lane<QTM, ALL>,
     /// `Worker::locals` slot of the cube of the current job (`NO_SLOT` if
     /// idle).
     slot: usize,
@@ -1132,7 +1277,7 @@ struct SharedLane<const QTM: bool> {
     started: Instant,
 }
 
-impl<const QTM: bool> SharedLane<QTM> {
+impl<const QTM: bool, const ALL: bool> SharedLane<QTM, ALL> {
     fn new() -> Self {
         let mut lane = Lane::new();
         lane.shared = true;
@@ -1159,21 +1304,37 @@ impl<const QTM: bool> SharedLane<QTM> {
     }
 }
 
+/// (All solutions.) How a lane that found a solution goes on
+/// (`Worker::found_all`).
+enum AllStep {
+    /// Its job goes on: a lookup is pending.
+    Pending,
+    /// Its job ended.
+    JobDone,
+    /// Its cube has more solutions than asked for: the job is dropped.
+    CubeDone,
+}
+
 /// A thread of a pool: its lanes, and its share of the cubes it works on;
-/// in QTM if `QTM`.
-struct Worker<'w, 'a, const QTM: bool> {
+/// in QTM if `QTM`, for all solutions of each cube if `ALL`
+/// (`Pool::run_all`; the code for one solution is the same as without the
+/// parameter: `ALL` is a constant, its branches fold away).
+struct Worker<'w, 'a, const QTM: bool, const ALL: bool = false>
+where
+    ModeOf<ALL>: WorkerMode,
+{
     pool: &'w Pool<'a>,
     solver: &'w Solver<'w>,
     /// Mailbox index (none if beyond `Pool::nthreads`).
     id: usize,
     done: &'w mut Done<'w>,
     /// The active lanes are `lanes[..active_lanes]`.
-    lanes: Vec<SharedLane<QTM>>,
+    lanes: Vec<SharedLane<QTM, ALL>>,
     active_lanes: usize,
     /// The cubes this thread works on, by slot (`SharedLane::slot`).
     locals: Vec<Option<Local>>,
     /// Builds iterations (its job buffers), and the buffers of serial builds.
-    scratch: Box<Lane<QTM>>,
+    scratch: Box<Lane<QTM, ALL>>,
     bufs: Bufs,
     /// `Pool::epoch` when idle lanes last looked for work.
     epoch: u64,
@@ -1187,14 +1348,20 @@ struct Worker<'w, 'a, const QTM: bool> {
     donate_backoff: u32,
     /// Event counters (`COUNT_NAMES`), summed into the pool's at the end.
     counts: [u64; NCOUNT],
+    /// With `ALL`: the search for all solutions (else nothing).
+    all: <ModeOf<ALL> as WorkerMode>::All<'w>,
 }
 
 /// Build the next iteration of `ctx` (the first one if `first`) with
 /// `scratch`'s extension, and publish it. If threads are waiting for work, a
 /// long job list is extended and sorted by all of them instead
 /// (`build_task`): returns true if that was started (the caller then helps).
-fn build<const QTM: bool>(
-    scratch: &mut Lane<QTM>,
+///
+/// With `ALL` (all solutions) every iteration runs alone on whole jobs: no
+/// first pass (an iteration's end decides whether the next one runs) and no
+/// leads or split iterations (their order is of no use).
+fn build<const QTM: bool, const ALL: bool>(
+    scratch: &mut Lane<QTM, ALL>,
     own_bufs: &mut Bufs,
     solver: &Solver,
     pool: &Pool,
@@ -1212,7 +1379,11 @@ fn build<const QTM: bool>(
     inner.extended = now;
     // (The next target, after the first.)
     inner.target += if first { 0 } else { target_step(QTM) };
-    plan_first_pass::<QTM>(inner, solver, pool.first_pass_span);
+    if ALL {
+        inner.phases = 1;
+    } else {
+        plan_first_pass::<QTM>(inner, solver, pool.first_pass_span);
+    }
     inner.sort_by_bounds = first;
     // The stack depth stays below the target, at most `MAX_TARGET` (< `MAXD`; only
     // a first bound above it is lowered: nothing is found, `settle` gives up).
@@ -1235,8 +1406,8 @@ fn build<const QTM: bool>(
     plan_leads(
         inner,
         first,
-        !QTM && job_len == MAX_JOB_LEN && parallel,
-        !QTM && from_atomics,
+        !QTM && !ALL && job_len == MAX_JOB_LEN && parallel,
+        !QTM && !ALL && from_atomics,
     );
     if !first && !from_atomics {
         copy_stats(inner);
@@ -1868,7 +2039,12 @@ fn lead_threshold(inner: &Inner, n: usize) -> u8 {
 /// except in a split job), and whether it records its job's lead (whole
 /// runs and first-part runs do).
 #[inline(never)]
-fn lead_run<const QTM: bool>(sl: &mut SharedLane<QTM>, inner: &Inner, entry: u32, children: u32) {
+fn lead_run<const QTM: bool, const ALL: bool>(
+    sl: &mut SharedLane<QTM, ALL>,
+    inner: &Inner,
+    entry: u32,
+    children: u32,
+) {
     if children != ALL_MOVES {
         // (The children are normal-side moves: a lead is recorded on the
         // normal side, and the next iteration has the root there too, its
@@ -2102,8 +2278,8 @@ fn sort_stage_done(inner: &mut Inner, stage: usize) -> Option<(usize, usize)> {
 /// the last task of a stage opens the next one or publishes the iteration.
 // Builds in stages by all waiting threads: l5 (not measured alone); on all
 // threads and without page faults since l6-share-a (-38.8% -c 1 at 48T).
-fn build_task<const QTM: bool>(
-    scratch: &mut Lane<QTM>,
+fn build_task<const QTM: bool, const ALL: bool>(
+    scratch: &mut Lane<QTM, ALL>,
     solver: &Solver,
     pool: &Pool,
     ctx: &Arc<CubeCtx>,
@@ -2320,10 +2496,10 @@ fn trace_build(pool: &Pool, ctx: &CubeCtx, inner: &Inner, sorted: Instant) {
 /// allocation, and untraced runs at 48T were slower: -c 1 +3.7%, -c 0
 /// +4.1%, bench share -4.2%; c10.)
 #[cold]
-fn trace_found<const QTM: bool>(
+fn trace_found<const QTM: bool, const ALL: bool>(
     pool: &Pool,
     ctx: &CubeCtx,
-    sl: &SharedLane<QTM>,
+    sl: &SharedLane<QTM, ALL>,
     active_lanes: usize,
     seconds: f64,
 ) {
@@ -2466,21 +2642,41 @@ impl Worker<'_, '_, true> {
     }
 }
 
-impl<'w, 'a, const QTM: bool> Worker<'w, 'a, QTM> {
+impl<'w, 'a, const QTM: bool, const ALL: bool> Worker<'w, 'a, QTM, ALL>
+where
+    ModeOf<ALL>: WorkerMode,
+{
+    /// (All solutions.) The worker's mode; `None` for one solution.
+    #[inline(always)]
+    fn mode(&self) -> Option<&'w AllMode<'w>> {
+        <ModeOf<ALL> as WorkerMode>::mode(self.all)
+    }
+
     /// The round loop of this worker's metric: `rounds` of
-    /// `Worker<false>` or `Worker<true>`, which differ only in placement.
+    /// `Worker<false>` or `Worker<true>`, which differ only in placement
+    /// (for all solutions: `rounds_all`).
     #[inline(always)]
     fn rounds_of_metric(&mut self, stop: &AtomicBool, round: &mut u32) -> bool {
         let solver = self.solver;
+        if ALL {
+            return self.rounds_all(solver, stop, round);
+        }
         let this = std::ptr::from_mut(self);
         if QTM {
-            // SAFETY: with `QTM` true, `Self` is `Worker<'w, 'a, true>`:
-            // the cast is the identity.
+            // SAFETY: with `QTM` true and `ALL` false, `Self` is
+            // `Worker<'w, 'a, true>`: the cast is the identity.
             unsafe { &mut *this.cast::<Worker<'w, 'a, true>>() }.rounds(solver, stop, round)
         } else {
             // SAFETY: as above, with `QTM` false.
             unsafe { &mut *this.cast::<Worker<'w, 'a, false>>() }.rounds(solver, stop, round)
         }
+    }
+
+    /// `round_loop` of a search for all solutions (outside the HTM loop's
+    /// section).
+    #[inline(never)]
+    fn rounds_all(&mut self, solver: &Solver, stop: &AtomicBool, round: &mut u32) -> bool {
+        self.round_loop(solver, stop, round)
     }
 
     fn run(&mut self, stop: &AtomicBool) {
@@ -2603,10 +2799,21 @@ impl<'w, 'a, const QTM: bool> Worker<'w, 'a, QTM> {
     /// Lane `i`'s job ended (`found`: with a solution): account for it and
     /// `restart` the lane. Returns false if there was no work: the lane was
     /// deactivated (another lane took its place).
+    ///
+    /// With `ALL` a solution does not end the job: it is recorded and the
+    /// lane goes on (`found_all`); the job ends later, as one without.
     #[inline(never)]
-    fn on_end(&mut self, i: usize, found: bool) -> bool {
+    fn on_end(&mut self, i: usize, mut found: bool) -> bool {
         if found {
-            self.found(i);
+            if ALL {
+                match self.found_all(i) {
+                    AllStep::Pending => return true,
+                    AllStep::JobDone => found = false,
+                    AllStep::CubeDone => {}
+                }
+            } else {
+                self.found(i);
+            }
         }
         let slot = self.end_job(i, !found);
         if self.restart(i, Some(slot)) {
@@ -2628,15 +2835,96 @@ impl<'w, 'a, const QTM: bool> Worker<'w, 'a, QTM> {
             // SAFETY: `i < lanes.len()` (an active lane, or the first idle
             // one in `fill_idle`).
             let lane = unsafe { &mut self.lanes.get_unchecked_mut(i).lane };
-            let found = match lane.advance_cold(self.solver) {
+            let mut found = match lane.advance_cold(self.solver) {
                 Step::Pending => return true,
                 step => matches!(step, Step::Found),
             };
             if found {
-                self.found(i);
+                if ALL {
+                    match self.found_all(i) {
+                        AllStep::Pending => return true,
+                        AllStep::JobDone => found = false,
+                        AllStep::CubeDone => {}
+                    }
+                } else {
+                    self.found(i);
+                }
             }
             prefer = Some(self.end_job(i, !found));
         }
+    }
+
+    /// (All solutions.) Lane `i` found a solution: record it, and go on
+    /// with the lane's job, past further solutions, to its next lookup
+    /// (`AllStep::Pending`) or its end. A lane that returned `Step::Found`
+    /// has taken the solving move off its node: `advance` resumes behind
+    /// it. If there are now more solutions than asked for, the cube is done
+    /// (`AllStep::CubeDone`: the job is dropped, as the other lanes' jobs
+    /// of the cube are by `cancel_done`).
+    fn found_all(&mut self, i: usize) -> AllStep {
+        let metric = self.solver.metric();
+        loop {
+            let sl = &self.lanes[i];
+            // (Always joined: a lane with a job holds its cube's slot. A
+            // pool of workers for all solutions has its mode.)
+            let (Some(Some(local)), Some(mode)) = (self.locals.get(sl.slot), self.mode()) else {
+                return AllStep::CubeDone;
+            };
+            let ctx = local.ctx.clone();
+            // (Checked outside the lock. In QTM `reconstruct` has simplified
+            // the sequence: `X X` is `X2` already, and a string whose moves
+            // cancel is the shorter solution it spells, which `canonical`
+            // keeps and the list has from that length's iteration.)
+            let solution = crate::solutions::canonical(metric, &sl.lane.reconstruct());
+            let go_on = match mode.lists.lock().get_mut(&ctx.index) {
+                Some(list) => list.add(solution),
+                None => false,
+            };
+            if !go_on {
+                self.finish_all(&ctx);
+            }
+            if ctx.done.load(Relaxed) {
+                return AllStep::CubeDone;
+            }
+            // SAFETY: `i < lanes.len()` (see `restart`).
+            let lane = unsafe { &mut self.lanes.get_unchecked_mut(i).lane };
+            match lane.advance_cold(self.solver) {
+                Step::Pending => return AllStep::Pending,
+                Step::Found => {}
+                Step::JobDone | Step::Unsolved => return AllStep::JobDone,
+            }
+        }
+    }
+
+    /// (All solutions.) The search of `ctx` is over (its last iteration
+    /// ended, or it has more solutions than asked for): publish that,
+    /// unless another thread has. The list stays in `AllMode::lists` until
+    /// the cube is reported (`release`).
+    fn finish_all(&mut self, ctx: &CubeCtx) {
+        if ctx.done.swap(true, AcqRel) {
+            return;
+        }
+        self.publish_solution(ctx, None, ctx.started.elapsed().as_secs_f64());
+    }
+
+    /// (All solutions.) The current iteration of `ctx` ended (no job
+    /// outstanding): returns whether that was the last one, the cube then
+    /// being finished (`finish_all`).
+    fn iteration_done_all(&mut self, ctx: &CubeCtx) -> bool {
+        let Some(mode) = self.mode() else {
+            return false;
+        };
+        // SAFETY: no job of the cube is outstanding (only the builder runs).
+        let target = unsafe { &*ctx.inner.get() }.target;
+        let go_on = match mode.lists.lock().get_mut(&ctx.index) {
+            Some(list) => list.iteration_done(target, target_step(QTM)),
+            None => false,
+        };
+        if go_on {
+            return false;
+        }
+        self.finish_all(ctx);
+        true
     }
 
     /// Lane `i` found a solution (its job ends). In a first pass, it is
@@ -3158,6 +3446,10 @@ impl<'w, 'a, const QTM: bool> Worker<'w, 'a, QTM> {
             if self.pass_solution(&ctx) {
                 return;
             }
+            // (All solutions: up to the limit, at most `MAX_TARGET`.)
+            if ALL && self.iteration_done_all(&ctx) {
+                return;
+            }
             // No iteration past `MAX_TARGET` (`MAX_TARGET_QTM`; see
             // `build`): no solution.
             if ctx.inner().target + target_step(QTM) > max_target(QTM) {
@@ -3165,7 +3457,7 @@ impl<'w, 'a, const QTM: bool> Worker<'w, 'a, QTM> {
                 return;
             }
             self.counts[C_BUILDS] += 1;
-            if build(
+            if build::<QTM, ALL>(
                 &mut self.scratch,
                 &mut self.bufs,
                 self.solver,
@@ -3205,7 +3497,23 @@ impl<'w, 'a, const QTM: bool> Worker<'w, 'a, QTM> {
                 nodes: ctx.rarely_written.nodes.load(Relaxed),
                 lookups: ctx.rarely_written.lookups.load(Relaxed),
             };
+            if ALL {
+                self.report_all(&ctx, stats, seconds);
+                return;
+            }
             (self.done)(ctx.index, solution, stats, seconds);
+        }
+    }
+
+    /// (All solutions.) Report `ctx`'s list (nobody works on the cube any
+    /// more).
+    fn report_all(&mut self, ctx: &CubeCtx, stats: Stats, seconds: f64) {
+        let Some(mode) = self.mode() else {
+            return;
+        };
+        let list = mode.lists.lock().remove(&ctx.index);
+        if let Some(list) = list {
+            (mode.done)(ctx.index, list.finish(), stats, seconds);
         }
     }
 
@@ -3261,7 +3569,37 @@ impl<'w, 'a, const QTM: bool> Worker<'w, 'a, QTM> {
         }
     }
 
+    /// (All solutions.) Start the list of the fresh cube `index` (`root`,
+    /// with the bounds of it and its inverse). Returns false if the cube is
+    /// finished already, and reported: its bounds are above the limit, so
+    /// it has no solution within it.
+    fn fresh_all(&mut self, index: usize, root: Cube, bounds: (u8, u8), started: Instant) -> bool {
+        let (pool, solver) = (self.pool, self.solver);
+        let Some(mode) = self.mode() else {
+            pool.active.fetch_sub(1, AcqRel);
+            return false;
+        };
+        let list = Collector::new(solver.metric(), &mode.options);
+        let first_target = if QTM {
+            solver.first_target(root, bounds.0, bounds.1)
+        } else {
+            bounds.0.max(bounds.1).max(1)
+        };
+        if first_target > list.limit() {
+            pool.active.fetch_sub(1, AcqRel);
+            let seconds = started.elapsed().as_secs_f64();
+            (mode.done)(index, list.finish(), Stats::default(), seconds);
+            return false;
+        }
+        mode.lists.lock().insert(index, list);
+        true
+    }
+
     /// Start a fresh cube in lane `li`.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one cube's start, with the all-solutions cases in place"
+    )]
     fn fresh(&mut self, li: usize) -> bool {
         let pool = self.pool;
         let solver = self.solver;
@@ -3285,12 +3623,22 @@ impl<'w, 'a, const QTM: bool> Worker<'w, 'a, QTM> {
             let root = Cube::from_cubie(&cubie);
             if root.is_solved() {
                 pool.active.fetch_sub(1, AcqRel);
+                if ALL {
+                    if let Some(mode) = self.mode() {
+                        let list = Collector::solved(solver.metric(), &mode.options);
+                        (mode.done)(index, list, Stats::default(), 0.0);
+                    }
+                    continue;
+                }
                 (self.done)(index, Some(vec![]), Stats::default(), 0.0);
                 continue;
             }
             let root_inverse = root.inverse();
             let bound = solver.lower_bound(root);
             let bound_inverse = solver.lower_bound(root_inverse);
+            if ALL && !self.fresh_all(index, root, (bound, bound_inverse), started) {
+                continue;
+            }
             let spare = pool.spare.lock().pop();
             let mut inner = spare.unwrap_or_else(Inner::touched);
             inner.target = if QTM {
@@ -3304,7 +3652,13 @@ impl<'w, 'a, const QTM: bool> Worker<'w, 'a, QTM> {
                 started,
                 root,
                 root_inverse,
-                sym_filter: solver.sym_filter(root, root_inverse),
+                // (All solutions: every job; the filter keeps one of each
+                // class of equivalent ones.)
+                sym_filter: if ALL {
+                    SymFilter::NONE
+                } else {
+                    solver.sym_filter(root, root_inverse)
+                },
                 claim: Pad::new(AtomicU64::new(0)),
                 task: Pad::new(AtomicU64::new(0)),
                 task_left: Pad::new(AtomicU32::new(0)),
@@ -3344,7 +3698,7 @@ impl<'w, 'a, const QTM: bool> Worker<'w, 'a, QTM> {
             // yet: the "unsolved" part, which this thread holds, keeps it.)
             ctx.parts.fetch_add(1, AcqRel);
             let slot = self.add_local(&ctx);
-            if build(&mut self.scratch, &mut self.bufs, solver, pool, &ctx, true) {
+            if build::<QTM, ALL>(&mut self.scratch, &mut self.bufs, solver, pool, &ctx, true) {
                 while build_task(&mut self.scratch, solver, pool, &ctx, self.id) {}
             }
             #[cfg(test)]
@@ -3874,6 +4228,7 @@ impl Pool<'_> {
             donate_wait: 0,
             donate_backoff: 0,
             counts: [0; NCOUNT],
+            all: (),
         };
         // The worker in a page-aligned slot of this frame (realigned to a
         // page), its loops' frames `WORKER_DEPTH` deeper.
@@ -4069,6 +4424,95 @@ mod tests {
                     "cube {i}: {threads} threads, {nlanes} lanes, {max_active} cubes"
                 );
             }
+        }
+    }
+
+    /// All solutions (`all_solutions`) with work sharing over a tiny search,
+    /// as `share_protocol_with_tiny_search`: every cube is reported once,
+    /// with the list of `Solver::all_solutions` (which the integration
+    /// tests check against brute force), whatever the threads, lanes and
+    /// cubes in progress; and jobs were split between lanes and threads
+    /// while solutions were being recorded.
+    #[test]
+    fn share_all_solutions_with_tiny_search() {
+        let corners = Cocsep::truncated(4);
+        let table = H48Table::zeroed(0, 2);
+        let solver = Solver::new(&corners, &table);
+        let mut rng = crate::cubie::Rng(78);
+        let (count, longest, plus) = if cfg!(miri) { (4, 3, 1) } else { (30, 5, 2) };
+        let cubes: Vec<CubieCube> = (0..count)
+            .map(|i| {
+                let moves: Vec<u8> = (0..i % longest)
+                    .map(|_| u8::try_from(rng.below(18)).unwrap())
+                    .collect();
+                CubieCube::SOLVED.apply_moves(&moves).unwrap()
+            })
+            .collect();
+        let options = Options::plus(plus);
+        let want: Vec<Solutions> = cubes
+            .iter()
+            .map(|cube| solver.all_solutions(cube, &options).0)
+            .collect();
+        assert!(want.iter().all(|list| !list.solutions.is_empty()));
+        // (threads, lanes per thread, cubes in progress)
+        let configs: &[(usize, usize, usize)] = if cfg!(miri) {
+            &[(3, 2, usize::MAX), (2, 1, 1)]
+        } else {
+            &[
+                (1, 3, 1),
+                (2, 1, 1),
+                (3, 2, usize::MAX),
+                (4, 3, 2),
+                (8, 2, 1),
+                (16, 1, 4),
+            ]
+        };
+        let mut counts = [0u64; NCOUNT];
+        for &(threads, nlanes, max_active) in configs {
+            let get = |i: usize| cubes.get(i).copied();
+            let lists = Mutex::new(vec![None; cubes.len()]);
+            let done = |i: usize, list: Solutions, _: Stats, _: f64| {
+                let mut lists = lists.lock();
+                assert!(lists[i].is_none(), "cube {i} reported twice");
+                lists[i] = Some(list);
+            };
+            let mode = AllMode {
+                options,
+                done: &done,
+                lists: Mutex::new(BTreeMap::new()),
+            };
+            let pool = Pool::new(&get, max_active, threads);
+            let stop = AtomicBool::new(false);
+            std::thread::scope(|scope| {
+                for _ in 0..threads {
+                    scope.spawn(|| {
+                        // A panic stops the other threads (else they could
+                        // wait for its jobs forever).
+                        let run = || pool.run_all(&solver, nlanes, &stop, &mode);
+                        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(run));
+                        if let Err(e) = result {
+                            stop.store(true, Relaxed);
+                            std::panic::resume_unwind(e);
+                        }
+                    });
+                }
+            });
+            assert!(mode.lists.lock().is_empty(), "a list was not reported");
+            for (sum, count) in counts.iter_mut().zip(*pool.counters.lock()) {
+                *sum += count;
+            }
+            let lists = lists.into_inner();
+            for (i, (list, want)) in lists.iter().zip(&want).enumerate() {
+                assert_eq!(
+                    list.as_ref(),
+                    Some(want),
+                    "cube {i}: {threads} threads, {nlanes} lanes, {max_active} cubes"
+                );
+            }
+        }
+        if !cfg!(miri) {
+            assert!(counts[C_BUILDS] > 0 && counts[C_JOBS] > 0, "{counts:?}");
+            assert!(counts[C_SPLITS] > 0 && counts[C_PIECES] > 0, "{counts:?}");
         }
     }
 
@@ -4342,6 +4786,7 @@ mod tests {
             donate_wait: 0,
             donate_backoff: 0,
             counts: [0; NCOUNT],
+            all: (),
         }
     }
 

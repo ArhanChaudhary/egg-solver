@@ -22,6 +22,8 @@
 //!   cubes.
 //! * `symstart`: for cubes with a symmetry, one job of each class of
 //!   equivalent job prefixes.
+//! * `solutions`: every distinct solution up to a length (all optimal
+//!   ones, or up to some moves more), with the same searches.
 //! * `cli` (feature `cli`, on by default): what the binaries share.
 
 // No intentional panics in shipped code (user request; asserts, which no
@@ -61,6 +63,7 @@ pub mod simd;
 #[cfg(not(backend = "x86"))]
 #[path = "portable/mod.rs"]
 pub mod simd;
+pub mod solutions;
 pub mod solver;
 pub mod symstart;
 pub mod tables;

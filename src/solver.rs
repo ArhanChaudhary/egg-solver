@@ -18,6 +18,10 @@
 //! so that the last iteration tends to find its solution early (-36% nodes,
 //! +46% at 48T on a batch when added, job-order).
 //!
+//! `all_solutions` lists every distinct solution up to a length instead
+//! (`crate::solutions`): the same search, which records a solution and goes
+//! on, through every target up to the limit.
+//!
 //! In the quarter-turn metric (`metric`; the search's `QTM` parameter) the
 //! search is the same, with a half turn charged two moves of the target:
 //! targets of the parity of the cube's corner permutation, in steps of 2,
@@ -28,8 +32,10 @@ use crate::coord::{cocsep_x3, index_sym};
 use crate::cubie::{inverse_move, CubieCube, Move};
 use crate::metric::{move_cost, Metric};
 use crate::simd::Cube;
+use crate::solutions::{Collector, Options, Solutions};
 use crate::symstart::SymFilter;
 use crate::tables::{packed_class, packed_depth, packed_sym_to_rep, Cocsep, H48Table, TableError};
+use std::cell::RefCell;
 
 /// All 18 moves (the low 18 bits).
 pub const ALL_MOVES: u32 = u32::MAX.unbounded_shr(32 - 18);
@@ -176,8 +182,47 @@ struct Child {
 
 /// A bound not known yet.
 const UNKNOWN: u8 = 0xFF;
-/// `search`'s result when it found a solution.
+/// `search`'s result when it found a solution (in a search for all
+/// solutions: when it is to stop, having found more than asked for).
 const FOUND: u8 = 0xFE;
+
+/// What a search does with a solution: `One` ends with it (the path in
+/// `SearchState` is the solution); a search for all solutions
+/// (`Solver::all_solutions`) records it in its `Collector` and goes on.
+/// (A type parameter of the search, passed by value: `One` is no data, so
+/// the search for one solution has the code and the state it has without
+/// the other.)
+trait Found: Copy {
+    /// Whether solutions are recorded.
+    const ALL: bool;
+    /// Record the solution of the path in `state`. Returns whether the
+    /// search goes on (false: there are more solutions than asked for).
+    fn record(self, state: &SearchState) -> bool;
+}
+
+/// See `Found`.
+#[derive(Clone, Copy)]
+struct One;
+
+impl Found for One {
+    const ALL: bool = false;
+    #[inline(always)]
+    fn record(self, _: &SearchState) -> bool {
+        false
+    }
+}
+
+impl Found for &RefCell<Collector> {
+    const ALL: bool = true;
+    fn record(self, state: &SearchState) -> bool {
+        let mut solution = state.moves[..state.n_moves].to_vec();
+        let premoves = state.premoves[..state.n_premoves].iter().rev();
+        solution.extend(premoves.map(|&mv| inverse_move(mv)));
+        // (Borrowed only here: never twice.)
+        self.try_borrow_mut()
+            .is_ok_and(|mut collector| collector.offer(&solution))
+    }
+}
 
 /// Half turns are left out on one side when the other side's bound is
 /// within this many moves of the moves left (`bound + slack >= remaining`):
@@ -594,7 +639,7 @@ impl<'a> Solver<'a> {
                 }
                 state.n_moves = j.len as usize;
                 state.n_premoves = 0;
-                let found = self.search::<QTM>(
+                let found = self.search::<QTM, One>(
                     &mut state,
                     j.cube,
                     j.inverse,
@@ -603,6 +648,7 @@ impl<'a> Solver<'a> {
                     normal_moves,
                     inverse_moves,
                     remaining_depth,
+                    One,
                 ) == FOUND;
                 j.stat = state.stat;
                 if found {
@@ -617,6 +663,160 @@ impl<'a> Solver<'a> {
         }
     }
 
+    /// Every distinct solution of `cube` within the limits of `options`
+    /// (`crate::solutions`: all optimal ones, or up to some moves more),
+    /// in the solver's metric, each in canonical form. An unsolvable cube
+    /// (or a table whose bounds are too high) has none.
+    ///
+    /// The search of `solve`, but a solution is recorded and the search
+    /// goes on, through every target up to the limit, on all jobs in any
+    /// order and without the symmetric-start filter (rules for one optimal
+    /// solution). Pruning by bounds is unchanged.
+    #[must_use]
+    pub fn all_solutions(&self, cube: &CubieCube, options: &Options) -> (Solutions, Stats) {
+        if self.metric.is_qtm() {
+            self.all_metric::<true>(cube, options)
+        } else {
+            self.all_metric::<false>(cube, options)
+        }
+    }
+
+    /// `all_solutions` in QTM if `QTM`, else in HTM.
+    fn all_metric<const QTM: bool>(
+        &self,
+        cube: &CubieCube,
+        options: &Options,
+    ) -> (Solutions, Stats) {
+        let cube = Cube::from_cubie(cube);
+        if cube.is_solved() {
+            return (Collector::solved(self.metric, options), Stats::default());
+        }
+        let inverse = cube.inverse();
+        let normal_bound = self.lower_bound(cube);
+        let inverse_bound = self.lower_bound(inverse);
+        let collector = RefCell::new(Collector::new(self.metric, options));
+        let limit = || {
+            collector
+                .try_borrow()
+                .map_or(0, |collector| collector.limit())
+        };
+        let mut state = SearchState {
+            moves: [0; 32],
+            n_moves: 0,
+            premoves: [0; 32],
+            n_premoves: 0,
+            stats: Stats::default(),
+            stat: 0,
+        };
+        let mut jobs = vec![Job {
+            moves: [0; 4],
+            len: 0,
+            cost: 0,
+            cube,
+            inverse,
+            stat: 0,
+            normal_bound,
+            inverse_bound,
+        }];
+        let mut target = self.first_target(cube, normal_bound, inverse_bound);
+        let slack = half_turn_slack(QTM);
+        // (The limit is at most `max_target`, which keeps the moves within
+        // `SearchState::moves`.)
+        while target <= limit() {
+            let job_len = self.job_len(target);
+            while jobs.first().is_some_and(|j| usize::from(j.len) < job_len) {
+                jobs = self.extend_all_jobs::<QTM>(&jobs);
+            }
+            let mut stopped = false;
+            for j in &jobs {
+                let remaining_depth = target - j.cost;
+                let (normal_bound, inverse_bound) = (j.normal_bound, j.inverse_bound);
+                // (A job that solves the cube: every sequence that starts
+                // with it has a detour, see `crate::solutions`.)
+                if normal_bound > remaining_depth
+                    || inverse_bound > remaining_depth
+                    || (j.len > 0 && j.cube.is_solved())
+                {
+                    continue;
+                }
+                let mut normal_moves = if j.len == 0 {
+                    ALL_MOVES
+                } else {
+                    ALLOWED_AFTER[(j.moves[j.len as usize - 1] / 3) as usize]
+                };
+                let mut inverse_moves = ALL_MOVES;
+                if inverse_bound + slack >= remaining_depth {
+                    normal_moves &= QUARTER_TURNS;
+                }
+                if normal_bound + slack >= remaining_depth {
+                    inverse_moves &= QUARTER_TURNS;
+                }
+                for (to, &mv) in state
+                    .moves
+                    .iter_mut()
+                    .zip(&j.moves)
+                    .take(usize::from(j.len))
+                {
+                    *to = mv;
+                }
+                state.n_moves = j.len as usize;
+                state.n_premoves = 0;
+                let stop = self.search::<QTM, &RefCell<Collector>>(
+                    &mut state,
+                    j.cube,
+                    j.inverse,
+                    normal_bound,
+                    inverse_bound,
+                    normal_moves,
+                    inverse_moves,
+                    remaining_depth,
+                    &collector,
+                ) == FOUND;
+                if stop {
+                    stopped = true;
+                    break;
+                }
+            }
+            // (A stopped iteration is not complete.)
+            let go_on = !stopped
+                && collector.try_borrow_mut().is_ok_and(|mut collector| {
+                    collector.iteration_done(target, self.target_step())
+                });
+            if !go_on {
+                break;
+            }
+            target += self.target_step();
+        }
+        (collector.into_inner().finish(), state.stats)
+    }
+
+    /// (All solutions.) Extend jobs by one move, every child with its
+    /// bounds: `extend_jobs` and `job_bounds` without a filter. (Apart from
+    /// them: they stay the one-solution search's own, compiled as before.)
+    fn extend_all_jobs<const QTM: bool>(&self, jobs: &[Job]) -> Vec<Job> {
+        let mut out = Vec::with_capacity(jobs.len() * 15);
+        for j in jobs {
+            let mut todo = if j.len == 0 {
+                ALL_MOVES
+            } else {
+                ALLOWED_AFTER[(j.moves[j.len as usize - 1] / 3) as usize]
+            };
+            while let Some(mv) = Move::lowest(todo) {
+                todo ^= todo.isolate_lowest_one();
+                let mut child = *j;
+                child.moves[child.len as usize] = mv as u8;
+                child.len += 1;
+                child.cost += move_cost(QTM, mv as u8);
+                child.cube = j.cube.apply_move(mv);
+                child.inverse = j.inverse.premove_inverse(mv);
+                child.normal_bound = self.lower_bound(child.cube);
+                child.inverse_bound = self.lower_bound(child.inverse);
+                out.push(child);
+            }
+        }
+        out
+    }
+
     /// Search for a solution of exactly `remaining_depth` (> 0) more moves.
     /// The bounds `normal_bound`, `inverse_bound` are at most
     /// `remaining_depth`; `normal_moves`, `inverse_moves` are the moves
@@ -629,8 +829,14 @@ impl<'a> Solver<'a> {
     /// node by `v - 1` and (b) bounds same-face siblings (one move apart) by
     /// `v - 1` as well. (Both: -17.7% nodes, +7.5% throughput when added,
     /// sibling-prune.) In QTM a half turn is two moves (`Learned`).
-    #[allow(clippy::too_many_arguments)]
-    fn search<const QTM: bool>(
+    ///
+    /// In a search for all solutions (`found`, see `Found`) a solution is
+    /// recorded and the search goes on; `FOUND` then means that it is to
+    /// stop. A node that is solved with moves left is not searched in
+    /// either case: there because every sequence through it has a detour
+    /// (see `crate::solutions`).
+    #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
+    fn search<const QTM: bool, F: Found>(
         &self,
         state: &mut SearchState,
         cube: Cube,
@@ -640,11 +846,12 @@ impl<'a> Solver<'a> {
         normal_moves: u32,
         inverse_moves: u32,
         remaining_depth: u8,
+        found: F,
     ) -> u8 {
         if remaining_depth == 1 {
             // (In QTM only quarter turns are left: half turns are masked
             // with one move left, `half_turn_slack`.)
-            return Self::last_move(state, cube, normal_moves & inverse_moves);
+            return Self::last_move(state, cube, normal_moves & inverse_moves, found);
         }
         let slack = half_turn_slack(QTM);
         // Move the side with fewer moves to try (ties: the normal cube; as
@@ -690,6 +897,17 @@ impl<'a> Solver<'a> {
                         state.premoves[state.n_premoves] = child.mv;
                         state.n_premoves += 1;
                     }
+                    if F::ALL {
+                        let go_on = found.record(state);
+                        if normal {
+                            state.n_moves -= 1;
+                        } else {
+                            state.n_premoves -= 1;
+                        }
+                        if go_on {
+                            continue;
+                        }
+                    }
                     return FOUND;
                 }
                 continue;
@@ -728,7 +946,7 @@ impl<'a> Solver<'a> {
             if child_normal_bound + slack >= child_remaining {
                 child_inverse_moves &= QUARTER_TURNS;
             }
-            let result = self.search::<QTM>(
+            let result = self.search::<QTM, F>(
                 state,
                 child_cube,
                 child_inverse,
@@ -737,6 +955,7 @@ impl<'a> Solver<'a> {
                 child_normal_moves,
                 child_inverse_moves,
                 child_remaining,
+                found,
             );
             if result == FOUND {
                 return FOUND;
@@ -759,7 +978,8 @@ impl<'a> Solver<'a> {
 
     /// The last move of a search: is one of `moves` (allowed on both sides)
     /// a solution? (Nodes with one move left always move the normal cube.)
-    fn last_move(state: &mut SearchState, cube: Cube, moves: u32) -> u8 {
+    /// (All solutions: each one that is, recorded; see `search`.)
+    fn last_move<F: Found>(state: &mut SearchState, cube: Cube, moves: u32, found: F) -> u8 {
         let mut todo = moves;
         while let Some(mv) = Move::lowest(todo) {
             todo ^= todo.isolate_lowest_one();
@@ -767,6 +987,13 @@ impl<'a> Solver<'a> {
             if cube.apply_move(mv).is_solved() {
                 state.moves[state.n_moves] = mv as u8;
                 state.n_moves += 1;
+                if F::ALL {
+                    let go_on = found.record(state);
+                    state.n_moves -= 1;
+                    if go_on {
+                        continue;
+                    }
+                }
                 return FOUND;
             }
         }
