@@ -39,6 +39,8 @@ target/release/solve --table tables/h7 < testdata/random_state.txt
 target/release/solve --table tables/h7 -c 1 < testdata/random_state.txt
 ```
 
+A cube can also be given as its 54 stickers instead of a scramble, wherever a scramble is read (`solve`, `bench` scramble files, `--warmup`): faces in the order U R F D L B, each read row by row as seen from outside (U with B at the top, D with F at the top, the side faces with U at the top), in any six symbols. This is what the web page shows for a random cube. A line of 54 symbols of six kinds without move suffixes is always read as stickers, also when the symbols are the face letters; if they are not the stickers of a cube that can be solved, it is an input error and nothing is solved. So a scramble of 54 moves of all six faces with no suffix at all must have one move written with the suffix `1` (`U1` is `U`).
+
 `--fast` requires an explicit `--table`. It does not search directories for tables. With no scramble arguments it reads exactly one nonblank stdin line. Empty input is an error, not a request for a random cube. An explicitly supplied empty scramble argument represents the solved cube. Warm-up is optional: `--warmup SCRAMBLE` adds one solve before the measured solve.
 
 | Option | Meaning |

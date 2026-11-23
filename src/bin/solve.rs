@@ -60,7 +60,7 @@
 use anyhow::Context as _;
 use clap::{parser::ValueSource, CommandFactory as _, FromArgMatches as _, Parser};
 use egg_solver::cli::{self, BadInput, LoadArgs, MetricArgs, Verbosity};
-use egg_solver::cubie::{format_moves, parse_moves, CubieCube};
+use egg_solver::cubie::{format_moves, CubieCube};
 use egg_solver::lanes::share::Pool;
 use egg_solver::metric::Metric;
 use egg_solver::solutions::{Options, Solutions, Stopped, DEFAULT_MAX_SOLUTIONS};
@@ -408,9 +408,8 @@ fn read_scrambles(count: usize) -> anyhow::Result<Vec<CubieCube>> {
         if cubes.len() >= count {
             break;
         }
-        let cube = parse_moves(&line)
-            .and_then(|moves| CubieCube::SOLVED.apply_moves(&moves))
-            .ok_or_else(|| BadInput(format!("line {}: cannot parse {line:?}", n + 1)))?;
+        let cube = cli::input_cube(&line)
+            .map_err(|message| BadInput(format!("line {}: {message}", n + 1)))?;
         cubes.push(cube);
     }
     Ok(cubes)
@@ -610,11 +609,7 @@ fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
         .as_deref()
         .context("--fast requires --table PATH")?;
     let scramble = fast_scramble(args)?;
-    let parse = |text: &str| {
-        parse_moves(text)
-            .and_then(|moves| CubieCube::SOLVED.apply_moves(&moves))
-            .ok_or_else(|| BadInput(format!("cannot parse {text:?}")))
-    };
+    let parse = |text: &str| cli::input_cube(text).map_err(BadInput);
     let mut cubes = Vec::new();
     let warmup = args.warmup.as_deref().unwrap_or("");
     if !warmup.trim().is_empty() {
@@ -1043,11 +1038,7 @@ fn list_fast(args: &Args, options: &Options) -> anyhow::Result<ExitCode> {
     check_listing(options, metric)?;
     catch_interrupt();
     let scramble = fast_scramble(args)?;
-    let parse = |text: &str| {
-        parse_moves(text)
-            .and_then(|moves| CubieCube::SOLVED.apply_moves(&moves))
-            .ok_or_else(|| BadInput(format!("cannot parse {text:?}")))
-    };
+    let parse = |text: &str| cli::input_cube(text).map_err(BadInput);
     let mut cubes = Vec::new();
     let warmup = args.warmup.as_deref().unwrap_or("");
     if !warmup.trim().is_empty() {

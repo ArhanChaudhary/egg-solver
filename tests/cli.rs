@@ -269,6 +269,63 @@ fn solve_fast() {
 
 /// Empty input and missing table flags must fail without opening a table or
 /// starting a hidden solve. The nonexistent path makes that ordering visible.
+/// `solve` and `bench` read a line of 54 stickers as that cube (what the web
+/// page shows for a random cube), not as 54 moves: the stickers of the cube
+/// after R are solved by R', in the face letters or any six symbols. Such a
+/// line that is not a cube is unusable input, and so is junk, with messages
+/// that say which.
+#[test]
+fn sticker_strings_are_cubes() {
+    let table = h0();
+    let solve = env!("CARGO_BIN_EXE_solve");
+    let after_r = "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB";
+    let colours = "wwgwwgwwg rrrrrrrrr ggyggyggy yybyybyyb ooooooooo wbbwbbwbb";
+    let input = format!("{after_r}\nR\n{colours}\n");
+    let out = ok(&run(solve, &[table, "-t", "2"], &input));
+    let solved: Vec<&str> = out.lines().filter(|l| l.starts_with("solved ")).collect();
+    assert_eq!(solved.len(), 3, "{out}");
+    for line in &solved {
+        // `solved <index> <length> <nodes> <seconds> <moves>`
+        let fields: Vec<&str> = line.split(' ').collect();
+        assert_eq!((fields[2], &fields[5..]), ("1", &["R'"][..]), "{out}");
+    }
+    let out = ok(&run(
+        solve,
+        &["--fast", "--table", table, "-t", "2", after_r],
+        "",
+    ));
+    assert!(out.contains("\nsolution R'\n"), "{out}");
+    assert!(
+        out.contains("length   1 moves (optimal, verified)"),
+        "{out}"
+    );
+    let out = ok(&run(solve, &[table, "-t", "2", "--all-optimal"], after_r));
+    assert!(out.contains("\nsolution 0 1 R'\n"), "{out}");
+    let file = scratch_file("stickers.txt");
+    std::fs::write(&file, format!("{after_r}\n")).unwrap();
+    let bench = env!("CARGO_BIN_EXE_bench");
+    let out = ok(&run(bench, &["batch", "-t", "2", table, &file], ""));
+    assert!(
+        out.contains("cubes 1 ") && out.contains("lengths 1:1"),
+        "{out}"
+    );
+    // One corner twisted: 54 stickers, but not a cube.
+    let twisted = "UUUUUUUURFRRRRRRRRFFUFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
+    for (args, input) in [
+        (vec![table], format!("R\n{twisted}\n")),
+        (vec!["--fast", "--table", table, twisted], String::new()),
+    ] {
+        let out = run(solve, &args, &input);
+        let log = text(&out.stderr);
+        assert_eq!(out.status.code(), Some(2), "{log}");
+        assert!(log.contains("54 stickers, which are not a cube"), "{log}");
+        assert!(!text(&out.stdout).contains("solved 1"), "{log}");
+    }
+    let out = run(solve, &[table], "R\nhello\n");
+    assert_eq!(out.status.code(), Some(2));
+    assert!(text(&out.stderr).contains("line 2: cannot parse \"hello\""));
+}
+
 #[test]
 fn solve_requires_explicit_input() {
     let solve = env!("CARGO_BIN_EXE_solve");

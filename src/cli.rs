@@ -68,6 +68,18 @@ pub struct MetricArgs {
     pub metric: crate::metric::Metric,
 }
 
+/// A cube of the input: a scramble, or the 54 stickers of a cube
+/// (`cubie::parse_cube`).
+///
+/// # Errors
+/// With the message to print, if `text` is neither.
+pub fn input_cube(text: &str) -> Result<crate::cubie::CubieCube, String> {
+    crate::cubie::parse_cube(text).map_err(|error| match error {
+        crate::cubie::CubeInputError::Facelets(_) => format!("cannot use {text:?}: {error}"),
+        _ => format!("cannot parse {text:?}"),
+    })
+}
+
 /// `--metric`.
 ///
 /// # Errors

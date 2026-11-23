@@ -38,7 +38,7 @@
 use anyhow::Context as _;
 use clap::{Args, Parser, Subcommand};
 use egg_solver::cli::{self, BadInput, LoadArgs, MetricArgs, Verbosity};
-use egg_solver::cubie::{parse_moves, CubieCube, Rng};
+use egg_solver::cubie::{CubieCube, Rng};
 use egg_solver::lanes::share::Pool;
 use egg_solver::metric::Metric;
 use egg_solver::solver::{Solver, Stats};
@@ -637,11 +637,8 @@ fn cube_set(set: &str) -> anyhow::Result<Vec<CubieCube>> {
         .enumerate()
         .filter(|(_, line)| !line.trim().is_empty())
         .map(|(n, line)| {
-            parse_moves(line)
-                .and_then(|moves| CubieCube::SOLVED.apply_moves(&moves))
-                .ok_or_else(|| {
-                    BadInput(format!("{set}: line {}: cannot parse {line:?}", n + 1)).into()
-                })
+            egg_solver::cli::input_cube(line)
+                .map_err(|message| BadInput(format!("{set}: line {}: {message}", n + 1)).into())
         })
         .collect()
 }

@@ -32,7 +32,7 @@
     )
 )]
 
-use egg_solver::cubie::{format_moves, parse_moves, CubieCube, Rng};
+use egg_solver::cubie::{format_moves, CubieCube, Rng};
 use egg_solver::lanes::share::Pool;
 use egg_solver::metric::Metric;
 use egg_solver::solutions::{Options, Solutions, Stopped, DEFAULT_MAX_SOLUTIONS};
@@ -201,19 +201,10 @@ unsafe fn text_argument<'a>(ptr: *const u8, len: usize) -> Result<&'a str, Strin
 /// of six symbols; see `CubieCube::from_facelets`). A scramble of 54 moves
 /// without suffixes of all six faces would read as facelets.
 fn parse_cube(text: &str) -> Result<CubieCube, String> {
-    let stickers: Vec<char> = text.chars().filter(|c| !c.is_whitespace()).collect();
-    let mut symbols = stickers.clone();
-    symbols.sort_unstable();
-    symbols.dedup();
-    let is_facelets = stickers.len() == 54
-        && symbols.len() == 6
-        && !symbols.iter().any(|c| matches!(c, '1' | '2' | '3' | '\''));
-    if is_facelets {
-        return CubieCube::from_facelets(text).map_err(|e| e.to_string());
-    }
-    parse_moves(text)
-        .and_then(|moves| CubieCube::SOLVED.apply_moves(&moves))
-        .ok_or_else(|| format!("neither a scramble nor 54 facelets: {text:?}"))
+    egg_solver::cubie::parse_cube(text).map_err(|error| match error {
+        egg_solver::cubie::CubeInputError::Facelets(error) => error.to_string(),
+        _ => format!("neither a scramble nor 54 facelets: {text:?}"),
+    })
 }
 
 /// A solved cube as JSON (`{"index":..,"error":..}` if it has no

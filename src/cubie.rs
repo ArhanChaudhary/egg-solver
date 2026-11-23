@@ -602,6 +602,51 @@ pub fn parse_moves(text: &str) -> Option<Vec<u8>> {
     Some(moves)
 }
 
+/// Why a line of input is not a cube (`parse_cube`).
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum CubeInputError {
+    /// 54 symbols of six kinds that are not the stickers of a cube.
+    #[error(
+        "it reads as 54 stickers, which are not a cube: {0} (a scramble of 54 moves \
+         without suffixes also reads as stickers: write one of its moves as U1)"
+    )]
+    Facelets(#[from] FaceletError),
+    /// Neither moves nor 54 stickers.
+    #[error("neither a scramble nor 54 stickers")]
+    Neither,
+}
+
+/// A cube from a line of input: a scramble ("R U2 F' D3 B1") or a facelet
+/// string (the 54 stickers in six symbols, see `CubieCube::from_facelets`).
+///
+/// A line of 54 symbols of exactly six kinds, without the move suffixes
+/// `1`, `2`, `3` and `'`, is read as stickers, also when the six symbols are
+/// the face letters: `UUFUUF...` is a cube's stickers, not 54 moves (which
+/// would be another cube). So a scramble of 54 moves of all six faces
+/// without any suffix cannot be given as it is: write one of its moves with
+/// the suffix `1` (`U1` is `U`).
+///
+/// # Errors
+/// If the text is neither, or has the form of a facelet string that is not
+/// a cube.
+#[cfg(cubie_generated)]
+pub fn parse_cube(text: &str) -> Result<CubieCube, CubeInputError> {
+    let mut symbols: Vec<char> = text.chars().filter(|c| !c.is_whitespace()).collect();
+    let stickers = symbols.len();
+    symbols.sort_unstable();
+    symbols.dedup();
+    let is_facelets = stickers == 54
+        && symbols.len() == 6
+        && !symbols.iter().any(|c| matches!(c, '1' | '2' | '3' | '\''));
+    if is_facelets {
+        return Ok(CubieCube::from_facelets(text)?);
+    }
+    parse_moves(text)
+        .and_then(|moves| CubieCube::SOLVED.apply_moves(&moves))
+        .ok_or(CubeInputError::Neither)
+}
+
 /// A move sequence in Singmaster notation, separated by spaces.
 #[must_use]
 pub fn format_moves(moves: &[u8]) -> String {
@@ -1022,6 +1067,44 @@ pub(crate) mod model {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `parse_cube`: scrambles as before; 54 symbols of six kinds without
+    /// move suffixes are stickers (the face letters too: the stickers of R,
+    /// not 54 moves), in any six symbols; such a line that is not a cube is
+    /// an error, not a scramble; a suffix makes 54 moves a scramble again.
+    #[test]
+    fn parse_cube_reads_scrambles_and_stickers() {
+        let cube_of = |moves: &str| {
+            CubieCube::SOLVED
+                .apply_moves(&parse_moves(moves).unwrap())
+                .unwrap()
+        };
+        for moves in ["", "R", "R U R' U'", "R3 B1 F2 L2 U3", "U2D2 R2L2"] {
+            assert_eq!(parse_cube(moves), Ok(cube_of(moves)), "{moves}");
+        }
+        let r = "UUFUUFUUFRRRRRRRRRFFDFFDFFDDDBDDBDDBLLLLLLLLLUBBUBBUBB";
+        assert_eq!(parse_cube(r), Ok(cube_of("R")));
+        assert_ne!(parse_cube(r), Ok(cube_of(&r.replace("", " "))));
+        let spaced = "UUFUUFUUF RRRRRRRRR FFDFFDFFD\tDDBDDBDDB LLLLLLLLL UBBUBBUBB\n";
+        assert_eq!(parse_cube(spaced), Ok(cube_of("R")));
+        let colors: String = r
+            .chars()
+            .map(|c| "wrgyob".chars().nth("URFDLB".find(c).unwrap()).unwrap())
+            .collect();
+        assert_eq!(parse_cube(&colors), Ok(cube_of("R")));
+        // 54 face letters that are not a cube (one corner twisted).
+        let twisted = "UUUUUUUURFRRRRRRRRFFUFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB";
+        assert!(matches!(
+            parse_cube(twisted),
+            Err(CubeInputError::Facelets(_))
+        ));
+        // The same 54 letters with a suffix are moves.
+        let moves = format!("U1{}", &twisted[1..]);
+        assert_eq!(parse_cube(&moves), Ok(cube_of(&twisted.replace("", " "))));
+        for junk in ["X", "R U Q", "R''", "hello"] {
+            assert_eq!(parse_cube(junk), Err(CubeInputError::Neither), "{junk}");
+        }
+    }
 
     /// Facelet strings: known ones (solved, U, R, the superflip as in
     /// Kociemba's examples), round trips with any color symbols, and

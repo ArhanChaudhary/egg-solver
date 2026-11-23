@@ -54,6 +54,8 @@ target/release/gen check tables/h7
 `-t N` selects threads; `-c 1` processes stdin one cube at a time;
 `--json` emits JSON. `--fast` requires `--table` and one scramble from
 arguments or stdin. Empty input is an error. `--warmup SCRAMBLE` is optional.
+A cube can also be given as its 54 stickers (faces U R F D L B, as the web
+page shows a random cube) instead of a scramble.
 
 `--metric qtm` solves in the quarter-turn metric, where a half turn counts as
 two moves. It works with any table; a QTM table (`gen 7 auto tables/h7q
