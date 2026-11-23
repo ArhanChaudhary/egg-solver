@@ -15,9 +15,12 @@
 // as one. And all solutions up to a length (`solveAll`): the known lists of
 // the 6-half-turn checkerboard (6 optimal solutions, 12 more of 8 moves),
 // each solution replayed, in order and once; the limits and the cap
-// (`truncated`); QTM lengths; what no search reaches is refused.
+// (`truncated`); QTM lengths; what no search reaches is refused. A list is
+// stopped by `timeLimit`, and on the threads build by `cancel` from another
+// thread (a worker here, as a page's main thread would while its solver
+// worker is blocked): it returns what was found, marked `stopped`.
 
-import { EggSolver } from './egg-solver.mjs';
+import { EggSolver, cancel } from './egg-solver.mjs';
 import * as model from './cube-model.mjs';
 
 const fail = (message) => {
@@ -128,7 +131,46 @@ for (const [name, threads] of [['egg-solver.wasm', undefined], ['egg-solver-thre
   if (quarter.count !== 2 || quarter.optimal !== 8 || quarter.metric !== 'qtm' || lengths(quarter) !== '8 8') {
     fail(`${name}: solveAll in QTM: ${JSON.stringify(quarter)}`);
   }
-  for (const options of [{ maxLength: 21 }, { metric: 'qtm', maxLength: 27 }, { plus: -1 }, { plus: 1.5 }, { maxSolutions: 0 }]) {
+  // A list stopped by the clock: what was found, marked; a limit that is
+  // not reached changes nothing.
+  const long = "R U F2 D L' B";
+  const timed = solver.solveAll(long, { maxLength: 16, timeLimit: 0.2 });
+  replays(long, timed);
+  if (timed.stopped !== 'time' || timed.truncated || timed.optimal !== 6 || timed.complete_length >= 16 || timed.seconds > 20) {
+    fail(`${name}: solveAll timeLimit: ${JSON.stringify({ ...timed, solutions: undefined })}`);
+  }
+  const whole = solver.solveAll(long, { maxLength: timed.complete_length });
+  const shortOnes = (list) => list.solutions.filter((solution) => solution.length <= timed.complete_length).map((solution) => solution.moves).join('|');
+  if (whole.stopped !== null || shortOnes(timed) !== shortOnes(whole)) fail(`${name}: solveAll timeLimit: not complete up to ${timed.complete_length}`);
+  const roomy = solver.solveAll(checkerboard, { plus: 2, timeLimit: 3600 });
+  if (roomy.stopped !== null || lengths(roomy) !== lengths(plus)) fail(`${name}: solveAll with a roomy timeLimit: ${lengths(roomy)}`);
+  // Cancelled from another thread (the threads build: its memory is shared).
+  const handle = solver.cancelHandle;
+  if ((handle !== null) !== Boolean(threads)) fail(`${name}: cancelHandle ${JSON.stringify(handle)}`);
+  if (cancel(handle) !== Boolean(threads)) fail(`${name}: cancel(handle)`);
+  // (A cancel without a running list does nothing: the next one starts afresh.)
+  if (solver.solveAll(checkerboard).count !== 6) fail(`${name}: solveAll after an idle cancel`);
+  if (handle) {
+    const code = `import { cancel } from ${JSON.stringify(new URL('./egg-solver.mjs', import.meta.url).href)};
+      self.onmessage = ({ data }) => setTimeout(() => self.postMessage(cancel(data.handle)), data.delay);
+      self.postMessage('ready');`;
+    const canceller = new Worker(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })), { type: 'module' });
+    await new Promise((resolve, reject) => {
+      canceller.onmessage = resolve;
+      canceller.onerror = (e) => reject(new Error(e.message));
+    });
+    canceller.postMessage({ handle, delay: 400 });
+    // (Blocks this thread, as a page's worker is blocked; minutes if not cancelled.)
+    const cancelled = solver.solveAll(long, { maxLength: 17, maxSolutions: 100000000 });
+    canceller.terminate();
+    replays(long, cancelled);
+    if (cancelled.stopped !== 'cancelled' || cancelled.optimal !== 6 || cancelled.count < 4 || cancelled.seconds > 60) {
+      fail(`${name}: solveAll cancelled: ${JSON.stringify({ ...cancelled, solutions: undefined })}`);
+    }
+    const after = solver.solveAll(checkerboard, { plus: 2 });
+    if (after.stopped !== null || lengths(after) !== lengths(plus)) fail(`${name}: solveAll after a cancel: ${lengths(after)}`);
+  }
+  for (const options of [{ maxLength: 21 }, { metric: 'qtm', maxLength: 27 }, { plus: -1 }, { plus: 1.5 }, { maxSolutions: 0 }, { timeLimit: 0 }, { timeLimit: 'soon' }]) {
     let refused = false;
     try {
       solver.solveAll(checkerboard, options);

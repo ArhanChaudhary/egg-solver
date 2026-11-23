@@ -35,7 +35,7 @@
 use egg_solver::cubie::{format_moves, parse_moves, CubieCube, Rng};
 use egg_solver::lanes::share::Pool;
 use egg_solver::metric::Metric;
-use egg_solver::solutions::{Options, Solutions, DEFAULT_MAX_SOLUTIONS};
+use egg_solver::solutions::{Options, Solutions, Stopped, DEFAULT_MAX_SOLUTIONS};
 use egg_solver::solver::{Solver, Stats};
 use egg_solver::tables::{default_base_metric, h48_bytes, Cocsep, H48Table, Memory};
 use std::fmt::Write as _;
@@ -460,6 +460,21 @@ pub unsafe extern "C" fn egg_solver_solve(
     })
 }
 
+/// The cancel word of `egg_solver_solve_all`: a byte of the module's
+/// memory that stops a running list when another thread sets it to 1.
+static CANCEL: AtomicBool = AtomicBool::new(false);
+
+/// The address of the cancel word in the module's memory: a thread that
+/// shares the memory (the threads build) stops a running
+/// `egg_solver_solve_all` by storing 1 there with an atomic byte store
+/// (`cancel` in `egg-solver.mjs`). The list is then returned with what was
+/// found, `"stopped":"cancelled"`. Every `egg_solver_solve_all` clears the
+/// word when it starts.
+#[unsafe(no_mangle)]
+pub extern "C" fn egg_solver_cancel_address() -> *const u8 {
+    CANCEL.as_ptr().cast_const().cast::<u8>()
+}
+
 /// List every distinct solution of one cube (a scramble or facelets, see
 /// `parse_cube`) up to a length, instead of one optimal solution
 /// (`egg_solver::solutions`), with all lanes of all threads on it. The
@@ -468,14 +483,18 @@ pub unsafe extern "C" fn egg_solver_solve(
 /// (0: no such limit; at most God's number of the metric); with both the
 /// smaller, with neither the optimal solutions. `max_solutions`: at most so
 /// many are listed (0: 100000); if the cube has more, the search stops and
-/// the list is marked truncated. `lanes`, `threads` and `metric` as for
+/// the list is marked truncated. `time_limit`: seconds after which the
+/// search stops (0: never); it also stops when the cancel word is set
+/// (`egg_solver_cancel_address`). `lanes`, `threads` and `metric` as for
 /// `egg_solver_solve`. Output: `{"index":0,"count":..,"optimal":..,
-/// "max_length":..,"truncated":false,"complete_length":..,"metric":..,
-/// "by_length":[{"length":..,"count":..}],"solutions":[{"moves":..,
-/// "length":..}],"nodes":..,"lookups":..,"seconds":..}`: the solutions by
-/// length (in that metric), each in canonical form; `optimal` is null if
-/// there is no solution of at most `max_length` moves, and a truncated
-/// list holds all solutions of at most `complete_length` moves and some
+/// "max_length":..,"truncated":false,"stopped":null,"complete_length":..,
+/// "metric":..,"by_length":[{"length":..,"count":..}],"solutions":
+/// [{"moves":..,"length":..}],"nodes":..,"lookups":..,"seconds":..}`: the
+/// solutions by length (in that metric), each in canonical form; `optimal`
+/// is null if there is no solution of at most `max_length` moves (or none
+/// was found before the search was stopped); `stopped` is `"time"` or
+/// `"cancelled"` if the search was stopped. A truncated or stopped list
+/// holds all solutions of at most `complete_length` moves and maybe some
 /// longer ones.
 ///
 /// # Safety
@@ -491,9 +510,11 @@ pub unsafe extern "C" fn egg_solver_solve_all(
     plus: u32,
     max_length: u32,
     max_solutions: u32,
+    time_limit: f64,
 ) -> i32 {
     // SAFETY: as the caller promises.
     let text = unsafe { text_argument(text, len) };
+    CANCEL.store(false, std::sync::atomic::Ordering::SeqCst);
     with_state(|state| {
         let cube = parse_cube(text?)?;
         let metric = metric_of(metric, state.table.as_ref())?;
@@ -506,6 +527,10 @@ pub unsafe extern "C" fn egg_solver_solve_all(
         let limit = |value: u32| u8::try_from(value).ok();
         let plus = plus.checked_sub(1).map(|k| limit(k).unwrap_or(u8::MAX));
         let max_length = limit(max_length).filter(|&n| n > 0);
+        // (0, or not a time: no limit.)
+        let time_limit = Some(time_limit)
+            .filter(|&seconds| seconds > 0.0)
+            .and_then(|seconds| std::time::Duration::try_from_secs_f64(seconds).ok());
         let options = Options {
             // (Neither limit: the optimal solutions.)
             plus: plus.or(max_length.is_none().then_some(0)),
@@ -514,9 +539,8 @@ pub unsafe extern "C" fn egg_solver_solve_all(
                 0 => DEFAULT_MAX_SOLUTIONS,
                 n => n as usize,
             },
-            // (No time limit and no cancel flag yet: the next commit.)
-            time_limit: None,
-            cancel: None,
+            time_limit,
+            cancel: Some(&CANCEL),
         };
         let solver = solver_of(state, metric)?;
         let get = |i: usize| (i == 0).then_some(cube);
@@ -536,7 +560,13 @@ pub unsafe extern "C" fn egg_solver_solve_all(
         )
         .map_err(|e| e.to_string())?;
         let result = result.into_inner().unwrap_or_else(PoisonError::into_inner);
-        result.ok_or("not solved")?
+        // (Cancelled before the cube's search began: no list was reported.
+        // The recursive solver, which looks at the flag first, gives the
+        // empty one, marked as cancelled.)
+        result.unwrap_or_else(|| {
+            let (list, stats) = solver.all_solutions(&cube, &options);
+            solutions_json(0, &list, stats, 0.0, metric)
+        })
     })
 }
 
@@ -549,14 +579,18 @@ fn solutions_json(
     seconds: f64,
     metric: Metric,
 ) -> Result<String, String> {
-    if list.optimal.is_none() && list.max_length >= metric.max_target() {
+    if list.optimal.is_none() && list.max_length >= metric.max_target() && list.stopped.is_none() {
         return Err(no_solution(metric));
     }
+    let stopped = list.stopped.map_or_else(
+        || "null".to_string(),
+        |stopped| format!(r#""{}""#, Stopped::name(stopped)),
+    );
     let optimal = list
         .optimal
         .map_or_else(|| "null".to_string(), |optimal| optimal.to_string());
     let mut json = format!(
-        r#"{{"index":{index},"count":{},"optimal":{optimal},"max_length":{},"truncated":{},"complete_length":{},"metric":"{metric}","by_length":["#,
+        r#"{{"index":{index},"count":{},"optimal":{optimal},"max_length":{},"truncated":{},"stopped":{stopped},"complete_length":{},"metric":"{metric}","by_length":["#,
         list.solutions.len(),
         list.max_length,
         list.truncated,

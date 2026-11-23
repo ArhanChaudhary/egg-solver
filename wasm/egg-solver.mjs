@@ -6,6 +6,7 @@
 //   solver.solve("R U R' U' F2 D L2");             // { moves, length, nodes, ... }
 //   solver.solve("R U R' U'", { metric: 'qtm' });  // quarter-turn metric
 //   solver.solveAll("R U R' U' F2", { plus: 1 });  // every solution up to optimal + 1
+//   cancel(solver.cancelHandle);                   // from another thread: stop a running solveAll
 //
 // The module is built for WASI (wasm32-wasip1, or wasm32-wasip1-threads for
 // several threads): this file provides the few WASI functions it imports
@@ -488,14 +489,19 @@ export class EggSolver {
    * one solution (listed with U before D, R before L, F before B), and a
    * sequence that only adds a loop to a shorter solution is not listed. At
    * most `maxSolutions` (default 100000) are listed: if the cube has more,
-   * the search stops and `truncated` is true.
+   * the search stops and `truncated` is true. `timeLimit` (seconds) stops
+   * the search when it is up, and `cancel(solver.cancelHandle)` from
+   * another thread stops it at once (the threads build): `stopped` is then
+   * 'time' or 'cancelled', and the list is what was found until then.
    * Returns `{ solutions: [{ moves, length }], count, optimal, max_length,
-   * truncated, complete_length, by_length: [{ length, count }], metric,
-   * nodes, lookups, seconds }`: the solutions by length; `optimal` is null
-   * if none has at most `maxLength` moves; a truncated list has all
-   * solutions of at most `complete_length` moves and some longer ones.
+   * truncated, stopped, complete_length, by_length: [{ length, count }],
+   * metric, nodes, lookups, seconds }`: the solutions by length; `optimal`
+   * is null if none has at most `maxLength` moves (or none was found before
+   * the search was stopped); `stopped` is null for a search that reached
+   * its limit; a truncated or stopped list has all solutions of at most
+   * `complete_length` moves and maybe some longer ones.
    */
-  solveAll(cube, { plus, maxLength, maxSolutions, lanes = 0, metric } = {}) {
+  solveAll(cube, { plus, maxLength, maxSolutions, timeLimit, lanes = 0, metric } = {}) {
     const code = metricCode(metric);
     const count = (name, value, least) => {
       if (value === undefined || value === null) return 0;
@@ -507,8 +513,30 @@ export class EggSolver {
     // (The module takes 1 + plus: 0 means no such limit.)
     const plusCode = plus === undefined || plus === null ? 0 : count('plus', plus, 0) + 1;
     const [length, most] = [count('maxLength', maxLength, 1), count('maxSolutions', maxSolutions, 1)];
+    let seconds = 0;
+    if (timeLimit !== undefined && timeLimit !== null) {
+      if (typeof timeLimit !== 'number' || !(timeLimit > 0)) {
+        throw new Error(`egg-solver: timeLimit ${timeLimit}: seconds, above 0`);
+      }
+      seconds = timeLimit;
+    }
     return this.withText(cube, (ptr, len) =>
-      this.call('egg_solver_solve_all', ptr, len, lanes, this.threads, code, plusCode, length, most));
+      this.call('egg_solver_solve_all', ptr, len, lanes, this.threads, code, plusCode, length, most, seconds));
+  }
+
+  /**
+   * What another thread needs to stop a running `solveAll` of this solver
+   * (`cancel(handle)`): the module's shared memory and the place of its
+   * cancel word in it, `{ buffer, offset }`. It can be posted to another
+   * thread (a page's main thread, while the worker that owns the solver is
+   * blocked in `solveAll`). Null for the single-thread build, whose memory
+   * no other thread sees: there only `timeLimit` ends a list early.
+   */
+  get cancelHandle() {
+    if (typeof SharedArrayBuffer === 'undefined' || !(this.memory.buffer instanceof SharedArrayBuffer)) {
+      return null;
+    }
+    return { buffer: this.memory.buffer, offset: this.exports.egg_solver_cancel_address() >>> 0 };
   }
 
   /**
@@ -577,6 +605,19 @@ export class EggSolver {
     for (const worker of this.workers) worker.terminate();
     this.workers = [];
   }
+}
+
+/**
+ * Stop the `solveAll` that is running on the solver of `handle` (its
+ * `cancelHandle`), from any thread: the search ends within one round of its
+ * lanes, and `solveAll` returns what was found with `stopped: 'cancelled'`.
+ * Without a running `solveAll` it does nothing (the next one starts
+ * afresh). Returns false for a null handle (the single-thread build).
+ */
+export function cancel(handle) {
+  if (!handle) return false;
+  Atomics.store(new Uint8Array(handle.buffer, handle.offset, 1), 0, 1);
+  return true;
 }
 
 /** Copy a byte stream into the table buffer (`at(offset, len)` views). */
