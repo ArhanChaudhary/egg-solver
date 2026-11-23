@@ -103,6 +103,7 @@ count quarter turns, where a half turn is two.</p>
   <label><input type="radio" name="list" value="plus"> <strong>Longer ones too</strong> — every solution of up to
     <select id="extra" aria-label="Moves more than the shortest"><option>1</option><option>2</option><option>3</option></select>
     more than the shortest; each extra move takes about 13 times longer</label>
+  <div class="note">A list stops after <input id="list-seconds" type="number" min="1" step="any" value="60" style="width:4.5rem" aria-label="Seconds before a list stops"> seconds, or when you press Stop, and shows what it has found.</div>
 </fieldset>
 
 <div class="row">
@@ -171,7 +172,10 @@ the left of F, R to its right, then B; U above and D below.</div>
   <p class="note">Under <strong>Solutions</strong> you can ask for every shortest solution, or
   for longer ones too: the shortest is not always the easiest to turn. Two solutions that differ
   only in the order of turns of opposite faces (U D and D U) count as one, and a solution with a
-  detour that undoes itself is left out. A list shows up to 2000 solutions.</p>
+  detour that undoes itself is left out. A list shows up to 2000 solutions, and stops after the
+  time you set or when you press Stop, keeping what it has found (a stopped list says up to which
+  length it is complete). A cube with symmetries is listed faster: the page searches one of each
+  set of equivalent branches and turns the solutions it finds into the others.</p>
   <div class="row">
     <label>Processor cores to use <input id="threads" type="number" min="1" value="1" style="width:4rem"></label>
     <button id="apply" disabled>Apply</button>
@@ -195,6 +199,7 @@ the left of F, R to its right, then B; U above and D below.</div>
 <script type="module">
 import { FACES, SOLVED, applyMoves, formatMoves, invertMoves, isSolved, moveName, parseMoves } from './cube-model.mjs';
 import { CubeInput } from './cube-input.mjs';
+import { cancel } from './egg-solver.mjs';
 
 const $ = (id) => document.getElementById(id);
 const status = (text) => { $('status').textContent = text; };
@@ -330,6 +335,11 @@ const forget = (t, m = metric) => store('readwrite', (s) => s.delete(key(t, m)))
 // --- State and buttons ---
 let threads = 1;
 let wanted = 1;
+// The threads build's cancel word (shared memory), or null: Stop then ends a list and keeps
+// what it found. `listing`: a list is being made.
+let cancelHandle = null;
+let listing = false;
+let stopping = false;
 let ready = false;
 let solving = false;
 let table = null;
@@ -338,7 +348,7 @@ const buttons = () => {
   $('stop').disabled = !solving;
   $('apply').disabled = $('file').disabled = $('fetch').disabled = $('forget').disabled = !ready || solving;
   for (const r of document.querySelectorAll('input[name=tables], input[name=metric], input[name=list]')) r.disabled = solving;
-  $('extra').disabled = solving;
+  $('extra').disabled = $('list-seconds').disabled = solving;
 };
 const mb = (bytes) => `${Math.round(bytes / 1e6)} MB`;
 const readyText = () => `Ready · ${table.from ?? dataName(kind)} · ${plural(threads, 'processor core')}`;
@@ -408,12 +418,12 @@ const boot = async (n) => {
   status('Starting…');
   startWorker();
   try {
-    ({ threads } = await call('init', { threads: n }));
+    ({ threads, cancelHandle } = await call('init', { threads: n }));
   } catch (e) {
     if (n <= 1 || e.message === 'restarted') throw e;
     stopWorker('restarted');
     startWorker();
-    ({ threads } = await call('init', { threads: 1 }));
+    ({ threads, cancelHandle } = await call('init', { threads: 1 }));
     console.warn(`could not use ${n} processor cores:`, e);
   }
   $('threads').value = threads;
@@ -679,13 +689,22 @@ $('solve').onclick = () => run('Solve', async () => {
   $('batch').hidden = true;
   const t0 = performance.now();
   let index = 0;
-  const timer = setInterval(() => status(`Solving${cubes.length > 1 ? ` ${index + 1} of ${cubes.length}` : ''}… ${((performance.now() - t0) / 1000).toFixed(1)} s`), 100);
+  stopping = false;
+  const timer = setInterval(() => status(stopping ? 'Stopping…'
+    : `Solving${cubes.length > 1 ? ` ${index + 1} of ${cubes.length}` : ''}… ${((performance.now() - t0) / 1000).toFixed(1)} s`), 100);
   const results = [];
   try {
     const plus = listMode();
     if (plus !== null) {
       // A list is made for one cube: the painted one, or the first line of the box.
-      const r = await call('solveAll', { cube: cubes[0].text, plus, maxSolutions: MAX_LIST, metric });
+      const timeLimit = Math.max(1, Number($('list-seconds').value) || 60);
+      listing = true;
+      let r;
+      try {
+        r = await call('solveAll', { cube: cubes[0].text, plus, maxSolutions: MAX_LIST, timeLimit, metric });
+      } finally {
+        listing = false;
+      }
       showList(r, cubes[0].stickers, cubes.length);
       status(readyText());
       return;
@@ -715,7 +734,10 @@ const listMode = () => {
 };
 /** A list of solutions of one cube: a table of them; choosing a row shows it in the player. */
 const showList = (r, start, lines) => {
-  const about = (searched) => `Listing took ${r.wall.toFixed(2)} s and searched ${searched} positions.`
+  // A stopped list is complete up to `complete_length` moves (possibly fewer than the shortest).
+  const stopped = !r.stopped ? ''
+    : ` ${r.stopped === 'time' ? 'The time was up' : 'Stopped'}: solutions of more than ${lengthText(r.complete_length, r.metric)} may be missing.`;
+  const about = (searched) => `Listing took ${r.wall.toFixed(2)} s and searched ${searched} positions.${stopped}`
     + (r.truncated ? ` There are more than ${r.count} solutions: this list has every one of up to ${lengthText(r.complete_length, r.metric)}, and some longer ones.` : '')
     + (lines > 1 ? ' A list is made for one cube: this is the first line.' : '');
   const list = { count: r.count, optimal: r.optimal, about };
@@ -745,9 +767,15 @@ const showList = (r, start, lines) => {
     return tr;
   }));
   if (!items.length) {
-    // (cannot happen for a cube that can be solved: its shortest solutions are always listed)
+    // (only a stopped list is empty: a finished one has the shortest solutions)
+    stopPlaying();
     $('result').hidden = false;
-    $('summary').textContent = 'No solution was listed.';
+    $('summary').textContent = r.stopped
+      ? `${r.stopped === 'time' ? 'The time was up' : 'Stopped'} before a solution was found: there is none of ${lengthText(r.complete_length, r.metric)} or fewer.`
+      : 'No solution was listed.';
+    $('moves').replaceChildren();
+    $('player').hidden = $('step-picture').hidden = true;
+    $('stats').textContent = '';
     return;
   }
   showSolution(items[0]);
@@ -786,8 +814,17 @@ const selectRow = (i) => {
 };
 
 $('stop').onclick = () => {
-  // A solve cannot be interrupted inside the module: end the worker and start a new one (the
-  // solving data comes back from this browser's storage).
+  if (listing && cancelHandle) {
+    // A list on the threads build: ask it to stop, and it returns what it has found. (The
+    // module clears the word when a list starts, so ask again until the reply is there.)
+    stopping = true;
+    status('Stopping…');
+    cancel(cancelHandle);
+    const again = setInterval(() => (listing ? cancel(cancelHandle) : clearInterval(again)), 100);
+    return;
+  }
+  // Otherwise a solve cannot be interrupted inside the module: end the worker and start a new
+  // one (the solving data comes back from this browser's storage).
   stopWorker('stopped');
   solving = false;
   status('Stopped');

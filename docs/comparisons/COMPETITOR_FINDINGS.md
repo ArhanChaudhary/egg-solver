@@ -140,8 +140,12 @@ Source read: nissy-core branch `benchmark-egg` at 8e30889 (2026-11).
 - **Where:** `src/solvers/h48/solve.h:117-118`. `solve_h48_dispatch` passes `(uint8_t)maxsols` to `solve_h48`, whose parameter is a `uint64_t`.
 - **Effect:** a request for up to N solutions is served with N mod 256. `999999`, the limit that `benchmarks/run-h48-benchmarks.sh` passes for "all solutions", becomes 63, and 256 becomes 0. Nothing reports that a list was cut.
 - **Repro:** `tools/301_solve_file` with h48h7 on `benchmarks/scrambles/scrambles-18.txt`, asking for every solution of at most one move more than optimal (`h48h7 FILE 999999 1`): no scramble gets more than 63 solutions (1,359 in all). With the limit 255 it lists 1,900. egg-solver's `--plus 1` lists 1,914: 24 scrambles agree exactly, and the other has 269 solutions, of which nissy lists 255.
-- **Impact:** lists are silently incomplete, and a timing of "all solutions" stops each cube's search early once 63 are found. For optimal solutions only, the 16-, 17- and 18-move sets are not affected (no scramble has more than 20, and nissy's lists equal egg-solver's there). The 19- and 20-move sets and the superflip were not checked.
-- **Suggested fix:** pass `maxsols` at its full width (drop the cast). The same call casts `threads` to `uint8_t`.
+- **Impact:** lists are silently incomplete, and a timing of "all solutions" stops each cube's search early once 63 are found. For optimal solutions only, by egg-solver's lists (every solution replayed on a separate cube model):
+  - the 16-, 17- and 18-move sets are not affected: no scramble has more than 20, and nissy's lists equal egg-solver's there;
+  - the 19-move set has 994 optimal solutions, and 2 of its 25 scrambles have more than 63 (the most is 88);
+  - the 20-move set has 6,705: every scramble has more than 63 (the most is 335), and 17 have more than 255;
+  - the superflip has 4,416.
+- **Suggested fix:** pass `maxsols` at its full width (drop the cast). Checked on a private copy with only that cast removed (and a larger output buffer in the tool): nissy then lists the superflip's 4,416 optimal solutions, the same sequences as egg-solver's. The same call casts `threads` to `uint8_t`.
 
 ## Source recheck (2026-11-05)
 

@@ -278,8 +278,15 @@ svg { max-width:100%; height:auto; }
 <li><strong>Where:</strong> <code>src/solvers/h48/solve.h:117-118</code>. <code>solve_h48_dispatch</code> passes <code>(uint8_t)maxsols</code> to <code>solve_h48</code>, whose parameter is a <code>uint64_t</code>.</li>
 <li><strong>Effect:</strong> a request for up to N solutions is served with N mod 256. <code>999999</code>, the limit that <code>benchmarks/run-h48-benchmarks.sh</code> passes for &quot;all solutions&quot;, becomes 63, and 256 becomes 0. Nothing reports that a list was cut.</li>
 <li><strong>Repro:</strong> <code>tools/301_solve_file</code> with h48h7 on <code>benchmarks/scrambles/scrambles-18.txt</code>, asking for every solution of at most one move more than optimal (<code>h48h7 FILE 999999 1</code>): no scramble gets more than 63 solutions (1,359 in all). With the limit 255 it lists 1,900. egg-solver's <code>--plus 1</code> lists 1,914: 24 scrambles agree exactly, and the other has 269 solutions, of which nissy lists 255.</li>
-<li><strong>Impact:</strong> lists are silently incomplete, and a timing of &quot;all solutions&quot; stops each cube's search early once 63 are found. For optimal solutions only, the 16-, 17- and 18-move sets are not affected (no scramble has more than 20, and nissy's lists equal egg-solver's there). The 19- and 20-move sets and the superflip were not checked.</li>
-<li><strong>Suggested fix:</strong> pass <code>maxsols</code> at its full width (drop the cast). The same call casts <code>threads</code> to <code>uint8_t</code>.</li>
+<li><strong>Impact:</strong> lists are silently incomplete, and a timing of &quot;all solutions&quot; stops each cube's search early once 63 are found. For optimal solutions only, by egg-solver's lists (every solution replayed on a separate cube model):
+<ul>
+<li>the 16-, 17- and 18-move sets are not affected: no scramble has more than 20, and nissy's lists equal egg-solver's there;</li>
+<li>the 19-move set has 994 optimal solutions, and 2 of its 25 scrambles have more than 63 (the most is 88);</li>
+<li>the 20-move set has 6,705: every scramble has more than 63 (the most is 335), and 17 have more than 255;</li>
+<li>the superflip has 4,416.</li>
+</ul>
+</li>
+<li><strong>Suggested fix:</strong> pass <code>maxsols</code> at its full width (drop the cast). Checked on a private copy with only that cast removed (and a larger output buffer in the tool): nissy then lists the superflip's 4,416 optimal solutions, the same sequences as egg-solver's. The same call casts <code>threads</code> to <code>uint8_t</code>.</li>
 </ul>
 <h2 id="source-recheck-2026-11-05">Source recheck (2026-11-05)</h2>
 <p>The source mechanisms for #1–#3 and #5–#11 were checked again against the exact commits named above, using <code>git show</code> rather than the harness's modified working files. Source excerpts with full commit IDs are retained in <a href="../reference/competitor-source-evidence.txt">competitor-source-evidence.txt</a>. The performance numbers and the large-table numerical proof remain the original recorded measurements; this source review does not claim to have rerun those experiments. #4's harness invocation was rechecked; the binary option-switch evidence remains the original disassembly.</p>
