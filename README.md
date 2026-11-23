@@ -63,7 +63,8 @@ two moves. It works with any table; a QTM table (`gen 7 auto tables/h7q
 `--all-optimal` lists every distinct optimal solution instead of one,
 `--plus K` every solution of at most K moves more than optimal, and
 `--max-length N` every solution of at most N moves; `--max-solutions M` caps
-a list, and a capped list says so. See the
+a list, and a capped list says so. `--time-limit SECONDS` or Ctrl-C stops a
+list and prints what was found. See the
 [user guide](docs/reference/USER_GUIDE.md#all-solutions).
 
 `--load copy` loads the table into private RAM before searching. With
