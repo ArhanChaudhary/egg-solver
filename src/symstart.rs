@@ -45,6 +45,12 @@
 //! extension level never drops it either. The search inside a job (both
 //! sides, premoves) is unchanged.
 //!
+//! Lists of all solutions (`crate::solutions`) use `keep` alone, and add to
+//! every solution found its images under the cube's symmetries (`images`):
+//! the solutions of the dropped jobs. `dedup` would lose solutions there (a
+//! job it drops for reaching the position of another has solutions of its
+//! own, which no symmetry gives back).
+//!
 //! Random states never have a symmetry: none of 7M positions (2000 random
 //! states and their prefixes up to 3 moves deep). The check at a cube's start
 //! costs 95 conjugations (~0.3 µs), and nothing else happens unless the cube
@@ -114,6 +120,42 @@ impl SymFilter {
     #[must_use]
     pub fn dedups(&self) -> bool {
         self.is_active() && self.antisymmetric
+    }
+
+    /// Whether the cube has an antisymmetry (a symmetry that takes it to
+    /// its inverse). (False after `without_dedup`.)
+    #[must_use]
+    pub fn antisymmetric(&self) -> bool {
+        self.antisymmetric
+    }
+
+    /// The number of symmetries of the cube, the identity included (1: no
+    /// filter).
+    #[must_use]
+    pub fn group_order(&self) -> usize {
+        usize::from(self.n_symmetries) + 1
+    }
+
+    /// The images of the move sequence `moves` under the cube's symmetries
+    /// other than the identity: `t(moves)`, move by move (`t m t⁻¹`), for
+    /// each such `t`. If `moves` solves the cube, so does each image
+    /// (`X·t(s) = t (X·s) t⁻¹`); the images are not in canonical order.
+    /// (For lists of all solutions, `crate::solutions`: the search runs the
+    /// jobs that `keep` keeps, and the images of what it finds are the
+    /// rest.)
+    #[must_use]
+    pub fn images(&self, moves: &[u8]) -> Vec<Vec<u8>> {
+        let conjugates = move_conjugates();
+        self.symmetries[..usize::from(self.n_symmetries)]
+            .iter()
+            .map(|&sym| {
+                let map = &conjugates[usize::from(sym)];
+                moves
+                    .iter()
+                    .map(|&mv| map.get(usize::from(mv)).copied().unwrap_or(mv))
+                    .collect()
+            })
+            .collect()
     }
 
     /// Whether to keep the job with move prefix `moves` (nonempty,
@@ -308,6 +350,37 @@ mod tests {
         let kept = kept_per_level(x);
         assert_eq!(kept[1], 2, "{kept:?}");
         assert!(kept[4] <= 1038, "{kept:?}");
+    }
+
+    /// `images`: one sequence per symmetry of the cube other than the
+    /// identity, each of which does what the sequence does to the cube (a
+    /// solution's images are solutions), and none for a cube without a
+    /// symmetry.
+    #[test]
+    fn images_of_a_solution_solve_the_cube() {
+        let turn = |cube: Cube, moves: &[u8]| {
+            moves.iter().fold(cube, |cube, &mv| {
+                cube.apply_move(Move::ALL[usize::from(mv)])
+            })
+        };
+        for (scramble, order) in [("U2 D2 R2 L2", 16), ("U", 4), ("U D R", 2), ("R U F", 1)] {
+            let x = cube(scramble);
+            let filter = SymFilter::new(x, x.inverse()).without_dedup();
+            assert_eq!(filter.group_order(), order, "{scramble}");
+            let solution: Vec<u8> = parse_moves(scramble)
+                .unwrap()
+                .iter()
+                .rev()
+                .map(|&mv| crate::cubie::inverse_move(mv))
+                .collect();
+            let images = filter.images(&solution);
+            assert_eq!(images.len(), order - 1, "{scramble}");
+            for image in &images {
+                assert_eq!(image.len(), solution.len());
+                assert!(turn(x, image).is_solved(), "{scramble}: {image:?}");
+            }
+        }
+        assert_eq!(SymFilter::NONE.images(&[0, 3]), Vec::<Vec<u8>>::new());
     }
 
     /// Only an antisymmetry: no filter (no symmetry for `keep`, and `dedup`

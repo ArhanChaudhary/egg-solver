@@ -514,6 +514,9 @@ pub unsafe extern "C" fn egg_solver_solve_all(
                 0 => DEFAULT_MAX_SOLUTIONS,
                 n => n as usize,
             },
+            // (No time limit and no cancel flag yet: the next commit.)
+            time_limit: None,
+            cancel: None,
         };
         let solver = solver_of(state, metric)?;
         let get = |i: usize| (i == 0).then_some(cube);

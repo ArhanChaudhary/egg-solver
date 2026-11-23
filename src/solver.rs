@@ -32,7 +32,7 @@ use crate::coord::{cocsep_x3, index_sym};
 use crate::cubie::{inverse_move, CubieCube, Move};
 use crate::metric::{move_cost, Metric};
 use crate::simd::Cube;
-use crate::solutions::{Collector, Options, Solutions};
+use crate::solutions::{Collector, Options, Solutions, Stopped};
 use crate::symstart::SymFilter;
 use crate::tables::{packed_class, packed_depth, packed_sym_to_rep, Cocsep, H48Table, TableError};
 use std::cell::RefCell;
@@ -669,9 +669,12 @@ impl<'a> Solver<'a> {
     /// (or a table whose bounds are too high) has none.
     ///
     /// The search of `solve`, but a solution is recorded and the search
-    /// goes on, through every target up to the limit, on all jobs in any
-    /// order and without the symmetric-start filter (rules for one optimal
-    /// solution). Pruning by bounds is unchanged.
+    /// goes on, through every target up to the limit, on the jobs in any
+    /// order. Of the symmetric-start filter only `keep` is used, and each
+    /// solution is recorded with its images under the cube's symmetries
+    /// (exact: `crate::solutions`). Pruning by bounds is unchanged.
+    /// `Options::time_limit` and `Options::cancel` are looked at between
+    /// jobs.
     #[must_use]
     pub fn all_solutions(&self, cube: &CubieCube, options: &Options) -> (Solutions, Stats) {
         if self.metric.is_qtm() {
@@ -694,7 +697,11 @@ impl<'a> Solver<'a> {
         let inverse = cube.inverse();
         let normal_bound = self.lower_bound(cube);
         let inverse_bound = self.lower_bound(inverse);
-        let collector = RefCell::new(Collector::new(self.metric, options));
+        let started = std::time::Instant::now();
+        // (Only `keep`: `dedup` drops jobs whose solutions no symmetry
+        // gives back.)
+        let filter = self.sym_filter(cube, inverse).without_dedup();
+        let collector = RefCell::new(Collector::new(self.metric, options, filter));
         let limit = || {
             collector
                 .try_borrow()
@@ -719,60 +726,36 @@ impl<'a> Solver<'a> {
             inverse_bound,
         }];
         let mut target = self.first_target(cube, normal_bound, inverse_bound);
-        let slack = half_turn_slack(QTM);
+        if let Ok(mut collector) = collector.try_borrow_mut() {
+            collector.start(target);
+        }
+        // Whether to give up: the cancel flag or the clock (the list is
+        // then marked stopped).
+        let give_up = || {
+            let reason = if options.cancelled() {
+                Stopped::Cancelled
+            } else if options
+                .time_limit
+                .is_some_and(|limit| started.elapsed() >= limit)
+            {
+                Stopped::Time
+            } else {
+                return false;
+            };
+            collector
+                .try_borrow_mut()
+                .is_ok_and(|mut collector| collector.stop(reason))
+        };
         // (The limit is at most `max_target`, which keeps the moves within
         // `SearchState::moves`.)
         while target <= limit() {
             let job_len = self.job_len(target);
             while jobs.first().is_some_and(|j| usize::from(j.len) < job_len) {
-                jobs = self.extend_all_jobs::<QTM>(&jobs);
+                jobs = self.extend_all_jobs::<QTM>(&jobs, &filter);
             }
             let mut stopped = false;
             for j in &jobs {
-                let remaining_depth = target - j.cost;
-                let (normal_bound, inverse_bound) = (j.normal_bound, j.inverse_bound);
-                // (A job that solves the cube: every sequence that starts
-                // with it has a detour, see `crate::solutions`.)
-                if normal_bound > remaining_depth
-                    || inverse_bound > remaining_depth
-                    || (j.len > 0 && j.cube.is_solved())
-                {
-                    continue;
-                }
-                let mut normal_moves = if j.len == 0 {
-                    ALL_MOVES
-                } else {
-                    ALLOWED_AFTER[(j.moves[j.len as usize - 1] / 3) as usize]
-                };
-                let mut inverse_moves = ALL_MOVES;
-                if inverse_bound + slack >= remaining_depth {
-                    normal_moves &= QUARTER_TURNS;
-                }
-                if normal_bound + slack >= remaining_depth {
-                    inverse_moves &= QUARTER_TURNS;
-                }
-                for (to, &mv) in state
-                    .moves
-                    .iter_mut()
-                    .zip(&j.moves)
-                    .take(usize::from(j.len))
-                {
-                    *to = mv;
-                }
-                state.n_moves = j.len as usize;
-                state.n_premoves = 0;
-                let stop = self.search::<QTM, &RefCell<Collector>>(
-                    &mut state,
-                    j.cube,
-                    j.inverse,
-                    normal_bound,
-                    inverse_bound,
-                    normal_moves,
-                    inverse_moves,
-                    remaining_depth,
-                    &collector,
-                ) == FOUND;
-                if stop {
+                if give_up() || self.search_job_all::<QTM>(&mut state, j, target, &collector) {
                     stopped = true;
                     break;
                 }
@@ -790,10 +773,68 @@ impl<'a> Solver<'a> {
         (collector.into_inner().finish(), state.stats)
     }
 
-    /// (All solutions.) Extend jobs by one move, every child with its
-    /// bounds: `extend_jobs` and `job_bounds` without a filter. (Apart from
-    /// them: they stay the one-solution search's own, compiled as before.)
-    fn extend_all_jobs<const QTM: bool>(&self, jobs: &[Job]) -> Vec<Job> {
+    /// (All solutions.) Search job `j` for the solutions of `target` moves,
+    /// recording them in `collector`: the job's root as `solve_metric` sets
+    /// it up. Returns whether the search is to stop (more solutions than
+    /// asked for).
+    fn search_job_all<const QTM: bool>(
+        &self,
+        state: &mut SearchState,
+        j: &Job,
+        target: u8,
+        collector: &RefCell<Collector>,
+    ) -> bool {
+        let slack = half_turn_slack(QTM);
+        let remaining_depth = target - j.cost;
+        let (normal_bound, inverse_bound) = (j.normal_bound, j.inverse_bound);
+        // (A job that solves the cube: every sequence that starts with it
+        // has a detour, see `crate::solutions`.)
+        if normal_bound > remaining_depth
+            || inverse_bound > remaining_depth
+            || (j.len > 0 && j.cube.is_solved())
+        {
+            return false;
+        }
+        let mut normal_moves = if j.len == 0 {
+            ALL_MOVES
+        } else {
+            ALLOWED_AFTER[(j.moves[j.len as usize - 1] / 3) as usize]
+        };
+        let mut inverse_moves = ALL_MOVES;
+        if inverse_bound + slack >= remaining_depth {
+            normal_moves &= QUARTER_TURNS;
+        }
+        if normal_bound + slack >= remaining_depth {
+            inverse_moves &= QUARTER_TURNS;
+        }
+        for (to, &mv) in state
+            .moves
+            .iter_mut()
+            .zip(&j.moves)
+            .take(usize::from(j.len))
+        {
+            *to = mv;
+        }
+        state.n_moves = j.len as usize;
+        state.n_premoves = 0;
+        self.search::<QTM, &RefCell<Collector>>(
+            state,
+            j.cube,
+            j.inverse,
+            normal_bound,
+            inverse_bound,
+            normal_moves,
+            inverse_moves,
+            remaining_depth,
+            collector,
+        ) == FOUND
+    }
+
+    /// (All solutions.) Extend jobs by one move, every child that `filter`
+    /// keeps (`SymFilter::keep`) with its bounds: `extend_jobs` and
+    /// `job_bounds` without `dedup`. (Apart from them: they stay the
+    /// one-solution search's own, compiled as before.)
+    fn extend_all_jobs<const QTM: bool>(&self, jobs: &[Job], filter: &SymFilter) -> Vec<Job> {
         let mut out = Vec::with_capacity(jobs.len() * 15);
         for j in jobs {
             let mut todo = if j.len == 0 {
@@ -807,6 +848,9 @@ impl<'a> Solver<'a> {
                 child.moves[child.len as usize] = mv as u8;
                 child.len += 1;
                 child.cost += move_cost(QTM, mv as u8);
+                if !filter.keep(&child.moves[..usize::from(child.len)]) {
+                    continue;
+                }
                 child.cube = j.cube.apply_move(mv);
                 child.inverse = j.inverse.premove_inverse(mv);
                 child.normal_bound = self.lower_bound(child.cube);

@@ -875,3 +875,385 @@ fn engines_agree_on_deeper_cubes() {
         eprintln!("{metric}: optimal lengths {lengths:?}");
     }
 }
+
+// ---------------------------------------------------------------------
+// Symmetric positions
+// ---------------------------------------------------------------------
+
+/// The kind of a position's symmetry: the number of its symmetries (the
+/// identity included) and whether it has an antisymmetry.
+fn symmetry_kind(cube: &CubieCube) -> (usize, bool) {
+    let cube = egg_solver::simd::Cube::from_cubie(cube);
+    let filter = egg_solver::symstart::SymFilter::new(cube, cube.inverse());
+    (filter.group_order(), filter.antisymmetric())
+}
+
+/// Positions with symmetries of many kinds: of each kind (`symmetry_kind`)
+/// with a symmetry, the first `per_kind` positions among the canonical
+/// sequences of at most 5 moves. (Their kinds: 2, 4 or 8 symmetries with
+/// and without an antisymmetry, and 16 with one.)
+fn short_symmetric_positions(per_kind: usize) -> Vec<CubieCube> {
+    fn walk(
+        cube: &CubieCube,
+        sequence: &mut Vec<u8>,
+        kinds: &mut std::collections::BTreeMap<(usize, bool), Vec<CubieCube>>,
+        per_kind: usize,
+    ) {
+        if !sequence.is_empty() {
+            let kind = symmetry_kind(cube);
+            let found = kinds.entry(kind).or_default();
+            if kind.0 > 1 && found.len() < per_kind && !found.contains(cube) {
+                found.push(*cube);
+            }
+        }
+        if sequence.len() == 5 {
+            return;
+        }
+        for mv in 0..18u8 {
+            if may_follow(sequence.last().copied(), mv) {
+                sequence.push(mv);
+                walk(&turn(cube, mv), sequence, kinds, per_kind);
+                sequence.pop();
+            }
+        }
+    }
+    let mut kinds = std::collections::BTreeMap::new();
+    walk(&CubieCube::SOLVED, &mut Vec::new(), &mut kinds, per_kind);
+    kinds.into_values().flatten().collect()
+}
+
+/// The kinds of symmetry among `cubes`, for the test log.
+fn kinds_of(cubes: &[CubieCube]) -> String {
+    let kinds: BTreeSet<(usize, bool)> = cubes.iter().map(symmetry_kind).collect();
+    let name = |&(order, anti): &(usize, bool)| format!("{order}{}", if anti { "a" } else { "" });
+    kinds.iter().map(name).collect::<Vec<_>>().join(" ")
+}
+
+/// Cubes with symmetries, where the searches run only the jobs that the
+/// symmetric-start filter keeps and add each solution's images: the lists
+/// are brute force's, for positions with 2 to 16 symmetries, with and
+/// without an antisymmetry, on a table whose low bounds make iterations of
+/// 5 to 9 moves run on jobs of 1 to 4 moves (and on the usual one). And
+/// the filter did drop jobs: fewer nodes than without it, the same lists.
+#[test]
+#[cfg_attr(miri, ignore = "too slow under Miri")]
+fn symmetric_positions_match_brute_force() {
+    let htm = Metric::Htm;
+    let cubes = short_symmetric_positions(2);
+    let kinds: BTreeSet<(usize, bool)> = cubes.iter().map(symmetry_kind).collect();
+    eprintln!(
+        "{} symmetric positions of at most 5 moves, kinds (symmetries, a: antisymmetric): {}",
+        cubes.len(),
+        kinds_of(&cubes)
+    );
+    // (Small and larger groups, with and without an antisymmetry.)
+    let want = [
+        (2, false),
+        (2, true),
+        (4, false),
+        (4, true),
+        (8, false),
+        (8, true),
+        (16, true),
+    ];
+    assert_eq!(kinds, BTreeSet::from(want));
+    let truths = truths(&cubes, htm, 4);
+    let options = [Options::all_optimal(), Options::plus(2), Options::plus(4)];
+    for base in [8, 1] {
+        let solver = solver(base, htm);
+        let name = format!("symmetric, h0 base {base}");
+        check_engines(&name, &solver, &cubes, &truths, &options, &ENGINES);
+    }
+    // Without the filter (`sym_start` off): the same lists, more nodes.
+    let filtered = solver(1, htm);
+    let mut plain = solver(1, htm);
+    plain.sym_start = false;
+    let (mut nodes, mut plain_nodes) = (0, 0);
+    for cube in &cubes {
+        let (list, stats) = filtered.all_solutions(cube, &Options::plus(4));
+        let (plain_list, plain_stats) = plain.all_solutions(cube, &Options::plus(4));
+        assert_eq!(list, plain_list);
+        assert!(stats.nodes <= plain_stats.nodes);
+        nodes += stats.nodes;
+        plain_nodes += plain_stats.nodes;
+    }
+    eprintln!("nodes with the filter {nodes}, without {plain_nodes}");
+    assert!(
+        2 * nodes < plain_nodes,
+        "the filter dropped little: {nodes} of {plain_nodes}"
+    );
+    // The share mode's jobs are filtered too.
+    let share_nodes = |solver: &Solver| {
+        let get = |i: usize| cubes.get(i).copied();
+        let nodes = std::sync::atomic::AtomicU64::new(0);
+        let done = |_, _, stats: egg_solver::solver::Stats, _| {
+            nodes.fetch_add(stats.nodes, std::sync::atomic::Ordering::Relaxed);
+        };
+        share::all_solutions(solver, &get, 2, 4, 1, &Options::plus(4), &done).unwrap();
+        nodes.into_inner()
+    };
+    let (nodes, plain_nodes) = (share_nodes(&filtered), share_nodes(&plain));
+    eprintln!("share mode: nodes with the filter {nodes}, without {plain_nodes}");
+    assert!(
+        2 * nodes < plain_nodes,
+        "the filter dropped little: {nodes} of {plain_nodes}"
+    );
+    let solutions: usize = truths.iter().map(|t| t.solutions.len()).sum();
+    eprintln!("{solutions} solutions up to 4 above optimal");
+}
+
+/// Longer symmetric positions (6 to 8 moves: the checkerboard with all 48
+/// symmetries, slice patterns, positions that are their own inverse), up
+/// to 2 above optimal, on the usual h0 and on one of base 2 (jobs of 1 to 4
+/// moves in the iterations of 6 to 10).
+#[test]
+#[cfg_attr(miri, ignore = "too slow under Miri")]
+fn longer_symmetric_positions_match_brute_force() {
+    let htm = Metric::Htm;
+    let cubes: Vec<CubieCube> = [
+        "U2 D2 R2 L2 F2 B2",
+        "U D' R L' F B' U D'",
+        "U R L' F' B U' D R L'",
+        "F2 B2 U D' R2 L2 U D'",
+        "U D R L F B",
+        "U D' R L' F B'",
+        "R2 L2 U D' F2 B2 U' D",
+        "U R U' R' U' F' U F",
+        "R U2 R' L' U2 L",
+    ]
+    .map(cube_of)
+    .to_vec();
+    eprintln!("longer symmetric positions, kinds: {}", kinds_of(&cubes));
+    let kinds: BTreeSet<(usize, bool)> = cubes.iter().map(symmetry_kind).collect();
+    // (Among them a group of order 6, and all 48 symmetries.)
+    assert!(
+        kinds.contains(&(6, true)) && kinds.contains(&(48, true)),
+        "{kinds:?}"
+    );
+    let truths = truths(&cubes, htm, 2);
+    for base in [8, 2] {
+        let solver = solver(base, htm);
+        let name = format!("longer symmetric, h0 base {base}");
+        check_engines(&name, &solver, &cubes, &truths, &PLUS, &ENGINES);
+    }
+    let solutions: usize = truths.iter().map(|t| t.solutions.len()).sum();
+    eprintln!("{solutions} solutions up to 2 above optimal");
+}
+
+/// Symmetric positions in the quarter-turn metric (those of at most 6
+/// quarter turns), up to 4 above optimal, on both tables.
+#[test]
+#[cfg_attr(miri, ignore = "too slow under Miri")]
+fn qtm_symmetric_positions_match_brute_force() {
+    let qtm = Metric::Qtm;
+    let mut cubes = short_symmetric_positions(2);
+    cubes.push(cube_of("U2 D2 R2"));
+    cubes.push(cube_of("U D' R L'"));
+    ball(qtm);
+    cubes.retain(|cube| ball(qtm).get(cube).is_some_and(|&d| d <= 6));
+    let kinds: BTreeSet<(usize, bool)> = cubes.iter().map(symmetry_kind).collect();
+    eprintln!(
+        "QTM: {} symmetric positions, kinds: {}",
+        cubes.len(),
+        kinds_of(&cubes)
+    );
+    assert!(kinds.len() >= 6, "{kinds:?}");
+    let truths = truths(&cubes, qtm, 4);
+    let options = [Options::all_optimal(), Options::plus(2), Options::plus(4)];
+    for base in [8, 1] {
+        let solver = solver(base, qtm);
+        let name = format!("QTM symmetric, h0 base {base}");
+        check_engines(&name, &solver, &cubes, &truths, &options, &ENGINES);
+    }
+}
+
+// ---------------------------------------------------------------------
+// Stopping a list: the time limit and the cancel flag
+// ---------------------------------------------------------------------
+
+/// A scramble whose list up to `LONG` moves takes long (seconds with the
+/// usual h0; its solutions up to `SHORT` moves take milliseconds).
+const LONG_SCRAMBLE: &str = "R U F2 D L' B";
+const LONG: u8 = 15;
+const SHORT: u8 = 12;
+
+/// Check a list that was (or may have been) stopped early: every solution
+/// replays, is canonical and has no detour (so it is one of the full
+/// list's), each once and in order; all those of at most `complete_length`
+/// moves are there (`full`: a list that reaches at least that far); and a
+/// list that was not stopped is the whole one.
+fn check_stopped(what: &str, cube: &CubieCube, list: &Solutions, full: &Solutions) {
+    let htm = Metric::Htm;
+    for solution in &list.solutions {
+        let text = format_moves(solution);
+        assert_eq!(
+            cube.apply_moves(solution),
+            Some(CubieCube::SOLVED),
+            "{what}: {text}"
+        );
+        assert!(is_canonical(solution), "{what}: {text} is not canonical");
+        assert!(!has_detour(solution, htm), "{what}: {text} has a detour");
+        assert!(
+            solution.len() <= usize::from(list.max_length),
+            "{what}: {text}"
+        );
+    }
+    let key = |s: &Vec<u8>| (s.len(), s.clone());
+    assert!(
+        list.solutions.windows(2).all(|w| key(&w[0]) < key(&w[1])),
+        "{what}: not in order, or a solution twice"
+    );
+    assert!(!list.truncated, "{what}");
+    let complete = usize::from(list.complete_length);
+    assert!(
+        complete <= usize::from(full.max_length),
+        "{what}: complete {complete}"
+    );
+    let up_to = |list: &Solutions| -> Vec<Vec<u8>> {
+        let short = |s: &&Vec<u8>| s.len() <= complete;
+        list.solutions.iter().filter(short).cloned().collect()
+    };
+    assert_eq!(up_to(list), up_to(full), "{what}: complete {complete}");
+    if list.stopped.is_none() {
+        assert_eq!(list.complete_length, list.max_length, "{what}");
+    }
+}
+
+/// A tiny time limit on a long list: the search returns at once, the list
+/// says that it was stopped by the clock, and holds what was found, with
+/// every solution up to `complete_length`; in a batch each cube has its
+/// own clock. A limit that is not reached changes nothing.
+#[test]
+#[cfg_attr(miri, ignore = "too slow under Miri")]
+fn time_limit_stops_a_list() {
+    use egg_solver::solutions::Stopped;
+    use std::time::{Duration, Instant};
+    let htm = Metric::Htm;
+    let solver = solver(8, htm);
+    let cube = cube_of(LONG_SCRAMBLE);
+    let full = solver.all_solutions(&cube, &Options::max_length(SHORT)).0;
+    assert!(full.stopped.is_none() && full.solutions.len() > 10);
+    let tiny = Options::max_length(LONG).with_time_limit(Duration::from_micros(300));
+    for engine in ENGINES {
+        let start = Instant::now();
+        let list = lists(engine, &solver, std::slice::from_ref(&cube), &tiny).remove(0);
+        let seconds = start.elapsed().as_secs_f64();
+        let what = format!("{engine:?}");
+        assert_eq!(list.stopped, Some(Stopped::Time), "{what}");
+        assert!(seconds < 20.0, "{what}: stopped after {seconds} s");
+        assert!(list.complete_length < LONG, "{what}");
+        assert_eq!(list.max_length, LONG, "{what}");
+        // (Should it have got beyond `SHORT`: compared up to there.)
+        let mut list = list;
+        list.complete_length = list.complete_length.min(SHORT);
+        check_stopped(&what, &cube, &list, &full);
+    }
+    // A batch: every cube is stopped by its own clock, the solved cube
+    // (listed without a search) is not.
+    let cubes = [
+        cube,
+        cube_of("F2 D L2 B' U R"),
+        CubieCube::SOLVED,
+        cube_of("U R2 F B R B2"),
+    ];
+    let batch = lists(Engine::Share(4, 4, usize::MAX), &solver, &cubes, &tiny);
+    let stopped: Vec<bool> = batch.iter().map(|list| list.stopped.is_some()).collect();
+    assert_eq!(stopped, [true, true, false, true]);
+    assert_eq!(batch[2].solutions, [Vec::<u8>::new()]);
+    // A limit that is not reached: the list without it.
+    let roomy = Options::max_length(SHORT).with_time_limit(Duration::from_secs(3600));
+    for engine in [ENGINES[0], ENGINES[4]] {
+        let list = lists(engine, &solver, std::slice::from_ref(&cube), &roomy).remove(0);
+        assert_eq!(list, full, "{engine:?}");
+    }
+}
+
+/// The cancel flag, set by another thread during a long list: the search
+/// returns, the list says that it was cancelled and holds what was found.
+/// A flag that is set from the start: the recursive solver returns at
+/// once; the share mode starts no cube. A flag that is never set changes
+/// nothing.
+#[test]
+#[cfg_attr(miri, ignore = "too slow under Miri")]
+fn cancel_stops_a_list() {
+    use egg_solver::solutions::Stopped;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::time::{Duration, Instant};
+    let htm = Metric::Htm;
+    let solver = solver(8, htm);
+    let cube = cube_of(LONG_SCRAMBLE);
+    let full = solver.all_solutions(&cube, &Options::max_length(SHORT)).0;
+    for engine in ENGINES {
+        let cancel = AtomicBool::new(false);
+        // (Set when the engine takes the cube: the flag is to be set while
+        // its list is searched, not before it starts.)
+        let taken = AtomicBool::new(false);
+        let options = Options::max_length(LONG).with_cancel(&cancel);
+        let start = Instant::now();
+        let list = std::thread::scope(|scope| {
+            scope.spawn(|| {
+                while !taken.load(Ordering::Relaxed) {
+                    std::thread::sleep(Duration::from_millis(1));
+                }
+                std::thread::sleep(Duration::from_millis(30));
+                cancel.store(true, Ordering::Relaxed);
+            });
+            match engine {
+                Engine::Recursive => {
+                    taken.store(true, Ordering::Relaxed);
+                    solver.all_solutions(&cube, &options).0
+                }
+                Engine::Share(threads, lanes, max_active) => {
+                    let get = |i: usize| {
+                        taken.store(true, Ordering::Relaxed);
+                        (i == 0).then_some(cube)
+                    };
+                    let out = Mutex::new(None);
+                    let done = |_, list: Solutions, _, _| {
+                        let previous = out.lock().unwrap().replace(list);
+                        assert!(previous.is_none(), "reported twice");
+                    };
+                    share::all_solutions(
+                        &solver, &get, threads, lanes, max_active, &options, &done,
+                    )
+                    .unwrap();
+                    out.into_inner().unwrap().expect("not reported")
+                }
+            }
+        });
+        let seconds = start.elapsed().as_secs_f64();
+        let what = format!("{engine:?}");
+        assert_eq!(list.stopped, Some(Stopped::Cancelled), "{what}");
+        assert!(seconds < 20.0, "{what}: returned after {seconds} s");
+        assert!(list.complete_length < LONG, "{what}");
+        // (Its complete lengths may go beyond `SHORT`: compared up to there.)
+        let mut list = list;
+        list.complete_length = list.complete_length.min(SHORT);
+        check_stopped(&what, &cube, &list, &full);
+    }
+    // Set from the start.
+    let cancel = AtomicBool::new(true);
+    let options = Options::max_length(LONG).with_cancel(&cancel);
+    let (list, stats) = solver.all_solutions(&cube, &options);
+    assert_eq!(list.stopped, Some(Stopped::Cancelled));
+    assert!(list.solutions.is_empty() && list.optimal.is_none() && stats.nodes == 0);
+    assert!(
+        list.complete_length < 6,
+        "below the optimum: {}",
+        list.complete_length
+    );
+    let reported = std::sync::atomic::AtomicUsize::new(0);
+    let get = |i: usize| (i < 3).then_some(cube);
+    let done = |_, _, _, _| {
+        reported.fetch_add(1, Ordering::Relaxed);
+    };
+    share::all_solutions(&solver, &get, 3, 4, 1, &options, &done).unwrap();
+    assert_eq!(reported.into_inner(), 0, "a cube was started");
+    // Never set: the list without the flag.
+    let cancel = AtomicBool::new(false);
+    let options = Options::max_length(SHORT).with_cancel(&cancel);
+    for engine in [ENGINES[0], ENGINES[5]] {
+        let list = lists(engine, &solver, std::slice::from_ref(&cube), &options).remove(0);
+        assert_eq!(list, full, "{engine:?}");
+    }
+}

@@ -7,9 +7,9 @@
 //! batch): the same iterations with increasing target, but a solution is
 //! recorded and the search goes on, through every target up to the limit.
 //! Nothing that only holds for "at least one optimal solution" is used: no
-//! symmetric-start filter, no job order, no end at the first solution.
-//! Pruning by lower bounds stays: it only cuts nodes that no sequence of
-//! the moves left can solve.
+//! job order, no end at the first solution, and of the symmetric-start
+//! filter only the part that stays exact (below). Pruning by lower bounds
+//! stays: it only cuts nodes that no sequence of the moves left can solve.
 //!
 //! # What a distinct solution is
 //!
@@ -51,10 +51,51 @@
 //! detour (the moves after it do nothing), so `canonical` would reject all
 //! of them. The list is decided by `canonical` alone, whatever the search
 //! skips and wherever its two sides meet.
+//!
+//! # Cubes with symmetries
+//!
+//! If a symmetry `t` leaves the cube `X` as it is (`t X t⁻¹ = X`), the
+//! image `t(s)` of a solution `s` (each move `m` replaced by `t m t⁻¹`) is a
+//! solution too: `X·t(s) = t (X·s) t⁻¹`. Images keep the length, the
+//! commuting pairs and the detours, so the solutions of `X` come in orbits
+//! under its symmetries, and the list is the union of whole orbits.
+//!
+//! The search then runs only the jobs that `SymFilter::keep` keeps: a job
+//! (a canonical prefix) is dropped if a symmetry of the cube maps it to a
+//! smaller prefix, or one of its own prefixes to a smaller one. Every
+//! solution found is recorded with its images (`Collector::add`). That
+//! gives every solution: take, in an orbit, the member `c` that is smallest
+//! (as a sequence of move numbers, in canonical form). Each of its prefixes
+//! is kept. For if `t` mapped the prefix of `j` moves to a smaller one `q`,
+//! the canonical form of `t(c)`, also in the orbit, would start with `q`,
+//! or with `q` and its last move swapped for the earlier opposite-face
+//! move that follows it: in both cases smaller than `c`. So the job of `c`
+//! is searched and `c` found (as above), and the images of `c` are its
+//! orbit.
+//!
+//! Only `keep` is used, not `SymFilter::dedup`, which also drops jobs that
+//! reach the same position as another by accident: their solutions are
+//! different sequences, and no symmetry gives them back. A symmetry that
+//! takes the cube to its inverse (an antisymmetry) also maps solutions to
+//! solutions (`t(s⁻¹)`), but relates a solution's first moves to another's
+//! last ones, which are not jobs: it is not used to search less.
+//!
+//! # Stopping early
+//!
+//! A list can be stopped before its limit: by `Options::max_solutions`
+//! (`Solutions::truncated`), by `Options::time_limit` or by
+//! `Options::cancel` (`Solutions::stopped`). It then holds what was found:
+//! every solution of at most `Solutions::complete_length` moves, and some
+//! of the longer ones. The searches look at the clock and the flag between
+//! jobs (the share mode at the flag once per round), never in their inner
+//! loops.
 
 use crate::cubie::{CubieCube, Move};
 use crate::metric::{simplify, Metric};
+use crate::symstart::SymFilter;
 use std::collections::BTreeSet;
+use std::sync::atomic::AtomicBool;
+use std::time::Duration;
 
 /// `Options::max_solutions` unless asked otherwise. (Counts grow about 13
 /// times per extra move: a random position has a handful of optimal
@@ -64,9 +105,10 @@ pub const DEFAULT_MAX_SOLUTIONS: usize = 100_000;
 /// Which solutions to list: those of at most `plus` moves more than an
 /// optimal one and at most `max_length` moves (each limit if given; neither:
 /// nothing beyond the metric's God's number limits the length), and at
-/// most `max_solutions` of them.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Options {
+/// most `max_solutions` of them; and when to give up (`time_limit`,
+/// `cancel`).
+#[derive(Clone, Copy, Debug)]
+pub struct Options<'a> {
     /// Moves above the optimal length (0: the optimal solutions only).
     pub plus: Option<u8>,
     /// The largest length listed (in the search's metric). Searches go up to
@@ -76,40 +118,93 @@ pub struct Options {
     /// more, the search stops and the list is marked truncated
     /// (`Solutions::truncated`).
     pub max_solutions: usize,
+    /// The longest a cube is searched, from its start. After that its
+    /// search stops (when a job of its ends), and its list is what was
+    /// found (`Stopped::Time`).
+    pub time_limit: Option<Duration>,
+    /// A flag that stops the searches once it is true (set from another
+    /// thread or a signal handler): the lists are what was found
+    /// (`Stopped::Cancelled`), and cubes not started are not listed.
+    pub cancel: Option<&'a AtomicBool>,
 }
 
-impl Options {
+impl<'a> Options<'a> {
     /// Every optimal solution.
     #[must_use]
-    pub const fn all_optimal() -> Options {
+    pub const fn all_optimal() -> Options<'a> {
         Options::plus(0)
     }
 
     /// Every solution of at most `plus` moves more than an optimal one.
     #[must_use]
-    pub const fn plus(plus: u8) -> Options {
+    pub const fn plus(plus: u8) -> Options<'a> {
         Options {
             plus: Some(plus),
             max_length: None,
             max_solutions: DEFAULT_MAX_SOLUTIONS,
+            time_limit: None,
+            cancel: None,
         }
     }
 
     /// Every solution of at most `max_length` moves.
     #[must_use]
-    pub const fn max_length(max_length: u8) -> Options {
+    pub const fn max_length(max_length: u8) -> Options<'a> {
         Options {
             plus: None,
             max_length: Some(max_length),
             max_solutions: DEFAULT_MAX_SOLUTIONS,
+            time_limit: None,
+            cancel: None,
         }
     }
 
     /// The same with at most `max_solutions` solutions listed.
     #[must_use]
-    pub const fn with_max_solutions(mut self, max_solutions: usize) -> Options {
+    pub const fn with_max_solutions(mut self, max_solutions: usize) -> Options<'a> {
         self.max_solutions = max_solutions;
         self
+    }
+
+    /// The same with each cube's search stopped after `time_limit`.
+    #[must_use]
+    pub const fn with_time_limit(mut self, time_limit: Duration) -> Options<'a> {
+        self.time_limit = Some(time_limit);
+        self
+    }
+
+    /// The same with the searches stopped once `cancel` is true.
+    #[must_use]
+    pub const fn with_cancel(mut self, cancel: &'a AtomicBool) -> Options<'a> {
+        self.cancel = Some(cancel);
+        self
+    }
+
+    /// Whether `cancel` is set.
+    #[must_use]
+    pub fn cancelled(&self) -> bool {
+        self.cancel
+            .is_some_and(|cancel| cancel.load(std::sync::atomic::Ordering::Relaxed))
+    }
+}
+
+/// Why a list ended before its limit (`Solutions::stopped`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Stopped {
+    /// `Options::time_limit` was reached.
+    Time,
+    /// `Options::cancel` was set.
+    Cancelled,
+}
+
+impl Stopped {
+    /// `time` or `cancelled` (as the command line and JSON name it).
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Stopped::Time => "time",
+            Stopped::Cancelled => "cancelled",
+        }
     }
 }
 
@@ -124,15 +219,19 @@ pub struct Solutions {
     pub optimal: Option<u8>,
     /// The length limit of the list: the smallest of the optimal length
     /// plus `Options::plus`, `Options::max_length` and God's number of the
-    /// metric.
+    /// metric. (Of a stopped list without a solution: as far as known,
+    /// without the first.)
     pub max_length: u8,
     /// There are more solutions within `max_length` than
     /// `Options::max_solutions`: the search stopped, and the list holds
     /// that many of them.
     pub truncated: bool,
+    /// The search was stopped before its limit, by the clock or the cancel
+    /// flag: the list holds what was found until then.
+    pub stopped: Option<Stopped>,
     /// Every solution of at most this length is listed: `max_length`, or if
-    /// `truncated` the last length searched completely (of the length
-    /// above, the list has only a part).
+    /// `truncated` or `stopped` the last length searched completely (of
+    /// the lengths above, the list has only a part, or nothing).
     pub complete_length: u8,
 }
 
@@ -242,8 +341,14 @@ pub(crate) struct Collector {
     /// of the search for one solution, whose machine code then changes.)
     found: BTreeSet<Vec<u8>>,
     truncated: bool,
+    stopped: Option<Stopped>,
+    /// The search reached its limit (then it is not stopped any more).
+    finished: bool,
     /// The last target searched completely.
     complete: u8,
+    /// The cube's symmetries, if the search runs only the jobs that the
+    /// filter keeps: every solution is recorded with its images.
+    symmetries: SymFilter,
     /// (Tests) Sequences offered, and those that `canonical` rejected or
     /// that were found before.
     #[cfg(test)]
@@ -255,8 +360,9 @@ pub(crate) struct Collector {
 }
 
 impl Collector {
-    /// For a search in `metric`.
-    pub(crate) fn new(metric: Metric, options: &Options) -> Collector {
+    /// For a search in `metric` on the jobs that `symmetries` keeps (of
+    /// the cube; `SymFilter::NONE`: on all jobs).
+    pub(crate) fn new(metric: Metric, options: &Options, symmetries: SymFilter) -> Collector {
         let limit = options
             .max_length
             .unwrap_or(u8::MAX)
@@ -269,7 +375,10 @@ impl Collector {
             optimal: None,
             found: BTreeSet::new(),
             truncated: false,
+            stopped: None,
+            finished: false,
             complete: 0,
+            symmetries,
             #[cfg(test)]
             offered: 0,
             #[cfg(test)]
@@ -292,12 +401,22 @@ impl Collector {
         self.add(canonical(self.metric, raw))
     }
 
+    /// The search starts at target `first_target`: the cube's bounds show
+    /// that it has no shorter solution.
+    pub(crate) fn start(&mut self, first_target: u8) {
+        self.complete = first_target.saturating_sub(1);
+    }
+
     /// `offer`, given `canonical` of the sequence found.
     ///
     /// The first solution kept gives the optimal length: iterations run in
     /// order of their targets, and at the optimal target every sequence
     /// found is a solution of its length (one that is not would be a
     /// shorter solution).
+    ///
+    /// The solution is recorded with its images under the cube's
+    /// symmetries (the module docs, "Cubes with symmetries"): solutions of
+    /// its length that the filtered search may not find itself.
     pub(crate) fn add(&mut self, solution: Option<Vec<u8>>) -> bool {
         #[cfg(test)]
         {
@@ -305,15 +424,22 @@ impl Collector {
             self.rejected += u64::from(solution.is_none());
         }
         let Some(solution) = solution else {
-            return !self.truncated;
+            return self.searching();
         };
-        if self.truncated {
+        if !self.searching() {
             return false;
         }
         if self.optimal.is_none() {
             let length = u8::try_from(self.metric.length(&solution)).unwrap_or(u8::MAX);
             self.optimal = Some(length);
             self.limit = self.limit.min(length.saturating_add(self.plus));
+        }
+        // (An image is a solution as the sequence is; `canonical` puts it
+        // in canonical order.)
+        for image in self.symmetries.images(&solution) {
+            if let Some(image) = canonical(self.metric, &image) {
+                self.found.insert(image);
+            }
         }
         let new = self.found.insert(solution);
         #[cfg(test)]
@@ -326,15 +452,31 @@ impl Collector {
         !self.truncated
     }
 
+    /// Whether the search goes on: not truncated, stopped or finished.
+    fn searching(&self) -> bool {
+        !self.truncated && self.stopped.is_none() && !self.finished
+    }
+
+    /// Stop the search for `reason` (the clock or the cancel flag), unless
+    /// it ended already. Returns whether it is stopped (for any reason:
+    /// not if it had reached its limit).
+    pub(crate) fn stop(&mut self, reason: Stopped) -> bool {
+        if self.searching() {
+            self.stopped = Some(reason);
+        }
+        !self.finished
+    }
+
     /// The iteration with target `target` ended, searched completely.
     /// Returns whether the next one (`step` moves longer) is to be searched.
     /// (Not if the search was stopped: that iteration is not complete.)
     pub(crate) fn iteration_done(&mut self, target: u8, step: u8) -> bool {
-        if self.truncated {
+        if !self.searching() {
             return false;
         }
         self.complete = self.complete.max(target);
-        target.saturating_add(step) <= self.limit
+        self.finished = target.saturating_add(step) > self.limit;
+        !self.finished
     }
 
     /// The list.
@@ -350,8 +492,9 @@ impl Collector {
             optimal: self.optimal,
             max_length: self.limit,
             truncated: self.truncated,
-            complete_length: if self.truncated {
-                // (A truncated search stopped within the iteration after
+            stopped: self.stopped,
+            complete_length: if self.truncated || self.stopped.is_some() {
+                // (The search stopped within the iteration after
                 // `complete`, or within the first one with solutions: every
                 // length below the optimal one is complete, with none.)
                 self.complete
@@ -366,7 +509,7 @@ impl Collector {
     /// The list of the solved cube: the empty solution (every other
     /// sequence that does nothing is a detour).
     pub(crate) fn solved(metric: Metric, options: &Options) -> Solutions {
-        let mut collector = Collector::new(metric, options);
+        let mut collector = Collector::new(metric, options, SymFilter::NONE);
         let _ = collector.offer(&[]);
         collector.finish()
     }
@@ -460,11 +603,65 @@ mod tests {
         assert!(has_detour(qtm, &within) && !has_detour(htm, &within));
     }
 
+    /// A solution of a cube with symmetries is recorded with its images:
+    /// the solutions that a search of the kept jobs alone does not find.
+    #[test]
+    fn collector_records_the_images() {
+        use crate::cubie::CubieCube;
+        use crate::simd::Cube;
+        let htm = Metric::Htm;
+        // U2 D2 R2 L2: its two optimal solutions are images of each other
+        // (a quarter turn of the whole cube about the F axis).
+        let cube = CubieCube::SOLVED
+            .apply_moves(&moves("U2 D2 R2 L2"))
+            .unwrap();
+        let cube = Cube::from_cubie(&cube);
+        let filter = SymFilter::new(cube, cube.inverse()).without_dedup();
+        assert_eq!(filter.group_order(), 16);
+        let mut collector = Collector::new(htm, &Options::all_optimal(), filter);
+        assert!(collector.offer(&moves("U2 D2 R2 L2")));
+        assert!(!collector.iteration_done(4, 1));
+        let list = collector.finish();
+        assert_eq!(list.solutions, [moves("U2 D2 R2 L2"), moves("R2 L2 U2 D2")]);
+        // The cap counts the images: one solution is asked for, two exist.
+        let options = Options::all_optimal().with_max_solutions(1);
+        let mut collector = Collector::new(htm, &options, filter);
+        assert!(!collector.offer(&moves("U2 D2 R2 L2")));
+        let list = collector.finish();
+        assert_eq!((list.truncated, list.solutions.len()), (true, 1));
+        // Stopped: the reason is kept, later ones and solutions are not.
+        let mut collector = Collector::new(htm, &Options::plus(3), SymFilter::NONE);
+        collector.start(4);
+        assert!(collector.offer(&moves("R U F D")));
+        collector.stop(Stopped::Time);
+        collector.stop(Stopped::Cancelled);
+        assert!(!collector.offer(&moves("R U F D' B")));
+        assert!(!collector.iteration_done(4, 1));
+        let list = collector.finish();
+        assert_eq!(list.stopped, Some(Stopped::Time));
+        assert_eq!((list.solutions.len(), list.complete_length), (1, 3));
+        // Before any solution: complete below the first target.
+        let mut collector = Collector::new(htm, &Options::all_optimal(), SymFilter::NONE);
+        collector.start(9);
+        collector.stop(Stopped::Cancelled);
+        let list = collector.finish();
+        assert_eq!((list.optimal, list.complete_length), (None, 8));
+        assert_eq!(
+            (list.stopped, list.max_length),
+            (Some(Stopped::Cancelled), 20)
+        );
+        // A list that reached its limit is not stopped afterwards.
+        let mut collector = Collector::new(htm, &Options::max_length(4), SymFilter::NONE);
+        assert!(!collector.iteration_done(4, 1));
+        collector.stop(Stopped::Cancelled);
+        assert_eq!(collector.finish().stopped, None);
+    }
+
     #[test]
     fn collector_limits_and_truncation() {
         let htm = Metric::Htm;
         // The first solution sets the optimal length and the limit.
-        let mut collector = Collector::new(htm, &Options::plus(1));
+        let mut collector = Collector::new(htm, &Options::plus(1), SymFilter::NONE);
         assert_eq!(collector.limit(), 20);
         assert!(collector.iteration_done(2, 1));
         assert!(collector.offer(&moves("R U F")));
@@ -488,6 +685,7 @@ mod tests {
                 optimal: Some(3),
                 max_length: 4,
                 truncated: false,
+                stopped: None,
                 complete_length: 4,
             }
         );
@@ -497,14 +695,21 @@ mod tests {
             max_length: Some(3),
             ..Options::plus(5)
         };
-        assert_eq!(Collector::new(htm, &options).limit(), 3);
-        assert_eq!(Collector::new(htm, &Options::max_length(99)).limit(), 20);
+        assert_eq!(Collector::new(htm, &options, SymFilter::NONE).limit(), 3);
         assert_eq!(
-            Collector::new(Metric::Qtm, &Options::max_length(99)).limit(),
+            Collector::new(htm, &Options::max_length(99), SymFilter::NONE).limit(),
+            20
+        );
+        assert_eq!(
+            Collector::new(Metric::Qtm, &Options::max_length(99), SymFilter::NONE).limit(),
             26
         );
         // More solutions than the cap: stop; complete below.
-        let mut collector = Collector::new(htm, &Options::max_length(9).with_max_solutions(2));
+        let mut collector = Collector::new(
+            htm,
+            &Options::max_length(9).with_max_solutions(2),
+            SymFilter::NONE,
+        );
         assert!(collector.iteration_done(3, 1));
         assert!(collector.offer(&moves("R U F D")));
         assert!(collector.iteration_done(4, 1));
@@ -519,7 +724,11 @@ mod tests {
             (Some(4), 9, 4)
         );
         // Truncated within the first iteration with solutions.
-        let mut collector = Collector::new(htm, &Options::all_optimal().with_max_solutions(1));
+        let mut collector = Collector::new(
+            htm,
+            &Options::all_optimal().with_max_solutions(1),
+            SymFilter::NONE,
+        );
         assert!(collector.iteration_done(5, 1));
         assert!(collector.offer(&moves("R U F D L B")));
         assert!(!collector.offer(&moves("R U F D L B'")));

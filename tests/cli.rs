@@ -67,6 +67,11 @@ fn shm_key(n: u32) -> String {
 /// (the binaries' own variables are unset otherwise, and `EGG_SOLVER_SHM_KEY`
 /// is `shm_key(0)` but with `--completions`).
 fn run_env(binary: &str, args: &[&str], stdin: &str, env: &[(&str, &str)]) -> Output {
+    start(binary, args, stdin, env).wait_with_output().unwrap()
+}
+
+/// Start `binary` as `run_env` runs it, with `stdin` written and closed.
+fn start(binary: &str, args: &[&str], stdin: &str, env: &[(&str, &str)]) -> std::process::Child {
     let mut command = Command::new(binary);
     command
         .args(args)
@@ -104,7 +109,7 @@ fn run_env(binary: &str, args: &[&str], stdin: &str, env: &[(&str, &str)]) -> Ou
     if let Some(mut input) = child.stdin.take() {
         let _ = std::io::Write::write_all(&mut input, stdin.as_bytes());
     }
-    child.wait_with_output().unwrap()
+    child
 }
 
 fn text(bytes: &[u8]) -> String {
@@ -884,9 +889,9 @@ fn qtm_metric() {
 
 /// The lists of `solve`'s text output with `--all-optimal`, `--plus` or
 /// `--max-length`: per cube (in input order) its `solutions` line's words,
-/// its `truncated` line's (if any) and its solutions as (length, moves);
-/// then the total line. Each cube's lines are together, and its
-/// `solutions` line counts its `solution` lines.
+/// its `truncated` or `stopped` line's (if any) and its solutions as
+/// (length, moves); then the total line. Each cube's lines are together,
+/// and its `solutions` line counts its `solution` lines.
 type Lists = Vec<(Vec<String>, Option<Vec<String>>, Vec<(usize, String)>)>;
 fn parse_lists(output: &str, cubes: usize) -> (Lists, String) {
     let mut lists: Lists = vec![Default::default(); cubes];
@@ -904,7 +909,7 @@ fn parse_lists(output: &str, cubes: usize) -> (Lists, String) {
         let index: usize = head[1].parse().unwrap();
         assert!(lists[index].0.is_empty(), "cube {index} listed twice");
         let truncated = lines
-            .next_if(|line| line.starts_with("truncated "))
+            .next_if(|line| line.starts_with("truncated ") || line.starts_with("stopped "))
             .map(|line| line.split(' ').map(str::to_string).collect::<Vec<_>>());
         if let Some(truncated) = &truncated {
             assert_eq!(truncated[1], head[1], "{output}");
@@ -1249,4 +1254,155 @@ fn solve_all_optimal_and_plus() {
         "{}",
         text(&out.stderr)
     );
+}
+
+/// A scramble whose list up to 16 moves takes long on h0.
+const LONG_LIST: &str = "R U F2 D L' B\n";
+
+/// `--time-limit`: a list that the clock stops says so as text, as JSON
+/// and with `--fast`, holds what was found (all of it up to the complete
+/// length) and is no error; a limit that is not reached changes nothing.
+#[test]
+fn solve_time_limit() {
+    let table = h0();
+    let solve = env!("CARGO_BIN_EXE_solve");
+    let limited = [
+        table,
+        "-t",
+        "2",
+        "--max-length",
+        "16",
+        "--time-limit",
+        "0.05",
+    ];
+    let out = ok(&run(solve, &limited, LONG_LIST));
+    let (stopped, total) = parse_lists(&out, 1);
+    assert!(total.starts_with("total 1 cubes "), "{total}");
+    let line = stopped[0].1.clone().expect("no stopped line");
+    assert_eq!(line[..3], ["stopped", "0", "time"], "{out}");
+    let complete: usize = line[3].parse().unwrap();
+    assert!((5..16).contains(&complete), "{out}");
+    assert_eq!(stopped[0].0[3..5], ["6", "16"], "optimal and limit");
+    // All of the solutions up to the complete length, some longer ones.
+    let args = [table, "-t", "2", "--max-length", "11"];
+    let (full, _) = parse_lists(&ok(&run(solve, &args, LONG_LIST)), 1);
+    let up_to = |list: &[(usize, String)], length: usize| -> Vec<(usize, String)> {
+        let short = |solution: &&(usize, String)| solution.0 <= length;
+        list.iter().filter(short).cloned().collect()
+    };
+    let common = complete.min(11);
+    assert_eq!(up_to(&stopped[0].2, common), up_to(&full[0].2, common));
+    assert!(stopped[0].2.iter().all(|solution| solution.0 <= 16));
+    // JSON.
+    let json = ok(&run(
+        solve,
+        &[&limited[..], &["--json"]].concat(),
+        LONG_LIST,
+    ));
+    let value: serde_json::Value = serde_json::from_str(json.lines().next().unwrap()).unwrap();
+    assert_eq!(value["stopped"], "time");
+    assert_eq!(
+        (value["truncated"].as_bool(), value["ok"].as_bool()),
+        (Some(false), Some(true))
+    );
+    assert!(value["complete_length"].as_u64().unwrap() < 16);
+    assert_eq!(value["max_length"], 16);
+    // --fast.
+    let fast = ["--fast", "--table", table, "-t", "2"];
+    let list = [
+        "--max-length",
+        "16",
+        "--time-limit",
+        "0.05",
+        "R U F2 D L' B",
+    ];
+    let out = ok(&run(solve, &[&fast[..], &list[..]].concat(), ""));
+    assert!(out.contains("\noptimal  6 moves\n"), "{out}");
+    let flag = "\nstopped: the time limit was reached; complete up to ";
+    assert!(out.contains(flag), "{out}");
+    let json = ok(&run(
+        solve,
+        &[&fast[..], &list[..], &["--json"]].concat(),
+        "",
+    ));
+    let report: serde_json::Value = serde_json::from_str(json.trim()).unwrap();
+    assert_eq!(report["stopped"], "time");
+    // A limit that is not reached: the list without it, not marked.
+    let args = [
+        table,
+        "-t",
+        "2",
+        "--max-length",
+        "11",
+        "--time-limit",
+        "3600",
+    ];
+    let (roomy, _) = parse_lists(&ok(&run(solve, &args, LONG_LIST)), 1);
+    assert!(roomy[0].1.is_none());
+    assert_eq!(roomy[0].2, full[0].2);
+    let args = [table, "-t", "2", "--plus", "0", "--json"];
+    let json = ok(&run(solve, &args, LONG_LIST));
+    let value: serde_json::Value = serde_json::from_str(json.lines().next().unwrap()).unwrap();
+    assert!(value["stopped"].is_null(), "{json}");
+    // Refused: no time, and a limit without a list.
+    for args in [
+        &["--plus", "1", "--time-limit", "0"][..],
+        &["--plus", "1", "--time-limit", "soon"][..],
+        &["--time-limit", "5"][..],
+    ] {
+        let out = run(solve, &[&[table, "-t", "2"], args].concat(), LONG_LIST);
+        assert_eq!(out.status.code(), Some(2), "{args:?}");
+        assert!(text(&out.stderr).contains("--time-limit"), "{args:?}");
+    }
+}
+
+/// Ctrl-C during a list: the search stops, what was found is printed as
+/// cancelled, the cubes not started are left out and the exit status is
+/// 130.
+#[cfg(unix)]
+#[test]
+fn solve_list_interrupted() {
+    let table = h0();
+    let solve = env!("CARGO_BIN_EXE_solve");
+    // Start a list with `-v`, wait until its log says that the search
+    // starts (`marker`), let it search for a while and send SIGINT.
+    let interrupt = |args: &[&str], stdin: &str, marker: &str| {
+        let mut child = start(solve, &[args, &["-v"]].concat(), stdin, &[]);
+        let mut log = std::io::BufReader::new(child.stderr.take().unwrap());
+        let mut line = String::new();
+        while !line.contains(marker) {
+            line.clear();
+            let read = std::io::BufRead::read_line(&mut log, &mut line).unwrap();
+            assert!(read > 0, "the search did not start");
+        }
+        std::thread::sleep(std::time::Duration::from_millis(1500));
+        let pid = libc::pid_t::try_from(child.id()).unwrap();
+        // SAFETY: a signal to our own child process.
+        assert_eq!(unsafe { libc::kill(pid, libc::SIGINT) }, 0);
+        child.wait_with_output().unwrap()
+    };
+    let list = ["--max-length", "17", "--max-solutions", "100000000"];
+    let args = [&[table, "-t", "2", "-c", "1"], &list[..]].concat();
+    let out = interrupt(
+        &args,
+        &format!("{LONG_LIST}U2 D2 R2 L2\n"),
+        " cubes, at most ",
+    );
+    assert_eq!(out.status.code(), Some(130));
+    let output = text(&out.stdout);
+    let (lists, total) = parse_lists(&output, 1);
+    let line = lists[0].1.clone().expect("no stopped line");
+    assert_eq!(line[..3], ["stopped", "0", "cancelled"]);
+    assert!(lists[0].2.len() > 10, "what was found is listed");
+    // (The second cube was not started: the total is of the first.)
+    assert!(total.starts_with("total 1 cubes "), "{total}");
+    // --fast and JSON.
+    let fast = ["--fast", "--table", table, "-t", "2", "--json"];
+    let args = [&fast[..], &list[..], &["R U F2 D L' B"]].concat();
+    let out = interrupt(&args, "", "listing, ");
+    assert_eq!(out.status.code(), Some(130));
+    let report: serde_json::Value = serde_json::from_str(text(&out.stdout).trim()).unwrap();
+    assert_eq!(report["stopped"], "cancelled");
+    assert!(report["count"].as_u64().unwrap() > 10);
+    assert_eq!(report["optimal"], 6);
 }

@@ -36,7 +36,8 @@
 //! `--all-optimal`, `--plus K` and `--max-length N` list every distinct
 //! solution of each cube up to a length instead of one optimal solution
 //! (`egg_solver::solutions`; `list_batch`, `list_fast`), at most
-//! `--max-solutions` of them.
+//! `--max-solutions` of them. A list ends early, with what was found, after
+//! `--time-limit` seconds per cube or on Ctrl-C (exit status 130).
 //!
 //! `solve --shm-load TABLE` loads a table into a shared memory segment that
 //! later runs attach at once (`--shm`; `docs/reference/USER_GUIDE.md` "Shared memory"), `solve
@@ -62,7 +63,7 @@ use egg_solver::cli::{self, BadInput, LoadArgs, MetricArgs, Verbosity};
 use egg_solver::cubie::{format_moves, parse_moves, CubieCube};
 use egg_solver::lanes::share::Pool;
 use egg_solver::metric::Metric;
-use egg_solver::solutions::{Options, Solutions, DEFAULT_MAX_SOLUTIONS};
+use egg_solver::solutions::{Options, Solutions, Stopped, DEFAULT_MAX_SOLUTIONS};
 use egg_solver::solver::{Solver, Stats};
 use egg_solver::tables::Cocsep;
 use std::io::{BufRead, IsTerminal as _, Write};
@@ -221,6 +222,17 @@ struct Args {
         display_order = 73
     )]
     max_solutions: usize,
+    /// With the three options above: stop a cube's search after SECONDS and
+    /// list what was found until then, marked as stopped. (Ctrl-C stops a
+    /// list the same way, with exit status 130.)
+    #[arg(
+        long,
+        value_name = "SECONDS",
+        requires = "listing",
+        value_parser = parse_time_limit,
+        display_order = 74
+    )]
+    time_limit: Option<std::time::Duration>,
     #[command(flatten)]
     metric: MetricArgs,
     #[command(flatten)]
@@ -285,11 +297,19 @@ sequence that only adds a loop to a shorter solution), by length:
 A cube with more than --max-solutions M solutions gets, after its first line,
   truncated <index> <M> <complete>
 and M solutions: all of at most <complete> moves, some of the longer ones.
+A cube whose search was stopped by --time-limit or by Ctrl-C gets
+  stopped <index> <time|cancelled> <complete>
+and the solutions found until then: all of at most <complete> moves, maybe
+some longer ones (<optimal> is - if none was found). After Ctrl-C the cubes
+not started are left out and the exit status is 130; a second Ctrl-C ends
+the program at once.
 With --json: {\"type\":\"solutions\",\"index\":..,\"count\":..,\"optimal\":..,
-\"max_length\":..,\"truncated\":false,\"complete_length\":..,\"metric\":\"htm\",
-\"by_length\":[{\"length\":..,\"count\":..}],\"solutions\":[{\"moves\":..,\"length\":..}],
-\"nodes\":..,\"lookups\":..,\"seconds\":..,\"ok\":true}. With --fast: optimal, listed
-and (if so) truncated lines, then the solutions under a line per length.";
+\"max_length\":..,\"truncated\":false,\"stopped\":null,\"complete_length\":..,
+\"metric\":\"htm\",\"by_length\":[{\"length\":..,\"count\":..}],
+\"solutions\":[{\"moves\":..,\"length\":..}],\"nodes\":..,\"lookups\":..,\"seconds\":..,
+\"ok\":true} (\"stopped\": null, \"time\" or \"cancelled\"). With --fast: optimal,
+listed and (if so) truncated or stopped lines, then the solutions under a
+line per length.";
 
 /// A line of `--json` output.
 #[derive(serde::Serialize)]
@@ -687,7 +707,7 @@ impl Args {
     /// What to list, if all solutions up to a length are asked for
     /// (`--all-optimal`, `--plus`, `--max-length`): `None` for one optimal
     /// solution per cube.
-    fn listing(&self) -> Option<Options> {
+    fn listing(&self) -> Option<Options<'static>> {
         if !self.all_optimal && self.plus.is_none() && self.max_length.is_none() {
             return None;
         }
@@ -696,7 +716,57 @@ impl Args {
             plus: self.plus.or(self.all_optimal.then_some(0)),
             max_length: self.max_length,
             max_solutions: self.max_solutions,
+            time_limit: self.time_limit,
+            // (Ctrl-C: `catch_interrupt`.)
+            cancel: Some(&INTERRUPTED),
         })
+    }
+}
+
+/// `--time-limit`: seconds, more than 0.
+fn parse_time_limit(text: &str) -> Result<std::time::Duration, String> {
+    let seconds = text.parse::<f64>().ok().filter(|&seconds| seconds > 0.0);
+    seconds
+        .and_then(|seconds| std::time::Duration::try_from_secs_f64(seconds).ok())
+        .ok_or_else(|| "expected a number of seconds above 0, e.g. 60 or 0.5".to_string())
+}
+
+/// Set by Ctrl-C while a list is searched (`catch_interrupt`): the searches
+/// stop and the lists so far are printed (`Options::cancel`).
+static INTERRUPTED: AtomicBool = AtomicBool::new(false);
+
+/// The SIGINT handler of a list: the first Ctrl-C sets `INTERRUPTED`, a
+/// second one ends the process at once. (Only an atomic and `_exit`: both
+/// are safe in a signal handler.)
+#[cfg(unix)]
+extern "C" fn interrupt(_signal: libc::c_int) {
+    if INTERRUPTED.swap(true, Ordering::SeqCst) {
+        // SAFETY: `_exit` is async-signal-safe and does not return.
+        unsafe { libc::_exit(130) };
+    }
+}
+
+/// From now on Ctrl-C stops the list being searched instead of killing the
+/// process (`interrupt`). Only lists do this: a solve for one solution
+/// keeps the default handling. (Elsewhere than on Unix: nothing.)
+fn catch_interrupt() {
+    #[cfg(unix)]
+    {
+        let handler = interrupt as extern "C" fn(libc::c_int);
+        // SAFETY: the handler is async-signal-safe (see `interrupt`).
+        unsafe { libc::signal(libc::SIGINT, handler as libc::sighandler_t) };
+    }
+}
+
+/// The exit status of a list: 130 after Ctrl-C (as a process killed by
+/// SIGINT reports), else 1 if a listed solution was wrong, else 0.
+fn list_status(bad: bool) -> ExitCode {
+    if INTERRUPTED.load(Ordering::SeqCst) {
+        ExitCode::from(130)
+    } else if bad {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
     }
 }
 
@@ -727,6 +797,10 @@ struct Listing {
     /// More solutions than `--max-solutions`: `count` of them are listed,
     /// all of at most `complete_length` moves and some longer ones.
     truncated: bool,
+    /// `"time"` (`--time-limit`) or `"cancelled"` (Ctrl-C) if the search
+    /// was stopped (else null): the solutions found until then are listed,
+    /// all of at most `complete_length` moves among them.
+    stopped: Option<&'static str>,
     complete_length: u8,
     metric: Metric,
     by_length: Vec<LengthCount>,
@@ -744,6 +818,7 @@ impl Listing {
             optimal: list.optimal,
             max_length: list.max_length,
             truncated: list.truncated,
+            stopped: list.stopped.map(Stopped::name),
             complete_length: list.complete_length,
             metric,
             by_length: (list.counts(metric).into_iter())
@@ -769,11 +844,12 @@ fn check_listing(options: &Options, metric: Metric) -> anyhow::Result<()> {
 }
 
 /// Whether a list is right as far as can be checked here: every solution
-/// solves `cube`, and a cube searched up to God's number has a solution.
+/// solves `cube`, and a cube searched up to God's number has a solution
+/// (unless its search was stopped).
 fn list_ok(cube: Option<&CubieCube>, list: &Solutions, metric: Metric) -> bool {
     let solves =
         |moves: &Vec<u8>| cube.and_then(|cube| cube.apply_moves(moves)) == Some(CubieCube::SOLVED);
-    let none_possible = list.max_length < metric.max_target();
+    let none_possible = list.max_length < metric.max_target() || list.stopped.is_some();
     list.solutions.iter().all(solves) && (list.optimal.is_some() || none_possible)
 }
 
@@ -796,6 +872,9 @@ fn list_batch(args: &Args, options: &Options) -> anyhow::Result<ExitCode> {
         .context("no table")?;
     let metric = args.metric.metric;
     check_listing(options, metric)?;
+    // (From here on: a Ctrl-C while the table loads stops the search as it
+    // starts.)
+    catch_interrupt();
     let cubes = read_scrambles(args.count.unwrap_or(usize::MAX))?;
     if cubes.is_empty() {
         return Err(BadInput("no scrambles on stdin".into()).into());
@@ -856,8 +935,14 @@ fn list_batch(args: &Args, options: &Options) -> anyhow::Result<ExitCode> {
     )
     .context("a thread panicked")?;
     let wall = start.elapsed().as_secs_f64();
-    let n = cubes.len();
     let reported = n_done.load(Ordering::Relaxed);
+    // (After Ctrl-C the cubes not started are not reported: the total is
+    // of those that were.)
+    let n = if INTERRUPTED.load(Ordering::SeqCst) {
+        reported
+    } else {
+        cubes.len()
+    };
     anyhow::ensure!(reported == n, "{reported} of {n} cubes reported");
     let wall_per_cube = wall / n.max(1) as f64;
     let nodes_per_cube = nodes.load(Ordering::Relaxed) as f64 / n.max(1) as f64;
@@ -878,15 +963,11 @@ fn list_batch(args: &Args, options: &Options) -> anyhow::Result<ExitCode> {
             "total {n} cubes wall {wall:.6} wall/cube {wall_per_cube:.6} nodes/cube {nodes_per_cube:.0} threads {threads} lanes {lanes} concurrency {concurrency}{metric_note}"
         );
     }
-    Ok(if bad.load(Ordering::Relaxed) {
-        ExitCode::FAILURE
-    } else {
-        ExitCode::SUCCESS
-    })
+    Ok(list_status(bad.load(Ordering::Relaxed)))
 }
 
 /// The text lines of cube `i`'s list (`OUTPUT_HELP`): `solutions`,
-/// `truncated` if it is, and a `solution` line each.
+/// `truncated` or `stopped` if it is, and a `solution` line each.
 fn write_list(
     out: &mut impl Write,
     i: usize,
@@ -911,6 +992,14 @@ fn write_list(
             out,
             "truncated {i} {} {}",
             options.max_solutions, list.complete_length
+        )?;
+    }
+    if let Some(stopped) = list.stopped {
+        writeln!(
+            out,
+            "stopped {i} {} {}",
+            stopped.name(),
+            list.complete_length
         )?;
     }
     for solution in &list.solutions {
@@ -952,6 +1041,7 @@ fn list_fast(args: &Args, options: &Options) -> anyhow::Result<ExitCode> {
         .context("--fast requires --table PATH")?;
     let metric = args.metric.metric;
     check_listing(options, metric)?;
+    catch_interrupt();
     let scramble = fast_scramble(args)?;
     let parse = |text: &str| {
         parse_moves(text)
@@ -988,12 +1078,17 @@ fn list_fast(args: &Args, options: &Options) -> anyhow::Result<ExitCode> {
             *result.lock().unwrap_or_else(PoisonError::into_inner) = Some((list, stats, seconds));
         }
     };
+    log::info!("listing, {metric}, {options:?}");
     egg_solver::lanes::share::all_solutions(&solver, &get, threads, lanes, 1, options, &done)
         .context("a thread panicked")?;
     let result = result.into_inner().unwrap_or_else(PoisonError::into_inner);
-    let (list, stats, seconds) = result.context("not solved")?;
+    let Some((list, stats, seconds)) = result else {
+        // (Ctrl-C before the scramble's search began, e.g. in the warm-up.)
+        anyhow::ensure!(INTERRUPTED.load(Ordering::SeqCst), "not solved");
+        return Ok(list_status(false));
+    };
     anyhow::ensure!(
-        list.optimal.is_some() || list.max_length < metric.max_target(),
+        list.optimal.is_some() || list.max_length < metric.max_target() || list.stopped.is_some(),
         "no solution within {} moves ({metric}): is the table damaged?",
         metric.max_target()
     );
@@ -1021,7 +1116,7 @@ fn list_fast(args: &Args, options: &Options) -> anyhow::Result<ExitCode> {
             ms: seconds * 1000.0,
             nodes_per_second: rate,
         })?;
-        return Ok(ExitCode::SUCCESS);
+        return Ok(list_status(false));
     }
     print_fast_list(&list, metric, options);
     println!(
@@ -1030,16 +1125,20 @@ fn list_fast(args: &Args, options: &Options) -> anyhow::Result<ExitCode> {
         stats.nodes as f64 / 1e6,
         rate / 1e6
     );
-    Ok(ExitCode::SUCCESS)
+    Ok(list_status(false))
 }
 
 /// `--fast`'s text lines of a list (`OUTPUT_HELP`): the optimal length,
 /// how many solutions are listed up to which length (and whether there are
-/// more), then the solutions under a line per length.
+/// more, or the search was stopped), then the solutions under a line per
+/// length.
 fn print_fast_list(list: &Solutions, metric: Metric, options: &Options) {
     let limit = length_text(metric, usize::from(list.max_length));
+    let complete = length_text(metric, usize::from(list.complete_length));
     match list.optimal {
         Some(optimal) => println!("optimal  {}", length_text(metric, usize::from(optimal))),
+        // (A stopped search knows less: the lengths it completed.)
+        None if list.stopped.is_some() => println!("optimal  more than {complete}"),
         None => println!("optimal  more than {limit}"),
     }
     let count = list.solutions.len();
@@ -1049,10 +1148,16 @@ fn print_fast_list(list: &Solutions, metric: Metric, options: &Options) {
     );
     if list.truncated {
         println!(
-            "truncated: there are more than {} (--max-solutions); complete up to {}",
+            "truncated: there are more than {} (--max-solutions); complete up to {complete}",
             options.max_solutions,
-            length_text(metric, usize::from(list.complete_length))
         );
+    }
+    match list.stopped {
+        Some(Stopped::Time) => {
+            println!("stopped: the time limit was reached; complete up to {complete}");
+        }
+        Some(Stopped::Cancelled) => println!("stopped: cancelled; complete up to {complete}"),
+        None => {}
     }
     let mut solutions = list.solutions.iter();
     for (length, count) in list.counts(metric) {

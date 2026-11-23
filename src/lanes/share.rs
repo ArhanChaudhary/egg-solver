@@ -55,10 +55,17 @@
 //! true>`, whose lanes record a solution and go on with their job
 //! (`Worker::found_all`), and whose cubes run every iteration to its end, up
 //! to the limit (`Worker::iteration_done_all`). What only serves to find one
-//! solution sooner is off there: the first pass, split iterations, the
-//! symmetric-start filter. The mode has machine code of its own (the `ALL`
-//! parameter of `Worker` and `Lane`): the search for one solution compiles
-//! as without it, and its types have no field for it.
+//! solution sooner is off there: the first pass, split iterations, and of
+//! the symmetric-start filter `dedup` (with `keep` alone the lists stay
+//! exact: each solution is recorded with its images under the cube's
+//! symmetries, see `crate::solutions`). A cube's search also ends when its
+//! time is up (`Options::time_limit`, looked at when a job ends), and all
+//! of them when the cancel flag is set (`Options::cancel`: it is the pool's
+//! `stop`, which the round loop reads once per round as it always did; the
+//! workers then end their cubes as cancelled, `Worker::cancel_all`). The
+//! mode has machine code of its own (the `ALL` parameter of `Worker` and
+//! `Lane`): the search for one solution compiles as without it, and its
+//! types have no field for it.
 //!
 //! Gains, 48 threads, h11, `random_state`: the mode itself (l5) took a batch
 //! from 7.86 ms to 1.26 ms per cube (bench random:1000 from 187 to 795
@@ -74,7 +81,7 @@ use super::{
 };
 use crate::cubie::CubieCube;
 use crate::simd::Cube;
-use crate::solutions::{Collector, Options, Solutions};
+use crate::solutions::{Collector, Options, Solutions, Stopped};
 use crate::solver::{Solver, Stats, ALLOWED_AFTER, ALL_MOVES};
 use crate::symstart::SymFilter;
 use crossbeam_utils::CachePadded;
@@ -156,7 +163,7 @@ pub type AllDone<'d> = dyn Fn(usize, Solutions, Stats, f64) + Sync + 'd;
 /// and when the cube is reported: rarely. A B-tree, as `Collector`'s set:
 /// hash tables share code with those of the search for one solution.)
 struct AllMode<'a> {
-    options: Options,
+    options: Options<'a>,
     done: &'a AllDone<'a>,
     /// By cube index: the solutions of each cube in progress.
     lists: Mutex<BTreeMap<usize, Collector>>,
@@ -1206,7 +1213,13 @@ pub fn solve_all(
 /// The share mode's search, with these differences: a solution is recorded
 /// and its job goes on; every iteration runs to its end, up to the limit;
 /// each iteration runs alone, on whole jobs (no first pass, no split
-/// iterations); no symmetric-start filter.
+/// iterations); of the symmetric-start filter only `keep`, each solution
+/// recorded with its images under the cube's symmetries.
+///
+/// A cube whose `Options::time_limit` is up is reported with what was
+/// found (`Solutions::stopped`). Once `Options::cancel` is set, the cubes in
+/// progress are reported so (every started cube is reported once), and no
+/// further cube is started (those are not reported at all).
 ///
 /// # Errors
 /// If a worker thread panicked.
@@ -1225,8 +1238,20 @@ pub fn all_solutions(
         lists: Mutex::new(BTreeMap::new()),
     };
     let pool = Pool::new(cubes, max_active, threads);
-    let stop = AtomicBool::new(false);
-    crate::parallel::on_threads(threads, |_| pool.run_all(solver, nlanes, &stop, &mode))?;
+    // (The pool's `stop` is the cancel flag: the round loop reads it once
+    // per round, as in a search for one solution.)
+    let never = AtomicBool::new(false);
+    let stop = options.cancel.unwrap_or(&never);
+    crate::parallel::on_threads(threads, |_| pool.run_all(solver, nlanes, stop, &mode))?;
+    // After a cancel, a started cube may be left that no thread was working
+    // on at that moment (between two iterations of a cube of a batch, which
+    // threads leave and join): its list is reported here, as cancelled.
+    // (Without a cancel every cube was reported, and none is left.)
+    let left = std::mem::take(&mut *mode.lists.lock());
+    for (index, mut list) in left {
+        list.stop(Stopped::Cancelled);
+        done(index, list.finish(), Stats::default(), 0.0);
+    }
     Ok(())
 }
 
@@ -2689,6 +2714,9 @@ where
                 break;
             }
         }
+        if ALL {
+            self.cancel_all();
+        }
         // (Only with `stop` can jobs be left; their cubes are not reported.)
         for slot in 0..self.locals.len() {
             if matches!(&self.locals[slot], Some(l) if l.pending == 0) {
@@ -2816,6 +2844,9 @@ where
             }
         }
         let slot = self.end_job(i, !found);
+        if ALL {
+            self.time_limit_all(slot);
+        }
         if self.restart(i, Some(slot)) {
             return true;
         }
@@ -2850,7 +2881,11 @@ where
                     self.found(i);
                 }
             }
-            prefer = Some(self.end_job(i, !found));
+            let slot = self.end_job(i, !found);
+            if ALL {
+                self.time_limit_all(slot);
+            }
+            prefer = Some(slot);
         }
     }
 
@@ -2905,6 +2940,59 @@ where
             return;
         }
         self.publish_solution(ctx, None, ctx.started.elapsed().as_secs_f64());
+    }
+
+    /// (All solutions.) Stop the search of `ctx` for `reason` (the clock or
+    /// the cancel flag), unless it has ended: its list is marked so and is
+    /// reported as it is.
+    fn stop_all(&mut self, ctx: &CubeCtx, reason: Stopped) {
+        if ctx.done.load(Acquire) {
+            return;
+        }
+        if let Some(mode) = self.mode() {
+            if let Some(list) = mode.lists.lock().get_mut(&ctx.index) {
+                list.stop(reason);
+            }
+        }
+        self.finish_all(ctx);
+    }
+
+    /// (All solutions.) A job of the cube in `slot` ended: stop the cube's
+    /// search if it has run for `Options::time_limit` (the other lanes drop
+    /// its jobs, as those of a solved cube).
+    fn time_limit_all(&mut self, slot: usize) {
+        let Some(limit) = self.mode().and_then(|mode| mode.options.time_limit) else {
+            return;
+        };
+        let Some(Some(local)) = self.locals.get(slot) else {
+            return;
+        };
+        if local.ctx.done.load(Relaxed) || local.ctx.started.elapsed() < limit {
+            return;
+        }
+        let ctx = local.ctx.clone();
+        self.stop_all(&ctx, Stopped::Time);
+    }
+
+    /// (All solutions.) This thread leaves the pool. If the pool was
+    /// stopped (`Options::cancel`), the cubes it works on end as cancelled,
+    /// with what was found, and its lanes drop their jobs: each such cube
+    /// is then reported by the last thread that leaves it (`release`).
+    /// (At the pool's regular end every cube is done: nothing to do.)
+    fn cancel_all(&mut self) {
+        while self.active_lanes > 0 {
+            let i = self.active_lanes - 1;
+            self.end_job(i, false);
+            self.deactivate(i);
+        }
+        for slot in 0..self.locals.len() {
+            let Some(local) = &self.locals[slot] else {
+                continue;
+            };
+            let ctx = local.ctx.clone();
+            self.stop_all(&ctx, Stopped::Cancelled);
+            self.settle(slot);
+        }
     }
 
     /// (All solutions.) The current iteration of `ctx` ended (no job
@@ -3579,12 +3667,14 @@ where
             pool.active.fetch_sub(1, AcqRel);
             return false;
         };
-        let list = Collector::new(solver.metric(), &mode.options);
+        let filter = Self::filter_all(solver, root);
+        let mut list = Collector::new(solver.metric(), &mode.options, filter);
         let first_target = if QTM {
             solver.first_target(root, bounds.0, bounds.1)
         } else {
             bounds.0.max(bounds.1).max(1)
         };
+        list.start(first_target);
         if first_target > list.limit() {
             pool.active.fetch_sub(1, AcqRel);
             let seconds = started.elapsed().as_secs_f64();
@@ -3593,6 +3683,16 @@ where
         }
         mode.lists.lock().insert(index, list);
         true
+    }
+
+    /// (All solutions.) The job filter of the cube `root`: of the
+    /// symmetric-start filter only `keep`. (`dedup` also drops jobs that
+    /// reach an equivalent position by accident, whose solutions no
+    /// symmetry of the cube gives back; with `keep`, each solution's images
+    /// under the cube's symmetries are the solutions of the dropped jobs:
+    /// `crate::solutions`.)
+    fn filter_all(solver: &Solver, root: Cube) -> SymFilter {
+        solver.sym_filter(root, root.inverse()).without_dedup()
     }
 
     /// Start a fresh cube in lane `li`.
@@ -3604,6 +3704,10 @@ where
         let pool = self.pool;
         let solver = self.solver;
         while !pool.no_fresh.load(Relaxed) {
+            // (All solutions: no new cube once the lists are cancelled.)
+            if ALL && self.mode().is_some_and(|mode| mode.options.cancelled()) {
+                return false;
+            }
             // (A load first: idle threads call this often.)
             if pool.active.load(Relaxed) >= pool.max_active {
                 return false;
@@ -3652,10 +3756,8 @@ where
                 started,
                 root,
                 root_inverse,
-                // (All solutions: every job; the filter keeps one of each
-                // class of equivalent ones.)
                 sym_filter: if ALL {
-                    SymFilter::NONE
+                    Self::filter_all(solver, root)
                 } else {
                     solver.sym_filter(root, root_inverse)
                 },
