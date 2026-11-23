@@ -4618,6 +4618,268 @@ mod tests {
         }
     }
 
+    /// The cubes of the tests of lists that end early (`share_lists_*`),
+    /// what is listed and the whole lists (`Solver::all_solutions`, which
+    /// the integration tests check against brute force): scrambles of 0 to
+    /// 3 random moves with every solution of at most 6 moves, over a tiny
+    /// search (as `share_protocol_with_tiny_search`: the iteration of 6
+    /// moves runs on jobs, the ones below are split between lanes and
+    /// threads). Under Miri: 4 scrambles of 0 to 2 moves, up to 3 moves.
+    fn early_lists(solver: &Solver) -> (Vec<CubieCube>, Options<'static>, Vec<Solutions>) {
+        let mut rng = crate::cubie::Rng(79);
+        let (count, longest, limit) = if cfg!(miri) { (4, 3, 3) } else { (8, 4, 6) };
+        let cubes: Vec<CubieCube> = (0..count)
+            .map(|i| {
+                let moves: Vec<u8> = (0..(i + 2) % longest)
+                    .map(|_| u8::try_from(rng.below(18)).unwrap())
+                    .collect();
+                CubieCube::SOLVED.apply_moves(&moves).unwrap()
+            })
+            .collect();
+        let options = Options::max_length(limit);
+        let whole: Vec<Solutions> = cubes
+            .iter()
+            .map(|cube| solver.all_solutions(cube, &options).0)
+            .collect();
+        assert!(whole.iter().all(|list| !list.solutions.is_empty()));
+        (cubes, options, whole)
+    }
+
+    /// The pool shapes of the tests of lists that end early: (threads,
+    /// lanes per thread, cubes in progress).
+    fn early_shapes() -> &'static [(usize, usize, usize)] {
+        if cfg!(miri) {
+            &[(3, 2, usize::MAX), (2, 1, 1)]
+        } else {
+            &[
+                (1, 3, 1),
+                (2, 1, 1),
+                (3, 2, usize::MAX),
+                (4, 3, 2),
+                (8, 2, 1),
+                (16, 1, 4),
+            ]
+        }
+    }
+
+    /// Check the list of `cube` from a search that may have ended early
+    /// (the clock, the cancel flag) against `whole`, its whole list for the
+    /// same limits: every solution replays, is in canonical form without a
+    /// detour and within the limit, each once and in order, and is one of
+    /// the whole list's; all those of at most `complete_length` moves are
+    /// there; and a list that did not end early is the whole one.
+    fn check_early_list(what: &str, cube: &CubieCube, list: &Solutions, whole: &Solutions) {
+        let htm = crate::metric::Metric::Htm;
+        for solution in &list.solutions {
+            assert_eq!(
+                cube.apply_moves(solution),
+                Some(CubieCube::SOLVED),
+                "{what}: {solution:?} does not solve the cube"
+            );
+            assert_eq!(
+                crate::solutions::canonical(htm, solution).as_ref(),
+                Some(solution),
+                "{what}: {solution:?} is no solution of its length"
+            );
+            assert!(
+                solution.len() <= usize::from(list.max_length),
+                "{what}: {solution:?} is too long"
+            );
+            assert!(
+                whole.solutions.contains(solution),
+                "{what}: {solution:?} is not in the whole list"
+            );
+        }
+        let key = |solution: &Vec<u8>| (solution.len(), solution.clone());
+        assert!(
+            list.solutions.windows(2).all(|w| key(&w[0]) < key(&w[1])),
+            "{what}: not in order, or a solution twice"
+        );
+        assert!(!list.truncated, "{what}: truncated");
+        let complete = usize::from(list.complete_length);
+        let up_to = |list: &Solutions| -> Vec<Vec<u8>> {
+            let short = |solution: &&Vec<u8>| solution.len() <= complete;
+            list.solutions.iter().filter(short).cloned().collect()
+        };
+        assert_eq!(up_to(list), up_to(whole), "{what}: complete {complete}");
+        if list.stopped.is_none() {
+            assert_eq!(list, whole, "{what}: not stopped");
+        } else {
+            assert!(list.complete_length <= whole.max_length, "{what}");
+        }
+    }
+
+    /// A time limit on lists (`Options::time_limit`, `Worker::time_limit_all`)
+    /// with work sharing over a tiny search, in batches and one cube at a
+    /// time: every cube is reported once, with a list that says whether the
+    /// clock stopped it and that holds what was found (`check_early_list`).
+    /// With no time at all every cube that is searched is stopped when its
+    /// first job ends (by whichever thread ends it, several at once in a
+    /// batch); with a little time, some are stopped later, in iterations
+    /// that several lanes and threads share (their jobs are dropped as
+    /// those of a solved cube, `cancel_done`), and some may finish. (No
+    /// assertion depends on how long anything takes.)
+    #[test]
+    fn share_lists_stop_at_the_time_limit() {
+        use std::time::Duration;
+        let corners = Cocsep::truncated(4);
+        let table = H48Table::zeroed(0, 2);
+        let solver = Solver::new(&corners, &table);
+        let (cubes, options, whole) = early_lists(&solver);
+        let limits: &[Duration] = if cfg!(miri) {
+            &[Duration::ZERO, Duration::from_millis(30)]
+        } else {
+            &[
+                Duration::ZERO,
+                Duration::from_micros(100),
+                Duration::from_millis(2),
+            ]
+        };
+        for &limit in limits {
+            let options = options.with_time_limit(limit);
+            for &(threads, nlanes, max_active) in early_shapes() {
+                let get = |i: usize| cubes.get(i).copied();
+                let reports = Mutex::new(vec![Vec::new(); cubes.len()]);
+                let done = |i: usize, list: Solutions, _: Stats, _: f64| {
+                    reports.lock()[i].push(list);
+                };
+                let mode = AllMode {
+                    options,
+                    done: &done,
+                    lists: Mutex::new(BTreeMap::new()),
+                };
+                let pool = Pool::new(&get, max_active, threads);
+                let stop = AtomicBool::new(false);
+                std::thread::scope(|scope| {
+                    for _ in 0..threads {
+                        scope.spawn(|| {
+                            // A panic stops the other threads (else they
+                            // could wait for its jobs forever).
+                            let run = || pool.run_all(&solver, nlanes, &stop, &mode);
+                            let result =
+                                std::panic::catch_unwind(std::panic::AssertUnwindSafe(run));
+                            if let Err(e) = result {
+                                stop.store(true, Relaxed);
+                                std::panic::resume_unwind(e);
+                            }
+                        });
+                    }
+                });
+                assert!(mode.lists.lock().is_empty(), "a list was not reported");
+                let reports = reports.into_inner();
+                for (i, lists) in reports.iter().enumerate() {
+                    let what = format!(
+                        "limit {limit:?}, cube {i}: {threads} threads, {nlanes} lanes, \
+                         {max_active} cubes"
+                    );
+                    let [list] = &lists[..] else {
+                        panic!("{what}: reported {} times", lists.len());
+                    };
+                    check_early_list(&what, &cubes[i], list, &whole[i]);
+                    assert_ne!(list.stopped, Some(Stopped::Cancelled), "{what}");
+                    assert_eq!(list.max_length, whole[i].max_length, "{what}");
+                    if limit.is_zero() {
+                        // (Stopped at the end of its first job, before its
+                        // first iteration can end; the solved cube is
+                        // listed without a search.)
+                        let searched = cubes[i] != CubieCube::SOLVED;
+                        assert_eq!(list.stopped.is_some(), searched, "{what}");
+                        assert!(!searched || list.complete_length < whole[i].max_length);
+                    }
+                }
+            }
+        }
+    }
+
+    /// The cancel flag on lists (`Options::cancel`, through `all_solutions`
+    /// as the binaries call it: `Worker::cancel_all`, the pool's `stop`),
+    /// with work sharing over a tiny search: set from the start (no cube is
+    /// taken), set by the thread that takes a cube of the batch, and set by
+    /// another thread once the first cube is taken. Every cube that was
+    /// taken is reported exactly once (by the last thread that leaves it,
+    /// or after the pool returns if no thread held it), the others are not;
+    /// a list says whether it was cancelled and holds what was found
+    /// (`check_early_list`); and the pool always returns. (No assertion
+    /// depends on how long anything takes.)
+    #[test]
+    fn share_lists_stop_at_cancel() {
+        /// When the flag is set.
+        #[derive(Clone, Copy, Debug, PartialEq)]
+        enum Cancel {
+            /// Before the pool starts.
+            AtStart,
+            /// By the thread that takes this cube, as it takes it.
+            Taking(usize),
+            /// By another thread, once a cube was taken.
+            Outside,
+        }
+        let corners = Cocsep::truncated(4);
+        let table = H48Table::zeroed(0, 2);
+        let solver = Solver::new(&corners, &table);
+        let (cubes, options, whole) = early_lists(&solver);
+        let mut cancelled = 0;
+        for when in [
+            Cancel::AtStart,
+            Cancel::Taking(0),
+            Cancel::Taking(cubes.len() / 2),
+            Cancel::Outside,
+        ] {
+            for &(threads, nlanes, max_active) in early_shapes() {
+                let cancel = AtomicBool::new(when == Cancel::AtStart);
+                let taken: Vec<AtomicBool> = cubes.iter().map(|_| AtomicBool::new(false)).collect();
+                let any_taken = AtomicBool::new(false);
+                let get = |i: usize| {
+                    let cube = cubes.get(i).copied();
+                    if cube.is_some() {
+                        taken[i].store(true, Relaxed);
+                        any_taken.store(true, Relaxed);
+                        if when == Cancel::Taking(i) {
+                            cancel.store(true, Relaxed);
+                        }
+                    }
+                    cube
+                };
+                let reports = Mutex::new(vec![Vec::new(); cubes.len()]);
+                let done = |i: usize, list: Solutions, _: Stats, _: f64| {
+                    reports.lock()[i].push(list);
+                };
+                let options = options.with_cancel(&cancel);
+                std::thread::scope(|scope| {
+                    if when == Cancel::Outside {
+                        scope.spawn(|| {
+                            while !any_taken.load(Relaxed) {
+                                std::thread::yield_now();
+                            }
+                            cancel.store(true, Relaxed);
+                        });
+                    }
+                    all_solutions(&solver, &get, threads, nlanes, max_active, &options, &done)
+                        .unwrap();
+                });
+                let reports = reports.into_inner();
+                for (i, lists) in reports.iter().enumerate() {
+                    let what = format!(
+                        "{when:?}, cube {i}: {threads} threads, {nlanes} lanes, {max_active} cubes"
+                    );
+                    // (Reported once if it was taken, else not at all.)
+                    let was_taken = taken[i].load(Relaxed);
+                    assert_eq!(lists.len(), usize::from(was_taken), "{what}: reports");
+                    assert!(!(when == Cancel::AtStart && was_taken), "{what}: taken");
+                    for list in lists {
+                        check_early_list(&what, &cubes[i], list, &whole[i]);
+                        assert_ne!(list.stopped, Some(Stopped::Time), "{what}");
+                        cancelled += usize::from(list.stopped == Some(Stopped::Cancelled));
+                    }
+                }
+                if let Cancel::Taking(at) = when {
+                    assert!(taken[at].load(Relaxed), "{when:?}: cube {at} was not taken");
+                }
+            }
+        }
+        // (With searches of millions of nodes: surely some were in progress.)
+        assert!(cfg!(miri) || cancelled > 0, "no list was cancelled");
+    }
+
     /// A cube's first pass, for the iterations from its lower bound up to the
     /// first with 3-move jobs (8 here), notes the solutions shorter than its
     /// target too, and reports the shortest when it ends: as short as

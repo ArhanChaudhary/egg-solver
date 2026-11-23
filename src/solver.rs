@@ -1192,6 +1192,57 @@ mod tests {
     use crate::metric::Metric;
     use crate::tables::{entry_depth, H48Meta, Memory};
 
+    /// `all_solutions` gives up when its time is up or the cancel flag is
+    /// set (it looks at both before each job): the list says so and holds
+    /// what was found until then, nothing here, complete below the cube's
+    /// first target. Limits that are not reached change nothing. (A tiny
+    /// search: the corner table cut at 4 moves, an empty h0.)
+    #[test]
+    fn all_solutions_stops_at_the_time_limit_and_at_cancel() {
+        use std::sync::atomic::AtomicBool;
+        use std::time::Duration;
+        let corners = Cocsep::truncated(4);
+        let table = H48Table::zeroed(0, 2);
+        let solver = Solver::new(&corners, &table);
+        let cube = CubieCube::SOLVED
+            .apply_moves(&parse_moves("R U").unwrap())
+            .unwrap();
+        let options = Options::max_length(if cfg!(miri) { 3 } else { 6 });
+        let (whole, whole_stats) = solver.all_solutions(&cube, &options);
+        assert_eq!((whole.stopped, whole.optimal), (None, Some(2)));
+        assert_eq!(whole.solutions[0], parse_moves("U' R'").unwrap());
+        assert!(whole_stats.nodes > 0);
+        let stopped_at_once = |options: &Options, reason: Stopped| {
+            let (list, stats) = solver.all_solutions(&cube, options);
+            assert_eq!(list.stopped, Some(reason));
+            assert!(list.solutions.is_empty() && list.optimal.is_none());
+            assert!(!list.truncated && stats.nodes == 0);
+            // (No solution of less than the first target, 2 moves; the
+            // limit is the one asked for.)
+            assert_eq!(
+                (list.complete_length, list.max_length),
+                (1, whole.max_length)
+            );
+        };
+        // No time at all, and the flag set from the start.
+        stopped_at_once(&options.with_time_limit(Duration::ZERO), Stopped::Time);
+        let cancel = AtomicBool::new(true);
+        stopped_at_once(&options.with_cancel(&cancel), Stopped::Cancelled);
+        // (Both: the flag is looked at first.)
+        let both = options.with_cancel(&cancel).with_time_limit(Duration::ZERO);
+        stopped_at_once(&both, Stopped::Cancelled);
+        // Time enough, and a flag that is never set: the whole list.
+        let cancel = AtomicBool::new(false);
+        let roomy = options
+            .with_time_limit(Duration::from_hours(24))
+            .with_cancel(&cancel);
+        assert_eq!(solver.all_solutions(&cube, &roomy).0, whole);
+        // The solved cube is listed without a search, whatever the limits.
+        let cancel = AtomicBool::new(true);
+        let (list, _) = solver.all_solutions(&CubieCube::SOLVED, &options.with_cancel(&cancel));
+        assert_eq!((list.stopped, list.solutions.len()), (None, 1));
+    }
+
     /// The hot-path index (`Solver::index`: `cocsep_x3`, packed entries,
     /// `index_sym`) equals `Cocsep::index` for every `k`, symmetric cubes too.
     #[test]
