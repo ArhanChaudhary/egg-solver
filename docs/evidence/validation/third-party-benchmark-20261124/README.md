@@ -156,6 +156,10 @@ The fix does not change `solve`'s search code: every function of the search is t
 | `solve -c 0`, 48 threads, 19-move set | 2.491 | 2.504 | +0.5% |
 | `solve -c 1`, 48 threads, 19-move set | 2.622 | 2.610 | -0.4% |
 
+## Miri
+
+The change is `5bfcd2a`. Its library part is safe code: `Pool::run` returns the sum of its lanes' node and lookup counters, and tune records are read and written differently. The full Miri catalogues of [November 23](../miri-20261123/README.md) were not rerun on it. Its new unit tests were run under Miri (miri 0.1.0 of 2026-11-02, `-Zmiri-symbolic-alignment-check -Zmiri-num-cpus=4`) on the x86 backend (`-C target-cpu=x86-64-v3`) and the portable one (`-C target-cpu=x86-64`): `lanes::share::tests::share_run_returns_the_work_of_its_lanes` under 16 scheduler seeds, and `tables::file::tests::tune_files_are_read_by_mode` and `nearest_thread_count_is_by_ratio` once. All passed; `default_lanes_use_the_tune_file` uses files and is ignored under Miri. The logs are `miri/tune-tests-x86.log` and `miri/tune-tests-portable.log`. These are finite runs of unit tests in an interpreter, not a proof that the program has no undefined behavior.
+
 ## What this does not show
 
 - Nothing was measured on his CPU or on any x86 CPU with two threads per core. The reading of his numbers in section 2 is an inference from them and from the lane counts measured here.
@@ -173,5 +177,6 @@ The fix does not change `solve`'s search code: every function of the search is t
 | `window-2/h7.txt` | The new `bench tune` on h7 (before the 1% rule), `solve` over lane counts at 24 and 48 threads, the fix against `dc153b3` |
 | `window-2/tune-final.txt` | The final `bench tune` on h6 to h9 (third window) |
 | `m2/m2-a.txt`, `m2-b.txt` | Apple M2: the three commits, lane counts, the earlier `bench tune` |
+| `miri/` | The targeted Miri runs of the new unit tests on `5bfcd2a` |
 | `scripts/` | The scripts that made these files, and the two scramble subsets |
 | `summarize.py` | Prints the tables of sections 1, 2 and 4 from the raw files |

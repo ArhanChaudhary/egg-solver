@@ -72,7 +72,7 @@ svg { max-width:100%; height:auto; }
 <li>H48 lists all optimal solutions of 20-move scrambles and of the superflip faster than egg-solver, and gains more from 16 threads on 8 cores.</li>
 </ol>
 <p>This folder records the measurements made here to answer them, and the change that followed (<code>bench tune</code>, the default lane count). His machine was not available: what is said about it below is inferred from his published numbers and marked as such.</p>
-<details class="contents"><summary>On this page</summary><ul><li><a href="#summary">Summary</a></li><li><a href="#machines-and-builds">Machines and builds</a></li><li><a href="#1-the-same-code-at-three-commits">1. The same code at three commits</a></li><li><a href="#2-lane-counts">2. Lane counts</a></li><li><a href="#3-lists-of-all-optimal-solutions">3. Lists of all optimal solutions</a></li><li><a href="#4-the-new-bench-tune">4. The new bench tune</a></li><li><a href="#what-this-does-not-show">What this does not show</a></li><li><a href="#files">Files</a></li></ul></details>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#summary">Summary</a></li><li><a href="#machines-and-builds">Machines and builds</a></li><li><a href="#1-the-same-code-at-three-commits">1. The same code at three commits</a></li><li><a href="#2-lane-counts">2. Lane counts</a></li><li><a href="#3-lists-of-all-optimal-solutions">3. Lists of all optimal solutions</a></li><li><a href="#4-the-new-bench-tune">4. The new bench tune</a></li><li><a href="#miri">Miri</a></li><li><a href="#what-this-does-not-show">What this does not show</a></li><li><a href="#files">Files</a></li></ul></details>
 <h2 id="summary">Summary</h2>
 <ul>
 <li><strong>The search code is not slower.</strong> The loop that <code>solve</code> spends its time in (<code>lanes::share::Worker::rounds</code>) is the same machine code, instruction for instruction and at the same address, in <code>28a1953</code>, <code>c3eb909</code> and <code>dc153b3</code>, built for this CPU and for his (<code>-C target-cpu=znver4</code>). Timed at one thread, the three versions are within 2.3% of each other in every configuration, mostly within 1% and in both directions, on this x86 server and on an Apple M2.</li>
@@ -227,6 +227,8 @@ svg { max-width:100%; height:auto; }
 <tr><td><code>solve -c 1</code>, 48 threads, 19-move set</td><td align="right">2.622</td><td align="right">2.610</td><td align="right">-0.4%</td></tr>
 </tbody>
 </table></div>
+<h2 id="miri">Miri</h2>
+<p>The change is <code>5bfcd2a</code>. Its library part is safe code: <code>Pool::run</code> returns the sum of its lanes' node and lookup counters, and tune records are read and written differently. The full Miri catalogues of <a href="../miri-20261123/index.html">November 23</a> were not rerun on it. Its new unit tests were run under Miri (miri 0.1.0 of 2026-11-02, <code>-Zmiri-symbolic-alignment-check -Zmiri-num-cpus=4</code>) on the x86 backend (<code>-C target-cpu=x86-64-v3</code>) and the portable one (<code>-C target-cpu=x86-64</code>): <code>lanes::share::tests::share_run_returns_the_work_of_its_lanes</code> under 16 scheduler seeds, and <code>tables::file::tests::tune_files_are_read_by_mode</code> and <code>nearest_thread_count_is_by_ratio</code> once. All passed; <code>default_lanes_use_the_tune_file</code> uses files and is ignored under Miri. The logs are <code>miri/tune-tests-x86.log</code> and <code>miri/tune-tests-portable.log</code>. These are finite runs of unit tests in an interpreter, not a proof that the program has no undefined behavior.</p>
 <h2 id="what-this-does-not-show">What this does not show</h2>
 <ul>
 <li>Nothing was measured on his CPU or on any x86 CPU with two threads per core. The reading of his numbers in section 2 is an inference from them and from the lane counts measured here.</li>
@@ -246,6 +248,7 @@ svg { max-width:100%; height:auto; }
 <tr><td><code>window-2/h7.txt</code></td><td>The new <code>bench tune</code> on h7 (before the 1% rule), <code>solve</code> over lane counts at 24 and 48 threads, the fix against <code>dc153b3</code></td></tr>
 <tr><td><code>window-2/tune-final.txt</code></td><td>The final <code>bench tune</code> on h6 to h9 (third window)</td></tr>
 <tr><td><code>m2/m2-a.txt</code>, <code>m2-b.txt</code></td><td>Apple M2: the three commits, lane counts, the earlier <code>bench tune</code></td></tr>
+<tr><td><code>miri/</code></td><td>The targeted Miri runs of the new unit tests on <code>5bfcd2a</code></td></tr>
 <tr><td><code>scripts/</code></td><td>The scripts that made these files, and the two scramble subsets</td></tr>
 <tr><td><code>summarize.py</code></td><td>Prints the tables of sections 1, 2 and 4 from the raw files</td></tr>
 </tbody>

@@ -52,8 +52,9 @@ The quarter-turn metric and the lists of all solutions changed the search code a
 | Shared-search scheduling | 16 seeds per backend passed, 5 tests each | `660c14e` |
 | Lists that end early (time limit, cancel) | 3 unit tests under 16 seeds passed on both backends | `0231f19` (adds tests only) |
 | Input parsing | 2 unit tests passed on both backends | `9d567df` |
+| Search work returned by `Pool::run`; tune records | 1 shared-search unit test under 16 seeds and 2 unit tests passed on both backends | `5bfcd2a` (November 24) |
 
-The source fingerprint of `660c14e` is `52c7c3bc374b541cada2e5bc9aa145653bcaaead95d01abbb3e1d46e2d10a9f2`. `9d567df` changed only how input lines are read, and the full catalogues were not rerun on it. The same qualifications apply as on November 7: default provenance, unit tests only, repeated schedules and not all interleavings, and nothing outside the interpreter. [The record](../evidence/validation/miri-20261123/README.md) has the counts, flags, exclusions and logs.
+The source fingerprint of `660c14e` is `52c7c3bc374b541cada2e5bc9aa145653bcaaead95d01abbb3e1d46e2d10a9f2`. `9d567df` changed only how input lines are read, and the full catalogues were not rerun on it. `5bfcd2a` makes `Pool::run` return its lanes' node and lookup counts and changes how tune records are read and written, all in safe code; the full catalogues were not rerun on it either, and [its targeted runs](../evidence/validation/third-party-benchmark-20261124/README.md#miri) are with the record of that change. The same qualifications apply as on November 7: default provenance, unit tests only, repeated schedules and not all interleavings, and nothing outside the interpreter. [The record](../evidence/validation/miri-20261123/README.md) has the counts, flags, exclusions and logs.
 
 ## Limits and caller obligations
 
