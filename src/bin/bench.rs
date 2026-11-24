@@ -7,14 +7,18 @@
 //!   bench batch <table> <scramble file | random:N:SEED> [-n count] [-t threads] [-l lanes]
 //!       Solves a fixed batch and verifies every solution.
 //!   bench tune <table> [--window S]
-//!       Short stream runs at 1 thread and at all threads over lane counts;
-//!       prints the best and saves it next to the table (`<table>.tune`).
+//!       The search speed of `solve` (nodes per second on random states)
+//!       over lane counts, in its batch mode and with one cube at a time,
+//!       at 1 thread, half the threads and all threads; prints the best
+//!       and saves it next to the table (`<table>.tune`).
 //! `--metric qtm` solves in the quarter-turn metric (lengths are QTM
-//! lengths). lanes = 0 uses the recursive single-cube solver; the default is
-//! `<table>.tune`'s if `tune` made one, else `tables::file::untuned_lanes`.
-//! `--share[=C]` uses the work-sharing mode (`lanes::share`) with at most C
-//! cubes in progress at once (default: threads * lanes; 1 solves one cube
-//! at a time with all threads). `--json` prints the result as JSON.
+//! lengths). lanes = 0 uses the recursive single-cube solver.
+//! `--share[=C]` uses the work-sharing mode (`lanes::share`, `solve`'s
+//! search) with at most C cubes in progress at once (default: threads *
+//! lanes; 1 solves one cube at a time with all threads). The default lanes
+//! of that mode are `<table>.tune`'s if `tune` made one, else
+//! `tables::file::untuned_lanes`; of the stream mode,
+//! `tables::file::untuned_stream_lanes`. `--json` prints the result as JSON.
 //!
 //! The form before subcommands, which scripts use, still works (`legacy`):
 //!   bench <table> stream [warmup] [window] [threads] [lanes] [seed] [share[:C]]
@@ -42,6 +46,7 @@ use egg_solver::cubie::{CubieCube, Rng};
 use egg_solver::lanes::share::Pool;
 use egg_solver::metric::Metric;
 use egg_solver::solver::{Solver, Stats};
+use egg_solver::tables::file::TuneMode;
 use egg_solver::tables::Cocsep;
 use std::collections::BTreeMap;
 use std::ffi::OsString;
@@ -64,8 +69,10 @@ struct Record {
 /// Solve `cubes(i)` for i = 0, 1, ... with `threads` threads (in `lanes`
 /// lanes each; 0: the recursive solver; with `share`: the work-sharing mode
 /// with that many cubes at once) until `cubes` returns `None` or `duration`
-/// seconds have passed. Every solution is checked. Returns the records and
-/// the elapsed seconds.
+/// seconds have passed. Every solution is checked. Returns the records, the
+/// elapsed seconds and, in the share mode, the nodes searched (also those
+/// of the cubes that were in progress at the end; else 0). The share mode's
+/// event counters go to stderr unless `quiet`.
 ///
 /// # Errors
 /// If a cube got no solution or a wrong one, or a thread could not be
@@ -77,7 +84,8 @@ fn run(
     lanes: usize,
     duration: Option<f64>,
     share: Option<usize>,
-) -> anyhow::Result<(Vec<Record>, f64)> {
+    quiet: bool,
+) -> anyhow::Result<(Vec<Record>, f64, u64)> {
     let next = AtomicUsize::new(0);
     let stop = AtomicBool::new(false);
     let pool = share.map(|max_active| {
@@ -90,6 +98,7 @@ fn run(
     });
     let records = Mutex::new(Vec::new());
     let bad = AtomicU64::new(0);
+    let share_nodes = AtomicU64::new(0);
     let t0 = Instant::now();
     let metric = solver.metric();
     // (Each mode's thread code is a function of its own, not inlined here:
@@ -122,7 +131,8 @@ fn run(
                         });
                 };
                 if let Some(pool) = &pool {
-                    share_thread(pool, solver, lanes, &stop, record);
+                    let work = share_thread(pool, solver, lanes, &stop, record);
+                    share_nodes.fetch_add(work.nodes, Ordering::Relaxed);
                 } else if lanes > 0 && solver.metric().is_qtm() {
                     stream_thread_qtm(solver, cubes, &next, &stop, lanes, record);
                 } else if lanes > 0 {
@@ -163,11 +173,12 @@ fn run(
     anyhow::ensure!(threads_ok, "a thread panicked");
     let bad = bad.load(Ordering::Relaxed);
     anyhow::ensure!(bad == 0, "{bad} bad solutions");
-    if let Some(pool) = &pool {
+    if let Some(pool) = pool.as_ref().filter(|_| !quiet) {
         eprintln!("share: {}", pool.counters());
     }
     let records = records.into_inner().unwrap_or_else(PoisonError::into_inner);
-    Ok((records, t0.elapsed().as_secs_f64()))
+    let share_nodes = share_nodes.into_inner();
+    Ok((records, t0.elapsed().as_secs_f64(), share_nodes))
 }
 
 /// A thread of a share-mode run. (This and `stream_thread` are not inlined
@@ -180,8 +191,8 @@ fn share_thread(
     lanes: usize,
     stop: &AtomicBool,
     record: impl FnMut(usize, Option<Vec<u8>>, Stats, f64),
-) {
-    pool.run(solver, lanes, stop, record);
+) -> Stats {
+    pool.run(solver, lanes, stop, record)
 }
 
 // `stream_thread`'s section: it starts at a fixed offset of a 64-byte line
@@ -228,28 +239,56 @@ fn stream_thread_qtm(
     egg_solver::lanes::run_lanes_metric::<true>(solver, cubes, next, stop, lanes, record);
 }
 
-/// Stream throughput (solves/s) of `threads` x `lanes` lanes, over a
-/// `window` after a warm-up of half as long.
-fn stream_throughput(
+/// One measurement of `tune`: the search speed of the work-sharing mode,
+/// which is `solve`'s search, at `threads` threads of `lanes` lanes, in
+/// nodes per second over `seconds` on the stream of random cubes of
+/// `stream`'s seed 2026: in the batch mode with threads * lanes cubes in
+/// progress, else one cube at a time. The nodes of the cubes that are in
+/// progress at the end count: on a small table that is most of the work,
+/// as a cube takes longer than the measurement (counting finished cubes,
+/// as `tune` did, gave 0.2 to 1.8 solves/s at 1 thread on h6, whatever the
+/// lane count).
+#[expect(clippy::cast_precision_loss, reason = "a rate")]
+fn search_speed(
     solver: &Solver,
     threads: usize,
     lanes: usize,
-    window: f64,
+    mode: TuneMode,
+    seconds: f64,
 ) -> anyhow::Result<f64> {
     let cubes = |i: usize| {
         let mut rng = Rng(2026u64.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ (i as u64));
         rng.next_u64();
         Some(CubieCube::random(&mut rng))
     };
-    let warmup = window / 2.0;
-    let (records, _) = run(solver, &cubes, threads, lanes, Some(warmup + window), None)?;
-    let done = records
-        .iter()
-        .filter(|r| r.finished >= warmup && r.finished < warmup + window)
-        .count();
-    #[expect(clippy::cast_precision_loss, reason = "a rate")]
-    let rate = done as f64 / window;
-    Ok(rate)
+    let share = match mode {
+        TuneMode::Batch => 0,
+        TuneMode::OneCube => 1,
+    };
+    let (_, elapsed, nodes) = run(
+        solver,
+        &cubes,
+        threads,
+        lanes,
+        Some(seconds),
+        Some(share),
+        true,
+    )?;
+    Ok(nodes as f64 / elapsed)
+}
+
+/// The thread counts that `tune` measures: 1, all, and half of all if
+/// there are at least 4 (with two hardware threads per core: one thread
+/// per core).
+fn tune_threads(all: usize) -> Vec<usize> {
+    let mut counts = vec![1];
+    if all >= 4 {
+        counts.push(all / 2);
+    }
+    if all > 1 {
+        counts.push(all);
+    }
+    counts
 }
 
 /// Optimal-solve throughput benchmark: solves per second, nodes and
@@ -283,10 +322,11 @@ enum Command {
     /// Solve a fixed set of cubes, verify every solution: solves per second
     /// and solve times.
     Batch(BatchArgs),
-    /// Measure lane counts at 1 thread and at all threads; save the best
-    /// next to the table (`<TABLE>.tune`, the default of `solve` and
-    /// `bench`; for a table on hugetlbfs, which holds no small files,
-    /// `tables/<NAME>.hugemeta.tune` in the build folder).
+    /// Measure the search speed of `solve` over lane counts (a batch and
+    /// one cube at a time; at 1 thread, half the threads and all threads);
+    /// save the best next to the table (`<TABLE>.tune`, the default of
+    /// `solve` and `bench`; for a table on hugetlbfs, which holds no small
+    /// files, `tables/<NAME>.hugemeta.tune` in the build folder).
     Tune(TuneArgs),
 }
 
@@ -315,8 +355,8 @@ struct RunArgs {
     )]
     threads: usize,
     /// Interleaved lanes per thread (0: the recursive single-cube solver)
-    /// [default: from `<TABLE>.tune` if `bench tune` made one, else a
-    /// default for the table's size].
+    /// [default: with --share from `<TABLE>.tune` if `bench tune` made
+    /// one, else 24; without, a default for the table's size].
     #[arg(short, long)]
     lanes: Option<usize>,
     /// The work-sharing mode, with at most C cubes in progress at once
@@ -368,8 +408,8 @@ struct BatchArgs {
 struct TuneArgs {
     #[command(flatten)]
     table: TableArgs,
-    /// Seconds counted per measurement (after half as many of warm-up).
-    #[arg(long, value_name = "S", default_value_t = 6.0, value_parser = seconds)]
+    /// Seconds measured per lane count (in two halves).
+    #[arg(long, value_name = "S", default_value_t = 4.0, value_parser = seconds)]
     window: f64,
 }
 
@@ -508,17 +548,19 @@ enum Report {
         max_seconds: f64,
         p50_seconds: f64,
     },
-    /// `tune`: one measurement.
+    /// `tune`: the search speed at a lane count (`mode`: `batch` or `one`).
     Tune {
+        mode: &'static str,
         threads: usize,
         lanes: usize,
-        solves_per_second: f64,
+        nodes_per_second: f64,
     },
-    /// `tune`: the best lanes at a thread count.
+    /// `tune`: the best lanes of a mode at a thread count.
     Best {
+        mode: &'static str,
         threads: usize,
         lanes: usize,
-        solves_per_second: f64,
+        nodes_per_second: f64,
     },
     /// `tune`: where the best lanes were saved (or why not).
     Saved {
@@ -538,40 +580,78 @@ fn print(json: bool, report: &Report, text: impl FnOnce()) -> anyhow::Result<()>
     Ok(())
 }
 
-/// `bench tune`: the best lane count at 1 thread and at all threads (each
-/// candidate measured for `window` seconds), saved to `<table>.tune`.
-fn tune(solver: &Solver, path: &str, window: f64, json: bool) -> anyhow::Result<()> {
-    let all = egg_solver::thread_count();
-    let candidates = [8, 12, 16, 20, 24, 32, 40, 48];
+/// The lane count that `tune` saves, of `candidates` with the measured
+/// `rates`, and its rate: of those within 1% of the fastest, the nearest
+/// to `default` (the untuned lane count; of two as near, the smaller). A
+/// measurement is no finer than that: on h7 at 48 threads, with one cube
+/// at a time, 20, 24 and 32 lanes measured within 1.3% of each other,
+/// fastest first, while `solve` on the 19-move set took 2.71, 2.61 and
+/// 2.68 s with them (EPYC 9V45, 2026-11-24).
+fn best_lanes(candidates: &[usize], rates: &[f64], default: usize) -> (usize, f64) {
+    let top = rates.iter().copied().fold(0.0, f64::max);
+    candidates
+        .iter()
+        .zip(rates)
+        .filter(|&(_, &rate)| rate >= 0.99 * top)
+        .min_by_key(|&(&lanes, _)| (lanes.abs_diff(default), lanes))
+        .map_or((default, 0.0), |(&lanes, &rate)| (lanes, rate))
+}
+
+/// `bench tune`: the best lane count of `solve`'s two modes (a batch; one
+/// cube at a time) at 1 thread, half the threads and all threads, by
+/// search speed (`search_speed`, `best_lanes`), saved to `<table>.tune`;
+/// `default` is the untuned lane count of the table. Each lane count
+/// is measured for `window` seconds in two halves, one on the way up the
+/// lane counts and one on the way down, so that a drift (the CPU heating
+/// up, another program) weighs on all of them alike.
+fn tune(
+    solver: &Solver,
+    path: &str,
+    default: usize,
+    window: f64,
+    json: bool,
+) -> anyhow::Result<()> {
+    const CANDIDATES: [usize; 8] = [8, 12, 16, 20, 24, 32, 40, 48];
     let mut best = Vec::new();
-    for threads in if all > 1 { vec![1, all] } else { vec![1] } {
-        let mut top = (0.0, 0);
-        for &lanes in &candidates {
-            let rate = stream_throughput(solver, threads, lanes, window)?;
-            let report = Report::Tune {
+    for mode in [TuneMode::Batch, TuneMode::OneCube] {
+        for threads in tune_threads(egg_solver::thread_count()) {
+            let mut rates = [0.0; CANDIDATES.len()];
+            let up = 0..CANDIDATES.len();
+            for index in up.clone().chain(up.rev()) {
+                let lanes = CANDIDATES[index];
+                rates[index] += search_speed(solver, threads, lanes, mode, window / 2.0)? / 2.0;
+            }
+            for (&lanes, &rate) in CANDIDATES.iter().zip(&rates) {
+                let report = Report::Tune {
+                    mode: mode.word(),
+                    threads,
+                    lanes,
+                    nodes_per_second: rate,
+                };
+                print(json, &report, || {
+                    println!(
+                        "{} threads {threads} lanes {lanes}: {:.2} M nodes/s",
+                        mode.word(),
+                        rate * 1e-6
+                    );
+                })?;
+            }
+            let (lanes, rate) = best_lanes(&CANDIDATES, &rates, default);
+            let report = Report::Best {
+                mode: mode.word(),
                 threads,
                 lanes,
-                solves_per_second: rate,
+                nodes_per_second: rate,
             };
             print(json, &report, || {
-                println!("threads {threads} lanes {lanes}: {rate:.2} solves/s");
+                println!(
+                    "best for {} at {threads} threads: {lanes} lanes ({:.2} M nodes/s)",
+                    mode.word(),
+                    rate * 1e-6
+                );
             })?;
-            if rate > top.0 {
-                top = (rate, lanes);
-            }
+            best.push((mode, threads, lanes));
         }
-        let report = Report::Best {
-            threads,
-            lanes: top.1,
-            solves_per_second: top.0,
-        };
-        print(json, &report, || {
-            println!(
-                "best at {threads} threads: {} lanes ({:.2} solves/s)",
-                top.1, top.0
-            );
-        })?;
-        best.push((threads, top.1));
     }
     let saved = egg_solver::tables::file::save_tuned_lanes(path, &best);
     let report = Report::Saved {
@@ -596,7 +676,15 @@ fn stream(solver: &Solver, args: &StreamArgs, lanes: usize, json: bool) -> anyho
         rng.next_u64();
         Some(CubieCube::random(&mut rng))
     };
-    let (records, _) = run(solver, &cubes, threads, lanes, Some(warmup + window), share)?;
+    let (records, _, _) = run(
+        solver,
+        &cubes,
+        threads,
+        lanes,
+        Some(warmup + window),
+        share,
+        false,
+    )?;
     let in_window: Vec<Record> = records
         .into_iter()
         .filter(|r| r.finished >= warmup && r.finished < warmup + window)
@@ -654,7 +742,7 @@ fn batch(
 ) -> anyhow::Result<()> {
     let (threads, share) = (args.run.threads, args.run.share);
     let get = |i: usize| cubes.get(i).copied();
-    let (records, elapsed) = run(solver, &get, threads, lanes, None, share)?;
+    let (records, elapsed, _) = run(solver, &get, threads, lanes, None, share, false)?;
     anyhow::ensure!(records.len() == cubes.len(), "cubes not reported");
     let n = cubes.len() as f64;
     let mut times: Vec<f64> = records.iter().map(|r| r.seconds).collect();
@@ -752,9 +840,25 @@ fn run_command(command: &Command, json: bool) -> anyhow::Result<()> {
             table.meta().metric
         ))
     })?;
-    let lanes = |run: &RunArgs| cli::lanes(run.lanes, path, table.meta().k, run.threads);
+    // (The stream mode's lanes are not tuned: `tune` measures the
+    // work-sharing mode, whose best lane counts are others.)
+    let k = table.meta().k;
+    let lanes = |run: &RunArgs| {
+        if let Some(cubes) = run.share {
+            let mode = TuneMode::of_concurrency(cubes);
+            cli::lanes(run.lanes, path, k, run.threads, mode)
+        } else {
+            let default = egg_solver::tables::file::untuned_stream_lanes(k);
+            let lanes = run.lanes.unwrap_or(default);
+            log::info!("{} threads, {lanes} lanes per thread", run.threads);
+            lanes
+        }
+    };
     match command {
-        Command::Tune(args) => tune(&solver, path, args.window, json),
+        Command::Tune(args) => {
+            let default = egg_solver::tables::file::untuned_lanes(k);
+            tune(&solver, path, default, args.window, json)
+        }
         Command::Stream(args) => stream(&solver, args, lanes(&args.run), json),
         Command::Batch(args) => batch(&solver, args, &cubes, lanes(&args.run), json),
     }
@@ -764,6 +868,25 @@ fn run_command(command: &Command, json: bool) -> anyhow::Result<()> {
 mod tests {
     use super::{cube_set, legacy};
     use egg_solver::cubie::{CubieCube, Rng};
+
+    /// `tune` saves the fastest lane count, unless the default (or one
+    /// nearer to it) is within 1% of it; and the thread counts it measures.
+    #[test]
+    fn tune_keeps_the_default_within_a_percent() {
+        let lanes = [8, 16, 24, 32];
+        let best = |rates: [f64; 4]| super::best_lanes(&lanes, &rates, 24);
+        assert_eq!(best([50.0, 90.0, 100.0, 95.0]), (24, 100.0));
+        assert_eq!(best([50.0, 100.0, 99.5, 95.0]), (24, 99.5));
+        assert_eq!(best([50.0, 100.0, 98.5, 95.0]), (16, 100.0));
+        // (As near to the default: the smaller.)
+        assert_eq!(best([50.0, 99.2, 90.0, 100.0]), (16, 99.2));
+        assert_eq!(best([100.0, 99.9, 90.0, 95.0]), (16, 99.9));
+        assert_eq!(super::best_lanes(&[], &[], 24), (24, 0.0));
+        assert_eq!(super::tune_threads(1), [1]);
+        assert_eq!(super::tune_threads(2), [1, 2]);
+        assert_eq!(super::tune_threads(3), [1, 3]);
+        assert_eq!(super::tune_threads(16), [1, 8, 16]);
+    }
 
     #[test]
     fn seconds_reject_unrepresentable_durations() {

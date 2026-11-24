@@ -65,6 +65,7 @@ use egg_solver::lanes::share::Pool;
 use egg_solver::metric::Metric;
 use egg_solver::solutions::{Options, Solutions, Stopped, DEFAULT_MAX_SOLUTIONS};
 use egg_solver::solver::{Solver, Stats};
+use egg_solver::tables::file::TuneMode;
 use egg_solver::tables::Cocsep;
 use std::io::{BufRead, IsTerminal as _, Write};
 use std::process::ExitCode;
@@ -170,7 +171,7 @@ struct Args {
     )]
     threads: usize,
     /// Interleaved lanes per thread [default: from `<TABLE>.tune` if `bench
-    /// tune` made one, else a default for the table's size].
+    /// tune` made one, else 24].
     #[arg(short, long, value_parser = cli::positive())]
     lanes: Option<usize>,
     /// Cubes in progress at once: 1 solves one cube at a time with all
@@ -429,8 +430,9 @@ fn run(args: &Args) -> anyhow::Result<ExitCode> {
     // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
     let table = unsafe { args.load.open(path) }?;
     let threads = args.threads;
-    let lanes = cli::lanes(args.lanes, path, table.meta().k, threads);
     let concurrency = args.concurrency;
+    let mode = TuneMode::of_concurrency(concurrency);
+    let lanes = cli::lanes(args.lanes, path, table.meta().k, threads, mode);
     log::info!(
         "{} cubes, at most {concurrency} at once (0: all), {metric}",
         cubes.len()
@@ -626,7 +628,7 @@ fn run_fast(args: &Args) -> anyhow::Result<ExitCode> {
     let corners = Cocsep::generate_metric(metric)?;
     // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
     let table = unsafe { args.load.open(path) }?;
-    let lanes = cli::lanes(args.lanes, path, table.meta().k, threads);
+    let lanes = cli::lanes(args.lanes, path, table.meta().k, threads, TuneMode::OneCube);
     let solver = solver_of(&corners, &table, metric, path)?;
     let get = |i: usize| cubes.get(i).copied();
     // (The scramble, after the warm-up cube if any.)
@@ -878,8 +880,9 @@ fn list_batch(args: &Args, options: &Options) -> anyhow::Result<ExitCode> {
     // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
     let table = unsafe { args.load.open(path) }?;
     let threads = args.threads;
-    let lanes = cli::lanes(args.lanes, path, table.meta().k, threads);
     let concurrency = args.concurrency;
+    let mode = TuneMode::of_concurrency(concurrency);
+    let lanes = cli::lanes(args.lanes, path, table.meta().k, threads, mode);
     log::info!(
         "{} cubes, at most {concurrency} at once (0: all), {metric}, {options:?}",
         cubes.len()
@@ -1054,7 +1057,7 @@ fn list_fast(args: &Args, options: &Options) -> anyhow::Result<ExitCode> {
     let corners = Cocsep::generate_metric(metric)?;
     // SAFETY: Mapped/shared CLI inputs are required to remain unchanged while loaded (README contract).
     let table = unsafe { args.load.open(path) }?;
-    let lanes = cli::lanes(args.lanes, path, table.meta().k, threads);
+    let lanes = cli::lanes(args.lanes, path, table.meta().k, threads, TuneMode::OneCube);
     let solver = solver_of(&corners, &table, metric, path)?;
     let get = |i: usize| cubes.get(i).copied();
     // (The scramble, after the warm-up cube if any.)

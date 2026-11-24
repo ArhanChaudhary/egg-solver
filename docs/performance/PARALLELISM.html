@@ -66,7 +66,7 @@ svg { max-width:100%; height:auto; }
 <main id="docs-content"><h1 id="workers-lanes-and-search-parallelism">Workers, lanes and search parallelism</h1>
 <p><a href="index.html">Performance studies</a> · <a href="../comparisons/NISSY_THROUGHPUT.html">Batch throughput</a> · <a href="../guide/HOW_IT_WORKS.html">How the search works</a></p>
 <p>Measured <strong>November 8, 2026</strong>, on the <strong>48-core EPYC VM</strong>. Forty-eight is the machine's worker budget, not a limit on search lanes. Explicit lane counts through 128 were tested; <strong>24 lanes per worker won every h6–h10 finite-batch screen</strong>.</p>
-<details class="contents"><summary>On this page</summary><ul><li><a href="#what-is-being-parallelized">What is being parallelized?</a></li><li><a href="#production-cli-lane-screen">Production CLI lane screen</a></li><li><a href="#parallelism-within-one-cube">Parallelism within one cube</a></li><li><a href="#cubeopt-s-occupied-and-empty-slots">Cubeopt's occupied and empty slots</a></li><li><a href="#research-caller-versus-shipped-cli">Research caller versus shipped CLI</a></li><li><a href="#benchmark-scope">Benchmark scope</a></li></ul></details>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#what-is-being-parallelized">What is being parallelized?</a></li><li><a href="#production-cli-lane-screen">Production CLI lane screen</a></li><li><a href="#lane-counts-at-one-thread">Lane counts at one thread</a></li><li><a href="#parallelism-within-one-cube">Parallelism within one cube</a></li><li><a href="#cubeopt-s-occupied-and-empty-slots">Cubeopt's occupied and empty slots</a></li><li><a href="#research-caller-versus-shipped-cli">Research caller versus shipped CLI</a></li><li><a href="#benchmark-scope">Benchmark scope</a></li></ul></details>
 <h2 id="what-is-being-parallelized">What is being parallelized?</h2>
 <div class="table-wrap" role="region" aria-label="What is being parallelized?" tabindex="0"><table id="docs-table-1"><caption>What is being parallelized?</caption>
 <thead>
@@ -80,7 +80,7 @@ svg { max-width:100%; height:auto; }
 </tbody>
 </table></div>
 <p>A worker visits lanes in sequence while their memory accesses overlap. Increasing lanes does not add CPU cores, and each lane needs state storage and bookkeeping, so filling more slots does not guarantee higher throughput. A shared search can generate many jobs from one cube, so it is not limited to one independent input per lane.</p>
-<p>The default lane counts are 40 for h0–h8, 32 for h9/h10 and 24 for h11. The built-in tuner currently stops its candidate list at 48; <code>-l</code> accepts larger values. Those defaults and candidates are heuristics, not tree-width limits. They were not changed from a single host's new batch screen.</p>
+<p>When these screens were run, the default lane counts were 40 for h0–h8, 32 for h9/h10 and 24 for h11, and they were not changed from a single host's batch screen. Since November 24, 2026 the default of <code>solve</code> is 24 for every table: single-thread screens of h6–h9 on this machine and screens on an Apple M2 agreed with the table below (see <a href="#lane-counts-at-one-thread">Lane counts at one thread</a>). The built-in tuner stops its candidate list at 48; <code>-l</code> accepts larger values. The default and the candidates are heuristics, not tree-width limits.</p>
 <h2 id="production-cli-lane-screen">Production CLI lane screen</h2>
 <p>Every cell is <strong>complete-batch wall seconds for 500 states</strong>, at <strong>48 workers</strong> and concurrency zero. <strong>Lower is faster.</strong> Each tuning cell is one process, not a repeated confidence estimate. All tables use resident 1 GiB pages.</p>
 <div class="table-wrap" role="region" aria-label="Production CLI lane screen" tabindex="0"><table id="docs-table-2"><caption>Production CLI lane screen</caption>
@@ -100,11 +100,30 @@ svg { max-width:100%; height:auto; }
 </tbody>
 </table></div>
 <p>The declared grid did not test 12 or 20 lanes. More than 48 lanes was supported but slower here. This does not determine the best lane count for every CPU or workload. <a href="../comparisons/NISSY_THROUGHPUT.html">The throughput report</a> gives the three final repeated batches at the selected setting.</p>
+<h2 id="lane-counts-at-one-thread">Lane counts at one thread</h2>
+<p>Measured <strong>November 24, 2026</strong> with commit <code>dc153b3</code>: one thread pinned to a core of the same 48-core EPYC VM, the table copied into memory on transparent huge pages, and nothing running but pinned measurements of this study on other cores. Every cell is the <strong>mean wall seconds of two runs</strong> of <code>solve -t 1 -c 1</code> on a 25-scramble set of nissy-core's benchmark (<code>scrambles-17.txt</code> for h6 and h7, <code>scrambles-18.txt</code> for h8 and h9). <strong>Lower is faster.</strong></p>
+<div class="table-wrap" role="region" aria-label="Lane counts at one thread" tabindex="0"><table id="docs-table-3"><caption>Lane counts at one thread</caption>
+<thead>
+<tr><th align="right">Lanes</th><th align="right">h6 (s)</th><th align="right">h7 (s)</th><th align="right">h8 (s)</th><th align="right">h9 (s)</th></tr>
+</thead>
+<tbody>
+<tr><td align="right">8</td><td align="right">8.489</td><td align="right">4.536</td><td align="right">16.551</td><td align="right">8.448</td></tr>
+<tr><td align="right">12</td><td align="right">6.550</td><td align="right">3.472</td><td align="right">12.492</td><td align="right">6.507</td></tr>
+<tr><td align="right">16</td><td align="right">5.621</td><td align="right">2.998</td><td align="right">10.810</td><td align="right">5.676</td></tr>
+<tr><td align="right">20</td><td align="right">5.123</td><td align="right">2.792</td><td align="right">9.994</td><td align="right">5.217</td></tr>
+<tr><td align="right">24</td><td align="right">4.841</td><td align="right">2.687</td><td align="right">9.571</td><td align="right">5.113</td></tr>
+<tr><td align="right">32</td><td align="right">4.839</td><td align="right">2.732</td><td align="right">9.727</td><td align="right">5.202</td></tr>
+<tr><td align="right">40</td><td align="right">4.957</td><td align="right">2.785</td><td align="right">9.871</td><td align="right">5.337</td></tr>
+<tr><td align="right">48</td><td align="right">5.107</td><td align="right">2.882</td><td align="right">10.432</td><td align="right">5.589</td></tr>
+</tbody>
+</table></div>
+<p>The batch mode (<code>-c 0</code>) gave the same picture: 24 lanes were fastest on h8 and h9, and within 2% of 32 lanes on h6 and h7. With 24 and 48 threads on h7 (the 19-move set), 24 lanes were fastest in both modes. On an Apple M2 laptop, 16 to 48 lanes were within 1.5% of each other at 1, 4 and 8 threads, 40 lanes were 2 to 3% slower at 8 threads, and 8 lanes were 20% slower. So one thread agrees with the 48-worker screen above, and the untuned default of <code>solve</code> became 24 lanes for every table. <a href="../evidence/validation/third-party-benchmark-20261124/index.html">The record</a> has every run.</p>
+<p>The best lane count is a property of the machine: these two differ, and a CPU with smaller caches, or with two threads per core, may want fewer lanes. <code>bench tune</code> measures it. Until this study it counted the cubes that <code>bench stream</code> finished in six seconds. On tables up to h9 that is a handful of cubes at one thread, so the choice was close to chance: on this machine it saved 48, 24, 32 and 48 lanes for h6 to h9 at one thread, and on the M2 it saved 8 lanes for h7 at eight threads. It now measures the search speed of <code>solve</code> itself, in nodes per second, which also counts the cubes that are still in progress when a measurement ends. Run on this machine, it saves 24 lanes for h6 to h9, for a batch and for one cube at a time, at 1, 24 and 48 threads.</p>
 <h2 id="parallelism-within-one-cube">Parallelism within one cube</h2>
 <p>These runs use the <strong>production CLI</strong>, concurrency one and a fixed 24 lanes per worker, the count selected by the throughput screen and not retuned for each row. They solve indices 0, 8 and 10 (optimal lengths 18, 16 and 19) ten times in the same order: <strong>30 solves of three distinct states</strong>. Each row is one process. This is a small scaling sample, not the complete 500-state benchmark or a confidence interval.</p>
 <p>Speedup is the one-worker batch time divided by the row's batch time. Efficiency is speedup divided by worker count. “Extra nodes” is the change in counted work relative to one worker. Time/cube is the 30-solve wall time divided by 30; lower is faster.</p>
 <h3 id="h6">h6</h3>
-<div class="table-wrap" role="region" aria-label="h6" tabindex="0"><table id="docs-table-3"><caption>h6</caption>
+<div class="table-wrap" role="region" aria-label="h6" tabindex="0"><table id="docs-table-4"><caption>h6</caption>
 <thead>
 <tr><th align="right">Workers</th><th align="right">Time/cube (ms)</th><th align="right">Speedup</th><th align="right">Efficiency</th><th align="right">Extra nodes</th></tr>
 </thead>
@@ -120,7 +139,7 @@ svg { max-width:100%; height:auto; }
 </tbody>
 </table></div>
 <h3 id="h10">h10</h3>
-<div class="table-wrap" role="region" aria-label="h10" tabindex="0"><table id="docs-table-4"><caption>h10</caption>
+<div class="table-wrap" role="region" aria-label="h10" tabindex="0"><table id="docs-table-5"><caption>h10</caption>
 <thead>
 <tr><th align="right">Workers</th><th align="right">Time/cube (ms)</th><th align="right">Speedup</th><th align="right">Efficiency</th><th align="right">Extra nodes</th></tr>
 </thead>
@@ -152,7 +171,7 @@ svg { max-width:100%; height:auto; }
 </code></pre>
 <p>A future binary's print format must be checked before reusing this interpretation.</p>
 <p>A controlled probe of the checksum-pinned original web Opt4 query function confirmed the interpretation. It uses the original generated table and valid one-move cubes. Negative budgets stop each assigned context after its first query; inactive slots are marked complete. Only exports are added to an in-memory module copy; function code and pruning data are unchanged.</p>
-<div class="table-wrap" role="region" aria-label="Cubeopt's occupied and empty slots" tabindex="0"><table id="docs-table-5"><caption>Cubeopt's occupied and empty slots</caption>
+<div class="table-wrap" role="region" aria-label="Cubeopt's occupied and empty slots" tabindex="0"><table id="docs-table-6"><caption>Cubeopt's occupied and empty slots</caption>
 <thead>
 <tr><th align="right">Assigned slots</th><th align="right">Occupied visits</th><th align="right">Empty visits</th></tr>
 </thead>
@@ -164,7 +183,7 @@ svg { max-width:100%; height:auto; }
 </tbody>
 </table></div>
 <p>The recorded runs give:</p>
-<div class="table-wrap" role="region" aria-label="Cubeopt's occupied and empty slots" tabindex="0"><table id="docs-table-6"><caption>Cubeopt's occupied and empty slots</caption>
+<div class="table-wrap" role="region" aria-label="Cubeopt's occupied and empty slots" tabindex="0"><table id="docs-table-7"><caption>Cubeopt's occupied and empty slots</caption>
 <thead>
 <tr><th>Run</th><th align="right">Occupied slot visits</th><th align="right">Empty slot visits</th><th align="right">Weighted query-slot occupancy</th></tr>
 </thead>
@@ -179,7 +198,7 @@ svg { max-width:100%; height:auto; }
 <h2 id="research-caller-versus-shipped-cli">Research caller versus shipped CLI</h2>
 <p>The exploratory Rust probe used ordinary <code>Pool::run</code>; the shipped CLI uses <code>run_pinned</code>, which fixes worker-state and stack-frame placement. <strong>Pinned here does not mean CPU affinity.</strong> Their timings and lane rankings differed substantially, so probe times were excluded from production configuration selection and must not be quoted as CLI performance.</p>
 <p>The initial research-probe runs, recorded in the November 8 study, solved all 500 states with h6:</p>
-<div class="table-wrap" role="region" aria-label="Research caller versus shipped CLI" tabindex="0"><table id="docs-table-7"><caption>Research caller versus shipped CLI</caption>
+<div class="table-wrap" role="region" aria-label="Research caller versus shipped CLI" tabindex="0"><table id="docs-table-8"><caption>Research caller versus shipped CLI</caption>
 <thead>
 <tr><th>Mode</th><th align="right">CPU threads</th><th align="right">Lanes/thread</th><th align="right">Batch wall</th><th align="right">Mean nodes/cube</th><th align="right">Process CPU seconds / batch wall</th></tr>
 </thead>

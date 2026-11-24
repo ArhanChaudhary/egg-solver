@@ -1,0 +1,103 @@
+start 19:23:00 load 7.20 6.27 5.77 avail 13655 MB
+h7 s18 c1 l16 t4 cores4-7 dc153b3 6.185036 62627105
+h7 s18 c1 l24 t4 cores4-7 dc153b3 6.246134 62628644
+h7 s18 c1 l32 t4 cores4-7 dc153b3 6.168134 62638218
+h7 s18 c1 l40 t4 cores4-7 dc153b3 6.211616 62679948
+h7 s18 c1 l40 t4 cores4-7 dc153b3 6.265844 62671166
+h7 s18 c1 l32 t4 cores4-7 dc153b3 6.287172 62741009
+h7 s18 c1 l24 t4 cores4-7 dc153b3 6.314105 62645147
+h7 s18 c1 l16 t4 cores4-7 dc153b3 6.326400 62644641
+h7 s18 c0 l16 t4 cores4-7 dc153b3 6.514077 64365449
+h7 s18 c0 l24 t4 cores4-7 dc153b3 6.493299 64371677
+h7 s18 c0 l32 t4 cores4-7 dc153b3 6.595812 64343963
+h7 s18 c0 l40 t4 cores4-7 dc153b3 6.543751 64407802
+h7 s18 c0 l40 t4 cores4-7 dc153b3 6.543382 64371720
+h7 s18 c0 l32 t4 cores4-7 dc153b3 6.574307 64393653
+h7 s18 c0 l24 t4 cores4-7 dc153b3 6.565502 64487297
+h7 s18 c0 l16 t4 cores4-7 dc153b3 6.579328 64322811
+h7 s18 c1 l40 t4 cores4-7 28a1953 6.431758 62702166
+h7 s18 c1 l40 t4 cores4-7 c3eb909 6.432320 62672086
+h7 s18 c1 l40 t4 cores4-7 dc153b3 6.449473 62681538
+h7 s18 c1 l40 t4 cores4-7 dc153b3 6.483845 62667110
+h7 s18 c1 l40 t4 cores4-7 c3eb909 6.448298 62657003
+h7 s18 c1 l40 t4 cores4-7 28a1953 6.507817 62690406
+h7 s18 c0 l40 t4 cores4-7 28a1953 6.636191 64399914
+h7 s18 c0 l40 t4 cores4-7 c3eb909 6.620657 64379903
+h7 s18 c0 l40 t4 cores4-7 dc153b3 6.637060 64367743
+h7 s18 c0 l40 t4 cores4-7 dc153b3 6.656556 64403138
+h7 s18 c0 l40 t4 cores4-7 c3eb909 6.656419 64390649
+h7 s18 c0 l40 t4 cores4-7 28a1953 6.682445 64444575
+h7 s18 c1 l16 t8 cores0-7 dc153b3 4.649041 62665183
+h7 s18 c1 l24 t8 cores0-7 dc153b3 4.691186 62830947
+h7 s18 c1 l32 t8 cores0-7 dc153b3 4.711953 62826974
+h7 s18 c1 l40 t8 cores0-7 dc153b3 4.764336 62649604
+h7 s18 c1 l40 t8 cores0-7 dc153b3 4.814934 62780237
+h7 s18 c1 l32 t8 cores0-7 dc153b3 4.800693 63107859
+h7 s18 c1 l24 t8 cores0-7 dc153b3 4.750930 62594662
+h7 s18 c1 l16 t8 cores0-7 dc153b3 4.837306 62962288
+h7 s18 c0 l16 t8 cores0-7 dc153b3 4.879918 64206458
+h7 s18 c0 l24 t8 cores0-7 dc153b3 4.956903 65163983
+h7 s18 c0 l32 t8 cores0-7 dc153b3 4.950920 64587209
+h7 s18 c0 l40 t8 cores0-7 dc153b3 4.983038 64260972
+h7 s18 c0 l40 t8 cores0-7 dc153b3 5.007229 64441581
+h7 s18 c0 l32 t8 cores0-7 dc153b3 4.927821 64003137
+h7 s18 c0 l24 t8 cores0-7 dc153b3 4.934497 64232290
+h7 s18 c0 l16 t8 cores0-7 dc153b3 4.954632 64352054
+h7 s18 c1 l40 t8 cores0-7 28a1953 4.892294 62642492
+h7 s18 c1 l40 t8 cores0-7 c3eb909 4.903454 62730082
+h7 s18 c1 l40 t8 cores0-7 dc153b3 4.904793 62809709
+h7 s18 c1 l40 t8 cores0-7 dc153b3 4.952336 63072150
+h7 s18 c1 l40 t8 cores0-7 c3eb909 4.914256 62494062
+h7 s18 c1 l40 t8 cores0-7 28a1953 4.915531 62601868
+h7 s18 c0 l40 t8 cores0-7 28a1953 5.064173 64647371
+h7 s18 c0 l40 t8 cores0-7 c3eb909 5.031366 64192832
+h7 s18 c0 l40 t8 cores0-7 dc153b3 5.067082 64354396
+h7 s18 c0 l40 t8 cores0-7 dc153b3 5.073231 64479552
+h7 s18 c0 l40 t8 cores0-7 c3eb909 5.072150 64340411
+h7 s18 c0 l40 t8 cores0-7 28a1953 5.081099 64447825
+threads done 19:29:39
+== tune h6 19:29:39
+threads 1 lanes 8: 0.67 solves/s
+threads 1 lanes 12: 0.33 solves/s
+threads 1 lanes 16: 0.17 solves/s
+threads 1 lanes 20: 0.67 solves/s
+threads 1 lanes 24: 0.50 solves/s
+threads 1 lanes 32: 1.17 solves/s
+threads 1 lanes 40: 1.33 solves/s
+threads 1 lanes 48: 1.50 solves/s
+best at 1 threads: 48 lanes (1.50 solves/s)
+threads 8 lanes 8: 3.50 solves/s
+threads 8 lanes 12: 3.33 solves/s
+threads 8 lanes 16: 3.50 solves/s
+threads 8 lanes 20: 4.33 solves/s
+threads 8 lanes 24: 4.00 solves/s
+threads 8 lanes 32: 5.00 solves/s
+threads 8 lanes 40: 5.00 solves/s
+threads 8 lanes 48: 5.50 solves/s
+best at 8 threads: 48 lanes (5.50 solves/s)
+saved to tables/h6.tune
+1 48
+8 48
+== tune h7 19:32:04
+threads 1 lanes 8: 0.83 solves/s
+threads 1 lanes 12: 1.17 solves/s
+threads 1 lanes 16: 1.17 solves/s
+threads 1 lanes 20: 1.00 solves/s
+threads 1 lanes 24: 0.83 solves/s
+threads 1 lanes 32: 0.83 solves/s
+threads 1 lanes 40: 1.50 solves/s
+threads 1 lanes 48: 1.67 solves/s
+best at 1 threads: 48 lanes (1.67 solves/s)
+threads 8 lanes 8: 9.33 solves/s
+threads 8 lanes 12: 7.50 solves/s
+threads 8 lanes 16: 8.33 solves/s
+threads 8 lanes 20: 8.67 solves/s
+threads 8 lanes 24: 6.50 solves/s
+threads 8 lanes 32: 6.00 solves/s
+threads 8 lanes 40: 5.67 solves/s
+threads 8 lanes 48: 8.00 solves/s
+best at 8 threads: 8 lanes (9.33 solves/s)
+saved to tables/h7.tune
+1 48
+8 8
+end 19:34:29 load 6.32 6.03 6.06

@@ -972,17 +972,21 @@ impl<'a> Pool<'a> {
     /// seconds)` (see `Done`) for the cubes whose last worker is this thread.
     /// The search is in the solver's metric (all threads of a pool use the
     /// same solver).
+    ///
+    /// Returns the search work of this thread's lanes (nodes and lookups).
+    /// It also counts the jobs that `stop` cut short, whose cubes are never
+    /// reported to `done`: `bench tune` measures the search speed with it.
     pub fn run(
         &self,
         solver: &Solver,
         nlanes: usize,
         stop: &AtomicBool,
         done: impl FnMut(usize, Option<Vec<u8>>, Stats, f64),
-    ) {
+    ) -> Stats {
         if solver.metric().is_qtm() {
-            self.run_metric::<true>(solver, nlanes, stop, done);
+            self.run_metric::<true>(solver, nlanes, stop, done)
         } else {
-            self.run_metric::<false>(solver, nlanes, stop, done);
+            self.run_metric::<false>(solver, nlanes, stop, done)
         }
     }
 
@@ -993,7 +997,7 @@ impl<'a> Pool<'a> {
         nlanes: usize,
         stop: &AtomicBool,
         mut done: impl FnMut(usize, Option<Vec<u8>>, Stats, f64),
-    ) {
+    ) -> Stats {
         let id = self.next_thread_id.fetch_add(1, Relaxed);
         if id < WARM_BUFFERS {
             let inner = Inner::touched();
@@ -1030,6 +1034,8 @@ impl<'a> Pool<'a> {
         for (sum, count) in counters.iter_mut().zip(worker.counts) {
             *sum += count;
         }
+        drop(counters);
+        worker.work()
     }
 
     /// Event counters of the finished threads, e.g. for tuning: rounds, the
@@ -2811,6 +2817,21 @@ where
         }
     }
 
+    /// The search work of this thread so far: its lanes' nodes and
+    /// lookups, whose counters run on from job to job (`end_job` takes
+    /// differences), so the jobs in progress count too. (Out of line and
+    /// cold: called once, after `run`.)
+    #[cold]
+    #[inline(never)]
+    fn work(&self) -> Stats {
+        let mut work = Stats::default();
+        for sl in &self.lanes {
+            work.nodes += sl.lane.stats.nodes;
+            work.lookups += sl.lane.stats.lookups;
+        }
+        work
+    }
+
     /// Withdraw a request for a piece (one already on its way is taken by
     /// `piece` later).
     fn unwant(&self) {
@@ -4527,6 +4548,65 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// `Pool::run` returns the search work of its thread's lanes, which
+    /// `bench tune` measures speed with: over a batch solved to the end,
+    /// the threads' work adds up to exactly the nodes and lookups of the
+    /// cubes' own statistics (every job's work goes to its cube when the
+    /// job ends); a thread that finds `stop` set returns none.
+    #[test]
+    fn share_run_returns_the_work_of_its_lanes() {
+        let corners = Cocsep::truncated(4);
+        let table = H48Table::zeroed(0, 2);
+        let solver = Solver::new(&corners, &table);
+        let mut rng = crate::cubie::Rng(78);
+        let count = if cfg!(miri) { 5 } else { 48 };
+        let cubes: Vec<CubieCube> = (0..count)
+            .map(|i| {
+                let moves: Vec<u8> = (0..i % 7)
+                    .map(|_| u8::try_from(rng.below(18)).unwrap())
+                    .collect();
+                CubieCube::SOLVED.apply_moves(&moves).unwrap()
+            })
+            .collect();
+        let get = |i: usize| cubes.get(i).copied();
+        let configs: &[(usize, usize, usize)] = if cfg!(miri) {
+            &[(2, 2, usize::MAX)]
+        } else {
+            &[(1, 1, 1), (1, 6, usize::MAX), (3, 2, usize::MAX), (4, 3, 1)]
+        };
+        for &(threads, nlanes, max_active) in configs {
+            let pool = Pool::new(&get, max_active, threads);
+            let stop = AtomicBool::new(false);
+            let reported = Mutex::new(Stats::default());
+            let work = Mutex::new(Stats::default());
+            std::thread::scope(|scope| {
+                for _ in 0..threads {
+                    scope.spawn(|| {
+                        let done = |_: usize, _: Option<Vec<u8>>, stats: Stats, _: f64| {
+                            let mut sum = reported.lock();
+                            sum.nodes += stats.nodes;
+                            sum.lookups += stats.lookups;
+                        };
+                        let own = pool.run(&solver, nlanes, &stop, done);
+                        let mut sum = work.lock();
+                        sum.nodes += own.nodes;
+                        sum.lookups += own.lookups;
+                    });
+                }
+            });
+            let (reported, work) = (reported.into_inner(), work.into_inner());
+            let what = format!("{threads} threads, {nlanes} lanes, {max_active} cubes");
+            assert!(reported.nodes > 0 && reported.lookups > 0, "{what}");
+            assert_eq!(work.nodes, reported.nodes, "{what}: nodes");
+            assert_eq!(work.lookups, reported.lookups, "{what}: lookups");
+        }
+        // Stopped before the start: no work.
+        let pool = Pool::new(&get, 1, 1);
+        let stop = AtomicBool::new(true);
+        let own = pool.run(&solver, 2, &stop, |_, _, _, _| {});
+        assert_eq!((own.nodes, own.lookups), (0, 0));
     }
 
     /// All solutions (`all_solutions`) with work sharing over a tiny search,

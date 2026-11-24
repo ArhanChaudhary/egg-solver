@@ -15,7 +15,7 @@ Measured **November 8, 2026**, on the **48-core EPYC VM**. Forty-eight is the ma
 
 A worker visits lanes in sequence while their memory accesses overlap. Increasing lanes does not add CPU cores, and each lane needs state storage and bookkeeping, so filling more slots does not guarantee higher throughput. A shared search can generate many jobs from one cube, so it is not limited to one independent input per lane.
 
-The default lane counts are 40 for h0–h8, 32 for h9/h10 and 24 for h11. The built-in tuner currently stops its candidate list at 48; `-l` accepts larger values. Those defaults and candidates are heuristics, not tree-width limits. They were not changed from a single host's new batch screen.
+When these screens were run, the default lane counts were 40 for h0–h8, 32 for h9/h10 and 24 for h11, and they were not changed from a single host's batch screen. Since November 24, 2026 the default of `solve` is 24 for every table: single-thread screens of h6–h9 on this machine and screens on an Apple M2 agreed with the table below (see [Lane counts at one thread](#lane-counts-at-one-thread)). The built-in tuner stops its candidate list at 48; `-l` accepts larger values. The default and the candidates are heuristics, not tree-width limits.
 
 ## Production CLI lane screen
 
@@ -34,6 +34,25 @@ Every cell is **complete-batch wall seconds for 500 states**, at **48 workers** 
 | 128 | 16.6385 | 8.1849 | 3.9488 | 1.9705 | 1.0363 |
 
 The declared grid did not test 12 or 20 lanes. More than 48 lanes was supported but slower here. This does not determine the best lane count for every CPU or workload. [The throughput report](../comparisons/NISSY_THROUGHPUT.md) gives the three final repeated batches at the selected setting.
+
+## Lane counts at one thread
+
+Measured **November 24, 2026** with commit `dc153b3`: one thread pinned to a core of the same 48-core EPYC VM, the table copied into memory on transparent huge pages, and nothing running but pinned measurements of this study on other cores. Every cell is the **mean wall seconds of two runs** of `solve -t 1 -c 1` on a 25-scramble set of nissy-core's benchmark (`scrambles-17.txt` for h6 and h7, `scrambles-18.txt` for h8 and h9). **Lower is faster.**
+
+| Lanes | h6 (s) | h7 (s) | h8 (s) | h9 (s) |
+|---:|---:|---:|---:|---:|
+| 8 | 8.489 | 4.536 | 16.551 | 8.448 |
+| 12 | 6.550 | 3.472 | 12.492 | 6.507 |
+| 16 | 5.621 | 2.998 | 10.810 | 5.676 |
+| 20 | 5.123 | 2.792 | 9.994 | 5.217 |
+| 24 | 4.841 | 2.687 | 9.571 | 5.113 |
+| 32 | 4.839 | 2.732 | 9.727 | 5.202 |
+| 40 | 4.957 | 2.785 | 9.871 | 5.337 |
+| 48 | 5.107 | 2.882 | 10.432 | 5.589 |
+
+The batch mode (`-c 0`) gave the same picture: 24 lanes were fastest on h8 and h9, and within 2% of 32 lanes on h6 and h7. With 24 and 48 threads on h7 (the 19-move set), 24 lanes were fastest in both modes. On an Apple M2 laptop, 16 to 48 lanes were within 1.5% of each other at 1, 4 and 8 threads, 40 lanes were 2 to 3% slower at 8 threads, and 8 lanes were 20% slower. So one thread agrees with the 48-worker screen above, and the untuned default of `solve` became 24 lanes for every table. [The record](../evidence/validation/third-party-benchmark-20261124/README.md) has every run.
+
+The best lane count is a property of the machine: these two differ, and a CPU with smaller caches, or with two threads per core, may want fewer lanes. `bench tune` measures it. Until this study it counted the cubes that `bench stream` finished in six seconds. On tables up to h9 that is a handful of cubes at one thread, so the choice was close to chance: on this machine it saved 48, 24, 32 and 48 lanes for h6 to h9 at one thread, and on the M2 it saved 8 lanes for h7 at eight threads. It now measures the search speed of `solve` itself, in nodes per second, which also counts the cubes that are still in progress when a measurement ends. Run on this machine, it saves 24 lanes for h6 to h9, for a batch and for one cube at a time, at 1, 24 and 48 threads.
 
 ## Parallelism within one cube
 

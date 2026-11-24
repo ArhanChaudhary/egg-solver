@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>A third-party benchmark, and what it showed about lane counts (November 24, 2026) — egg-solver</title><style>
+:root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
+header { padding:1rem max(1rem,calc((100vw - 1400px)/2)); background:#132c40; color:white; }
+header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
+header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
+header a { color:#d9f0ff; }
+header a[aria-current] { color:white; text-decoration-thickness:3px; }
+.layout { max-width:1400px; margin:1.5rem auto; padding:0 1rem; display:grid; grid-template-columns:15rem minmax(0,1fr); gap:1.5rem; align-items:start; }
+.site-nav { position:sticky; top:1rem; max-height:calc(100vh - 2rem); overflow:auto; font-size:.9rem; }
+.site-menu { margin:0; padding:.4rem .8rem .8rem; background:white; }
+.site-menu summary { padding:.3rem 0; }
+.nav-group { margin:.9rem 0 .25rem; font-size:.75rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+.site-nav ul { list-style:none; margin:0; padding:0; }
+.site-nav li { margin:0; }
+.site-nav li a { display:block; padding:.2rem .45rem; border-radius:4px; text-decoration:none; line-height:1.35; }
+.site-nav li a:hover { background:#eef3f6; }
+.site-nav a[aria-current] { background:#e2edf5; font-weight:650; color:var(--ink); }
+@media(min-width:901px) { .site-menu > summary { display:none; } }
+@media(max-width:900px) { .layout { display:block; margin:.75rem auto; } .site-nav { position:static; max-height:none; margin-bottom:.75rem; } }
+main { margin:0; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+h1 { margin-top:0; font-size:2rem; line-height:1.25; }
+h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
+h3 { margin-top:1.5rem; }
+a { color:var(--accent); overflow-wrap:anywhere; }
+p,li { max-width:90ch; }
+code { background:#eff3f6; border-radius:3px; padding:.1em .25em; overflow-wrap:anywhere; font-size:.9em; }
+pre { max-width:100%; padding:1rem; background:#eef3f6; overflow:auto; line-height:1.45; }
+pre code { background:none; padding:0; overflow-wrap:normal; }
+.table-wrap { max-width:100%; overflow:auto; margin:1rem 0 1.5rem; border:1px solid var(--line); }
+.table-wrap.long-table { max-height:70vh; }
+table { width:100%; border-collapse:collapse; font-size:.9rem; font-variant-numeric:tabular-nums; }
+th,td { padding:.55rem .65rem; border:1px solid var(--line); vertical-align:top; overflow-wrap:normal; }
+th { background:#eaf1f6; text-align:left; position:sticky; top:0; z-index:1; }
+tr:nth-child(even) { background:#f8fafb; }
+caption,.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+details { border:1px solid var(--line); padding:.6rem 1rem; border-radius:5px; margin:1rem 0; }
+summary { cursor:pointer; font-weight:600; }
+.table-tools { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:.6rem; background:#f4f7f9; }
+.table-tools input { font:inherit; border:1px solid #afc0ce; border-radius:4px; padding:.3rem .5rem; width:min(100%,22rem); min-width:0; }
+.note,.source-link,footer { color:var(--muted); font-size:.85rem; }
+.source-link { margin-top:2rem; }
+.archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
+footer { max-width:1400px; margin:1rem auto 2rem; padding:0 1rem; }
+blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
+svg { max-width:100%; height:auto; }
+:target { scroll-margin-top:1rem; }
+.skip-link { position:absolute; left:-10000px; }
+.skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
+@media(max-width:700px) { .layout { padding:0 .5rem; } main { padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+</style></head>
+<body>
+<a class="skip-link" href="#docs-content">Skip to content</a>
+<header><strong>egg-solver</strong><nav aria-label="Documentation"><a href="../../../index.html">Home</a>
+<a href="../../../guide/OVERVIEW.html">Learn</a>
+<a href="../../../comparisons/index.html">Benchmarks</a>
+<a href="../../../performance/index.html">Performance</a>
+<a href="../../../safety/index.html">Safety</a>
+<a href="../../../history/DELETED_EXPERIMENTS.html">Experiments</a>
+<a href="../../../BENCHMARK_CATALOG.html">Catalog</a>
+<a href="https://egg-solver.arhan.sh/">Solver demo ↗</a></nav></header>
+<div class="layout"><nav class="site-nav" aria-label="All documentation pages"><details class="site-menu" open><summary>All pages</summary><p class="nav-group">Start</p><ul><li><a href="../../../index.html">Overview</a></li><li><a href="../../../guide/QUICKSTART.html">Quick start</a></li><li><a href="../../../guide/OVERVIEW.html">Tables and memory</a></li><li><a href="../../../guide/HOW_IT_WORKS.html">How the search works</a></li><li><a href="../../../guide/GLOSSARY.html">Glossary</a></li></ul><p class="nav-group">Reference</p><ul><li><a href="../../../reference/USER_GUIDE.html">User guide</a></li><li><a href="../../../guide/DEVELOPMENT.html">Development checks</a></li><li><a href="../../../guide/PUBLISHING.html">Publishing the site</a></li><li><a href="../../../reference/inventories/index.html">Technique inventories</a></li></ul><p class="nav-group">Benchmarks</p><ul><li><a href="../../../comparisons/index.html">Solver benchmarks</a></li><li><a href="../../../comparisons/METHODS.html">Reading the tables</a></li><li><a href="../../../comparisons/NISSY_THROUGHPUT.html">nissy throughput</a></li><li><a href="../../../comparisons/NXOPT32.html">nxopt, 62 GB table</a></li><li><a href="../../../comparisons/CUBEOPT_AUDIT.html">cubeopt audit</a></li><li><a href="../../../comparisons/TABLE_ANALYSIS.html">h4 table analysis</a></li><li><a href="../../../comparisons/RESULTS.html">Multi-solver matrix</a></li><li><a href="../../../comparisons/COMPETITOR_FINDINGS.html">Competitor findings</a></li></ul><p class="nav-group">Performance</p><ul><li><a href="../../../performance/index.html">Performance studies</a></li><li><a href="../../../performance/PARALLELISM.html">Parallelism</a></li><li><a href="../../../performance/HARDWARE_COUNTERS.html">Hardware counters</a></li><li><a href="../../../performance/OPTIMIZATION_REVIEW.html">Optimization review</a></li></ul><p class="nav-group">Safety</p><ul><li><a href="../../../safety/index.html">Correctness and safety</a></li><li><a href="../../../safety/NO_UB.html">Undefined behavior</a></li><li><a href="../../../safety/MORDANT.html">Mordant audit</a></li></ul><p class="nav-group">Evidence and history</p><ul><li><a href="../../../BENCHMARK_CATALOG.html">Benchmark catalog</a></li><li><a href="../../../reproduce/index.html">Reproduce results</a></li><li><a href="../../../PROVENANCE.html">Sources and IDs</a></li><li><a href="../../../history/DELETED_EXPERIMENTS.html">Deleted experiments</a></li></ul></details></nav>
+<main id="docs-content"><h1 id="a-third-party-benchmark-and-what-it-showed-about-lane-counts-november-24-2026">A third-party benchmark, and what it showed about lane counts (November 24, 2026)</h1>
+<p class="archive-note">Recorded evidence. Commands, paths and status messages describe the measurement environment and date. <a href="../../../index.html">Documentation home</a>.</p>
+<p><a href="../../../performance/PARALLELISM.html">Lane study</a> · <a href="../../../comparisons/COMPETITOR_FINDINGS.html">nissy-core findings</a> · <a href="../../../reference/USER_GUIDE.html#tune-and-benchmark">User guide: tune and benchmark</a></p>
+<p>Sebastiano Tronto, the author of nissy-core, benchmarked egg-solver <code>c3eb909</code> against his H48 solver on a Ryzen 7 7700 (8 cores, 16 threads) and published the result in <a href="https://github.com/sebastianotronto/nissy-core/blob/master/benchmarks/benchmarks.md">nissy-core's benchmarks page</a> (nissy-core <code>d0f311a</code>, November 22). An earlier run of his (November 14, egg-solver <code>28a1953</code>) had used other settings. Two things on the page asked for an explanation:</p>
+<ol>
+<li>Some egg-solver rows are slower than in his earlier run, after the quarter-turn metric and the lists of all solutions were added.</li>
+<li>H48 lists all optimal solutions of 20-move scrambles and of the superflip faster than egg-solver, and gains more from 16 threads on 8 cores.</li>
+</ol>
+<p>This folder records the measurements made here to answer them, and the change that followed (<code>bench tune</code>, the default lane count). His machine was not available: what is said about it below is inferred from his published numbers and marked as such.</p>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#summary">Summary</a></li><li><a href="#machines-and-builds">Machines and builds</a></li><li><a href="#1-the-same-code-at-three-commits">1. The same code at three commits</a></li><li><a href="#2-lane-counts">2. Lane counts</a></li><li><a href="#3-lists-of-all-optimal-solutions">3. Lists of all optimal solutions</a></li><li><a href="#4-the-new-bench-tune">4. The new bench tune</a></li><li><a href="#what-this-does-not-show">What this does not show</a></li><li><a href="#files">Files</a></li></ul></details>
+<h2 id="summary">Summary</h2>
+<ul>
+<li><strong>The search code is not slower.</strong> The loop that <code>solve</code> spends its time in (<code>lanes::share::Worker::rounds</code>) is the same machine code, instruction for instruction and at the same address, in <code>28a1953</code>, <code>c3eb909</code> and <code>dc153b3</code>, built for this CPU and for his (<code>-C target-cpu=znver4</code>). Timed at one thread, the three versions are within 2.3% of each other in every configuration, mostly within 1% and in both directions, on this x86 server and on an Apple M2.</li>
+<li><strong>The slower rows come from lane counts.</strong> Between his two runs the settings changed: batch mode with the default lanes became <code>-c 1</code> with the lanes that <code>bench tune</code> saved. That <code>bench tune</code> counted the cubes a stream finished in six seconds, a handful on tables up to h9, so what it saved was close to chance. Run here, it saved 48, 24, 32 and 48 lanes for h6 to h9 at one thread, where 24 is the fastest on every one of them. His one-thread rows moved the way those lane counts predict: h6 and h9 slower, h7 and h8 faster, h10 and h11 the same.</li>
+<li><strong>The lists are not comparable as published.</strong> nissy-core cuts the number of solutions it is asked for to 8 bits, so its &quot;all solutions&quot; runs stop at 63 per cube (<a href="../../../comparisons/COMPETITOR_FINDINGS.html">finding 12</a>). Every 20-move scramble of the set has 154 to 335 optimal solutions and the superflip has 4,416. And <code>c3eb909</code> did not yet use a cube's symmetries for lists (added in <code>2ea70b9</code>). With both accounted for, egg-solver lists the same solutions 7.3 to 8.5 times faster than nissy-core on 16 cores of this server (18- to 20-move scrambles), and all 4,416 of the superflip in less than half the time nissy-core takes for 63.</li>
+<li><strong>Two threads per core gain egg-solver little.</strong> A thread already keeps about 24 table lookups in flight, which is what a second thread on the same core would otherwise add. On his page, for the 18- to 20-move sets, H48 at 16 threads is 7.3 to 12.3 times as fast as at one thread and egg-solver 7.3 to 9.1 times; in seconds egg-solver is 4.1 to 7.6 times faster there at 16 threads.</li>
+<li><strong>Changed:</strong> <code>bench tune</code> now measures the search speed of <code>solve</code> itself in nodes per second, which counts the cubes in progress when a measurement ends; records of the earlier command are ignored; and the untuned default is 24 lanes for every table (it was 40 up to h8 and 32 for h9 and h10).</li>
+</ul>
+<h2 id="machines-and-builds">Machines and builds</h2>
+<div class="table-wrap" role="region" aria-label="Machines and builds" tabindex="0"><table id="docs-table-1"><caption>Machines and builds</caption>
+<thead>
+<tr><th></th><th>This server</th><th>Apple M2</th></tr>
+</thead>
+<tbody>
+<tr><td>CPU</td><td>AMD EPYC 9V45 (Zen 5), 48 cores given to the VM, one thread per core</td><td>Apple M2, 4 performance and 4 efficiency cores</td></tr>
+<tr><td>Memory</td><td>94 GB</td><td>15 GB</td></tr>
+<tr><td>System</td><td>Linux 7.0, transparent huge pages on request (<code>madvise</code>)</td><td>Fedora Asahi, Linux 7.1</td></tr>
+<tr><td>Compiler</td><td>rustc 1.99.1; GCC 13.3 for nissy-core</td><td>rustc 1.99.1</td></tr>
+</tbody>
+</table></div>
+<p>egg-solver was built at <code>28a1953</code> (his first run), <code>c3eb909</code> (his second) and <code>dc153b3</code> (main on November 24), each with <code>cargo build --release --locked</code> for this CPU (<code>native</code>) and for his (<code>znver4</code>), from one source path and one build path. Tables h6 to h9 were made by <code>gen K auto</code> and copied into memory on transparent huge pages. nissy-core is its master <code>d0f311a</code>, built for 16 threads (<code>-DTHREADS=16 -DAVX2 -O3 -mavx2</code>), once as it is and once with only the 8-bit cast of the solution limit removed (and a larger output buffer in the tool); its table is its own <code>h48h7</code>.</p>
+<p>The scramble sets are those of nissy-core's <code>benchmarks/scrambles</code> (25 scrambles each, by optimal length). <code>scripts/s19-sub.txt</code> and <code>scripts/s20-sub.txt</code> are 6 scrambles of the 19-move set (indices 0, 1, 2, 3, 9, 24) and 3 of the 20-move set (indices 0, 1, 10), to keep nissy-core's list runs to minutes.</p>
+<p>Timed runs held the machine's benchmark lock exclusively. In the first window five pinned measurements of this study ran at once on separate groups of cores (cores 2, 10 and 18; 24 to 31; 32 to 47), and nothing else. The second and third windows ran one program at a time on all 48 cores. On the M2 each unit held that machine's lock. Times are <code>solve</code>'s own <code>wall</code> of the whole set, which leaves out loading the table; nissy-core's are its &quot;Total time&quot;.</p>
+<h2 id="1-the-same-code-at-three-commits">1. The same code at three commits</h2>
+<p><code>summarize.py</code> prints these tables from the raw files. Mean wall seconds per set, one thread pinned to a core; the percentage is against <code>28a1953</code> in the same row. The versions were run in the order A B C C B A, 12 times each for h6 and 6 times for h9.</p>
+<div class="table-wrap" role="region" aria-label="1. The same code at three commits" tabindex="0"><table id="docs-table-2"><caption>1. The same code at three commits</caption>
+<thead>
+<tr><th>Run</th><th align="right">28a1953</th><th align="right">c3eb909</th><th align="right">dc153b3</th></tr>
+</thead>
+<tbody>
+<tr><td>h6, 17-move set, 40 lanes, <code>-c 1</code>, native</td><td align="right">5.000</td><td align="right">5.034 (+0.7%)</td><td align="right">5.079 (+1.6%)</td></tr>
+<tr><td>h6, 17-move set, 40 lanes, <code>-c 0</code>, native</td><td align="right">5.134</td><td align="right">5.138 (+0.1%)</td><td align="right">5.145 (+0.2%)</td></tr>
+<tr><td>h6, 17-move set, 40 lanes, <code>-c 1</code>, znver4</td><td align="right">5.078</td><td align="right">5.093 (+0.3%)</td><td align="right">5.078 (-0.0%)</td></tr>
+<tr><td>h6, 17-move set, 40 lanes, <code>-c 0</code>, znver4</td><td align="right">5.079</td><td align="right">5.080 (+0.0%)</td><td align="right">5.080 (+0.0%)</td></tr>
+<tr><td>h9, 18-move set, 32 lanes, <code>-c 1</code>, native</td><td align="right">5.279</td><td align="right">5.347 (+1.3%)</td><td align="right">5.260 (-0.4%)</td></tr>
+<tr><td>h9, 18-move set, 32 lanes, <code>-c 0</code>, native</td><td align="right">5.253</td><td align="right">5.290 (+0.7%)</td><td align="right">5.227 (-0.5%)</td></tr>
+<tr><td>h9, 18-move set, 32 lanes, <code>-c 1</code>, znver4</td><td align="right">5.367</td><td align="right">5.334 (-0.6%)</td><td align="right">5.335 (-0.6%)</td></tr>
+<tr><td>h9, 18-move set, 32 lanes, <code>-c 0</code>, znver4</td><td align="right">5.297</td><td align="right">5.416 (+2.3%)</td><td align="right">5.402 (+2.0%)</td></tr>
+</tbody>
+</table></div>
+<p>On the Apple M2 (40 lanes; one thread on a performance core, 4 threads on the performance cores, 8 on all):</p>
+<div class="table-wrap" role="region" aria-label="1. The same code at three commits" tabindex="0"><table id="docs-table-3"><caption>1. The same code at three commits</caption>
+<thead>
+<tr><th>Run</th><th align="right">28a1953</th><th align="right">c3eb909</th><th align="right">dc153b3</th></tr>
+</thead>
+<tbody>
+<tr><td>h6, 17-move set, <code>-c 0</code>, 1 thread</td><td align="right">6.013</td><td align="right">6.032 (+0.3%)</td><td align="right">6.011 (-0.0%)</td></tr>
+<tr><td>h6, 17-move set, <code>-c 1</code>, 1 thread</td><td align="right">6.014</td><td align="right">6.018 (+0.1%)</td><td align="right">6.030 (+0.3%)</td></tr>
+<tr><td>h7, 18-move set, <code>-c 0</code>, 4 threads</td><td align="right">6.659</td><td align="right">6.639 (-0.3%)</td><td align="right">6.595 (-1.0%)</td></tr>
+<tr><td>h7, 18-move set, <code>-c 0</code>, 8 threads</td><td align="right">5.073</td><td align="right">5.052 (-0.4%)</td><td align="right">5.033 (-0.8%)</td></tr>
+<tr><td>h7, 18-move set, <code>-c 1</code>, 4 threads</td><td align="right">6.470</td><td align="right">6.440 (-0.5%)</td><td align="right">6.353 (-1.8%)</td></tr>
+<tr><td>h7, 18-move set, <code>-c 1</code>, 8 threads</td><td align="right">4.904</td><td align="right">4.909 (+0.1%)</td><td align="right">4.859 (-0.9%)</td></tr>
+</tbody>
+</table></div>
+<p>Every version searched the same number of nodes (15,523,314 per cube in the first row). The largest difference, 2.3% on h9 in batch mode for the znver4 build, is of 6 runs each and has the opposite sign in the native build; it was not followed up.</p>
+<p>The machine code was compared by disassembling the binaries and comparing each function's instructions with addresses and the names' generic arguments removed. <code>Worker::rounds</code> is 1,246 instructions in the three native builds and 1,243 in the three znver4 builds, with none different between the commits, at the same offset within its page. Functions around it differ between <code>28a1953</code> and <code>c3eb909</code>: one field offset in <code>continue_local</code>, and <code>maintain</code> (once per round of the lanes), <code>restart</code> and <code>settle</code> (once per job) by 2 to 77 instructions. Between <code>c3eb909</code> and <code>dc153b3</code> the functions that differ are those of the lists (<code>solutions::Collector</code>, <code>lanes::share::all_solutions</code>) and of reading the input; nothing of the single-solution search does.</p>
+<h2 id="2-lane-counts">2. Lane counts</h2>
+<p>Mean wall seconds of two runs, <code>dc153b3</code>, one thread on this server (<code>window-1/lanes.txt</code>):</p>
+<div class="table-wrap" role="region" aria-label="2. Lane counts" tabindex="0"><table id="docs-table-4"><caption>2. Lane counts</caption>
+<thead>
+<tr><th align="right">Lanes</th><th align="right">h6, 17-move, <code>-c 1</code></th><th align="right">h7, 17-move, <code>-c 1</code></th><th align="right">h8, 18-move, <code>-c 1</code></th><th align="right">h9, 18-move, <code>-c 1</code></th><th align="right">h6, <code>-c 0</code></th><th align="right">h7, <code>-c 0</code></th><th align="right">h8, <code>-c 0</code></th><th align="right">h9, <code>-c 0</code></th></tr>
+</thead>
+<tbody>
+<tr><td align="right">8</td><td align="right">8.489</td><td align="right">4.536</td><td align="right">16.551</td><td align="right">8.448</td><td align="right">8.506</td><td align="right">4.563</td><td align="right">16.405</td><td align="right">8.399</td></tr>
+<tr><td align="right">12</td><td align="right">6.550</td><td align="right">3.472</td><td align="right">12.492</td><td align="right">6.507</td><td align="right">6.495</td><td align="right">3.497</td><td align="right">12.433</td><td align="right">6.454</td></tr>
+<tr><td align="right">16</td><td align="right">5.621</td><td align="right">2.998</td><td align="right">10.810</td><td align="right">5.676</td><td align="right">5.639</td><td align="right">3.031</td><td align="right">10.827</td><td align="right">5.651</td></tr>
+<tr><td align="right">20</td><td align="right">5.123</td><td align="right">2.792</td><td align="right">9.994</td><td align="right">5.217</td><td align="right">5.161</td><td align="right">2.776</td><td align="right">9.881</td><td align="right">5.200</td></tr>
+<tr><td align="right">24</td><td align="right">4.841</td><td align="right">2.687</td><td align="right">9.571</td><td align="right">5.113</td><td align="right">4.935</td><td align="right">2.641</td><td align="right">9.346</td><td align="right">5.037</td></tr>
+<tr><td align="right">32</td><td align="right">4.839</td><td align="right">2.732</td><td align="right">9.727</td><td align="right">5.202</td><td align="right">4.837</td><td align="right">2.638</td><td align="right">9.803</td><td align="right">5.081</td></tr>
+<tr><td align="right">40</td><td align="right">4.957</td><td align="right">2.785</td><td align="right">9.871</td><td align="right">5.337</td><td align="right">5.038</td><td align="right">2.695</td><td align="right">10.255</td><td align="right">5.116</td></tr>
+<tr><td align="right">48</td><td align="right">5.107</td><td align="right">2.882</td><td align="right">10.432</td><td align="right">5.589</td><td align="right">5.268</td><td align="right">2.781</td><td align="right">10.579</td><td align="right">5.399</td></tr>
+</tbody>
+</table></div>
+<p>The node counts differ by less than 0.1% between lane counts, so the time differences are differences in speed. On the M2 (<code>m2/</code>), 16 to 48 lanes are within 1.5% of each other at 1, 4 and 8 threads, 40 lanes are 2 to 3% slower at 8 threads, and 8 lanes are 20% slower.</p>
+<h3 id="what-the-earlier-bench-tune-saved">What the earlier <code>bench tune</code> saved</h3>
+<p><code>window-1/tune-old.txt</code> and <code>m2/m2-b.txt</code> hold its output (<code>dc153b3</code>). At one thread on h6 it measured between 0.17 and 1.83 solves per second over its eight lane counts: one to eleven cubes finished in each six-second window.</p>
+<div class="table-wrap" role="region" aria-label="What the earlier bench tune saved" tabindex="0"><table id="docs-table-5"><caption>What the earlier bench tune saved</caption>
+<thead>
+<tr><th>Table</th><th align="right">This server, 1 thread</th><th align="right">This server, 8 threads</th><th align="right">M2, 1 thread</th><th align="right">M2, 8 threads</th></tr>
+</thead>
+<tbody>
+<tr><td>h6</td><td align="right">48 (run twice)</td><td align="right">48</td><td align="right">48</td><td align="right">48</td></tr>
+<tr><td>h7</td><td align="right">24</td><td align="right">24</td><td align="right">48</td><td align="right">8</td></tr>
+<tr><td>h8</td><td align="right">32</td><td align="right">24</td><td align="right"></td><td align="right"></td></tr>
+<tr><td>h9</td><td align="right">48</td><td align="right">40</td><td align="right"></td><td align="right"></td></tr>
+</tbody>
+</table></div>
+<p>On the M2, 8 lanes for h7 are 20% slower than 16 to 32. That command also measured <code>bench stream</code>'s search, whose lanes hold one cube each and have other best counts than those of <code>solve</code>.</p>
+<h3 id="his-two-runs-read-with-these-lane-counts-inferred">His two runs, read with these lane counts (inferred)</h3>
+<p>His first run was <code>solve -t N</code> (batch mode, the default lanes: 40 for h6 to h8, 32 for h9 and h10, 24 for h11). His second was <code>solve -t N -c 1</code> after <code>bench tune</code> on every table. The stream that <code>bench tune</code> measured is the same on every machine, and one thread of his CPU is about as fast as one of this server, so its record at one thread was probably the one it made here. The change of his times from the first run to the second, against the change that those settings make here (first run's settings: <code>-c 0</code> with the default; second: <code>-c 1</code> with the lanes above):</p>
+<div class="table-wrap" role="region" aria-label="His two runs, read with these lane counts (inferred)" tabindex="0"><table id="docs-table-6"><caption>His two runs, read with these lane counts (inferred)</caption>
+<thead>
+<tr><th>Table</th><th align="right">His times, 1 thread (17-, 18-, 19-move sets)</th><th align="right">Here, same change of settings</th></tr>
+</thead>
+<tbody>
+<tr><td>h6</td><td align="right">+2.1%, +4.7%, +5.3%</td><td align="right">+1.4% (40 to 48 lanes)</td></tr>
+<tr><td>h7</td><td align="right">-6.2%, -8.6%, -10.9%</td><td align="right">-0.3% (40 to 24)</td></tr>
+<tr><td>h8</td><td align="right">-6.2%, -6.7%, -6.7%</td><td align="right">-5.1% (40 to 32)</td></tr>
+<tr><td>h9</td><td align="right">+6.8%, +9.5%, +7.8%</td><td align="right">+10.0% (32 to 48)</td></tr>
+<tr><td>h10</td><td align="right">-2.9%, -1.6%, -1.5%</td><td align="right">not measured</td></tr>
+<tr><td>h11</td><td align="right">+0.1%, +0.3%, -0.2%</td><td align="right">not measured</td></tr>
+</tbody>
+</table></div>
+<p>The signs agree for h6, h8 and h9 and the sizes are close; h7 is flat here and 6 to 11% faster there. His tune records were not seen: this is an inference.</p>
+<p>At 16 threads his second run is 33 to 40% faster than his first on h6 to h8, 26 to 36% on h9, 20 to 35% on h10, and from 11% faster to 9% slower on h11. The gain is where the default was 40 or 32 lanes and is absent where it was 24. That fits a CPU on which two threads share a core's caches (32 KB of first-level data cache on his, 48 KB here, and here one thread per core): 40 lanes for each of two threads no longer fit. This server has no second thread per core, so this could not be measured here.</p>
+<h2 id="3-lists-of-all-optimal-solutions">3. Lists of all optimal solutions</h2>
+<p>h7, 16 threads on cores 32 to 47 of this server, one program at a time (<code>window-1/lists.txt</code>). &quot;As published&quot; is nissy-core master, which stops at 63 solutions per cube; &quot;complete&quot; is the copy without that cut.</p>
+<div class="table-wrap" role="region" aria-label="3. Lists of all optimal solutions" tabindex="0"><table id="docs-table-7"><caption>3. Lists of all optimal solutions</caption>
+<thead>
+<tr><th>Scrambles</th><th align="right">Solutions</th><th align="right">egg-solver <code>dc153b3</code></th><th align="right">nissy-core, complete</th><th align="right">nissy-core, as published</th><th align="right">egg-solver, stopping at 63 per cube</th></tr>
+</thead>
+<tbody>
+<tr><td>18-move set (25)</td><td align="right">140</td><td align="right">7.13 s</td><td align="right">60.74 s</td><td align="right">59.33 s (140)</td><td align="right"></td></tr>
+<tr><td>19-move set, 6 scrambles</td><td align="right">326</td><td align="right">20.83 s</td><td align="right">165.53 s</td><td align="right">141.42 s (296)</td><td align="right">18.53 s (296)</td></tr>
+<tr><td>20-move set, 3 scrambles</td><td align="right">609</td><td align="right">100.47 s</td><td align="right">733.22 s</td><td align="right">242.00 s (189)</td><td align="right">34.40 s (189)</td></tr>
+<tr><td>Superflip</td><td align="right">4,416</td><td align="right">7.35 s</td><td align="right">not run</td><td align="right">16.55 s (63)</td><td align="right"></td></tr>
+</tbody>
+</table></div>
+<p><code>c3eb909</code>, the commit he benchmarked, took 7.19 s for the 18-move set and 268.19 s for the superflip: 36 times longer than <code>dc153b3</code>, which searches one job of each group of first moves that the superflip's 48 symmetries map onto each other. One optimal solution of each cube (no list) took <code>dc153b3</code> 1.35 s, 1.59 s and 7.17 s for the three sets.</p>
+<p>His page has H48 ahead on 20-move scrambles (3.88 s against 5.08 s per cube on h11) and on the superflip (1.86 s against 15.38 s). Here nissy-core's time for the complete 20-move lists is 3.0 times its time for 63 solutions per cube, and egg-solver's 2.9 times; and the superflip's list is 36 times shorter with the symmetries.</p>
+<h2 id="4-the-new-bench-tune">4. The new <code>bench tune</code></h2>
+<p>It measures, for each lane count, the nodes per second of the work-sharing search on a stream of random cubes, in a batch and with one cube at a time, at 1 thread, half the threads and all threads, in two passes (up and down the lane counts). The nodes of unfinished cubes count: <code>lanes::share::Pool::run</code> now returns its thread's node count. Of the lane counts within 1% of the fastest it saves the one nearest to the default.</p>
+<p>On h7 with all 48 cores (<code>window-2/h7.txt</code>), against <code>solve</code> on the 19-move set (mean of two runs):</p>
+<div class="table-wrap" role="region" aria-label="4. The new bench tune" tabindex="0"><table id="docs-table-8"><caption>4. The new bench tune</caption>
+<thead>
+<tr><th align="right">Lanes</th><th align="right">24T <code>-c 1</code>: tune, M nodes/s</th><th align="right">24T <code>-c 1</code>: solve, s</th><th align="right">24T <code>-c 0</code>: tune</th><th align="right">24T <code>-c 0</code>: solve, s</th><th align="right">48T <code>-c 1</code>: tune</th><th align="right">48T <code>-c 1</code>: solve, s</th><th align="right">48T <code>-c 0</code>: tune</th><th align="right">48T <code>-c 0</code>: solve, s</th></tr>
+</thead>
+<tbody>
+<tr><td align="right">8</td><td align="right">1112</td><td align="right">8.014</td><td align="right">1107</td><td align="right">7.582</td><td align="right">2060</td><td align="right">4.124</td><td align="right">2115</td><td align="right">4.086</td></tr>
+<tr><td align="right">12</td><td align="right">1445</td><td align="right">6.102</td><td align="right">1447</td><td align="right">5.696</td><td align="right">2533</td><td align="right">3.240</td><td align="right">2725</td><td align="right">3.085</td></tr>
+<tr><td align="right">16</td><td align="right">1661</td><td align="right">5.282</td><td align="right">1668</td><td align="right">4.969</td><td align="right">2948</td><td align="right">2.854</td><td align="right">3084</td><td align="right">2.781</td></tr>
+<tr><td align="right">20</td><td align="right">1806</td><td align="right">4.844</td><td align="right">1825</td><td align="right">4.494</td><td align="right">3158</td><td align="right">2.709</td><td align="right">3284</td><td align="right">2.557</td></tr>
+<tr><td align="right">24</td><td align="right">1871</td><td align="right">4.624</td><td align="right">1905</td><td align="right">4.351</td><td align="right">3135</td><td align="right">2.613</td><td align="right">3337</td><td align="right">2.536</td></tr>
+<tr><td align="right">32</td><td align="right">1838</td><td align="right">4.651</td><td align="right">1872</td><td align="right">4.457</td><td align="right">3117</td><td align="right">2.679</td><td align="right">3232</td><td align="right">2.553</td></tr>
+<tr><td align="right">40</td><td align="right">1788</td><td align="right">4.740</td><td align="right">1828</td><td align="right">4.458</td><td align="right">3047</td><td align="right">2.703</td><td align="right">3128</td><td align="right">2.622</td></tr>
+<tr><td align="right">48</td><td align="right">1741</td><td align="right">4.878</td><td align="right">1772</td><td align="right">4.704</td><td align="right">2918</td><td align="right">2.855</td><td align="right">3023</td><td align="right">2.641</td></tr>
+</tbody>
+</table></div>
+<p>The fastest <code>solve</code> is at 24 lanes in all four columns, and the measured speed follows the times. Before the 1% rule this run saved 24, 24, 24 for a batch (1, 24, 48 threads) and 32, 24, 20 for one cube at a time; the two that are not 24 were within 0.8% of 24 in the measurement, and 1.7% and 3.6% slower in <code>solve</code>, which is why the rule was added.</p>
+<p>The final command (with the 1% rule) saved 24 lanes for h6, h7, h8 and h9 alike, for both modes at 1, 24 and 48 threads (<code>window-2/tune-final.txt</code>; about 3 minutes and 15 seconds per table). In its measurements 24 lanes were the fastest or within 0.4% of the fastest in every one of the 24 cases, 40 lanes 2.3 to 5.8% slower, 48 lanes 5.4 to 9.2%, 16 lanes 3.9 to 14.8% and 8 lanes 30 to 44%.</p>
+<p>The fix does not change <code>solve</code>'s search code: every function of the search is the same machine code as in <code>dc153b3</code>, and the functions that differ are those that read the command line and the tune record. <code>bench</code>'s work-sharing thread differs at its end (it returns the node count); its frame and the loop it calls are as before. Mean wall seconds of 8 runs on h7 with 24 lanes (<code>window-2/h7.txt</code>):</p>
+<div class="table-wrap" role="region" aria-label="4. The new bench tune" tabindex="0"><table id="docs-table-9"><caption>4. The new bench tune</caption>
+<thead>
+<tr><th>Run</th><th align="right">dc153b3</th><th align="right">fix</th><th align="right">Difference</th></tr>
+</thead>
+<tbody>
+<tr><td><code>bench batch --share=1</code>, 1 thread, 17-move set</td><td align="right">2.502</td><td align="right">2.506</td><td align="right">+0.2%</td></tr>
+<tr><td><code>bench batch --share=0</code>, 48 threads, 19-move set</td><td align="right">2.493</td><td align="right">2.516</td><td align="right">+0.9%</td></tr>
+<tr><td><code>bench batch --share=1</code>, 48 threads, 19-move set</td><td align="right">2.630</td><td align="right">2.641</td><td align="right">+0.4%</td></tr>
+<tr><td><code>solve -c 1</code>, 1 thread, 17-move set</td><td align="right">2.498</td><td align="right">2.499</td><td align="right">+0.0%</td></tr>
+<tr><td><code>solve -c 0</code>, 48 threads, 19-move set</td><td align="right">2.491</td><td align="right">2.504</td><td align="right">+0.5%</td></tr>
+<tr><td><code>solve -c 1</code>, 48 threads, 19-move set</td><td align="right">2.622</td><td align="right">2.610</td><td align="right">-0.4%</td></tr>
+</tbody>
+</table></div>
+<h2 id="what-this-does-not-show">What this does not show</h2>
+<ul>
+<li>Nothing was measured on his CPU or on any x86 CPU with two threads per core. The reading of his numbers in section 2 is an inference from them and from the lane counts measured here.</li>
+<li>The lists were timed on h7 only, on subsets of the 19- and 20-move sets, once each.</li>
+<li>The lane counts were measured on two machines. They are not a claim about others: that is what <code>bench tune</code> is for.</li>
+</ul>
+<h2 id="files">Files</h2>
+<div class="table-wrap" role="region" aria-label="Files" tabindex="0"><table id="docs-table-10"><caption>Files</caption>
+<thead>
+<tr><th>Path</th><th>Content</th></tr>
+</thead>
+<tbody>
+<tr><td><code>window-1/ab-h6.txt</code>, <code>ab-h9.txt</code></td><td>The three commits, two target CPUs, one thread: table, set, mode, lanes, build, wall seconds, nodes per cube</td></tr>
+<tr><td><code>window-1/lanes.txt</code></td><td>Lane counts at one thread, both modes</td></tr>
+<tr><td><code>window-1/tune-old.txt</code></td><td>The earlier <code>bench tune</code> on h6 (twice), h7, h8, h9, with 8 cores</td></tr>
+<tr><td><code>window-1/lists.txt</code></td><td>Lists against nissy-core</td></tr>
+<tr><td><code>window-2/h7.txt</code></td><td>The new <code>bench tune</code> on h7 (before the 1% rule), <code>solve</code> over lane counts at 24 and 48 threads, the fix against <code>dc153b3</code></td></tr>
+<tr><td><code>window-2/tune-final.txt</code></td><td>The final <code>bench tune</code> on h6 to h9 (third window)</td></tr>
+<tr><td><code>m2/m2-a.txt</code>, <code>m2-b.txt</code></td><td>Apple M2: the three commits, lane counts, the earlier <code>bench tune</code></td></tr>
+<tr><td><code>scripts/</code></td><td>The scripts that made these files, and the two scramble subsets</td></tr>
+<tr><td><code>summarize.py</code></td><td>Prints the tables of sections 1, 2 and 4 from the raw files</td></tr>
+</tbody>
+</table></div>
+
+<p class="source-link"><a href="README.md">Markdown source</a></p></main></div>
+<footer><a href="../../../PROVENANCE.html">Sources and evidence scope</a></footer>
+<script>
+for (const wrapper of document.querySelectorAll('.table-wrap')) {
+  const table=wrapper.querySelector('table');
+  const rows=[...table.tBodies].flatMap(body=>[...body.rows]);
+  if(rows.length>50) wrapper.classList.add('long-table');
+  if(rows.length<=12) continue;
+  const tools=document.createElement('div'); tools.className='table-tools';
+  const label=document.createElement('label'); label.textContent='Filter this table';
+  const input=document.createElement('input'); input.type='search'; input.id=table.id+'-filter';
+  label.htmlFor=input.id; input.setAttribute('aria-controls',table.id);
+  const count=document.createElement('span'); count.className='note'; count.setAttribute('aria-live','polite');
+  count.textContent=rows.length+' rows';
+  input.addEventListener('input',()=>{
+    const query=input.value.trim().toLowerCase(); let shown=0;
+    for(const row of rows){row.hidden=!!query&&!row.textContent.toLowerCase().includes(query);if(!row.hidden)shown++;}
+    count.textContent=shown+' of '+rows.length+' rows';
+  });
+  tools.append(label,input,count); wrapper.before(tools);
+}
+function revealTarget(){
+  let id;try{id=decodeURIComponent(location.hash.slice(1));}catch{return;}
+  const target=document.getElementById(id);if(!target)return;
+  for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+}
+revealTarget(); window.addEventListener('hashchange',revealTarget);
+const menu=document.querySelector('.site-menu');
+if(menu){const wide=matchMedia('(min-width:901px)');const sync=()=>{menu.open=wide.matches;};sync();wide.addEventListener('change',sync);
+const current=menu.querySelector('[aria-current]');if(current&&wide.matches)current.scrollIntoView({block:'nearest'});}
+</script>
+</body></html>

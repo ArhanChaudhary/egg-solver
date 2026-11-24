@@ -13,12 +13,55 @@ const SCRAMBLES: &str = "R U R' U'\n\nF2 D L2 B' U\nR1 U2 F3 D1 L2 B1 R3\nU R2 F
 
 /// A scratch folder for this test run.
 fn scratch() -> &'static Path {
-    static DIR: OnceLock<PathBuf> = OnceLock::new();
     DIR.get_or_init(|| {
-        let dir = std::env::temp_dir().join(format!("egg-solver-cli-{}", std::process::id()));
+        remove_stale_scratch();
+        let dir = std::env::temp_dir().join(format!("{SCRATCH_PREFIX}{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
+        // (The test harness has no hook at its end: the C library's.)
+        // SAFETY: `remove_scratch` is an `extern "C" fn()` that does not
+        // unwind (it ignores the removal's errors) and reads a `static`.
+        #[cfg(unix)]
+        unsafe {
+            libc::atexit(remove_scratch);
+        }
         dir
     })
+}
+
+static DIR: OnceLock<PathBuf> = OnceLock::new();
+const SCRATCH_PREFIX: &str = "egg-solver-cli-";
+
+/// Removes the scratch folder (its tables take over 200 MB) when the test
+/// process exits.
+#[cfg(unix)]
+extern "C" fn remove_scratch() {
+    if let Some(dir) = DIR.get() {
+        let _ = std::fs::remove_dir_all(dir);
+    }
+}
+
+/// Removes the scratch folders of test processes that are gone (killed, or
+/// from before the folders were removed at exit: 25 of them once filled a
+/// disk). On Linux only, where `/proc` tells whether a process is alive.
+fn remove_stale_scratch() {
+    if !cfg!(target_os = "linux") {
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(std::env::temp_dir()) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let pid = name
+            .to_str()
+            .and_then(|name| name.strip_prefix(SCRATCH_PREFIX))
+            .and_then(|pid| pid.parse::<u32>().ok());
+        if let Some(pid) = pid {
+            if !Path::new(&format!("/proc/{pid}")).exists() {
+                let _ = std::fs::remove_dir_all(entry.path());
+            }
+        }
+    }
 }
 
 /// A file in the scratch folder.
@@ -192,19 +235,95 @@ fn solve_legacy_forms() {
     // README: `solve <table> < file` (all cores).
     let out = run(solve, &[table], SCRAMBLES);
     let threads = std::thread::available_parallelism().unwrap().to_string();
-    check_solve_output(&ok(&out), 4, &threads, "40", "0");
+    check_solve_output(&ok(&out), 4, &threads, "24", "0");
     assert_eq!(text(&out.stderr), "", "stderr as before: nothing");
     // Scripts: `solve <table> -t T -c C [-n N] [-l L]`.
     let out = run(solve, &[table, "-t", "2", "-c", "1", "-n", "3"], SCRAMBLES);
-    check_solve_output(&ok(&out), 3, "2", "40", "1");
+    check_solve_output(&ok(&out), 3, "2", "24", "1");
     let out = run(solve, &[table, "-t", "2", "-l", "4", "-c", "0"], SCRAMBLES);
     check_solve_output(&ok(&out), 4, "2", "4", "0");
     // runtest.sh sets EGG_SOLVER_LOAD.
     for load in ["copy", "map", "auto", ""] {
         let env = [("EGG_SOLVER_LOAD", load)];
         let out = run_env(solve, &[table, "-t", "2", "-c", "1"], SCRAMBLES, &env);
-        check_solve_output(&ok(&out), 4, "2", "40", "1");
+        check_solve_output(&ok(&out), 4, "2", "24", "1");
     }
+}
+
+/// `bench tune` measures the search speed of `solve`'s two modes at each
+/// thread count and lane count (also on h0, where no random cube is solved
+/// within a measurement) and saves the best lane counts; `solve` then uses
+/// the entry of its mode, and not a record of the earlier tune command. On
+/// a copy of the table: the other tests rely on the untuned default.
+#[test]
+fn bench_tune_and_its_record() {
+    let table = scratch_file("h0-tuned");
+    std::fs::copy(h0(), &table).unwrap();
+    let record = format!("{table}.tune");
+    let (bench, solve) = (env!("CARGO_BIN_EXE_bench"), env!("CARGO_BIN_EXE_solve"));
+    let out = run(bench, &["tune", &table, "--window", "0.1", "--json"], "");
+    let lines: Vec<serde_json::Value> = ok(&out)
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    let of_type = |kind: &str| -> Vec<&serde_json::Value> {
+        lines.iter().filter(|line| line["type"] == kind).collect()
+    };
+    // Thread counts: 1, half of all (if at least 4) and all.
+    let all = std::thread::available_parallelism().unwrap().get();
+    let mut thread_counts = vec![1];
+    if all >= 4 {
+        thread_counts.push(all / 2);
+    }
+    if all > 1 {
+        thread_counts.push(all);
+    }
+    let (measured, best) = (of_type("tune"), of_type("best"));
+    assert_eq!(measured.len(), 2 * thread_counts.len() * 8, "{lines:?}");
+    assert_eq!(best.len(), 2 * thread_counts.len(), "{lines:?}");
+    for line in &measured {
+        assert!(line["nodes_per_second"].as_f64().unwrap() > 0.0, "{line}");
+        assert!(line["mode"] == "batch" || line["mode"] == "one", "{line}");
+        let threads = usize::try_from(line["threads"].as_u64().unwrap()).unwrap();
+        assert!(thread_counts.contains(&threads), "{line}");
+    }
+    assert_eq!(of_type("saved")[0]["path"], record.as_str());
+    // The record: the header, then each best lane count.
+    let saved = std::fs::read_to_string(&record).unwrap();
+    let mut rows = vec!["# egg-solver tune 2".to_string()];
+    for line in &best {
+        let mode = line["mode"].as_str().unwrap();
+        rows.push(format!("{mode} {} {}", line["threads"], line["lanes"]));
+    }
+    assert_eq!(saved.lines().collect::<Vec<_>>(), rows);
+    // `solve` uses the entry of its mode.
+    let lanes_of = |mode: &str| {
+        let entry = best.iter().find(|b| b["mode"] == mode && b["threads"] == 1);
+        entry.unwrap()["lanes"].to_string()
+    };
+    for (concurrency, mode) in [("1", "one"), ("0", "batch")] {
+        let args = ["-v", "--table", &table, "-t", "1", "-c", concurrency];
+        let out = run(solve, &args, SCRAMBLES);
+        check_solve_output(&ok(&out), 4, "1", &lanes_of(mode), concurrency);
+        let log = text(&out.stderr);
+        assert!(log.contains("from the table's .tune file"), "{log}");
+    }
+    // A record of the earlier tune command (`threads lanes` lines) is not
+    // used, and the log says so.
+    std::fs::write(&record, "1 48\n8 48\n").unwrap();
+    let out = run(solve, &["-v", "--table", &table, "-t", "1"], SCRAMBLES);
+    check_solve_output(&ok(&out), 4, "1", "24", "0");
+    let log = text(&out.stderr);
+    assert!(log.contains("of an earlier `bench tune`"), "{log}");
+    // The text output, in the form before subcommands.
+    let out = ok(&run(bench, &[&table, "tune", "0.05"], ""));
+    assert!(out.contains("batch threads 1 lanes 8: "), "{out}");
+    assert!(out.contains(" M nodes/s"), "{out}");
+    assert!(out.contains("best for one at 1 threads: "), "{out}");
+    assert!(out.ends_with(&format!("saved to {record}\n")), "{out}");
+    assert!(std::fs::read_to_string(&record)
+        .unwrap()
+        .starts_with("# egg-solver tune 2\n"));
 }
 
 /// One explicit scramble, with an optional short warm-up.
@@ -395,7 +514,7 @@ fn solve_json_env_and_logging() {
     assert_eq!(lines[4]["threads"], 2);
     let log = text(&out.stderr);
     assert!(log.contains("h0 base 8"), "{log}");
-    assert!(log.contains("2 threads, 40 lanes per thread"), "{log}");
+    assert!(log.contains("2 threads, 24 lanes per thread"), "{log}");
 }
 
 /// Removes a shared memory test's segment on drop.
@@ -454,7 +573,7 @@ fn solve_shared_memory() {
     for load in ["--shm", "--load=auto"] {
         let args = [table, "-t", "2", "-c", "1", "-v", load];
         let out = run_env(solve, &args, SCRAMBLES, &env);
-        check_solve_output(&ok(&out), 4, "2", "40", "1");
+        check_solve_output(&ok(&out), 4, "2", "24", "1");
         let log = text(&out.stderr);
         assert!(
             log.contains(&format!("shared memory segment {key} (shmid "))
@@ -468,10 +587,10 @@ fn solve_shared_memory() {
         ("EGG_SOLVER_PREFLIGHT_LIMIT", "1000000"),
     ];
     let out = run_env(solve, &[table, "-t", "2", "-c", "1"], SCRAMBLES, &low);
-    check_solve_output(&ok(&out), 4, "2", "40", "1");
+    check_solve_output(&ok(&out), 4, "2", "24", "1");
     let args = [table, "-t", "2", "-c", "1", "-v", "--load", "copy"];
     let out = run_env(solve, &args, SCRAMBLES, &env);
-    check_solve_output(&ok(&out), 4, "2", "40", "1");
+    check_solve_output(&ok(&out), 4, "2", "24", "1");
     assert!(!text(&out.stderr).contains("shared memory segment"));
     let removed = ok(&run_env(solve, &["--shm-remove", table], "", &env));
     assert!(
@@ -1019,7 +1138,7 @@ fn solve_max_length() {
     assert!(
         matches(
             &total,
-            "total 3 cubes wall # wall/cube # nodes/cube # threads 2 lanes 40 concurrency 1"
+            "total 3 cubes wall # wall/cube # nodes/cube # threads 2 lanes 24 concurrency 1"
         ),
         "{total}"
     );
@@ -1221,7 +1340,7 @@ fn solve_all_optimal_and_plus() {
     assert!(
         matches(
             &total,
-            "total 3 cubes wall # wall/cube # nodes/cube # threads 2 lanes 40 concurrency 0"
+            "total 3 cubes wall # wall/cube # nodes/cube # threads 2 lanes 24 concurrency 0"
         ),
         "{total}"
     );

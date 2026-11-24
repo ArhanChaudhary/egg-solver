@@ -1,0 +1,259 @@
+window3 start 21:10:08 load 38.39 39.36 29.37
+== tune h6 21:10:08
+batch threads 1 lanes 8: 47.69 M nodes/s
+batch threads 1 lanes 12: 62.98 M nodes/s
+batch threads 1 lanes 16: 72.67 M nodes/s
+batch threads 1 lanes 20: 79.78 M nodes/s
+batch threads 1 lanes 24: 84.11 M nodes/s
+batch threads 1 lanes 32: 84.17 M nodes/s
+batch threads 1 lanes 40: 82.25 M nodes/s
+batch threads 1 lanes 48: 79.39 M nodes/s
+best for batch at 1 threads: 24 lanes (84.11 M nodes/s)
+batch threads 24 lanes 8: 1122.35 M nodes/s
+batch threads 24 lanes 12: 1468.74 M nodes/s
+batch threads 24 lanes 16: 1689.99 M nodes/s
+batch threads 24 lanes 20: 1843.97 M nodes/s
+batch threads 24 lanes 24: 1920.19 M nodes/s
+batch threads 24 lanes 32: 1890.97 M nodes/s
+batch threads 24 lanes 40: 1845.01 M nodes/s
+batch threads 24 lanes 48: 1793.94 M nodes/s
+best for batch at 24 threads: 24 lanes (1920.19 M nodes/s)
+batch threads 48 lanes 8: 2155.64 M nodes/s
+batch threads 48 lanes 12: 2786.57 M nodes/s
+batch threads 48 lanes 16: 3180.87 M nodes/s
+batch threads 48 lanes 20: 3417.41 M nodes/s
+batch threads 48 lanes 24: 3474.38 M nodes/s
+batch threads 48 lanes 32: 3404.31 M nodes/s
+batch threads 48 lanes 40: 3314.00 M nodes/s
+batch threads 48 lanes 48: 3212.37 M nodes/s
+best for batch at 48 threads: 24 lanes (3474.38 M nodes/s)
+one threads 1 lanes 8: 48.22 M nodes/s
+one threads 1 lanes 12: 63.02 M nodes/s
+one threads 1 lanes 16: 72.51 M nodes/s
+one threads 1 lanes 20: 79.63 M nodes/s
+one threads 1 lanes 24: 84.15 M nodes/s
+one threads 1 lanes 32: 83.99 M nodes/s
+one threads 1 lanes 40: 81.87 M nodes/s
+one threads 1 lanes 48: 79.64 M nodes/s
+best for one at 1 threads: 24 lanes (84.15 M nodes/s)
+one threads 24 lanes 8: 1139.90 M nodes/s
+one threads 24 lanes 12: 1491.96 M nodes/s
+one threads 24 lanes 16: 1713.44 M nodes/s
+one threads 24 lanes 20: 1878.39 M nodes/s
+one threads 24 lanes 24: 1965.86 M nodes/s
+one threads 24 lanes 32: 1931.14 M nodes/s
+one threads 24 lanes 40: 1891.75 M nodes/s
+one threads 24 lanes 48: 1837.07 M nodes/s
+best for one at 24 threads: 24 lanes (1965.86 M nodes/s)
+one threads 48 lanes 8: 2134.73 M nodes/s
+one threads 48 lanes 12: 2736.94 M nodes/s
+one threads 48 lanes 16: 3105.29 M nodes/s
+one threads 48 lanes 20: 3303.73 M nodes/s
+one threads 48 lanes 24: 3357.74 M nodes/s
+one threads 48 lanes 32: 3282.30 M nodes/s
+one threads 48 lanes 40: 3182.67 M nodes/s
+one threads 48 lanes 48: 3111.90 M nodes/s
+best for one at 48 threads: 24 lanes (3357.74 M nodes/s)
+saved to /data3/build/perf/tune-tables/h6.tune
+-- file:
+# egg-solver tune 2
+batch 1 24
+batch 24 24
+batch 48 24
+one 1 24
+one 24 24
+one 48 24
+== tune h7 21:13:20
+batch threads 1 lanes 8: 47.53 M nodes/s
+batch threads 1 lanes 12: 62.78 M nodes/s
+batch threads 1 lanes 16: 72.68 M nodes/s
+batch threads 1 lanes 20: 80.26 M nodes/s
+batch threads 1 lanes 24: 83.65 M nodes/s
+batch threads 1 lanes 32: 83.67 M nodes/s
+batch threads 1 lanes 40: 81.57 M nodes/s
+batch threads 1 lanes 48: 77.72 M nodes/s
+best for batch at 1 threads: 24 lanes (83.65 M nodes/s)
+batch threads 24 lanes 8: 1120.09 M nodes/s
+batch threads 24 lanes 12: 1468.07 M nodes/s
+batch threads 24 lanes 16: 1694.06 M nodes/s
+batch threads 24 lanes 20: 1855.82 M nodes/s
+batch threads 24 lanes 24: 1938.74 M nodes/s
+batch threads 24 lanes 32: 1910.05 M nodes/s
+batch threads 24 lanes 40: 1849.47 M nodes/s
+batch threads 24 lanes 48: 1794.42 M nodes/s
+best for batch at 24 threads: 24 lanes (1938.74 M nodes/s)
+batch threads 48 lanes 8: 2129.50 M nodes/s
+batch threads 48 lanes 12: 2749.21 M nodes/s
+batch threads 48 lanes 16: 3140.31 M nodes/s
+batch threads 48 lanes 20: 3393.14 M nodes/s
+batch threads 48 lanes 24: 3461.45 M nodes/s
+batch threads 48 lanes 32: 3358.57 M nodes/s
+batch threads 48 lanes 40: 3266.58 M nodes/s
+batch threads 48 lanes 48: 3164.03 M nodes/s
+best for batch at 48 threads: 24 lanes (3461.45 M nodes/s)
+one threads 1 lanes 8: 47.95 M nodes/s
+one threads 1 lanes 12: 63.03 M nodes/s
+one threads 1 lanes 16: 72.40 M nodes/s
+one threads 1 lanes 20: 79.88 M nodes/s
+one threads 1 lanes 24: 84.29 M nodes/s
+one threads 1 lanes 32: 84.02 M nodes/s
+one threads 1 lanes 40: 81.94 M nodes/s
+one threads 1 lanes 48: 79.67 M nodes/s
+best for one at 1 threads: 24 lanes (84.29 M nodes/s)
+one threads 24 lanes 8: 1112.24 M nodes/s
+one threads 24 lanes 12: 1441.73 M nodes/s
+one threads 24 lanes 16: 1653.30 M nodes/s
+one threads 24 lanes 20: 1801.04 M nodes/s
+one threads 24 lanes 24: 1877.09 M nodes/s
+one threads 24 lanes 32: 1857.84 M nodes/s
+one threads 24 lanes 40: 1804.55 M nodes/s
+one threads 24 lanes 48: 1751.89 M nodes/s
+best for one at 24 threads: 24 lanes (1877.09 M nodes/s)
+one threads 48 lanes 8: 2031.65 M nodes/s
+one threads 48 lanes 12: 2634.98 M nodes/s
+one threads 48 lanes 16: 2934.28 M nodes/s
+one threads 48 lanes 20: 3163.38 M nodes/s
+one threads 48 lanes 24: 3194.25 M nodes/s
+one threads 48 lanes 32: 3106.40 M nodes/s
+one threads 48 lanes 40: 3038.71 M nodes/s
+one threads 48 lanes 48: 2901.17 M nodes/s
+best for one at 48 threads: 24 lanes (3194.25 M nodes/s)
+saved to /data3/build/perf/tune-tables/h7.tune
+-- file:
+# egg-solver tune 2
+batch 1 24
+batch 24 24
+batch 48 24
+one 1 24
+one 24 24
+one 48 24
+== tune h8 21:16:33
+batch threads 1 lanes 8: 47.26 M nodes/s
+batch threads 1 lanes 12: 62.00 M nodes/s
+batch threads 1 lanes 16: 71.41 M nodes/s
+batch threads 1 lanes 20: 79.26 M nodes/s
+batch threads 1 lanes 24: 83.51 M nodes/s
+batch threads 1 lanes 32: 83.83 M nodes/s
+batch threads 1 lanes 40: 80.98 M nodes/s
+batch threads 1 lanes 48: 78.22 M nodes/s
+best for batch at 1 threads: 24 lanes (83.51 M nodes/s)
+batch threads 24 lanes 8: 1099.40 M nodes/s
+batch threads 24 lanes 12: 1438.67 M nodes/s
+batch threads 24 lanes 16: 1657.92 M nodes/s
+batch threads 24 lanes 20: 1812.73 M nodes/s
+batch threads 24 lanes 24: 1896.27 M nodes/s
+batch threads 24 lanes 32: 1867.00 M nodes/s
+batch threads 24 lanes 40: 1817.86 M nodes/s
+batch threads 24 lanes 48: 1769.11 M nodes/s
+best for batch at 24 threads: 24 lanes (1896.27 M nodes/s)
+batch threads 48 lanes 8: 2099.22 M nodes/s
+batch threads 48 lanes 12: 2702.34 M nodes/s
+batch threads 48 lanes 16: 3078.67 M nodes/s
+batch threads 48 lanes 20: 3316.92 M nodes/s
+batch threads 48 lanes 24: 3356.43 M nodes/s
+batch threads 48 lanes 32: 3269.25 M nodes/s
+batch threads 48 lanes 40: 3185.79 M nodes/s
+batch threads 48 lanes 48: 3076.47 M nodes/s
+best for batch at 48 threads: 24 lanes (3356.43 M nodes/s)
+one threads 1 lanes 8: 47.29 M nodes/s
+one threads 1 lanes 12: 62.31 M nodes/s
+one threads 1 lanes 16: 71.68 M nodes/s
+one threads 1 lanes 20: 79.22 M nodes/s
+one threads 1 lanes 24: 84.01 M nodes/s
+one threads 1 lanes 32: 83.60 M nodes/s
+one threads 1 lanes 40: 81.46 M nodes/s
+one threads 1 lanes 48: 78.48 M nodes/s
+best for one at 1 threads: 24 lanes (84.01 M nodes/s)
+one threads 24 lanes 8: 1089.16 M nodes/s
+one threads 24 lanes 12: 1412.81 M nodes/s
+one threads 24 lanes 16: 1624.40 M nodes/s
+one threads 24 lanes 20: 1762.37 M nodes/s
+one threads 24 lanes 24: 1832.74 M nodes/s
+one threads 24 lanes 32: 1807.24 M nodes/s
+one threads 24 lanes 40: 1753.00 M nodes/s
+one threads 24 lanes 48: 1697.92 M nodes/s
+best for one at 24 threads: 24 lanes (1832.74 M nodes/s)
+one threads 48 lanes 8: 1974.14 M nodes/s
+one threads 48 lanes 12: 2544.32 M nodes/s
+one threads 48 lanes 16: 2844.38 M nodes/s
+one threads 48 lanes 20: 3052.80 M nodes/s
+one threads 48 lanes 24: 3061.08 M nodes/s
+one threads 48 lanes 32: 3001.48 M nodes/s
+one threads 48 lanes 40: 2916.45 M nodes/s
+one threads 48 lanes 48: 2844.38 M nodes/s
+best for one at 48 threads: 24 lanes (3061.08 M nodes/s)
+saved to /data3/build/perf/tune-tables/h8.tune
+-- file:
+# egg-solver tune 2
+batch 1 24
+batch 24 24
+batch 48 24
+one 1 24
+one 24 24
+one 48 24
+== tune h9 21:19:47
+batch threads 1 lanes 8: 46.78 M nodes/s
+batch threads 1 lanes 12: 61.04 M nodes/s
+batch threads 1 lanes 16: 69.58 M nodes/s
+batch threads 1 lanes 20: 76.05 M nodes/s
+batch threads 1 lanes 24: 78.55 M nodes/s
+batch threads 1 lanes 32: 77.35 M nodes/s
+batch threads 1 lanes 40: 75.61 M nodes/s
+batch threads 1 lanes 48: 73.56 M nodes/s
+best for batch at 1 threads: 24 lanes (78.55 M nodes/s)
+batch threads 24 lanes 8: 1086.30 M nodes/s
+batch threads 24 lanes 12: 1404.02 M nodes/s
+batch threads 24 lanes 16: 1609.64 M nodes/s
+batch threads 24 lanes 20: 1738.95 M nodes/s
+batch threads 24 lanes 24: 1801.12 M nodes/s
+batch threads 24 lanes 32: 1752.32 M nodes/s
+batch threads 24 lanes 40: 1711.59 M nodes/s
+batch threads 24 lanes 48: 1646.53 M nodes/s
+best for batch at 24 threads: 24 lanes (1801.12 M nodes/s)
+batch threads 48 lanes 8: 2063.29 M nodes/s
+batch threads 48 lanes 12: 2635.10 M nodes/s
+batch threads 48 lanes 16: 2979.82 M nodes/s
+batch threads 48 lanes 20: 3134.83 M nodes/s
+batch threads 48 lanes 24: 3123.98 M nodes/s
+batch threads 48 lanes 32: 3049.44 M nodes/s
+batch threads 48 lanes 40: 2953.35 M nodes/s
+batch threads 48 lanes 48: 2865.96 M nodes/s
+best for batch at 48 threads: 24 lanes (3123.98 M nodes/s)
+one threads 1 lanes 8: 47.11 M nodes/s
+one threads 1 lanes 12: 61.23 M nodes/s
+one threads 1 lanes 16: 69.93 M nodes/s
+one threads 1 lanes 20: 76.28 M nodes/s
+one threads 1 lanes 24: 79.14 M nodes/s
+one threads 1 lanes 32: 77.66 M nodes/s
+one threads 1 lanes 40: 75.70 M nodes/s
+one threads 1 lanes 48: 73.29 M nodes/s
+best for one at 1 threads: 24 lanes (79.14 M nodes/s)
+one threads 24 lanes 8: 1058.83 M nodes/s
+one threads 24 lanes 12: 1360.80 M nodes/s
+one threads 24 lanes 16: 1536.57 M nodes/s
+one threads 24 lanes 20: 1656.03 M nodes/s
+one threads 24 lanes 24: 1698.61 M nodes/s
+one threads 24 lanes 32: 1660.32 M nodes/s
+one threads 24 lanes 40: 1607.88 M nodes/s
+one threads 24 lanes 48: 1549.90 M nodes/s
+best for one at 24 threads: 24 lanes (1698.61 M nodes/s)
+one threads 48 lanes 8: 1890.69 M nodes/s
+one threads 48 lanes 12: 2360.44 M nodes/s
+one threads 48 lanes 16: 2591.59 M nodes/s
+one threads 48 lanes 20: 2679.46 M nodes/s
+one threads 48 lanes 24: 2696.53 M nodes/s
+one threads 48 lanes 32: 2652.91 M nodes/s
+one threads 48 lanes 40: 2582.82 M nodes/s
+one threads 48 lanes 48: 2472.65 M nodes/s
+best for one at 48 threads: 24 lanes (2696.53 M nodes/s)
+saved to /data3/build/perf/tune-tables/h9.tune
+-- file:
+# egg-solver tune 2
+batch 1 24
+batch 24 24
+batch 48 24
+one 1 24
+one 24 24
+one 48 24
+done 21:23:03
+window3 end 21:23:03

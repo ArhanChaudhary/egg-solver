@@ -1,0 +1,111 @@
+== tune h6 18:58:50
+threads 1 lanes 8: 0.83 solves/s
+threads 1 lanes 12: 0.33 solves/s
+threads 1 lanes 16: 0.33 solves/s
+threads 1 lanes 20: 0.33 solves/s
+threads 1 lanes 24: 0.50 solves/s
+threads 1 lanes 32: 1.33 solves/s
+threads 1 lanes 40: 1.33 solves/s
+threads 1 lanes 48: 1.83 solves/s
+best at 1 threads: 48 lanes (1.83 solves/s)
+threads 8 lanes 8: 4.67 solves/s
+threads 8 lanes 12: 3.83 solves/s
+threads 8 lanes 16: 3.83 solves/s
+threads 8 lanes 20: 5.00 solves/s
+threads 8 lanes 24: 4.67 solves/s
+threads 8 lanes 32: 4.83 solves/s
+threads 8 lanes 40: 5.17 solves/s
+threads 8 lanes 48: 8.50 solves/s
+best at 8 threads: 48 lanes (8.50 solves/s)
+saved to /data3/build/perf/tune-tables/h6.tune
+1 48
+8 48
+== tune h6 19:01:15
+threads 1 lanes 8: 0.83 solves/s
+threads 1 lanes 12: 0.33 solves/s
+threads 1 lanes 16: 0.17 solves/s
+threads 1 lanes 20: 0.33 solves/s
+threads 1 lanes 24: 0.50 solves/s
+threads 1 lanes 32: 1.33 solves/s
+threads 1 lanes 40: 1.33 solves/s
+threads 1 lanes 48: 1.83 solves/s
+best at 1 threads: 48 lanes (1.83 solves/s)
+threads 8 lanes 8: 4.67 solves/s
+threads 8 lanes 12: 3.83 solves/s
+threads 8 lanes 16: 3.67 solves/s
+threads 8 lanes 20: 5.00 solves/s
+threads 8 lanes 24: 4.83 solves/s
+threads 8 lanes 32: 5.00 solves/s
+threads 8 lanes 40: 5.17 solves/s
+threads 8 lanes 48: 8.50 solves/s
+best at 8 threads: 48 lanes (8.50 solves/s)
+saved to /data3/build/perf/tune-tables/h6.tune
+1 48
+8 48
+== tune h7 19:03:42
+threads 1 lanes 8: 0.83 solves/s
+threads 1 lanes 12: 1.00 solves/s
+threads 1 lanes 16: 1.50 solves/s
+threads 1 lanes 20: 1.83 solves/s
+threads 1 lanes 24: 2.33 solves/s
+threads 1 lanes 32: 1.67 solves/s
+threads 1 lanes 40: 1.17 solves/s
+threads 1 lanes 48: 1.67 solves/s
+best at 1 threads: 24 lanes (2.33 solves/s)
+threads 8 lanes 8: 10.67 solves/s
+threads 8 lanes 12: 13.83 solves/s
+threads 8 lanes 16: 16.33 solves/s
+threads 8 lanes 20: 16.17 solves/s
+threads 8 lanes 24: 17.17 solves/s
+threads 8 lanes 32: 9.50 solves/s
+threads 8 lanes 40: 10.17 solves/s
+threads 8 lanes 48: 9.67 solves/s
+best at 8 threads: 24 lanes (17.17 solves/s)
+saved to /data3/build/perf/tune-tables/h7.tune
+1 24
+8 24
+== tune h8 19:06:10
+threads 1 lanes 8: 1.33 solves/s
+threads 1 lanes 12: 2.67 solves/s
+threads 1 lanes 16: 3.33 solves/s
+threads 1 lanes 20: 4.00 solves/s
+threads 1 lanes 24: 4.83 solves/s
+threads 1 lanes 32: 5.17 solves/s
+threads 1 lanes 40: 4.50 solves/s
+threads 1 lanes 48: 4.50 solves/s
+best at 1 threads: 32 lanes (5.17 solves/s)
+threads 8 lanes 8: 18.50 solves/s
+threads 8 lanes 12: 21.83 solves/s
+threads 8 lanes 16: 28.33 solves/s
+threads 8 lanes 20: 35.33 solves/s
+threads 8 lanes 24: 37.67 solves/s
+threads 8 lanes 32: 36.83 solves/s
+threads 8 lanes 40: 36.67 solves/s
+threads 8 lanes 48: 30.33 solves/s
+best at 8 threads: 24 lanes (37.67 solves/s)
+saved to /data3/build/perf/tune-tables/h8.tune
+1 32
+8 24
+== tune h9 19:08:42
+threads 1 lanes 8: 3.83 solves/s
+threads 1 lanes 12: 5.33 solves/s
+threads 1 lanes 16: 7.17 solves/s
+threads 1 lanes 20: 8.33 solves/s
+threads 1 lanes 24: 8.67 solves/s
+threads 1 lanes 32: 8.50 solves/s
+threads 1 lanes 40: 9.83 solves/s
+threads 1 lanes 48: 10.50 solves/s
+best at 1 threads: 48 lanes (10.50 solves/s)
+threads 8 lanes 8: 31.17 solves/s
+threads 8 lanes 12: 44.50 solves/s
+threads 8 lanes 16: 54.17 solves/s
+threads 8 lanes 20: 60.50 solves/s
+threads 8 lanes 24: 62.33 solves/s
+threads 8 lanes 32: 64.00 solves/s
+threads 8 lanes 40: 64.67 solves/s
+threads 8 lanes 48: 63.83 solves/s
+best at 8 threads: 40 lanes (64.67 solves/s)
+saved to /data3/build/perf/tune-tables/h9.tune
+1 48
+8 40
+done 19:11:24

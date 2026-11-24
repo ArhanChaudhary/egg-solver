@@ -46,7 +46,7 @@ A cube can also be given as its 54 stickers instead of a scramble, wherever a sc
 | Option | Meaning |
 |---|---|
 | `-t N` / `--threads N` | Worker threads; default is the program's detected thread count |
-| `-l N` / `--lanes N` | Interleaved contexts per worker; otherwise use a matching tune record or table-dependent default |
+| `-l N` / `--lanes N` | Interleaved contexts per worker; otherwise the table's tune record if there is one, else 24 |
 | `-c 0` | Allow the complete input batch in progress; the default |
 | `-c 1` | Complete one input before starting the next; workers still cooperate within a cube |
 | `-n N` | Read at most N scrambles in batch mode |
@@ -217,7 +217,9 @@ target/release/bench tables/h7 tune
 target/release/bench --help
 ```
 
-The tune command writes a `<TABLE>.tune` record for its measured configurations. A table on hugetlbfs (any mount, not only `/mnt/huge`) cannot hold small files, so its record goes to `tables/<NAME>.hugemeta.tune` in the build checkout, beside the optional `tables/<NAME>.hugemeta` metadata sidecar; rebuild on each machine so that path is local, and keep table names distinct across hugetlbfs mounts. `solve` and `bench` use a matching record unless `-l` is explicit. The built-in lane candidates end at 48, but explicit larger lane values are supported. Tuning a stream does not guarantee the best finite-batch or single-cube setting. The [measured lane study](../performance/PARALLELISM.md) explains that distinction.
+The tune command measures how fast `solve` searches (nodes per second on random states, for about three minutes) with 8 to 48 lanes per thread, in its two modes (a batch, and one cube at a time on all threads) at 1 thread, half the threads and all threads, and writes the best lane count of each to a `<TABLE>.tune` record (the default of 24, unless another count is more than 1% faster: the measurement is no finer than that). `solve` takes the entry of its mode at the nearest thread count (nearest as a ratio: 4 threads use the entry of 8, not of 1). The best lane count depends on the CPU, mostly on its caches and on whether two threads share a core, so tune on the machine that solves, with nothing else running. A table on hugetlbfs (any mount, not only `/mnt/huge`) cannot hold small files, so its record goes to `tables/<NAME>.hugemeta.tune` in the build checkout, beside the optional `tables/<NAME>.hugemeta` metadata sidecar; rebuild on each machine so that path is local, and keep table names distinct across hugetlbfs mounts. `solve` and `bench` use a matching record unless `-l` is explicit. The built-in lane candidates end at 48, but explicit larger lane values are supported. The [measured lane study](../performance/PARALLELISM.md) has lane screens of one machine.
+
+Records of the earlier tune command (those without the first line `# egg-solver tune 2`) are not used, and `solve -v` says so. That command counted the cubes that a stream of random states finished in six seconds, which on tables up to h9 is a handful at one thread, so its choice was close to chance; and it measured `bench stream`'s search, not the one `solve` runs. Run the tune command again to replace such a record.
 
 The historical positional benchmark syntax remains supported. Use `bench --help` and each subcommand's help for named syntax, warm-up and measurement windows. Record the actual command with benchmark output.
 

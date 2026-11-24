@@ -1,0 +1,20 @@
+start 18:58:50
+egg dc153b3-native one scrambles-18: 25 cubes, 1.346371 s, 63157801 nodes/cube, solutions 0, truncated cubes 0
+egg dc153b3-native all-optimal scrambles-18: 25 cubes, 7.133927 s, 343951679 nodes/cube, solutions 140, truncated cubes 0
+egg c3eb909-native all-optimal scrambles-18: 25 cubes, 7.191011 s, 343951668 nodes/cube, solutions 140, truncated cubes 0
+nissy capped scrambles-18: Total time: 59.3306s, solutions 140
+nissy nocap scrambles-18: Total time: 60.7385s, solutions 140
+egg dc153b3-native one s19-sub: 6 cubes, 1.591964 s, 318620207 nodes/cube, solutions 0, truncated cubes 0
+egg dc153b3-native all-optimal s19-sub: 6 cubes, 20.828725 s, 4202136406 nodes/cube, solutions 326, truncated cubes 0
+egg dc153b3-native all-optimal-max63 s19-sub: 6 cubes, 18.530591 s, 3753451832 nodes/cube, solutions 296, truncated cubes 2
+nissy capped s19-sub: Total time: 141.4184s, solutions 296
+nissy nocap s19-sub: Total time: 165.5337s, solutions 326
+egg dc153b3-native one s20-sub: 3 cubes, 7.169913 s, 2994543231 nodes/cube, solutions 0, truncated cubes 0
+egg dc153b3-native all-optimal s20-sub: 3 cubes, 100.468669 s, 40926463470 nodes/cube, solutions 609, truncated cubes 0
+egg dc153b3-native all-optimal-max63 s20-sub: 3 cubes, 34.401514 s, 14277831431 nodes/cube, solutions 189, truncated cubes 3
+nissy capped s20-sub: Total time: 242.0036s, solutions 189
+nissy nocap s20-sub: Total time: 733.2159s, solutions 609
+egg dc153b3-native all-optimal superflip: 1 cubes, 7.345552 s, 6698552770 nodes/cube, solutions 4416, truncated cubes 0
+egg c3eb909-native all-optimal superflip: 1 cubes, 268.186934 s, 259651012336 nodes/cube, solutions 4416, truncated cubes 0
+nissy capped superflip: Total time: 16.5457s, solutions 63
+done 19:31:05

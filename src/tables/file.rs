@@ -648,31 +648,90 @@ pub(crate) fn tune_path(table: &str) -> String {
     }
 }
 
-/// Save the best lane count per thread count (`threads lanes` lines).
+/// The first line of a tune file made by `bench tune` as it measures now:
+/// the search speed of `solve`'s two modes. (The files of the previous
+/// `bench tune`, which counted the cubes that a stream finished in a few
+/// seconds, have no such line and are not used: on a small table few cubes
+/// finish in that time, and the best lane count was close to chance.)
+const TUNE_HEADER: &str = "# egg-solver tune 2";
+
+/// How `solve` runs, as far as the best lane count goes.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum TuneMode {
+    /// Many cubes in progress at once (`solve -c 0`, the default).
+    Batch,
+    /// One cube at a time on all threads (`solve -c 1`, a single scramble).
+    OneCube,
+}
+
+impl TuneMode {
+    /// The mode of `solve -c concurrency`.
+    #[must_use]
+    pub fn of_concurrency(concurrency: usize) -> TuneMode {
+        if concurrency == 1 {
+            TuneMode::OneCube
+        } else {
+            TuneMode::Batch
+        }
+    }
+
+    /// The word that starts the mode's lines in a tune file (and names it
+    /// in `bench tune`'s output).
+    #[must_use]
+    pub fn word(self) -> &'static str {
+        match self {
+            TuneMode::Batch => "batch",
+            TuneMode::OneCube => "one",
+        }
+    }
+}
+
+/// Save the best lane count per mode and thread count (after the header,
+/// `mode threads lanes` lines).
 ///
 /// # Errors
 /// If the file cannot be written (e.g. the table's folder is read-only).
-pub fn save_tuned_lanes(table: &str, best: &[(usize, usize)]) -> std::io::Result<String> {
+pub fn save_tuned_lanes(table: &str, best: &[(TuneMode, usize, usize)]) -> std::io::Result<String> {
     use std::fmt::Write as _;
-    let mut text = String::new();
-    for (threads, lanes) in best {
-        let _ = writeln!(text, "{threads} {lanes}");
+    let mut text = format!("{TUNE_HEADER}\n");
+    for (mode, threads, lanes) in best {
+        let _ = writeln!(text, "{} {threads} {lanes}", mode.word());
     }
     let path = tune_path(table);
     std::fs::write(&path, text)?;
     Ok(path)
 }
 
-/// Lanes per thread for a table of `k`, when not tuned (`bench tune`).
-/// Smaller tables gain from more lanes (measured, solves/s, 24 -> 40 lanes):
-/// h7 +10% at 1T (2.017 -> 2.217) and at 8 threads (15.43 -> 17.07), also
-/// on 1 GiB pages (2.017 -> 2.283 at 1T: not a TLB effect); h8 equal at 1T,
-/// +8.9% at 8 threads (26.73 -> 29.10); h6 equal (+4.5% at 1T, -1 to -5%
-/// at 8 threads). h11 keeps `lanes::DEFAULT_LANES`, 24 (tuned at 1 and 48
-/// threads; 40 is 3.4% slower at 8 threads, 197.9 -> 191.2). h9 and h10
-/// (no RAM for them here) get 32, in between.
+/// Lanes per thread when not tuned (`bench tune`): `lanes::DEFAULT_LANES`,
+/// 24, for every table. `solve`'s search (the work-sharing mode) was
+/// fastest with 24 on every table measured, `-c 1` and `-c 0` alike. At 1
+/// thread on Zen 5 (EPYC 9V45, 2026-11-24, 17- and 18-move sets, seconds
+/// with 24, 32, 40, 48 lanes, `-c 1`): h6 4.84, 4.84, 4.96, 5.11; h7 2.69,
+/// 2.73, 2.79, 2.88; h8 9.57, 9.73, 9.87, 10.43; h9 5.11, 5.20, 5.34, 5.59
+/// (16 lanes: 11 to 17% slower, 8: 65 to 76%). At 48 threads there, 24 won
+/// every batch screen of h6 to h10 (docs/performance/PARALLELISM.md). On an
+/// Apple M2 (h6, h7; 1, 4 and 8 threads) 16 to 48 lanes are within 1.5% of
+/// each other, 40 is 2 to 3% slower at 8 threads, and 8 lanes 20% slower.
+/// (Until then: 40 lanes up to h8 and 32 for h9 and h10, from `bench
+/// stream`'s search, where 40 lanes were up to 10% faster than 24 on h7:
+/// its lanes are smaller than the work-sharing mode's.)
 #[must_use]
-pub fn untuned_lanes(k: u32) -> usize {
+pub fn untuned_lanes(_k: u32) -> usize {
+    crate::lanes::DEFAULT_LANES
+}
+
+/// Lanes per thread of `bench stream` (independent cubes, one per lane)
+/// for a table of `k`, unless asked otherwise: `bench tune` measures the
+/// work-sharing mode, not this one. Smaller tables gain from more lanes
+/// (measured, solves/s, 24 -> 40 lanes): h7 +10% at 1T (2.017 -> 2.217)
+/// and at 8 threads (15.43 -> 17.07), also on 1 GiB pages (2.017 -> 2.283
+/// at 1T: not a TLB effect); h8 equal at 1T, +8.9% at 8 threads (26.73 ->
+/// 29.10); h6 equal (+4.5% at 1T, -1 to -5% at 8 threads). h11 keeps
+/// `lanes::DEFAULT_LANES`, 24 (tuned at 1 and 48 threads; 40 is 3.4%
+/// slower at 8 threads, 197.9 -> 191.2). h9 and h10 (no RAM for them
+/// then) get 32, in between.
+#[must_use]
+pub fn untuned_stream_lanes(k: u32) -> usize {
     match k {
         0..=8 => 40,
         9 | 10 => 32,
@@ -680,29 +739,144 @@ pub fn untuned_lanes(k: u32) -> usize {
     }
 }
 
-/// The default lanes per thread for `threads` threads on the table at
-/// `path`: from `<path>.tune` (`bench tune`; the entry of the nearest
-/// thread count), else `untuned_lanes(k)`.
-pub fn default_lanes(path: &str, k: u32) -> impl Fn(usize) -> usize {
-    let tuned: Vec<(usize, usize)> = std::fs::read_to_string(tune_path(path))
-        .unwrap_or_default()
-        .lines()
-        .filter_map(|l| {
-            let mut w = l.split_whitespace().map(|x| x.parse::<usize>().ok());
-            Some((w.next()??, w.next()??))
+/// The entries (`threads`, `lanes`) of `mode` in the text of a tune file;
+/// none if the text is not of this `bench tune` (`TUNE_HEADER`).
+fn tuned_entries(text: &str, mode: TuneMode) -> Vec<(usize, usize)> {
+    let mut lines = text.lines();
+    if lines.next() != Some(TUNE_HEADER) {
+        return Vec::new();
+    }
+    lines
+        .filter_map(|line| {
+            let mut words = line.split_whitespace();
+            if words.next()? != mode.word() {
+                return None;
+            }
+            let mut numbers = words.map(|word| word.parse::<usize>().ok());
+            Some((numbers.next()??, numbers.next()??))
         })
         .filter(|&(threads, lanes)| threads > 0 && lanes > 0)
-        .collect();
-    move |threads| {
-        tuned
-            .iter()
-            .min_by_key(|&&(t, _)| t.abs_diff(threads))
-            .map_or(untuned_lanes(k), |&(_, lanes)| lanes)
+        .collect()
+}
+
+/// Of `entries` (`threads`, `lanes`), the lanes of the thread count
+/// nearest to `threads` as a ratio (4 threads are nearer to 8 than to 1;
+/// of two as near, the larger count's).
+fn nearest_lanes(entries: &[(usize, usize)], threads: usize) -> Option<usize> {
+    // (The ratio of the larger to the smaller of two counts, as a fraction.)
+    let ratio = |t: usize| (t.max(threads) as u128, t.min(threads).max(1) as u128);
+    entries
+        .iter()
+        .min_by(|&&(a, _), &&(b, _)| {
+            let ((a_top, a_bottom), (b_top, b_bottom)) = (ratio(a), ratio(b));
+            (a_top * b_bottom).cmp(&(b_top * a_bottom)).then(b.cmp(&a))
+        })
+        .map(|&(_, lanes)| lanes)
+}
+
+/// Whether the table at `path` has a tune file that `default_lanes` uses
+/// (made by this `bench tune`, with an entry).
+#[must_use]
+pub fn is_tuned(path: &str) -> bool {
+    std::fs::read_to_string(tune_path(path))
+        .is_ok_and(|text| !tuned_entries(&text, TuneMode::Batch).is_empty())
+}
+
+/// The default lanes per thread for `threads` threads in `mode` on the
+/// table at `path`: from `<path>.tune` (`bench tune`: the entry of the
+/// mode, or else of the batch mode, at the nearest thread count), else
+/// `untuned_lanes(k)`.
+pub fn default_lanes(path: &str, k: u32) -> impl Fn(usize, TuneMode) -> usize {
+    let text = std::fs::read_to_string(tune_path(path)).unwrap_or_default();
+    let batch = tuned_entries(&text, TuneMode::Batch);
+    let one = tuned_entries(&text, TuneMode::OneCube);
+    move |threads, mode| {
+        let of_mode = match mode {
+            TuneMode::OneCube => nearest_lanes(&one, threads),
+            TuneMode::Batch => None,
+        };
+        of_mode
+            .or_else(|| nearest_lanes(&batch, threads))
+            .unwrap_or_else(|| untuned_lanes(k))
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::{nearest_lanes, tuned_entries, TuneMode, TUNE_HEADER};
+
+    /// A tune file: the entries of each mode; lines of other kinds and the
+    /// files of the previous `bench tune` (no header) are not used.
+    #[test]
+    fn tune_files_are_read_by_mode() {
+        let text =
+            format!("{TUNE_HEADER}\nbatch 1 24\nbatch 16 12\none 1 32\nlater 3 4\none x 8\n");
+        assert_eq!(tuned_entries(&text, TuneMode::Batch), [(1, 24), (16, 12)]);
+        assert_eq!(tuned_entries(&text, TuneMode::OneCube), [(1, 32)]);
+        // (As the previous `bench tune` wrote them, and one with zeros.)
+        assert_eq!(tuned_entries("1 48\n8 24\n", TuneMode::Batch), []);
+        let zeros = format!("{TUNE_HEADER}\nbatch 0 24\nbatch 4 0\n");
+        assert_eq!(tuned_entries(&zeros, TuneMode::Batch), []);
+        assert_eq!(tuned_entries("", TuneMode::Batch), []);
+    }
+
+    /// The entry of the nearest thread count is the nearest as a ratio.
+    #[test]
+    fn nearest_thread_count_is_by_ratio() {
+        let entries = [(1, 10), (8, 20), (16, 30)];
+        let lanes = |threads| nearest_lanes(&entries, threads);
+        assert_eq!(lanes(1), Some(10));
+        assert_eq!(lanes(2), Some(10));
+        // (4 is 4 times 1 and half of 8.)
+        assert_eq!(lanes(4), Some(20));
+        assert_eq!(lanes(8), Some(20));
+        assert_eq!(lanes(12), Some(30));
+        assert_eq!(lanes(16), Some(30));
+        assert_eq!(lanes(1000), Some(30));
+        // As near to both: the larger count's.
+        assert_eq!(nearest_lanes(&[(1, 10), (16, 30)], 4), Some(30));
+        assert_eq!(nearest_lanes(&[(16, 30), (1, 10)], 4), Some(30));
+        assert_eq!(nearest_lanes(&[], 4), None);
+        assert_eq!(
+            nearest_lanes(&[(usize::MAX, 7), (1, 9)], usize::MAX),
+            Some(7)
+        );
+    }
+
+    /// `default_lanes` on a table's tune file: the mode's entry, else the
+    /// batch's, else the untuned default (also for a file of the previous
+    /// `bench tune`).
+    #[test]
+    #[cfg_attr(miri, ignore = "files")]
+    fn default_lanes_use_the_tune_file() {
+        let dir = std::env::temp_dir().join(format!("egg-solver-tune-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let table = dir.join("h0").to_str().unwrap().to_string();
+        let untuned = super::untuned_lanes(0);
+        assert!(!super::is_tuned(&table));
+        assert_eq!(super::default_lanes(&table, 0)(8, TuneMode::Batch), untuned);
+        let best = [
+            (TuneMode::Batch, 1, 12),
+            (TuneMode::Batch, 8, 16),
+            (TuneMode::OneCube, 8, 20),
+        ];
+        let saved = super::save_tuned_lanes(&table, &best).unwrap();
+        assert_eq!(saved, format!("{table}.tune"));
+        assert!(super::is_tuned(&table));
+        let lanes = super::default_lanes(&table, 0);
+        assert_eq!(lanes(1, TuneMode::Batch), 12);
+        assert_eq!(lanes(6, TuneMode::Batch), 16);
+        assert_eq!(lanes(1, TuneMode::OneCube), 20);
+        // Only batch entries: for both modes.
+        super::save_tuned_lanes(&table, &best[..2]).unwrap();
+        assert_eq!(super::default_lanes(&table, 0)(8, TuneMode::OneCube), 16);
+        // A file of the previous `bench tune`.
+        std::fs::write(&saved, "1 48\n8 48\n").unwrap();
+        assert!(!super::is_tuned(&table));
+        assert_eq!(super::default_lanes(&table, 0)(8, TuneMode::Batch), untuned);
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
     #[test]
     fn previous_table_magic_is_accepted() {
         let trailer = super::Trailer {

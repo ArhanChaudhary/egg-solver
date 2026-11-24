@@ -1,0 +1,229 @@
+window2 h7 start 20:06:26 load 36.68 39.99 32.38
+== tune h7 20:06:26
+batch threads 1 lanes 8: 47.25 M nodes/s
+batch threads 1 lanes 12: 62.02 M nodes/s
+batch threads 1 lanes 16: 69.56 M nodes/s
+batch threads 1 lanes 20: 78.38 M nodes/s
+batch threads 1 lanes 24: 81.74 M nodes/s
+batch threads 1 lanes 32: 78.02 M nodes/s
+batch threads 1 lanes 40: 74.26 M nodes/s
+batch threads 1 lanes 48: 71.46 M nodes/s
+best for batch at 1 threads: 24 lanes (81.74 M nodes/s)
+batch threads 24 lanes 8: 1107.17 M nodes/s
+batch threads 24 lanes 12: 1446.82 M nodes/s
+batch threads 24 lanes 16: 1667.52 M nodes/s
+batch threads 24 lanes 20: 1824.66 M nodes/s
+batch threads 24 lanes 24: 1905.23 M nodes/s
+batch threads 24 lanes 32: 1872.10 M nodes/s
+batch threads 24 lanes 40: 1828.22 M nodes/s
+batch threads 24 lanes 48: 1771.69 M nodes/s
+best for batch at 24 threads: 24 lanes (1905.23 M nodes/s)
+batch threads 48 lanes 8: 2115.24 M nodes/s
+batch threads 48 lanes 12: 2725.27 M nodes/s
+batch threads 48 lanes 16: 3083.76 M nodes/s
+batch threads 48 lanes 20: 3283.94 M nodes/s
+batch threads 48 lanes 24: 3337.09 M nodes/s
+batch threads 48 lanes 32: 3231.87 M nodes/s
+batch threads 48 lanes 40: 3128.23 M nodes/s
+batch threads 48 lanes 48: 3023.21 M nodes/s
+best for batch at 48 threads: 24 lanes (3337.09 M nodes/s)
+one threads 1 lanes 8: 47.74 M nodes/s
+one threads 1 lanes 12: 62.90 M nodes/s
+one threads 1 lanes 16: 71.88 M nodes/s
+one threads 1 lanes 20: 79.44 M nodes/s
+one threads 1 lanes 24: 84.47 M nodes/s
+one threads 1 lanes 32: 84.93 M nodes/s
+one threads 1 lanes 40: 82.26 M nodes/s
+one threads 1 lanes 48: 79.38 M nodes/s
+best for one at 1 threads: 32 lanes (84.93 M nodes/s)
+one threads 24 lanes 8: 1111.66 M nodes/s
+one threads 24 lanes 12: 1445.47 M nodes/s
+one threads 24 lanes 16: 1660.77 M nodes/s
+one threads 24 lanes 20: 1805.97 M nodes/s
+one threads 24 lanes 24: 1871.24 M nodes/s
+one threads 24 lanes 32: 1837.52 M nodes/s
+one threads 24 lanes 40: 1787.62 M nodes/s
+one threads 24 lanes 48: 1741.21 M nodes/s
+best for one at 24 threads: 24 lanes (1871.24 M nodes/s)
+one threads 48 lanes 8: 2060.02 M nodes/s
+one threads 48 lanes 12: 2532.74 M nodes/s
+one threads 48 lanes 16: 2947.85 M nodes/s
+one threads 48 lanes 20: 3158.28 M nodes/s
+one threads 48 lanes 24: 3134.56 M nodes/s
+one threads 48 lanes 32: 3117.35 M nodes/s
+one threads 48 lanes 40: 3046.97 M nodes/s
+one threads 48 lanes 48: 2918.20 M nodes/s
+best for one at 48 threads: 20 lanes (3158.28 M nodes/s)
+saved to /data3/build/perf/tune-tables/h7.tune
+-- file:
+# egg-solver tune 2
+batch 1 24
+batch 24 24
+batch 48 24
+one 1 32
+one 24 24
+one 48 20
+== sweep h7 s19 20:09:39
+h7 s19 c1 l8 t24 8.036439 364291992
+h7 s19 c1 l12 t24 6.139108 364539293
+h7 s19 c1 l16 t24 5.266605 361615271
+h7 s19 c1 l20 t24 4.851237 360494853
+h7 s19 c1 l24 t24 4.654921 363206518
+h7 s19 c1 l32 t24 4.629248 359305371
+h7 s19 c1 l40 t24 4.742418 355843873
+h7 s19 c1 l48 t24 4.861966 355095809
+h7 s19 c1 l48 t24 4.893639 356390726
+h7 s19 c1 l40 t24 4.737120 355370394
+h7 s19 c1 l32 t24 4.672287 360865479
+h7 s19 c1 l24 t24 4.594017 362293172
+h7 s19 c1 l20 t24 4.836262 362483095
+h7 s19 c1 l16 t24 5.297282 359803781
+h7 s19 c1 l12 t24 6.065334 360247964
+h7 s19 c1 l8 t24 7.990716 362576008
+h7 s19 c0 l8 t24 7.602849 346102754
+h7 s19 c0 l12 t24 5.598386 333913563
+h7 s19 c0 l16 t24 5.003628 344890487
+h7 s19 c0 l20 t24 4.536619 344846113
+h7 s19 c0 l24 t24 4.344272 344828327
+h7 s19 c0 l32 t24 4.414594 343511808
+h7 s19 c0 l40 t24 4.452767 336308128
+h7 s19 c0 l48 t24 4.759978 347039864
+h7 s19 c0 l48 t24 4.647089 341453674
+h7 s19 c0 l40 t24 4.463988 337576039
+h7 s19 c0 l32 t24 4.499055 350417518
+h7 s19 c0 l24 t24 4.357951 347276510
+h7 s19 c0 l20 t24 4.450644 342628078
+h7 s19 c0 l16 t24 4.934662 341976308
+h7 s19 c0 l12 t24 5.793658 346612286
+h7 s19 c0 l8 t24 7.560392 343604645
+h7 s19 c1 l8 t48 4.068938 349483643
+h7 s19 c1 l12 t48 3.277242 359699945
+h7 s19 c1 l16 t48 2.847686 356573332
+h7 s19 c1 l20 t48 2.732211 364288317
+h7 s19 c1 l24 t48 2.657332 362152045
+h7 s19 c1 l32 t48 2.715856 360682747
+h7 s19 c1 l40 t48 2.653650 344050840
+h7 s19 c1 l48 t48 2.840617 355894238
+h7 s19 c1 l48 t48 2.869753 359124082
+h7 s19 c1 l40 t48 2.751440 353081123
+h7 s19 c1 l32 t48 2.642754 352821051
+h7 s19 c1 l24 t48 2.569612 355286797
+h7 s19 c1 l20 t48 2.685280 365982438
+h7 s19 c1 l16 t48 2.861122 359795211
+h7 s19 c1 l12 t48 3.202523 352696453
+h7 s19 c1 l8 t48 4.179784 358519586
+h7 s19 c0 l8 t48 4.100573 350674838
+h7 s19 c0 l12 t48 3.130774 349443896
+h7 s19 c0 l16 t48 2.781940 354850295
+h7 s19 c0 l20 t48 2.493362 341720688
+h7 s19 c0 l24 t48 2.508054 347906623
+h7 s19 c0 l32 t48 2.555129 347060552
+h7 s19 c0 l40 t48 2.536513 334196231
+h7 s19 c0 l48 t48 2.675494 342446048
+h7 s19 c0 l48 t48 2.607269 333333186
+h7 s19 c0 l40 t48 2.706650 348341958
+h7 s19 c0 l32 t48 2.551409 348092291
+h7 s19 c0 l24 t48 2.563682 352724514
+h7 s19 c0 l20 t48 2.621508 353193351
+h7 s19 c0 l16 t48 2.780124 354867588
+h7 s19 c0 l12 t48 3.039282 339485609
+h7 s19 c0 l8 t48 4.072043 351872018
+== ab 20:14:40
+benchshare t48 share1 dc153b3-native cubes 25 threads 48 lanes 24 time 2.554s share 1
+solve t48 c1 dc153b3-native 2.596515 353456431
+benchshare t48 share0 dc153b3-native cubes 25 threads 48 lanes 24 time 2.543s share 0
+solve t48 c0 dc153b3-native 2.466835 342664404
+benchshare t1 share1 dc153b3-native cubes 25 threads 1 lanes 24 time 2.517s share 1
+solve t1 c1 dc153b3-native 2.501637 8300261
+benchshare t48 share1 tune-fix-native cubes 25 threads 48 lanes 24 time 2.677s share 1
+solve t48 c1 tune-fix-native 2.630049 357018470
+benchshare t48 share0 tune-fix-native cubes 25 threads 48 lanes 24 time 2.519s share 0
+solve t48 c0 tune-fix-native 2.445483 340605271
+benchshare t1 share1 tune-fix-native cubes 25 threads 1 lanes 24 time 2.518s share 1
+solve t1 c1 tune-fix-native 2.488342 8300261
+benchshare t48 share1 tune-fix-native cubes 25 threads 48 lanes 24 time 2.597s share 1
+solve t48 c1 tune-fix-native 2.548539 349274539
+benchshare t48 share0 tune-fix-native cubes 25 threads 48 lanes 24 time 2.466s share 0
+solve t48 c0 tune-fix-native 2.347428 326212799
+benchshare t1 share1 tune-fix-native cubes 25 threads 1 lanes 24 time 2.498s share 1
+solve t1 c1 tune-fix-native 2.525310 8300261
+benchshare t48 share1 dc153b3-native cubes 25 threads 48 lanes 24 time 2.673s share 1
+solve t48 c1 dc153b3-native 2.633366 356920187
+benchshare t48 share0 dc153b3-native cubes 25 threads 48 lanes 24 time 2.575s share 0
+solve t48 c0 dc153b3-native 2.619096 347443947
+benchshare t1 share1 dc153b3-native cubes 25 threads 1 lanes 24 time 2.522s share 1
+solve t1 c1 dc153b3-native 2.509792 8300261
+benchshare t48 share1 dc153b3-native cubes 25 threads 48 lanes 24 time 2.624s share 1
+solve t48 c1 dc153b3-native 2.643705 360977022
+benchshare t48 share0 dc153b3-native cubes 25 threads 48 lanes 24 time 2.433s share 0
+solve t48 c0 dc153b3-native 2.556070 346722072
+benchshare t1 share1 dc153b3-native cubes 25 threads 1 lanes 24 time 2.499s share 1
+solve t1 c1 dc153b3-native 2.485095 8300261
+benchshare t48 share1 tune-fix-native cubes 25 threads 48 lanes 24 time 2.574s share 1
+solve t48 c1 tune-fix-native 2.562724 348865724
+benchshare t48 share0 tune-fix-native cubes 25 threads 48 lanes 24 time 2.500s share 0
+solve t48 c0 tune-fix-native 2.479103 347718352
+benchshare t1 share1 tune-fix-native cubes 25 threads 1 lanes 24 time 2.504s share 1
+solve t1 c1 tune-fix-native 2.495104 8300261
+benchshare t48 share1 tune-fix-native cubes 25 threads 48 lanes 24 time 2.570s share 1
+solve t48 c1 tune-fix-native 2.661436 359968220
+benchshare t48 share0 tune-fix-native cubes 25 threads 48 lanes 24 time 2.466s share 0
+solve t48 c0 tune-fix-native 2.488559 347709184
+benchshare t1 share1 tune-fix-native cubes 25 threads 1 lanes 24 time 2.477s share 1
+solve t1 c1 tune-fix-native 2.499487 8300261
+benchshare t48 share1 dc153b3-native cubes 25 threads 48 lanes 24 time 2.600s share 1
+solve t48 c1 dc153b3-native 2.668726 361409813
+benchshare t48 share0 dc153b3-native cubes 25 threads 48 lanes 24 time 2.516s share 0
+solve t48 c0 dc153b3-native 2.475127 346391466
+benchshare t1 share1 dc153b3-native cubes 25 threads 1 lanes 24 time 2.508s share 1
+solve t1 c1 dc153b3-native 2.505936 8300261
+benchshare t48 share1 dc153b3-native cubes 25 threads 48 lanes 24 time 2.595s share 1
+solve t48 c1 dc153b3-native 2.642312 358883553
+benchshare t48 share0 dc153b3-native cubes 25 threads 48 lanes 24 time 2.410s share 0
+solve t48 c0 dc153b3-native 2.470130 347204049
+benchshare t1 share1 dc153b3-native cubes 25 threads 1 lanes 24 time 2.464s share 1
+solve t1 c1 dc153b3-native 2.441334 8300261
+benchshare t48 share1 tune-fix-native cubes 25 threads 48 lanes 24 time 2.601s share 1
+solve t48 c1 tune-fix-native 2.680121 358838026
+benchshare t48 share0 tune-fix-native cubes 25 threads 48 lanes 24 time 2.537s share 0
+solve t48 c0 tune-fix-native 2.601615 351835555
+benchshare t1 share1 tune-fix-native cubes 25 threads 1 lanes 24 time 2.502s share 1
+solve t1 c1 tune-fix-native 2.509516 8300261
+benchshare t48 share1 tune-fix-native cubes 25 threads 48 lanes 24 time 2.668s share 1
+solve t48 c1 tune-fix-native 2.728882 368363511
+benchshare t48 share0 tune-fix-native cubes 25 threads 48 lanes 24 time 2.490s share 0
+solve t48 c0 tune-fix-native 2.583626 349814040
+benchshare t1 share1 tune-fix-native cubes 25 threads 1 lanes 24 time 2.516s share 1
+solve t1 c1 tune-fix-native 2.502956 8300261
+benchshare t48 share1 dc153b3-native cubes 25 threads 48 lanes 24 time 2.659s share 1
+solve t48 c1 dc153b3-native 2.542844 346597154
+benchshare t48 share0 dc153b3-native cubes 25 threads 48 lanes 24 time 2.508s share 0
+solve t48 c0 dc153b3-native 2.469549 344303144
+benchshare t1 share1 dc153b3-native cubes 25 threads 1 lanes 24 time 2.502s share 1
+solve t1 c1 dc153b3-native 2.500305 8300261
+benchshare t48 share1 dc153b3-native cubes 25 threads 48 lanes 24 time 2.614s share 1
+solve t48 c1 dc153b3-native 2.544283 350821698
+benchshare t48 share0 dc153b3-native cubes 25 threads 48 lanes 24 time 2.452s share 0
+solve t48 c0 dc153b3-native 2.396602 336197415
+benchshare t1 share1 dc153b3-native cubes 25 threads 1 lanes 24 time 2.502s share 1
+solve t1 c1 dc153b3-native 2.540105 8300261
+benchshare t48 share1 tune-fix-native cubes 25 threads 48 lanes 24 time 2.792s share 1
+solve t48 c1 tune-fix-native 2.505818 338647338
+benchshare t48 share0 tune-fix-native cubes 25 threads 48 lanes 24 time 2.608s share 0
+solve t48 c0 tune-fix-native 2.596695 358035714
+benchshare t1 share1 tune-fix-native cubes 25 threads 1 lanes 24 time 2.529s share 1
+solve t1 c1 tune-fix-native 2.508942 8300261
+benchshare t48 share1 tune-fix-native cubes 25 threads 48 lanes 24 time 2.647s share 1
+solve t48 c1 tune-fix-native 2.565758 346604831
+benchshare t48 share0 tune-fix-native cubes 25 threads 48 lanes 24 time 2.540s share 0
+solve t48 c0 tune-fix-native 2.491139 342196897
+benchshare t1 share1 tune-fix-native cubes 25 threads 1 lanes 24 time 2.505s share 1
+solve t1 c1 tune-fix-native 2.459390 8300261
+benchshare t48 share1 dc153b3-native cubes 25 threads 48 lanes 24 time 2.721s share 1
+solve t48 c1 dc153b3-native 2.701494 360608165
+benchshare t48 share0 dc153b3-native cubes 25 threads 48 lanes 24 time 2.507s share 0
+solve t48 c0 dc153b3-native 2.477959 346542166
+benchshare t1 share1 dc153b3-native cubes 25 threads 1 lanes 24 time 2.503s share 1
+solve t1 c1 dc153b3-native 2.495813 8300261
+done 20:19:43
+window2 h7 end 20:19:43

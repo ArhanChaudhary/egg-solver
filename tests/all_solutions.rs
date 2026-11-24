@@ -1040,6 +1040,150 @@ fn longer_symmetric_positions_match_brute_force() {
     eprintln!("{solutions} solutions up to 2 above optimal");
 }
 
+/// Cubes with 3 and 24 symmetries, which no position of few moves has
+/// (those above have 2, 4, 6, 8, 16 or 48), and `TWELVE_SYMMETRIES` with
+/// 12: their symmetries include a turn about a corner. They were built
+/// from twists, flips and cycles of pieces on the orbits of such a group.
+/// `(scramble, symmetries, optimal length, optimal solutions, solutions up
+/// to one move more)`.
+///
+/// Brute force does not reach these lengths. The numbers are those of a
+/// build from before the symmetric-start filter, which searched every job
+/// (commit 17be652, on an h8 table, 2026-11-23): the build with the filter
+/// listed the same solutions, one for one, for 39 such cubes, these among
+/// them.
+const SYMMETRIC_CUBES: [(&str, usize, usize, usize, usize); 6] = [
+    ("L F' D2 B D B' D2 F D' L'", 3, 10, 6, 30),
+    ("U B R' F2 R B' R' F2 R U'", 3, 10, 12, 36),
+    ("U' B R2 L2 F' L' F L2 R2 B' L U", 3, 12, 12, 174),
+    ("U F' L2 B2 R B' L B' L B' R' B F U", 3, 14, 24, 132),
+    (
+        "L2 U' B2 L R F2 U' R2 D2 R' F2 D U B2 R' U2",
+        24,
+        16,
+        2448,
+        8304,
+    ),
+    (
+        "D R2 L2 B2 F2 U' L2 B F2 L2 R2 D2 U2 F' R2 U2",
+        24,
+        16,
+        2448,
+        8304,
+    ),
+];
+
+/// A cube with 12 symmetries (six flipped edges around a corner-to-corner
+/// axis), of 17 moves with 24 optimal solutions. Every such cube found is
+/// of 17 or 18 moves, which an h0 table makes slow.
+const TWELVE_SYMMETRIES: (&str, usize, usize, usize) =
+    ("U' F' R D F' L' B2 F2 D R' F U R' B' L2 R2 U2", 12, 17, 24);
+
+/// A list of a `SYMMETRIC_CUBES` entry on its own terms: `count` solutions
+/// of `length` moves at most, the first of `optimal` moves; each solves
+/// the cube, is canonical and comes once, in order.
+fn check_symmetric_list(
+    what: &str,
+    cube: &CubieCube,
+    list: &Solutions,
+    (optimal, length, count): (usize, usize, usize),
+) {
+    let htm = Metric::Htm;
+    assert_eq!(list.optimal.map(usize::from), Some(optimal), "{what}");
+    assert_eq!(usize::from(list.max_length), length, "{what}");
+    assert_eq!(list.complete_length, list.max_length, "{what}");
+    assert!(!list.truncated && list.stopped.is_none(), "{what}");
+    assert_eq!(list.solutions.len(), count, "{what}: solutions");
+    for solution in &list.solutions {
+        let text = format_moves(solution);
+        assert_eq!(
+            cube.apply_moves(solution),
+            Some(CubieCube::SOLVED),
+            "{what}: {text} does not solve the cube"
+        );
+        assert!(is_canonical(solution), "{what}: {text} is not canonical");
+        assert!(
+            (optimal..=length).contains(&solution.len()),
+            "{what}: {text}"
+        );
+    }
+    let key = |s: &Vec<u8>| (s.len(), s.clone());
+    assert!(
+        list.solutions.windows(2).all(|w| key(&w[0]) < key(&w[1])),
+        "{what}: not in order, or a solution twice"
+    );
+    let counts: usize = list.counts(htm).iter().map(|&(_, count)| count).sum();
+    assert_eq!(counts, count, "{what}: counts");
+}
+
+/// The lists of cubes with 3 and 24 symmetries (`SYMMETRIC_CUBES`): the
+/// numbers of optimal solutions for all of them; for the cubes of at most
+/// 14 moves also the solutions up to one move above optimal, and the same
+/// lists without the filter, which take more nodes wherever the search
+/// runs on jobs. That is from 12 moves on the usual h0 (shorter iterations
+/// are one job, with nothing for the filter to drop), so the 10-move cubes
+/// are also listed on the h0 of base 2 (jobs from 6 moves). The share mode
+/// with one cube at a time on up to 16 threads, and for the short cubes
+/// the recursive solver.
+#[test]
+#[cfg_attr(miri, ignore = "too slow under Miri")]
+fn cubes_with_3_and_24_symmetries_have_the_known_lists() {
+    let htm = Metric::Htm;
+    let share = Engine::Share(egg_solver::thread_count().min(16), 8, 1);
+    for (scramble, symmetries, optimal, count, count_plus_1) in SYMMETRIC_CUBES {
+        let cube = cube_of(scramble);
+        assert_eq!(symmetry_kind(&cube).0, symmetries, "{scramble}");
+        let short = optimal <= 14;
+        let bases: &[u8] = if optimal <= 10 { &[8, 2] } else { &[8] };
+        for &base in bases {
+            let filtered = solver(base, htm);
+            let mut plain = solver(base, htm);
+            plain.sym_start = false;
+            let mut cases = vec![(Options::all_optimal(), (optimal, optimal, count))];
+            if short {
+                cases.push((Options::plus(1), (optimal, optimal + 1, count_plus_1)));
+            }
+            for (options, expected) in cases {
+                let name = format!("{scramble}, h0 base {base}, {options:?}");
+                let list = lists(share, &filtered, &[cube], &options).remove(0);
+                check_symmetric_list(&format!("{name}, {share:?}"), &cube, &list, expected);
+                if !short {
+                    continue;
+                }
+                let (recursive, stats) = filtered.all_solutions(&cube, &options);
+                assert_eq!(recursive, list, "{name}: the recursive solver's list");
+                // Without the filter: the same list, and more nodes where
+                // the last iteration runs on jobs.
+                let (plain_list, plain_stats) = plain.all_solutions(&cube, &options);
+                assert_eq!(plain_list, list, "{name}: without the filter");
+                let on_jobs = base == 2 || expected.1 >= 12;
+                assert!(
+                    stats.nodes <= plain_stats.nodes
+                        && (stats.nodes < plain_stats.nodes || !on_jobs),
+                    "{name}: {} nodes, {} without the filter",
+                    stats.nodes,
+                    plain_stats.nodes
+                );
+            }
+        }
+    }
+}
+
+/// The list of the cube with 12 symmetries (`TWELVE_SYMMETRIES`): its 24
+/// optimal solutions. Not run by default: on h0 it takes a minute and a
+/// half with 16 threads (`cargo test --test all_solutions -- --ignored`).
+#[test]
+#[ignore = "about 90 s on 16 threads"]
+fn cube_with_12_symmetries_has_the_known_list() {
+    let (scramble, symmetries, optimal, count) = TWELVE_SYMMETRIES;
+    let cube = cube_of(scramble);
+    assert_eq!(symmetry_kind(&cube).0, symmetries, "{scramble}");
+    let share = Engine::Share(egg_solver::thread_count().min(16), 8, 1);
+    let solver = solver(8, Metric::Htm);
+    let list = lists(share, &solver, &[cube], &Options::all_optimal()).remove(0);
+    check_symmetric_list(scramble, &cube, &list, (optimal, optimal, count));
+}
+
 /// Symmetric positions in the quarter-turn metric (those of at most 6
 /// quarter turns), up to 4 above optimal, on both tables.
 #[test]

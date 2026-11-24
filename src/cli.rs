@@ -7,7 +7,7 @@
 
 pub mod preflight;
 
-use crate::tables::file::{LoadMode, LoadOptions, ShmPages};
+use crate::tables::file::{LoadMode, LoadOptions, ShmPages, TuneMode};
 use crate::tables::shm::{self, Segment};
 use crate::tables::{h48_bytes, H48Table, LoadReport, TableError};
 use std::io::Write as _;
@@ -513,17 +513,19 @@ fn page_report(_: usize, _: usize) -> String {
     "page sizes unknown (only reported on Linux)".to_string()
 }
 
-/// Lanes per thread for `threads` threads on the table at `path` (of `k`):
-/// `asked`, else from its tune file (`bench tune`, see
-/// `tables::file::tune_path`), else the untuned
-/// default for `k` (`tables::file::default_lanes`). Logs where it came from.
+/// Lanes per thread for `threads` threads in `mode` on the table at `path`
+/// (of `k`): `asked`, else from its tune file (`bench tune`, see
+/// `tables::file::tune_path`), else the untuned default for `k`
+/// (`tables::file::default_lanes`). Logs where it came from.
 #[must_use]
-pub fn lanes(asked: Option<usize>, path: &str, k: u32, threads: usize) -> usize {
-    let lanes = asked.unwrap_or_else(|| crate::tables::file::default_lanes(path, k)(threads));
+pub fn lanes(asked: Option<usize>, path: &str, k: u32, threads: usize, mode: TuneMode) -> usize {
+    let lanes = asked.unwrap_or_else(|| crate::tables::file::default_lanes(path, k)(threads, mode));
     let source = if asked.is_some() {
         "as asked"
-    } else if std::path::Path::new(&crate::tables::file::tune_path(path)).exists() {
+    } else if crate::tables::file::is_tuned(path) {
         "from the table's .tune file"
+    } else if std::path::Path::new(&crate::tables::file::tune_path(path)).exists() {
+        "untuned default: the table's .tune file is of an earlier `bench tune`, run it again"
     } else {
         "untuned default"
     };
