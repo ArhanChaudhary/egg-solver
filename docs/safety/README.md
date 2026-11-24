@@ -14,6 +14,8 @@ There are three different questions to ask about a fast solver:
 
 The audited source fingerprint is `93478bc5c45ba267255574f8cb466f02f006f1c7bf558fb8f9d088ec4307a4c9`, integrated as `a247321` on November 7, 2026. The complete Miri catalogues executed 50 of 56 x86 tests and 48 of 54 portable tests, with six explicit exclusions per backend. Each backend also ran the shared-search tests under 16 scheduling seeds. Native/backend, focused strict-provenance, AddressSanitizer and ThreadSanitizer checks completed.
 
+Miri was run again on November 23, 2026 on the later code with the quarter-turn metric and the lists of all solutions (`660c14e`): 55 of 61 x86 tests and 53 of 59 portable tests passed, with the same six exclusions and 16 seeds per backend; the sanitizer runs were not repeated ([record](../evidence/validation/miri-20261123/README.md)).
+
 The [UB evidence summary](NO_UB.md) explains the fixed API, bounds, memory ownership and publication defects, the provenance-mode qualifications, and the OS/assembly/backend exclusions, and identifies the audited source. The [complete November 7 assessment record](NO_UB_20261107.md) retains test names, compiler versions, exclusions and earlier failed or incomplete snapshots as history.
 
 [Mordant](MORDANT.md), a third-party Rust lint tool, produced 14 distinct native and 70 WASI lint diagnostics, with zero compiler errors in the accepted November 7 runs. Those diagnostics were reviewed. A successful lint run is not a claim of zero warnings or a safety proof.

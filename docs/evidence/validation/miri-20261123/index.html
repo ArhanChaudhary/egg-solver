@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Miri rerun, November 23, 2026 — egg-solver</title><style>
+:root { color-scheme:light; --ink:#172c40; --muted:#506477; --line:#dce4eb; --accent:#075b86; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--ink); background:#f8fafb; font:16px/1.65 system-ui,-apple-system,sans-serif; }
+header { padding:1rem max(1rem,calc((100vw - 1400px)/2)); background:#132c40; color:white; }
+header strong { display:block; font-size:1.15rem; margin-bottom:.35rem; }
+header nav { display:flex; flex-wrap:wrap; gap:.4rem 1.1rem; }
+header a { color:#d9f0ff; }
+header a[aria-current] { color:white; text-decoration-thickness:3px; }
+.layout { max-width:1400px; margin:1.5rem auto; padding:0 1rem; display:grid; grid-template-columns:15rem minmax(0,1fr); gap:1.5rem; align-items:start; }
+.site-nav { position:sticky; top:1rem; max-height:calc(100vh - 2rem); overflow:auto; font-size:.9rem; }
+.site-menu { margin:0; padding:.4rem .8rem .8rem; background:white; }
+.site-menu summary { padding:.3rem 0; }
+.nav-group { margin:.9rem 0 .25rem; font-size:.75rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+.site-nav ul { list-style:none; margin:0; padding:0; }
+.site-nav li { margin:0; }
+.site-nav li a { display:block; padding:.2rem .45rem; border-radius:4px; text-decoration:none; line-height:1.35; }
+.site-nav li a:hover { background:#eef3f6; }
+.site-nav a[aria-current] { background:#e2edf5; font-weight:650; color:var(--ink); }
+@media(min-width:901px) { .site-menu > summary { display:none; } }
+@media(max-width:900px) { .layout { display:block; margin:.75rem auto; } .site-nav { position:static; max-height:none; margin-bottom:.75rem; } }
+main { margin:0; padding:1.5rem 2rem; background:white; border:1px solid var(--line); border-radius:8px; min-width:0; overflow-wrap:anywhere; }
+h1 { margin-top:0; font-size:2rem; line-height:1.25; }
+h2 { margin-top:2rem; border-bottom:1px solid var(--line); padding-bottom:.3rem; }
+h3 { margin-top:1.5rem; }
+a { color:var(--accent); overflow-wrap:anywhere; }
+p,li { max-width:90ch; }
+code { background:#eff3f6; border-radius:3px; padding:.1em .25em; overflow-wrap:anywhere; font-size:.9em; }
+pre { max-width:100%; padding:1rem; background:#eef3f6; overflow:auto; line-height:1.45; }
+pre code { background:none; padding:0; overflow-wrap:normal; }
+.table-wrap { max-width:100%; overflow:auto; margin:1rem 0 1.5rem; border:1px solid var(--line); }
+.table-wrap.long-table { max-height:70vh; }
+table { width:100%; border-collapse:collapse; font-size:.9rem; font-variant-numeric:tabular-nums; }
+th,td { padding:.55rem .65rem; border:1px solid var(--line); vertical-align:top; overflow-wrap:normal; }
+th { background:#eaf1f6; text-align:left; position:sticky; top:0; z-index:1; }
+tr:nth-child(even) { background:#f8fafb; }
+caption,.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+details { border:1px solid var(--line); padding:.6rem 1rem; border-radius:5px; margin:1rem 0; }
+summary { cursor:pointer; font-weight:600; }
+.table-tools { display:flex; align-items:center; flex-wrap:wrap; gap:.5rem; padding:.6rem; background:#f4f7f9; }
+.table-tools input { font:inherit; border:1px solid #afc0ce; border-radius:4px; padding:.3rem .5rem; width:min(100%,22rem); min-width:0; }
+.note,.source-link,footer { color:var(--muted); font-size:.85rem; }
+.source-link { margin-top:2rem; }
+.archive-note { padding:.7rem 1rem; border-left:4px solid #b18524; background:#fff9e9; }
+footer { max-width:1400px; margin:1rem auto 2rem; padding:0 1rem; }
+blockquote { border-left:3px solid #aac5d8; padding-left:1rem; margin-left:0; color:#40576b; }
+svg { max-width:100%; height:auto; }
+:target { scroll-margin-top:1rem; }
+.skip-link { position:absolute; left:-10000px; }
+.skip-link:focus { left:1rem; top:1rem; z-index:10; background:white; padding:.6rem; }
+@media(max-width:700px) { .layout { padding:0 .5rem; } main { padding:1rem; border-radius:0; } h1 { font-size:1.65rem; } th,td { padding:.4rem; } header { padding:1rem; } }
+</style></head>
+<body>
+<a class="skip-link" href="#docs-content">Skip to content</a>
+<header><strong>egg-solver</strong><nav aria-label="Documentation"><a href="../../../index.html">Home</a>
+<a href="../../../guide/OVERVIEW.html">Learn</a>
+<a href="../../../comparisons/index.html">Benchmarks</a>
+<a href="../../../performance/index.html">Performance</a>
+<a href="../../../safety/index.html">Safety</a>
+<a href="../../../history/DELETED_EXPERIMENTS.html">Experiments</a>
+<a href="../../../BENCHMARK_CATALOG.html">Catalog</a>
+<a href="https://egg-solver.arhan.sh/">Solver demo ↗</a></nav></header>
+<div class="layout"><nav class="site-nav" aria-label="All documentation pages"><details class="site-menu" open><summary>All pages</summary><p class="nav-group">Start</p><ul><li><a href="../../../index.html">Overview</a></li><li><a href="../../../guide/QUICKSTART.html">Quick start</a></li><li><a href="../../../guide/OVERVIEW.html">Tables and memory</a></li><li><a href="../../../guide/HOW_IT_WORKS.html">How the search works</a></li><li><a href="../../../guide/GLOSSARY.html">Glossary</a></li></ul><p class="nav-group">Reference</p><ul><li><a href="../../../reference/USER_GUIDE.html">User guide</a></li><li><a href="../../../guide/DEVELOPMENT.html">Development checks</a></li><li><a href="../../../guide/PUBLISHING.html">Publishing the site</a></li><li><a href="../../../reference/inventories/index.html">Technique inventories</a></li></ul><p class="nav-group">Benchmarks</p><ul><li><a href="../../../comparisons/index.html">Solver benchmarks</a></li><li><a href="../../../comparisons/METHODS.html">Reading the tables</a></li><li><a href="../../../comparisons/NISSY_THROUGHPUT.html">nissy throughput</a></li><li><a href="../../../comparisons/NXOPT32.html">nxopt, 62 GB table</a></li><li><a href="../../../comparisons/CUBEOPT_AUDIT.html">cubeopt audit</a></li><li><a href="../../../comparisons/TABLE_ANALYSIS.html">h4 table analysis</a></li><li><a href="../../../comparisons/RESULTS.html">Multi-solver matrix</a></li><li><a href="../../../comparisons/COMPETITOR_FINDINGS.html">Competitor findings</a></li></ul><p class="nav-group">Performance</p><ul><li><a href="../../../performance/index.html">Performance studies</a></li><li><a href="../../../performance/PARALLELISM.html">Parallelism</a></li><li><a href="../../../performance/HARDWARE_COUNTERS.html">Hardware counters</a></li><li><a href="../../../performance/OPTIMIZATION_REVIEW.html">Optimization review</a></li></ul><p class="nav-group">Safety</p><ul><li><a href="../../../safety/index.html">Correctness and safety</a></li><li><a href="../../../safety/NO_UB.html">Undefined behavior</a></li><li><a href="../../../safety/MORDANT.html">Mordant audit</a></li></ul><p class="nav-group">Evidence and history</p><ul><li><a href="../../../BENCHMARK_CATALOG.html">Benchmark catalog</a></li><li><a href="../../../reproduce/index.html">Reproduce results</a></li><li><a href="../../../PROVENANCE.html">Sources and IDs</a></li><li><a href="../../../history/DELETED_EXPERIMENTS.html">Deleted experiments</a></li></ul></details></nav>
+<main id="docs-content"><h1 id="miri-rerun-november-23-2026">Miri rerun, November 23, 2026</h1>
+<p class="archive-note">Recorded evidence. Commands, paths and status messages describe the measurement environment and date. <a href="../../../index.html">Documentation home</a>.</p>
+<p><a href="../../../safety/index.html">Safety overview</a> · <a href="../../../safety/NO_UB.html">Undefined-behavior evidence</a></p>
+<p>The November 7 Miri records describe the code of that day. The quarter-turn metric (November 16) and the lists of all solutions (November 20 to 23) changed the search code after it. This folder records the Miri runs made on that later code. They are finite runs of unit tests in an interpreter: they are not a proof that every execution is free of undefined behavior.</p>
+<details class="contents"><summary>On this page</summary><ul><li><a href="#what-ran">What ran</a></li><li><a href="#what-the-later-commits-changed">What the later commits changed</a></li><li><a href="#explicitly-ignored-tests">Explicitly ignored tests</a></li><li><a href="#not-covered-by-these-runs">Not covered by these runs</a></li><li><a href="#files">Files</a></li></ul></details>
+<h2 id="what-ran">What ran</h2>
+<p><code>scripts/miri.sh</code> runs <code>cargo miri test --lib --bins</code>: the unit tests of the library and the binaries, with the shared-search tests (<code>lanes::share::tests::share_*</code>) under 16 scheduler seeds. Toolchain: miri 0.1.0 (1c3a650696 2026-11-02), rustc 1.101.0-nightly (1c3a65069 2026-11-02). Flags: <code>-Zmiri-symbolic-alignment-check -Zmiri-num-cpus=4</code>, default provenance (the synchronization dependency uses exposed provenance, as on November 7).</p>
+<div class="table-wrap" role="region" aria-label="What ran" tabindex="0"><table id="docs-table-1"><caption>What ran</caption>
+<thead>
+<tr><th>Run</th><th>Source</th><th>Result</th></tr>
+</thead>
+<tbody>
+<tr><td>Full catalogue, x86 backend (<code>-C target-cpu=x86-64-v3</code>)</td><td><code>660c14e</code></td><td>55 of 61 catalogued tests passed, 6 explicitly ignored; 16 seeds of 5 shared-search tests passed</td></tr>
+<tr><td>Full catalogue, portable backend (<code>-C target-cpu=x86-64</code>)</td><td><code>660c14e</code></td><td>53 of 59 catalogued tests passed, 6 explicitly ignored; 16 seeds of 5 shared-search tests passed</td></tr>
+<tr><td>Tests of lists that end early (time limit, cancel), both backends</td><td><code>0231f19</code></td><td>3 tests under 16 seeds passed on each backend</td></tr>
+<tr><td>Input parsing (<code>cubie::parse_cube</code>, facelets), both backends</td><td><code>9d567df</code></td><td>2 tests passed on each backend</td></tr>
+</tbody>
+</table></div>
+<p>The source fingerprint of <code>660c14e</code> is <code>52c7c3bc374b541cada2e5bc9aa145653bcaaead95d01abbb3e1d46e2d10a9f2</code> (sha256 over the sorted tracked .rs files, Cargo.toml files, Cargo.lock, .cargo/config.toml, scripts/miri.sh and scripts/check.sh (name, NUL, sha256 of the content), read from the git commit).</p>
+<h2 id="what-the-later-commits-changed">What the later commits changed</h2>
+<ul>
+<li><code>0231f19</code> adds unit tests only (inside <code>#[cfg(test)]</code>); the library code is that of <code>660c14e</code>. Its three tests exist because the catalogue of <code>660c14e</code> had no unit test that stopped a list: those tests were integration tests, which Miri does not run.</li>
+<li><code>9d567df</code> changes how input lines are read (<code>cubie::parse_cube</code>, <code>cli::input_cube</code> and their callers). The full catalogues were not rerun on it; its new unit test was.</li>
+</ul>
+<h2 id="explicitly-ignored-tests">Explicitly ignored tests</h2>
+<p>The same six on both backends, for the reasons in the source:</p>
+<div class="table-wrap" role="region" aria-label="Explicitly ignored tests" tabindex="0"><table id="docs-table-2"><caption>Explicitly ignored tests</caption>
+<thead>
+<tr><th>Test</th><th>Reason</th></tr>
+</thead>
+<tbody>
+<tr><td><code>solver::tests::hot_index_matches_reference_index</code></td><td>Cocsep::generate is too slow under Miri</td></tr>
+<tr><td><code>tables::file::tests::trailer_write_keeps_data</code></td><td>files</td></tr>
+<tr><td><code>tables::tests::cocsep_classes_and_distribution</code></td><td>Cocsep::generate is too slow under Miri</td></tr>
+<tr><td><code>tables::tests::opened_table_file_is_read_only</code></td><td>files</td></tr>
+<tr><td><code>tables::tests::table_from_file_memory_is_checked</code></td><td>a 29 MiB checksum is too slow under Miri</td></tr>
+<tr><td><code>tables::tests::table_meta_and_size_are_checked</code></td><td>files</td></tr>
+</tbody>
+</table></div>
+<h2 id="not-covered-by-these-runs">Not covered by these runs</h2>
+<ul>
+<li>Miri runs unit tests only: integration tests and doctests were not interpreted.</li>
+<li>Native inline assembly, native AVX-512, file mappings, System V shared memory, and the NEON and WebAssembly backends are outside the interpreter, as before.</li>
+<li>AddressSanitizer, ThreadSanitizer and the focused strict-provenance Miri runs of November 7 were not repeated on the later code.</li>
+<li>Sixteen scheduler seeds are repeated schedules, not all interleavings.</li>
+</ul>
+<h2 id="files">Files</h2>
+<p><a href="validation.json">validation.json</a> has the counts, flags, source fingerprints and the SHA-256 of every log. The logs of the two catalogues are in <code>x86/</code> and <code>portable/</code> (<code>run.out</code> ends with the script's verdict; <code>catalogue.log</code> lists the tests; <code>expected.txt</code> and <code>accounted.txt</code> are the coverage comparison). The targeted runs are <code>stop-tests-*.log</code> and <code>parse-cube-*.log</code>. Paths in the logs are those of the machine that ran them.</p>
+
+<p class="source-link"><a href="README.md">Markdown source</a></p></main></div>
+<footer><a href="../../../PROVENANCE.html">Sources and evidence scope</a></footer>
+<script>
+for (const wrapper of document.querySelectorAll('.table-wrap')) {
+  const table=wrapper.querySelector('table');
+  const rows=[...table.tBodies].flatMap(body=>[...body.rows]);
+  if(rows.length>50) wrapper.classList.add('long-table');
+  if(rows.length<=12) continue;
+  const tools=document.createElement('div'); tools.className='table-tools';
+  const label=document.createElement('label'); label.textContent='Filter this table';
+  const input=document.createElement('input'); input.type='search'; input.id=table.id+'-filter';
+  label.htmlFor=input.id; input.setAttribute('aria-controls',table.id);
+  const count=document.createElement('span'); count.className='note'; count.setAttribute('aria-live','polite');
+  count.textContent=rows.length+' rows';
+  input.addEventListener('input',()=>{
+    const query=input.value.trim().toLowerCase(); let shown=0;
+    for(const row of rows){row.hidden=!!query&&!row.textContent.toLowerCase().includes(query);if(!row.hidden)shown++;}
+    count.textContent=shown+' of '+rows.length+' rows';
+  });
+  tools.append(label,input,count); wrapper.before(tools);
+}
+function revealTarget(){
+  let id;try{id=decodeURIComponent(location.hash.slice(1));}catch{return;}
+  const target=document.getElementById(id);if(!target)return;
+  for(let parent=target.parentElement;parent;parent=parent.parentElement)if(parent.tagName==='DETAILS')parent.open=true;
+}
+revealTarget(); window.addEventListener('hashchange',revealTarget);
+const menu=document.querySelector('.site-menu');
+if(menu){const wide=matchMedia('(min-width:901px)');const sync=()=>{menu.open=wide.matches;};sync();wide.addEventListener('change',sync);
+const current=menu.querySelector('[aria-current]');if(current&&wide.matches)current.scrollIntoView({block:'nearest'});}
+</script>
+</body></html>

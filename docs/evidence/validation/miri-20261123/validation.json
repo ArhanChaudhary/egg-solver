@@ -1,0 +1,197 @@
+{
+ "recorded": "2026-11-23",
+ "tool": "cargo miri test --lib --bins (scripts/miri.sh), unit tests of the library and binaries only",
+ "toolchain": {
+  "miri": "miri 0.1.0 (1c3a650696 2026-11-02)",
+  "rustc": "rustc 1.101.0-nightly (1c3a65069 2026-11-02)"
+ },
+ "fingerprint_rule": "sha256 over the sorted tracked .rs files, Cargo.toml files, Cargo.lock, .cargo/config.toml, scripts/miri.sh and scripts/check.sh (name, NUL, sha256 of the content), read from the git commit",
+ "catalogues": {
+  "x86": {
+   "status": "PASS",
+   "source": {
+    "commit": "660c14e58056eff6096898831f42f04c5a80bdd8",
+    "sha256": "52c7c3bc374b541cada2e5bc9aa145653bcaaead95d01abbb3e1d46e2d10a9f2",
+    "files": 105
+   },
+   "rustflags": "-C target-cpu=x86-64-v3",
+   "miriflags": "-Zmiri-symbolic-alignment-check -Zmiri-num-cpus=4 (default provenance)",
+   "catalogued_tests": 61,
+   "executed_and_passed": 55,
+   "explicitly_ignored": {
+    "solver::tests::hot_index_matches_reference_index": "Cocsep::generate is too slow under Miri",
+    "tables::file::tests::trailer_write_keeps_data": "files",
+    "tables::tests::cocsep_classes_and_distribution": "Cocsep::generate is too slow under Miri",
+    "tables::tests::opened_table_file_is_read_only": "files",
+    "tables::tests::table_from_file_memory_is_checked": "a 29 MiB checksum is too slow under Miri",
+    "tables::tests::table_meta_and_size_are_checked": "files"
+   },
+   "shared_search_seeds": {
+    "seeds": "0..16 (exclusive upper bound)",
+    "filter": "lanes::share::tests::share_",
+    "runs": 16,
+    "tests_per_run": [
+     5
+    ],
+    "failed": 0
+   },
+   "completed_at": "2026-11-23 02:53 UTC",
+   "final_line": "MIRI CHECK OK; all catalogued unit tests accounted for",
+   "logs": {
+    "1.log": "402da47125d7c729b099253f5d3f50fdb4f80d5d312ac049212206d5e4d45531",
+    "2.log": "ad205ed280e938cb2dce6c96781cfb7405b321f3bb7399f1e42b208041339dda",
+    "3-1.log": "7516f8e8aa1cf166925716aa1ebd100371f4e24f1727a2d5033848662a19841e",
+    "3-2.log": "b44226c6336af690729db5cca827cf787b118127c773ee28ca409283f55f1692",
+    "3-3.log": "da8b78413b84555b26744058f8914fcac4040c8e885d8f1c7d7aa22cf02f4934",
+    "3-4.log": "1f0b8807e337130cef347b1233b9b6f8730350ca20e299ebb88eef11d11389cc",
+    "3.log": "f90f439c4dc2722ab215cb90aaaf399508d29175e07b538601e1603534256410",
+    "4.log": "693e5ef3bba901ad26be230cf7228f6eef1b6bcb8982559b2d1ef3aaf523db48",
+    "5.log": "d59d96d258a00f1c2180d2708a51b38414b8b834dfe70fcc1f66c3bab6d049b9",
+    "6.log": "c4a0fb4e9746fae90047f6a8ac9c1f7bb4d8b9b5cfc006e520455b8b3ae0d45e",
+    "7.log": "166563e1b7872954a12829de95b8959db2058b07ec46b0d9da5b4aee7be25a89",
+    "8-1.log": "ad2f4cc1d24b3b89b05c1f53c5199b2a722090a68e619820d7178adc2e58d5d1",
+    "8-2.log": "f15a9175601bd60360ef6cee5168961c14e6e802ae64e8a21036034d734591bd",
+    "8-3.log": "f80f6fdecfe82f7724d4a5e23e0f7f59b328dfa73762cad8ff9e705781905167",
+    "8-4.log": "544e5ce814ae1e1e759f87d51a3f7ec7a9958b0d2710e7b774345d47aad7bb43",
+    "8.log": "3d748a6bb1b735ad1bc8d1734e815cce548efc6011b6ddfa2c3b98511da7351f",
+    "9.log": "a37f07f231d270ffd7192bdeb1943d613b14d6717562b9fc9dbf26d44d7e8a16",
+    "accounted.txt": "67e141ccc4db4a2b696814b2d145cd593766c3da7c7f7576a993a01205f5d13e",
+    "build.log": "f7ac0ad6a22107052b35af3c8b1187852ec8d71c704b995e5bbc964cf79c5114",
+    "catalogue.log": "81dad4d35957bece27f32a0981ff9c5c7bc988cac0767116910b293ee0e7cea7",
+    "expected.txt": "67e141ccc4db4a2b696814b2d145cd593766c3da7c7f7576a993a01205f5d13e",
+    "missing.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "run.out": "25bb4663c79b1f1da6d20a1c9a3d7ef9c2549287c3348f8b64c24e3d40ac795b"
+   }
+  },
+  "portable": {
+   "status": "PASS",
+   "source": {
+    "commit": "660c14e58056eff6096898831f42f04c5a80bdd8",
+    "sha256": "52c7c3bc374b541cada2e5bc9aa145653bcaaead95d01abbb3e1d46e2d10a9f2",
+    "files": 105
+   },
+   "rustflags": "-C target-cpu=x86-64",
+   "miriflags": "-Zmiri-symbolic-alignment-check -Zmiri-num-cpus=4 (default provenance)",
+   "catalogued_tests": 59,
+   "executed_and_passed": 53,
+   "explicitly_ignored": {
+    "solver::tests::hot_index_matches_reference_index": "Cocsep::generate is too slow under Miri",
+    "tables::file::tests::trailer_write_keeps_data": "files",
+    "tables::tests::cocsep_classes_and_distribution": "Cocsep::generate is too slow under Miri",
+    "tables::tests::opened_table_file_is_read_only": "files",
+    "tables::tests::table_from_file_memory_is_checked": "a 29 MiB checksum is too slow under Miri",
+    "tables::tests::table_meta_and_size_are_checked": "files"
+   },
+   "shared_search_seeds": {
+    "seeds": "0..16 (exclusive upper bound)",
+    "filter": "lanes::share::tests::share_",
+    "runs": 16,
+    "tests_per_run": [
+     5
+    ],
+    "failed": 0
+   },
+   "completed_at": "2026-11-23 09:39 UTC",
+   "final_line": "MIRI CHECK OK; all catalogued unit tests accounted for",
+   "logs": {
+    "1.log": "a00343410d804c6c6fad14acde00033d13de56272d1084922b90d511de6daba4",
+    "2.log": "96dac3be86bfa94f278adff37a78738195bf7c5ec9de5c175ba49fa4d2bdd124",
+    "3-1.log": "30cda43184b1fcc57737481757cdf65977b8d00abcf0776bc204a9723c9430af",
+    "3-2.log": "1326c6c73c1823a62fa240561b7633d8c9242e2b494a0dc29527a9df90e4b826",
+    "3-3.log": "026b10429285c528dfdada19e448659aac9876594f8aefc54e2d2f9184150293",
+    "3-4.log": "55641d0a896821f100b81ac2b26c802fc7c17a8afebd5503592982e819a5df98",
+    "3.log": "b12cb8868028042e98759b5ea5b772057f53b6834d38cbd15fac110bc6d02056",
+    "4.log": "0724cd0bae4f870864b7e4580ad7465a0da332cd11a91a00f1c3b584f3a6b74c",
+    "5.log": "f706477d06dedce46cf309f956e065b8e3fa801197847ec8cb0bfa7907dd860f",
+    "6.log": "042ed8d7e6346b81e2d17edda52192000b9d0ca8fc6144654ef8de1345240cc6",
+    "7.log": "31c5fc8f70aca81669dbdedcb7c3e4583076a868cad2ce11314fbb9a23ecfa19",
+    "8-1.log": "35ffa1c34e4639e9bd3ef9b1a6fbe06b7585f0a6eff54d8b27c84e3cd46c8be2",
+    "8-2.log": "ab251d2d8cfc2c459c561b4f64dc6554aef9cb081d14210fa2998714aeddd13e",
+    "8-3.log": "f4761164055a05316b8576d7192307bf74358991dbcd7cd49eeb53869bcc3ba2",
+    "8-4.log": "9bb414f4ea3eac6274c4a2f149038f3502fbf549a8c05624e3f1b072490205b9",
+    "8.log": "feed9bdeaa8db618749fbb7b20925efc8ac573a229af8c24bec60344845a4e95",
+    "9.log": "74a0cf2f4d328a0cffb073f395b9bca78b1fe68c8890c5b4eb29fdb9ef745a02",
+    "accounted.txt": "c868c995b0ce942a062abe0607d5711e4b505905f761f74cd7725dd68d0cdadb",
+    "build.log": "51a5abaa490facb3fe4798dc4ba0f4dbddb63692e49271cf64c1bbd79fec5df4",
+    "catalogue.log": "a6cb5132bf48f873c54f51c0e9a443174f7f9aac5f053ae694242a632bde76d7",
+    "expected.txt": "c868c995b0ce942a062abe0607d5711e4b505905f761f74cd7725dd68d0cdadb",
+    "missing.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "run.out": "b971a0266a3c83d79fb53adbb249c5c55e92857373ae84fa7cfae0a2ee10aa5c"
+   }
+  }
+ },
+ "targeted": {
+  "stop_tests": {
+   "what": "lanes::share::tests::share_lists_stop_at_the_time_limit, share_lists_stop_at_cancel and solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel under -Zmiri-many-seeds=0..16",
+   "source": {
+    "commit": "0231f197d618a4e9fc15f416b1a0c128e3d97005",
+    "sha256": "62cba2490c36b75820f11c7271c5c62c4c9f2589a29cc6f7ca6a7529e90690bf",
+    "files": 105
+   },
+   "backends": {
+    "x86": {
+     "status": "PASS",
+     "runs": 16,
+     "tests_per_run": [
+      3
+     ],
+     "log": "stop-tests-x86.log",
+     "sha256": "589c6359bb1fcd90ca95e7cdb47aa169ebe27c2682e324313225c8c46bc82508"
+    },
+    "portable": {
+     "status": "PASS",
+     "runs": 16,
+     "tests_per_run": [
+      3
+     ],
+     "log": "stop-tests-portable.log",
+     "sha256": "1a7d9d0bdd289353baeda3e21048340cd6076517839f5b04e71179657f26aba4"
+    }
+   }
+  },
+  "parse_cube": {
+   "what": "cubie::tests::parse_cube_reads_scrambles_and_stickers and cubie::tests::facelets",
+   "source": {
+    "commit": "9d567df70ce24d7b1ee9d03f40ee40c09b226345",
+    "sha256": "516ae510334a4efb7bbff6262965918e41a26e04b7081b649c64b14219aefca1",
+    "files": 105
+   },
+   "backends": {
+    "x86": {
+     "status": "PASS",
+     "runs": 1,
+     "tests_per_run": [
+      2
+     ],
+     "log": "parse-cube-x86.log",
+     "sha256": "7afc838f67e4a84b44462b702caecdfda07ae770eee18a026171c150f3a590b7"
+    },
+    "portable": {
+     "status": "PASS",
+     "runs": 1,
+     "tests_per_run": [
+      2
+     ],
+     "log": "parse-cube-portable.log",
+     "sha256": "cb5548dc72efbdef9cc3c57d766dcdd2ff815bf5e2fd23fe7f409b24d8188543"
+    }
+   }
+  }
+ },
+ "not_rerun": [
+  "AddressSanitizer",
+  "ThreadSanitizer",
+  "focused strict-provenance Miri",
+  "integration tests and doctests under Miri (Miri runs unit tests only)"
+ ],
+ "not_interpreted": [
+  "native inline assembly",
+  "native AVX-512",
+  "Linux System V shared memory and file mappings",
+  "NEON and WebAssembly backends"
+ ],
+ "later_commits": {
+  "0231f19": "unit tests only (inside #[cfg(test)] of src/lanes/share.rs and src/solver.rs); library code as 660c14e",
+  "9d567df": "input parsing only (cubie::parse_cube, cli::input_cube and their callers in solve, bench and the wasm crate); no full catalogue was rerun on it"
+ }
+}

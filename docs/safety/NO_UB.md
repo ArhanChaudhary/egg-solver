@@ -2,7 +2,7 @@
 
 [Safety overview](README.md) · [Complete assessment record (November 7, 2026)](NO_UB_20261107.md) · [Validation records](../evidence/validation/ub-audit/REPORT.md)
 
-**Assessment recorded November 7, 2026.** The identified defects below were fixed and the stated checks passed on the audited source. **This is not a proof that every possible execution is free of undefined behavior.** Checksums, solution replay and finite Miri runs answer different questions.
+**Assessment recorded November 7, 2026; Miri rerun on later code on November 23, 2026 ([below](#miri-rerun-on-later-code-november-23-2026)).** The identified defects below were fixed and the stated checks passed on the audited source. **This is not a proof that every possible execution is free of undefined behavior.** Checksums, solution replay and finite Miri runs answer different questions.
 
 ## Source covered by the audit
 
@@ -40,6 +40,20 @@ Review also ended staged-sort mutable argument borrows before publication. Mappi
 | Native/backend checks | Passed with documented harness exclusions | Native, ARM/QEMU, WASI/wasmtime and Bun checks |
 
 [Native validation](../evidence/validation/ub-audit/native-validation.json), [focused Miri](../evidence/validation/ub-audit/focused-miri-validation.json), [ASan](../evidence/validation/ub-audit/asan-validation.json) and [TSan](../evidence/validation/ub-audit/tsan-validation.json) bind the results to source and tool settings. The [complete November 7 assessment record](NO_UB_20261107.md) retains test names, compiler versions, all six exclusions, earlier failed attempts and the detailed invariant review.
+
+## Miri rerun on later code (November 23, 2026)
+
+The quarter-turn metric and the lists of all solutions changed the search code after the audit above. Miri was run again on that code; the other checks of the table above (AddressSanitizer, ThreadSanitizer, focused strict-provenance Miri) were not repeated.
+
+| Check | Recorded result | Source |
+|---|---|---|
+| Full x86 Miri catalogue | 55 of 61 named tests passed; 6 explicitly excluded | `660c14e` |
+| Full portable Miri catalogue | 53 of 59 named tests passed; 6 explicitly excluded | `660c14e` |
+| Shared-search scheduling | 16 seeds per backend passed, 5 tests each | `660c14e` |
+| Lists that end early (time limit, cancel) | 3 unit tests under 16 seeds passed on both backends | `0231f19` (adds tests only) |
+| Input parsing | 2 unit tests passed on both backends | `9d567df` |
+
+The source fingerprint of `660c14e` is `52c7c3bc374b541cada2e5bc9aa145653bcaaead95d01abbb3e1d46e2d10a9f2`. `9d567df` changed only how input lines are read, and the full catalogues were not rerun on it. The same qualifications apply as on November 7: default provenance, unit tests only, repeated schedules and not all interleavings, and nothing outside the interpreter. [The record](../evidence/validation/miri-20261123/README.md) has the counts, flags, exclusions and logs.
 
 ## Limits and caller obligations
 

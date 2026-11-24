@@ -1,0 +1,267 @@
+    Blocking waiting for file lock on package cache
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.27
+   Compiling utf8parse v0.2.2
+   Compiling libc v0.2.191
+   Compiling thiserror v2.0.21
+   Compiling anstyle-query v1.1.5
+   Compiling colorchoice v1.0.5
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling anstyle v1.0.14
+   Compiling serde_core v1.0.229
+   Compiling zmij v1.0.23
+   Compiling strsim v0.11.1
+   Compiling heck v0.5.0
+   Compiling portable-atomic v1.15.0
+   Compiling parking_lot_core v0.9.12 (/data3/egg-solver-allsol/vendor/parking_lot_core)
+   Compiling clap_lex v1.1.1
+   Compiling serde v1.0.229
+   Compiling unicode-width v0.2.3
+   Compiling cfg-if v1.0.5
+   Compiling scopeguard v1.2.0
+   Compiling crossbeam-utils v0.8.23
+   Compiling log v0.4.35
+   Compiling anyhow v1.0.104
+   Compiling serde_json v1.0.154
+   Compiling smallvec v1.16.4
+   Compiling unit-prefix v0.5.2
+   Compiling itoa v1.0.18
+   Compiling allocator-api2 v0.2.21
+   Compiling foldhash v0.2.0
+   Compiling equivalent v1.0.3
+   Compiling memchr v2.8.3
+   Compiling anstyle-parse v1.0.0
+   Compiling env_filter v2.0.0
+   Compiling lock_api v0.4.14
+   Compiling anstream v1.0.0
+   Compiling hashbrown v0.16.1
+   Compiling syn v3.0.9
+   Compiling clap_builder v4.6.7
+   Compiling env_logger v0.11.11
+   Compiling console v0.16.6
+   Compiling parking_lot v0.12.5
+   Compiling indicatif v0.18.6
+   Compiling thiserror-impl v2.0.21
+   Compiling clap_derive v4.6.7
+   Compiling serde_derive v1.0.229
+   Compiling clap v4.6.7
+   Compiling clap_complete v4.6.11
+   Compiling egg-solver v0.1.0 (/data3/egg-solver-allsol)
+    Finished `test` profile [optimized + debuginfo] target(s) in 5.89s
+     Running unittests src/lib.rs (/data3/build/egg-solver-miri-new-portable/miri/x86_64-unknown-linux-gnu/debug/build/egg-solver/46faae831e71f596/out/egg_solver-46faae831e71f596)
+warning: Miri does not support optimizations: the opt-level is ignored. The only effect of selecting a Cargo profile that enables optimizations (such as --release) is to apply its remaining settings, such as whether debug assertions and overflow checks are enabled.
+
+Trying seed: 0
+Trying seed: 15
+Trying seed: 14
+Trying seed: 13
+Trying seed: 12
+Trying seed: 11
+Trying seed: 10
+Trying seed: 9
+Trying seed: 8
+Trying seed: 7
+Trying seed: 6
+Trying seed: 5
+Trying seed: 4
+Trying seed: 3
+Trying seed: 2
+Trying seed: 1
+
+running 3 tests
+
+running 3 tests
+
+running 3 tests
+test lanes::share::tests::share_lists_stop_at_cancel ... test lanes::share::tests::share_lists_stop_at_cancel ... test lanes::share::tests::share_lists_stop_at_cancel ... 
+running 3 tests
+
+running 3 tests
+
+running 3 tests
+
+running 3 tests
+test lanes::share::tests::share_lists_stop_at_cancel ... 
+running 3 tests
+
+running 3 tests
+test lanes::share::tests::share_lists_stop_at_cancel ... test lanes::share::tests::share_lists_stop_at_cancel ... test lanes::share::tests::share_lists_stop_at_cancel ... 
+running 3 tests
+test lanes::share::tests::share_lists_stop_at_cancel ... test lanes::share::tests::share_lists_stop_at_cancel ... 
+running 3 tests
+
+running 3 tests
+test lanes::share::tests::share_lists_stop_at_cancel ... test lanes::share::tests::share_lists_stop_at_cancel ... 
+running 3 tests
+
+running 3 tests
+test lanes::share::tests::share_lists_stop_at_cancel ... test lanes::share::tests::share_lists_stop_at_cancel ... test lanes::share::tests::share_lists_stop_at_cancel ... 
+running 3 tests
+test lanes::share::tests::share_lists_stop_at_cancel ... 
+running 3 tests
+test lanes::share::tests::share_lists_stop_at_cancel ... warning: integer-to-pointer cast
+   --> vendor/parking_lot_core/src/word_lock.rs:320:9
+    |
+320 |         (self & QUEUE_MASK) as *const ThreadData
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ integer-to-pointer cast
+    |
+    = help: this program is using integer-to-pointer casts or (equivalently) `ptr::with_exposed_provenance`, which means that Miri might miss pointer bugs in this program
+    = help: see https://doc.rust-lang.org/nightly/std/ptr/fn.with_exposed_provenance.html for more details on that operation
+    = help: to ensure that Miri does not miss bugs in your program, use Strict Provenance APIs (https://doc.rust-lang.org/nightly/std/ptr/index.html#strict-provenance, https://crates.io/crates/sptr) instead
+    = help: you can then set `MIRIFLAGS=-Zmiri-strict-provenance` to ensure you are not relying on `with_exposed_provenance` semantics
+    = help: alternatively, `MIRIFLAGS=-Zmiri-permissive-provenance` disables this warning
+    = note: this is on thread `lanes::share::t`
+    = note: stack backtrace:
+            0: <usize as parking_lot_core::word_lock::LockState>::queue_head
+                at vendor/parking_lot_core/src/word_lock.rs:320:9: 320:49
+            1: parking_lot_core::word_lock::WordLock::unlock
+                at vendor/parking_lot_core/src/word_lock.rs:104:39: 104:57
+            2: parking_lot_core::parking_lot::park::<{closure@parking_lot::RawMutex::lock_slow::{closure#0}}, {closure@parking_lot::RawMutex::lock_slow::{closure#1}}, {closure@parking_lot::RawMutex::lock_slow::{closure#2}}>::{closure#0}
+                at vendor/parking_lot_core/src/parking_lot.rs:624:9: 624:30
+            3: parking_lot_core::parking_lot::with_thread_data::<parking_lot_core::parking_lot::ParkResult, {closure@parking_lot_core::parking_lot::park<{closure@parking_lot::RawMutex::lock_slow::{closure#0}}, {closure@parking_lot::RawMutex::lock_slow::{closure#1}}, {closure@parking_lot::RawMutex::lock_slow::{closure#2}}>::{closure#0}}>
+                at vendor/parking_lot_core/src/parking_lot.rs:207:5: 207:36
+            4: parking_lot_core::parking_lot::park::<{closure@parking_lot::RawMutex::lock_slow::{closure#0}}, {closure@parking_lot::RawMutex::lock_slow::{closure#1}}, {closure@parking_lot::RawMutex::lock_slow::{closure#2}}>
+                at vendor/parking_lot_core/src/parking_lot.rs:600:5: 705:7
+            5: parking_lot::RawMutex::lock_slow
+                at /home/super/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot-0.12.5/src/raw_mutex.rs:262:17: 269:18
+            6: <parking_lot::RawMutex as parking_lot::lock_api::RawMutex>::lock
+                at /home/super/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot-0.12.5/src/raw_mutex.rs:72:13: 72:33
+            7: lanes::share::Pool::<'_>::run_all_metric::<false>
+                at src/lanes/share.rs:964:28: 964:48
+            8: lanes::share::Pool::<'_>::run_all
+                at src/lanes/share.rs:928:13: 928:69
+            9: lanes::share::all_solutions::{closure#0}
+                at src/lanes/share.rs:1245:46: 1245:87
+            10: parallel::on_threads::<(), {closure@src/lanes/share.rs:1245:42: 1245:45}>::{closure#3}
+                at src/parallel.rs:66:21: 66:28
+            11: std::thread::scope::<'_, {closure@src/parallel.rs:57:24: 57:27}, std::result::Result<std::vec::Vec<()>, parallel::WorkerPanicked>>::{closure#0}
+                at /data3/rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/scoped.rs:158:51: 158:60
+            12: <std::panic::AssertUnwindSafe<{closure@std::thread::scope<'_, {closure@src/parallel.rs:57:24: 57:27}, std::result::Result<std::vec::Vec<()>, parallel::WorkerPanicked>>::{closure#0}}> as std::ops::FnOnce<()>>::call_once
+                at /data3/rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272:9: 272:19
+            13: std::panicking::catch_unwind::do_call::<std::panic::AssertUnwindSafe<{closure@std::thread::scope<'_, {closure@src/parallel.rs:57:24: 57:27}, std::result::Result<std::vec::Vec<()>, parallel::WorkerPanicked>>::{closure#0}}>, std::result::Result<std::vec::Vec<()>, parallel::WorkerPanicked>>
+                at /data3/rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:573:43: 573:46
+            14: std::panicking::catch_unwind::<std::result::Result<std::vec::Vec<()>, parallel::WorkerPanicked>, std::panic::AssertUnwindSafe<{closure@std::thread::scope<'_, {closure@src/parallel.rs:57:24: 57:27}, std::result::Result<std::vec::Vec<()>, parallel::WorkerPanicked>>::{closure#0}}>>
+                at /data3/rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:541:19: 541:77
+            15: std::panic::catch_unwind::<std::panic::AssertUnwindSafe<{closure@std::thread::scope<'_, {closure@src/parallel.rs:57:24: 57:27}, std::result::Result<std::vec::Vec<()>, parallel::WorkerPanicked>>::{closure#0}}>, std::result::Result<std::vec::Vec<()>, parallel::WorkerPanicked>>
+                at /data3/rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14: 359:40
+            16: parallel::on_threads::<(), {closure@src/lanes/share.rs:1245:42: 1245:45}>
+                at src/parallel.rs:57:5: 78:7
+            17: lanes::share::all_solutions
+                at src/lanes/share.rs:1245:5: 1245:88
+            18: lanes::share::tests::share_lists_stop_at_cancel::{closure#3}
+                at src/lanes/share.rs:4856:21: 4856:95
+            19: std::thread::scope::<'_, {closure@src/lanes/share.rs:4847:36: 4847:43}, ()>::{closure#0}
+                at /data3/rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/thread/scoped.rs:158:51: 158:60
+            20: <std::panic::AssertUnwindSafe<{closure@std::thread::scope<'_, {closure@src/lanes/share.rs:4847:36: 4847:43}, ()>::{closure#0}}> as std::ops::FnOnce<()>>::call_once
+                at /data3/rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/panic/unwind_safe.rs:272:9: 272:19
+            21: std::panicking::catch_unwind::do_call::<std::panic::AssertUnwindSafe<{closure@std::thread::scope<'_, {closure@src/lanes/share.rs:4847:36: 4847:43}, ()>::{closure#0}}>, ()>
+                at /data3/rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:573:43: 573:46
+            22: std::panicking::catch_unwind::<(), std::panic::AssertUnwindSafe<{closure@std::thread::scope<'_, {closure@src/lanes/share.rs:4847:36: 4847:43}, ()>::{closure#0}}>>
+                at /data3/rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:541:19: 541:77
+            23: std::panic::catch_unwind::<std::panic::AssertUnwindSafe<{closure@std::thread::scope<'_, {closure@src/lanes/share.rs:4847:36: 4847:43}, ()>::{closure#0}}>, ()>
+                at /data3/rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panic.rs:359:14: 359:40
+            24: lanes::share::tests::share_lists_stop_at_cancel
+                at src/lanes/share.rs:4847:17: 4858:19
+            25: lanes::share::tests::share_lists_stop_at_cancel::{closure#0}
+                at src/lanes/share.rs:4805:36: 4805:36
+
+ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 58 filtered out; finished in 2663.48s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 58 filtered out; finished in 2691.93s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 58 filtered out; finished in 2691.29s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 58 filtered out; finished in 2664.41s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 58 filtered out; finished in 2694.79s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 58 filtered out; finished in 2694.55s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 58 filtered out; finished in 2697.09s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 58 filtered out; finished in 2691.27s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 58 filtered out; finished in 2693.56s
+
+okok
+
+
+
+test result: test result: okok. 3 passed; 0 failed; 0 ignored; 0 measured; 58 filtered out. 3 passed; 0 failed; 0 ignored; 0 measured; 58 filtered out; finished in 2714.06s
+
+; finished in 2730.11s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 58 filtered out; finished in 2741.48s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 58 filtered out; finished in 2727.73s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 58 filtered out; finished in 2727.85s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 58 filtered out; finished in 2779.15s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 58 filtered out; finished in 2780.70s
+
+warning: 2 warnings emitted
+
+exit 0

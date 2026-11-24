@@ -1,0 +1,242 @@
+    Blocking waiting for file lock on package cache
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling utf8parse v0.2.2
+   Compiling thiserror v2.0.21
+   Compiling libc v0.2.191
+   Compiling anstyle-query v1.1.5
+   Compiling anstyle v1.0.14
+   Compiling colorchoice v1.0.5
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling serde_core v1.0.229
+   Compiling clap_lex v1.1.1
+   Compiling parking_lot_core v0.9.12 (/data3/egg-solver-allsol/vendor/parking_lot_core)
+   Compiling zmij v1.0.23
+   Compiling strsim v0.11.1
+   Compiling heck v0.5.0
+   Compiling portable-atomic v1.15.0
+   Compiling serde_json v1.0.154
+   Compiling smallvec v1.16.4
+   Compiling unicode-width v0.2.3
+   Compiling serde v1.0.229
+   Compiling cfg-if v1.0.5
+   Compiling scopeguard v1.2.0
+   Compiling anyhow v1.0.104
+   Compiling crossbeam-utils v0.8.23
+   Compiling log v0.4.35
+   Compiling memchr v2.8.3
+   Compiling unit-prefix v0.5.2
+   Compiling itoa v1.0.18
+   Compiling allocator-api2 v0.2.21
+   Compiling foldhash v0.2.0
+   Compiling equivalent v1.0.3
+   Compiling anstyle-parse v1.0.0
+   Compiling lock_api v0.4.14
+   Compiling anstream v1.0.0
+   Compiling env_filter v2.0.0
+   Compiling clap_builder v4.6.7
+   Compiling env_logger v0.11.11
+   Compiling hashbrown v0.16.1
+   Compiling syn v3.0.9
+   Compiling console v0.16.6
+   Compiling indicatif v0.18.6
+   Compiling parking_lot v0.12.5
+   Compiling thiserror-impl v2.0.21
+   Compiling clap_derive v4.6.7
+   Compiling serde_derive v1.0.229
+   Compiling clap v4.6.7
+   Compiling clap_complete v4.6.11
+   Compiling egg-solver v0.1.0 (/data3/egg-solver-allsol)
+    Finished `test` profile [optimized + debuginfo] target(s) in 6.33s
+     Running unittests src/lib.rs (/data3/build/egg-solver-miri-new-x86/miri/x86_64-unknown-linux-gnu/debug/build/egg-solver/2c049e830a763edb/out/egg_solver-2c049e830a763edb)
+warning: Miri does not support optimizations: the opt-level is ignored. The only effect of selecting a Cargo profile that enables optimizations (such as --release) is to apply its remaining settings, such as whether debug assertions and overflow checks are enabled.
+
+Trying seed: 0
+Trying seed: 15
+Trying seed: 14
+Trying seed: 13
+Trying seed: 12
+Trying seed: 11
+Trying seed: 10
+Trying seed: 9
+Trying seed: 8
+Trying seed: 7
+Trying seed: 6
+Trying seed: 5
+Trying seed: 4
+Trying seed: 3
+Trying seed: 2
+Trying seed: 1
+
+running 3 tests
+
+running 3 tests
+test lanes::share::tests::share_lists_stop_at_cancel ... test lanes::share::tests::share_lists_stop_at_cancel ... 
+running 3 tests
+
+running 3 tests
+
+running 3 tests
+
+running 3 tests
+test lanes::share::tests::share_lists_stop_at_cancel ... test lanes::share::tests::share_lists_stop_at_cancel ... 
+running 3 tests
+test lanes::share::tests::share_lists_stop_at_cancel ... 
+running 3 tests
+test lanes::share::tests::share_lists_stop_at_cancel ... 
+running 3 tests
+test lanes::share::tests::share_lists_stop_at_cancel ... test lanes::share::tests::share_lists_stop_at_cancel ... 
+running 3 tests
+test lanes::share::tests::share_lists_stop_at_cancel ... 
+running 3 tests
+
+running 3 tests
+test lanes::share::tests::share_lists_stop_at_cancel ... test lanes::share::tests::share_lists_stop_at_cancel ... test lanes::share::tests::share_lists_stop_at_cancel ... 
+running 3 tests
+
+running 3 tests
+test lanes::share::tests::share_lists_stop_at_cancel ... 
+running 3 tests
+test lanes::share::tests::share_lists_stop_at_cancel ... 
+running 3 tests
+test lanes::share::tests::share_lists_stop_at_cancel ... test lanes::share::tests::share_lists_stop_at_cancel ... warning: integer-to-pointer cast
+   --> vendor/parking_lot_core/src/word_lock.rs:320:9
+    |
+320 |         (self & QUEUE_MASK) as *const ThreadData
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ integer-to-pointer cast
+    |
+    = help: this program is using integer-to-pointer casts or (equivalently) `ptr::with_exposed_provenance`, which means that Miri might miss pointer bugs in this program
+    = help: see https://doc.rust-lang.org/nightly/std/ptr/fn.with_exposed_provenance.html for more details on that operation
+    = help: to ensure that Miri does not miss bugs in your program, use Strict Provenance APIs (https://doc.rust-lang.org/nightly/std/ptr/index.html#strict-provenance, https://crates.io/crates/sptr) instead
+    = help: you can then set `MIRIFLAGS=-Zmiri-strict-provenance` to ensure you are not relying on `with_exposed_provenance` semantics
+    = help: alternatively, `MIRIFLAGS=-Zmiri-permissive-provenance` disables this warning
+    = note: this is on thread `unnamed-3`
+    = note: stack backtrace:
+            0: <usize as parking_lot_core::word_lock::LockState>::queue_head
+                at vendor/parking_lot_core/src/word_lock.rs:320:9: 320:49
+            1: parking_lot_core::word_lock::WordLock::unlock
+                at vendor/parking_lot_core/src/word_lock.rs:104:39: 104:57
+            2: parking_lot_core::parking_lot::unpark_one::<{closure@parking_lot::RawMutex::unlock_slow::{closure#0}}>
+                at vendor/parking_lot_core/src/parking_lot.rs:793:5: 793:26
+            3: parking_lot::RawMutex::unlock_slow
+                at /home/super/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot-0.12.5/src/raw_mutex.rs:321:13: 321:57
+            4: <parking_lot::RawMutex as parking_lot::lock_api::RawMutex>::unlock
+                at /home/super/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/parking_lot-0.12.5/src/raw_mutex.rs:109:9: 109:32
+            5: <parking_lot::lock_api::MutexGuard<'_, parking_lot::RawMutex, [u64; 14]> as std::ops::Drop>::drop
+                at /home/super/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/lock_api-0.4.14/src/mutex.rs:706:13: 706:36
+            6: std::ptr::drop_glue::<parking_lot::lock_api::MutexGuard<'_, parking_lot::RawMutex, [u64; 14]>> - shim(Some(parking_lot::lock_api::MutexGuard<'_, parking_lot::RawMutex, [u64; 14]>))
+                at /data3/rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ptr/mod.rs:844:1: 846:25
+            7: lanes::share::Pool::<'_>::run_all_metric::<false>
+                at src/lanes/share.rs:968:5: 968:6
+            8: lanes::share::Pool::<'_>::run_all
+                at src/lanes/share.rs:928:13: 928:69
+            9: lanes::share::all_solutions::{closure#0}
+                at src/lanes/share.rs:1245:46: 1245:87
+            10: parallel::on_threads::<(), {closure@src/lanes/share.rs:1245:42: 1245:45}>::{closure#3}::{closure#0}::{closure#0}
+                at src/parallel.rs:62:73: 62:80
+note: the last function in that backtrace got called indirectly due to this code
+   --> src/parallel.rs:62:21
+    |
+ 62 |                     std::thread::Builder::new().spawn_scoped(s, move || work(t)),
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test lanes::share::tests::share_lists_stop_at_the_time_limit ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+test solver::tests::all_solutions_stops_at_the_time_limit_and_at_cancel ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 60 filtered out; finished in 378.55s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 60 filtered out; finished in 379.92s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 60 filtered out; finished in 384.77s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 60 filtered out; finished in 389.11s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 60 filtered out; finished in 388.87s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 60 filtered out; finished in 389.34s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 60 filtered out; finished in 389.41s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 60 filtered out; finished in 390.27s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 60 filtered out; finished in 389.54s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 60 filtered out; finished in 391.92s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 60 filtered out; finished in 393.60s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 60 filtered out; finished in 395.08s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 60 filtered out; finished in 393.38s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 60 filtered out; finished in 396.87s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 60 filtered out; finished in 406.94s
+
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 60 filtered out; finished in 398.07s
+
+warning: 2 warnings emitted
+
+exit 0
