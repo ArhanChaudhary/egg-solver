@@ -7,7 +7,8 @@
 // of its moves. A table exported as a file (`exportTable`, kept by the demo
 // page in IndexedDB) must load back. The demo page's sticker model
 // (cube-model.mjs) must agree with the module: its stickers of a scramble
-// are that scramble's cube, and the module's solutions solve its cubes.
+// are that scramble's cube, and the module's solutions solve its cubes; and
+// the page's 3D picture (cube-3d.mjs) must turn layers as the model does.
 // Then the quarter-turn metric: QTM solves on the HTM table and on a QTM h0
 // must agree, replay, be no shorter than the HTM ones and have the corner
 // permutation's parity (known: R U R' U' 4q, the checkerboard 12q); an HTM
@@ -22,11 +23,30 @@
 
 import { EggSolver, cancel } from './egg-solver.mjs';
 import * as model from './cube-model.mjs';
+import { NORMALS, rotate, turnAngle } from './cube-3d.mjs';
 
 const fail = (message) => {
   console.error(`wasm test: ${message}`);
   process.exit(1);
 };
+// The page's 3D picture against its sticker model: turning a layer's stickers by `turnAngle`
+// about the face's normal puts every sticker where the model's move puts its colour.
+{
+  const key = (p, n) => `${p.map(Math.round)}|${n.map(Math.round)}`;
+  const slot = new Map(model.STICKERS.map((s, i) => [key(s.position, s.normal), i]));
+  const labels = [...Array(54).keys()].map((i) => String.fromCharCode(48 + i)).join('');
+  for (let face = 0; face < 6; face++) {
+    for (const turns of [1, 2, 3]) {
+      const after = model.applyMove(labels, { face, turns });
+      const [axis, angle] = [NORMALS[face], turnAngle({ turns })];
+      model.STICKERS.forEach((s, i) => {
+        const inLayer = s.position.reduce((sum, v, a) => sum + v * axis[a], 0) === 1;
+        const to = inLayer ? slot.get(key(rotate(s.position, axis, angle), rotate(s.normal, axis, angle))) : i;
+        if (after[to] !== labels[i]) fail(`3D picture: ${model.moveName({ face, turns })} takes sticker ${i} to ${to}, not where the model does`);
+      });
+    }
+  }
+}
 const scrambles = [
   "R U R' U'",
   "F2 D L2 B' U",

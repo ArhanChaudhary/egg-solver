@@ -13,8 +13,7 @@ const commands = {
     solver?.close();
     const wasm = new URL(threads > 1 ? 'dist/egg-solver-threads.wasm' : 'dist/egg-solver.wasm', import.meta.url);
     solver = await EggSolver.create({ wasm, threads: threads > 1 ? threads : undefined });
-    // (`cancelHandle`: shared memory of the threads build, for the page's Stop; null otherwise.)
-    return { threads: solver.threads, cancelHandle: solver.cancelHandle };
+    return { threads: solver.threads };
   },
   async generate({ k, base, metric }) {
     const start = performance.now();
@@ -33,15 +32,6 @@ const commands = {
     const start = performance.now();
     const result = solver.solve(cube, { lanes, metric });
     return { ...result, wall: (performance.now() - start) / 1000 };
-  },
-  /** Every solution of at most `plus` moves more than the shortest (0: every shortest one). */
-  solveAll({ cube, plus, maxSolutions, timeLimit, metric }) {
-    const start = performance.now();
-    const result = solver.solveAll(cube, { plus, maxSolutions, timeLimit, metric });
-    return { ...result, wall: (performance.now() - start) / 1000 };
-  },
-  random({ seed }) {
-    return solver.randomCubes(seed, 1)[0];
   },
 };
 

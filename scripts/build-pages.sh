@@ -12,7 +12,7 @@ python3 scripts/check-docs.py
 wasm/build.sh
 mkdir -p "$output/dist"
 cp wasm/index.html wasm/demo-worker.mjs wasm/egg-solver.mjs wasm/egg-solver-thread.mjs \
-    wasm/cube-model.mjs wasm/cube-input.mjs wasm/coi-sw.js "$output/"
+    wasm/cube-model.mjs wasm/cube-input.mjs wasm/cube-3d.mjs wasm/coi-sw.js "$output/"
 cp wasm/dist/egg-solver.wasm wasm/dist/egg-solver-threads.wasm "$output/dist/"
 cp -R docs "$output/docs"
 printf 'Pages site: %s\n' "$output"
