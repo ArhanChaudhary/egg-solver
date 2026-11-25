@@ -1,0 +1,65 @@
+source: branch progress-bars at f498832 plus its uncommitted changes; RUSTFLAGS=-C target-cpu=x86-64; MIRIFLAGS=-Zmiri-symbolic-alignment-check -Zmiri-num-cpus=4
+miri 0.1.0 (1c3a650696 2026-11-02)
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.27
+   Compiling quote v1.0.47
+   Compiling libc v0.2.191
+   Compiling thiserror v2.0.21
+   Compiling utf8parse v0.2.2
+   Compiling anstyle-query v1.1.5
+   Compiling anstyle v1.0.14
+   Compiling colorchoice v1.0.5
+   Compiling is_terminal_polyfill v1.70.2
+   Compiling serde_core v1.0.229
+   Compiling portable-atomic v1.15.0
+   Compiling parking_lot_core v0.9.12 (/data3/egg-solver-site/vendor/parking_lot_core)
+   Compiling strsim v0.11.1
+   Compiling heck v0.5.0
+   Compiling zmij v1.0.23
+   Compiling clap_lex v1.1.1
+   Compiling crossbeam-utils v0.8.23
+   Compiling log v0.4.35
+   Compiling serde_json v1.0.154
+   Compiling smallvec v1.16.4
+   Compiling anyhow v1.0.104
+   Compiling serde v1.0.229
+   Compiling unicode-width v0.2.3
+   Compiling cfg-if v1.0.5
+   Compiling scopeguard v1.2.0
+   Compiling equivalent v1.0.3
+   Compiling memchr v2.8.3
+   Compiling unit-prefix v0.5.2
+   Compiling itoa v1.0.18
+   Compiling allocator-api2 v0.2.21
+   Compiling foldhash v0.2.0
+   Compiling anstyle-parse v1.0.0
+   Compiling lock_api v0.4.14
+   Compiling env_filter v2.0.0
+   Compiling anstream v1.0.0
+   Compiling hashbrown v0.16.1
+   Compiling clap_builder v4.6.7
+   Compiling env_logger v0.11.11
+   Compiling syn v3.0.9
+   Compiling console v0.16.6
+   Compiling parking_lot v0.12.5
+   Compiling indicatif v0.18.6
+   Compiling thiserror-impl v2.0.21
+   Compiling clap_derive v4.6.7
+   Compiling serde_derive v1.0.229
+   Compiling egg-solver v0.1.0 (/data3/egg-solver-site)
+   Compiling clap v4.6.7
+   Compiling clap_complete v4.6.11
+    Finished `test` profile [optimized + debuginfo] target(s) in 3.05s
+     Running unittests src/lib.rs (/data3/build/perf/target-miri-portable/miri/x86_64-unknown-linux-gnu/debug/build/egg-solver/46faae831e71f596/out/egg_solver-46faae831e71f596)
+warning: Miri does not support optimizations: the opt-level is ignored. The only effect of selecting a Cargo profile that enables optimizations (such as --release) is to apply its remaining settings, such as whether debug assertions and overflow checks are enabled.
+
+
+running 2 tests
+test gen::progress::tests::overall_follows_a_bfs_generation ... ok
+test gen::progress::tests::overall_follows_a_dfs_generation ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 66 filtered out; finished in 0.83s
+
+warning: 1 warning emitted
+
+exit status 0

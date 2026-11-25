@@ -146,6 +146,11 @@ impl Prefix {
             let last = levels.last().map_or(&[][..], Vec::as_slice);
             let next_index = AtomicUsize::new(0);
             let chunk = 4096;
+            // (A step of its own for a progress bar: the last levels take seconds.)
+            super::progress::start(
+                format_args!("prefix depth {d} of {depth}"),
+                last.len() as u64,
+            );
             let parts: Vec<Vec<u64>> = crate::parallel::on_threads(threads, |_| {
                 let mut out = Vec::new();
                 loop {
@@ -159,6 +164,7 @@ impl Prefix {
                             for_each_entry(corners, c.apply_move(m), |x| out.push(x));
                         }
                     }
+                    super::progress::advance(chunk as u64);
                 }
                 out.sort_unstable();
                 out.dedup();

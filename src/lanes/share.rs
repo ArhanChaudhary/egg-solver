@@ -711,6 +711,8 @@ impl CubeCtx {
             return None;
         }
         let (count, next) = claim_fields(self.claim.fetch_add(u64::from(chunk), AcqRel));
+        #[cfg(target_family = "wasm")]
+        SEARCH_PROGRESS[2].fetch_max(next.saturating_add(chunk).min(count), Relaxed);
         (next < count).then(|| (next, chunk.min(count - next)))
     }
 }
@@ -2414,6 +2416,22 @@ fn build_task<const QTM: bool, const ALL: bool>(
     true
 }
 
+/// (WebAssembly only) Where the search of the cube whose iteration was
+/// published last has got to, for a page's progress bar: the iteration's
+/// target length, the number of iterations it stands for (above 1: a first
+/// pass, every length up to the target), its claim entries claimed so far,
+/// and how many it has. Written when an iteration is published and when
+/// jobs are claimed; another thread reads the words in the module's shared
+/// memory while this one searches. With one cube at a time they describe
+/// that cube. Native builds have none of this: their code stays as it is.
+#[cfg(target_family = "wasm")]
+pub static SEARCH_PROGRESS: [AtomicU32; 4] = [
+    AtomicU32::new(0),
+    AtomicU32::new(0),
+    AtomicU32::new(0),
+    AtomicU32::new(0),
+];
+
 /// Publish the (extended and sorted) jobs of the new iteration of `ctx`.
 fn finish_build(pool: &Pool, ctx: &Arc<CubeCtx>) {
     // SAFETY: as in `build`.
@@ -2445,6 +2463,13 @@ fn finish_build(pool: &Pool, ctx: &Arc<CubeCtx>) {
     // another worker can finish these jobs and immediately rebuild it.
     if pool.trace {
         trace_build(pool, ctx, inner, sorted);
+    }
+    #[cfg(target_family = "wasm")]
+    {
+        SEARCH_PROGRESS[0].store(u32::from(inner.target), Relaxed);
+        SEARCH_PROGRESS[1].store(inner.phases, Relaxed);
+        SEARCH_PROGRESS[2].store(0, Relaxed);
+        SEARCH_PROGRESS[3].store(u32::try_from(claimed).unwrap_or(u32::MAX), Relaxed);
     }
     ctx.claim.store(claimed << 32, Release);
     pool.publish(ctx);

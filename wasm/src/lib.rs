@@ -386,6 +386,9 @@ pub extern "C" fn egg_solver_generate(k: u32, base: u32, threads: u32, metric: u
         let bytes = usize::try_from(h48_bytes(k)).map_err(|_| format!("h{k} is too big"))?;
         drop(Memory::try_anonymous(bytes).ok_or(format!("no room for h{k} ({bytes} bytes)"))?);
         let corners = corners(&mut state.corners)?;
+        // (The generators' steps go to `GENERATED` from now on, not to stderr.)
+        egg_solver::gen::progress::install(Box::new(&GENERATED));
+        GENERATED.reset();
         let table = egg_solver::generate_table_metric(
             corners,
             k,
@@ -395,6 +398,7 @@ pub extern "C" fn egg_solver_generate(k: u32, base: u32, threads: u32, metric: u
             false,
         )
         .map_err(|e| e.to_string())?;
+        GENERATED.finish();
         let info = table_json(&table);
         state.table = Some(table);
         Ok(info)
@@ -421,6 +425,7 @@ pub unsafe extern "C" fn egg_solver_solve(
 ) -> i32 {
     // SAFETY: as the caller promises.
     let text = unsafe { text_argument(text, len) };
+    clear_search_progress();
     with_state(|state| {
         let cube = parse_cube(text?)?;
         let metric = metric_of(metric, state.table.as_ref())?;
@@ -466,6 +471,39 @@ pub extern "C" fn egg_solver_cancel_address() -> *const u8 {
     CANCEL.as_ptr().cast_const().cast::<u8>()
 }
 
+/// How far the running `egg_solver_generate` is.
+static GENERATED: egg_solver::gen::progress::Overall = egg_solver::gen::progress::Overall::new();
+
+/// The address of a 32-bit word that holds how far the running
+/// `egg_solver_generate` is, 0 to 1000 (`gen::progress::Overall`): a thread
+/// that shares the memory (the threads build) can read it with an atomic
+/// load while this thread generates, for a progress bar.
+#[unsafe(no_mangle)]
+pub extern "C" fn egg_solver_generate_progress_address() -> *const u32 {
+    GENERATED.permille().as_ptr().cast_const()
+}
+
+/// The address of four 32-bit words that say where the running search of
+/// one cube (`egg_solver_solve`, `egg_solver_solve_all`) has got to, to be
+/// read like `egg_solver_generate_progress_address`'s word: the target
+/// length of the iteration in progress (0 before the first), the number of
+/// lengths it stands for (above 1: every length up to the target at once),
+/// its jobs claimed so far, and how many jobs it has. Both calls clear the
+/// words when they start.
+#[unsafe(no_mangle)]
+pub extern "C" fn egg_solver_search_progress_address() -> *const u32 {
+    egg_solver::lanes::share::SEARCH_PROGRESS
+        .as_ptr()
+        .cast::<u32>()
+}
+
+/// A search starts: nothing known yet.
+fn clear_search_progress() {
+    for word in &egg_solver::lanes::share::SEARCH_PROGRESS {
+        word.store(0, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
 /// List every distinct solution of one cube (a scramble or facelets, see
 /// `parse_cube`) up to a length, instead of one optimal solution
 /// (`egg_solver::solutions`), with all lanes of all threads on it. The
@@ -506,6 +544,7 @@ pub unsafe extern "C" fn egg_solver_solve_all(
     // SAFETY: as the caller promises.
     let text = unsafe { text_argument(text, len) };
     CANCEL.store(false, std::sync::atomic::Ordering::SeqCst);
+    clear_search_progress();
     with_state(|state| {
         let cube = parse_cube(text?)?;
         let metric = metric_of(metric, state.table.as_ref())?;

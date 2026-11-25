@@ -160,7 +160,11 @@ const parity = (perm) => {
  * blank). Returns null if they make a cube that can be solved, else
  * { kind, message, stickers } with the sticker indices concerned:
  * kind 'blank', 'counts' (with counts: [[colour, n], ...]), 'centres',
- * 'piece', 'twist', 'flip' or 'parity'.
+ * 'piece', 'twist', 'flip' or 'parity'. The last four also have `reason`,
+ * 0 to 7 in the order of this function's messages (a page with wording of
+ * its own picks by it): a corner in mirror order, a corner or an edge with
+ * colours that none has, the same corner or edge twice, a twisted corner, a
+ * flipped edge, two swapped pieces.
  */
 export function checkStickers(cells) {
   const blanks = cells.map((c, i) => (c ? -1 : i)).filter((i) => i >= 0);
@@ -200,6 +204,7 @@ export function checkStickers(cells) {
       const mirrored = homeCorner.some((home) => [...home].sort().join() === [...faces].sort().join());
       return {
         kind: 'piece',
+        reason: mirrored ? 0 : 1,
         message: mirrored
           ? 'a corner has its colours in the wrong order around it (a mirror image of a real corner)'
           : 'a corner has colours that no corner has',
@@ -220,7 +225,7 @@ export function checkStickers(cells) {
       if (home[0] === faces[0] && home[1] === faces[1]) { found = piece; ori = 0; }
       if (home[0] === faces[1] && home[1] === faces[0]) { found = piece; ori = 1; }
     }
-    if (found < 0) return { kind: 'piece', message: 'an edge has colours that no edge has', stickers };
+    if (found < 0) return { kind: 'piece', reason: 2, message: 'an edge has colours that no edge has', stickers };
     edgePerm[pos] = found;
     flip += ori;
   }
@@ -233,13 +238,13 @@ export function checkStickers(cells) {
     return null;
   };
   const dupCorner = twice(cornerPerm, CORNERS);
-  if (dupCorner) return { kind: 'piece', message: 'the same corner appears twice', stickers: dupCorner };
+  if (dupCorner) return { kind: 'piece', reason: 3, message: 'the same corner appears twice', stickers: dupCorner };
   const dupEdge = twice(edgePerm, EDGES);
-  if (dupEdge) return { kind: 'piece', message: 'the same edge appears twice', stickers: dupEdge };
-  if (twist % 3) return { kind: 'twist', message: 'one corner is twisted (turned in place)', stickers: CORNERS.flat() };
-  if (flip % 2) return { kind: 'flip', message: 'one edge is flipped', stickers: EDGES.flat() };
+  if (dupEdge) return { kind: 'piece', reason: 4, message: 'the same edge appears twice', stickers: dupEdge };
+  if (twist % 3) return { kind: 'twist', reason: 5, message: 'one corner is twisted (turned in place)', stickers: CORNERS.flat() };
+  if (flip % 2) return { kind: 'flip', reason: 6, message: 'one edge is flipped', stickers: EDGES.flat() };
   if (parity(cornerPerm) !== parity(edgePerm)) {
-    return { kind: 'parity', message: 'two pieces are swapped (as if taken out and put back the wrong way)', stickers: [] };
+    return { kind: 'parity', reason: 7, message: 'two pieces are swapped (as if taken out and put back the wrong way)', stickers: [] };
   }
   return null;
 }

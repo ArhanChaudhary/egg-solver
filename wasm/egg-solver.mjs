@@ -7,6 +7,7 @@
 //   solver.solve("R U R' U'", { metric: 'qtm' });  // quarter-turn metric
 //   solver.solveAll("R U R' U' F2", { plus: 1 });  // every solution up to optimal + 1
 //   cancel(solver.cancelHandle);                   // from another thread: stop a running solveAll
+//   progress(solver.progressHandle);               // from another thread: how far a table or a search is
 //
 // The module is built for WASI (wasm32-wasip1, or wasm32-wasip1-threads for
 // several threads): this file provides the few WASI functions it imports
@@ -540,6 +541,25 @@ export class EggSolver {
   }
 
   /**
+   * What another thread needs to watch a running `generateTable`, `solve`
+   * or `solveAll` of this solver (`progress(handle)`): the module's shared
+   * memory and the places of its progress words in it, `{ buffer, generate,
+   * search }`. It can be posted to another thread (a page's main thread,
+   * for a progress bar, while the worker that owns the solver is blocked).
+   * Null for the single-thread build, whose memory no other thread sees.
+   */
+  get progressHandle() {
+    if (typeof SharedArrayBuffer === 'undefined' || !(this.memory.buffer instanceof SharedArrayBuffer)) {
+      return null;
+    }
+    return {
+      buffer: this.memory.buffer,
+      generate: this.exports.egg_solver_generate_progress_address() >>> 0,
+      search: this.exports.egg_solver_search_progress_address() >>> 0,
+    };
+  }
+
+  /**
    * Solve many cubes for throughput (each lane solves its own cube); results
    * in input order. `metric` as for `solve`.
    */
@@ -618,6 +638,28 @@ export function cancel(handle) {
   if (!handle) return false;
   Atomics.store(new Uint8Array(handle.buffer, handle.offset, 1), 0, 1);
   return true;
+}
+
+/**
+ * How far the solver of `handle` (an `EggSolver`'s `progressHandle`) has
+ * got, from any thread: `{ generated, target, lengths, claimed, jobs }`.
+ * `generated` is the share of the running (or last) `generateTable` that is
+ * done, 0 to 1. The rest is about the running (or last) `solve` or
+ * `solveAll`: `target` is the length that its current iteration searches (0
+ * before the first), `lengths` how many lengths that iteration stands for
+ * (above 1: every length up to `target` at once, as a cube's first
+ * iteration may), and `claimed` of the iteration's `jobs` have been taken
+ * up, so `claimed / jobs` is how far the iteration is. An iteration that
+ * finds no solution is followed by one of the next length, which takes
+ * several times longer; nothing says how many will be needed. Null if
+ * `handle` is null.
+ */
+export function progress(handle) {
+  if (!handle) return null;
+  const generated = Atomics.load(new Uint32Array(handle.buffer, handle.generate, 1), 0) / 1000;
+  const words = new Uint32Array(handle.buffer, handle.search, 4);
+  const [target, lengths, claimed, jobs] = [0, 1, 2, 3].map((i) => Atomics.load(words, i));
+  return { generated, target, lengths, claimed, jobs };
 }
 
 /** Copy a byte stream into the table buffer (`at(offset, len)` views). */

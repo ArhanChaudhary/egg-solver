@@ -80,8 +80,8 @@ const STYLE = `
 `;
 
 export class Cube3D {
-  /** A picture inside `root`; `colours`: the colour of each face letter. */
-  constructor(root, colours) {
+  /** A picture inside `root`; `colours`: the colour of each face letter; `label`: for screen readers. */
+  constructor(root, colours, label) {
     this.colours = colours;
     this.yaw = -0.6;
     this.pitch = 0.48;
@@ -94,7 +94,7 @@ export class Cube3D {
       style.textContent = STYLE;
       document.head.append(style);
     }
-    this.svg = el('svg', { class: 'c3', viewBox: '-2.9 -2.9 5.8 5.8', role: 'img', 'aria-label': 'The cube in 3D: drag to turn it around' });
+    this.svg = el('svg', { class: 'c3', viewBox: '-2.9 -2.9 5.8 5.8', role: 'img', 'aria-label': label });
     this.rest = el('g');
     this.layer = el('g');
     this.svg.append(this.rest, this.layer);

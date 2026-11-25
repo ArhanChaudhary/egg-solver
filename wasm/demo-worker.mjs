@@ -15,8 +15,9 @@ const commands = {
     solver?.close();
     const wasm = new URL(threads > 1 ? 'dist/egg-solver-threads.wasm' : 'dist/egg-solver.wasm', import.meta.url);
     solver = await EggSolver.create({ wasm, threads: threads > 1 ? threads : undefined });
-    // (`cancelHandle`: shared memory of the threads build, with which the page stops a list; null otherwise.)
-    return { threads: solver.threads, cancelHandle: solver.cancelHandle };
+    // (Shared memory of the threads build, null otherwise: with `cancelHandle` the page stops a
+    // list, in `progressHandle` it reads how far a table or a search is.)
+    return { threads: solver.threads, cancelHandle: solver.cancelHandle, progressHandle: solver.progressHandle };
   },
   async generate({ k, base, metric }) {
     const start = performance.now();

@@ -14,7 +14,6 @@ export const COLOURS = {
   L: '#f37a12',
   B: '#2360cf',
 };
-export const COLOUR_NAMES = { U: 'white', R: 'red', F: 'green', D: 'yellow', L: 'orange', B: 'blue' };
 const STORE = 'egg-solver-painted';
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -45,9 +44,12 @@ const NET = { U: [3, 0], L: [0, 3], F: [3, 3], R: [6, 3], B: [9, 3], D: [3, 6] }
 const CELL = 26;
 const PAD = 2;
 
-/** The net and its palette inside `root`. `onPaint()` is called after every painted sticker. */
+/**
+ * The net and its palette inside `root`. `onPaint()` is called after every painted sticker.
+ * `text`: what screen readers and tooltips say, `{ net, palette, colours: { U, R, F, D, L, B } }`.
+ */
 export class CubeInput {
-  constructor(root, { onPaint = () => {} } = {}) {
+  constructor(root, { onPaint = () => {}, text }) {
     this.onPaint = onPaint;
     this.cells = [...SOLVED];
     this.brush = null;
@@ -60,7 +62,7 @@ export class CubeInput {
       class: 'ci-net',
       viewBox: `0 0 ${12 * CELL + 2 * PAD} ${9 * CELL + 2 * PAD}`,
       role: 'group',
-      'aria-label': 'The cube unfolded: pick a colour below, then click or drag over stickers to paint them',
+      'aria-label': text.net,
     }, SVG);
     this.rects = [];
     for (let i = 0; i < 54; i++) {
@@ -83,10 +85,10 @@ export class CubeInput {
       t.textContent = face;
       this.net.append(t);
     }
-    this.palette = el('div', { class: 'ci-palette', role: 'group', 'aria-label': 'Colours to paint with' });
+    this.palette = el('div', { class: 'ci-palette', role: 'group', 'aria-label': text.palette });
     this.swatches = {};
     for (const face of FACES) {
-      const b = el('button', { type: 'button', 'aria-pressed': 'false', 'aria-label': COLOUR_NAMES[face], title: COLOUR_NAMES[face] });
+      const b = el('button', { type: 'button', 'aria-pressed': 'false', 'aria-label': text.colours[face], title: text.colours[face] });
       b.style.background = COLOURS[face];
       b.addEventListener('click', () => this.setBrush(this.brush === face ? null : face));
       this.swatches[face] = b;

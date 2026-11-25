@@ -9,6 +9,8 @@
 // (cube-model.mjs) must agree with the module: its stickers of a scramble
 // are that scramble's cube, and the module's solutions solve its cubes; and
 // the page's 3D picture (cube-3d.mjs) must turn layers as the model does.
+// The progress words of the threads build (`progress`) are readable and
+// sensible after a table and after a solve.
 // Then the quarter-turn metric: QTM solves on the HTM table and on a QTM h0
 // must agree, replay, be no shorter than the HTM ones and have the corner
 // permutation's parity (known: R U R' U' 4q, the checkerboard 12q); an HTM
@@ -21,7 +23,7 @@
 // thread (a worker here, as a page's main thread would while its solver
 // worker is blocked): it returns what was found, marked `stopped`.
 
-import { EggSolver, cancel } from './egg-solver.mjs';
+import { EggSolver, cancel, progress } from './egg-solver.mjs';
 import * as model from './cube-model.mjs';
 import { NORMALS, rotate, turnAngle } from './cube-3d.mjs';
 
@@ -62,7 +64,20 @@ for (const [name, threads] of [['egg-solver.wasm', undefined], ['egg-solver-thre
   if (solver.exports.egg_solver_has_threads() !== (threads ? 1 : 0)) fail(`${name}: has_threads`);
   const table = await solver.generateTable(0);
   if (table.k !== 0) fail(`${name}: generated h${table.k}`);
+  // The progress words (the threads build: its memory is shared): a finished table is all
+  // done, and after a solve they hold its last iteration.
+  const watch = solver.progressHandle;
+  if ((watch !== null) !== Boolean(threads)) fail(`${name}: progressHandle ${JSON.stringify(watch)}`);
+  if (progress(null) !== null) fail(`${name}: progress without a handle`);
+  if (watch && progress(watch).generated !== 1) fail(`${name}: a finished table is at ${progress(watch).generated}`);
   const single = scrambles.map((s) => solver.solve(s));
+  if (watch) {
+    const at = progress(watch);
+    const last = single.at(-1).length;
+    if (at.target < last || at.target > 20 || at.lengths < 1 || at.jobs < 1 || at.claimed < 1 || at.claimed > at.jobs) {
+      fail(`${name}: progress after a ${last}-move solve: ${JSON.stringify(at)}`);
+    }
+  }
   const batch = solver.solveMany(scrambles, { lanes: 4 });
   scrambles.forEach((scramble, i) => {
     const { moves, length } = single[i];
