@@ -52,11 +52,6 @@
   progress::-webkit-progress-bar { background: var(--line); }
   progress::-webkit-progress-value { background: var(--accent); }
   progress::-moz-progress-bar { background: var(--accent); }
-  progress:indeterminate { background: linear-gradient(90deg, var(--line) 0 35%, var(--accent) 50%, var(--line) 65% 100%) 0 0 / 200% 100%; animation: slide 1.2s linear infinite; }
-  progress:indeterminate::-webkit-progress-bar { background: transparent; }
-  progress:indeterminate::-moz-progress-bar { background: transparent; }
-  @keyframes slide { from { background-position: 100% 0; } to { background-position: -100% 0; } }
-  @media (prefers-reduced-motion: reduce) { progress:indeterminate { animation: none; } }
   #bar[hidden] { display: block !important; visibility: hidden; }
   .under { display: flex; justify-content: space-between; align-items: start; gap: 1rem; min-height: 1.5rem; margin: 0.4rem 0 1rem; font-size: 0.9rem; }
   .under .links { display: flex; gap: 1rem; margin-left: auto; }
@@ -236,11 +231,110 @@ const offerFinds = (wanted) => {
 offerFinds(saved('egg-solver-find', ['one', '0', '1', '2']));
 $('find').onchange = () => remember('egg-solver-find', $('find').value);
 const lengthText = (n, m) => fill(TEXT.lengths[m === 'qtm' ? 'qtm' : 'htm'][n === 1 ? 0 : 1], { count: n });
-/** Show the bar at `share` (0 to 1), moving with no share known (undefined), or not at all (null). */
+/** Show the bar at `share` (0 to 1; empty while nothing is known yet), or not at all (null). */
 const bar = (share) => {
   $('bar').hidden = share === null;
-  if (share === undefined || share === null) $('bar').removeAttribute('value');
-  else $('bar').value = Math.max(0, Math.min(1, share));
+  $('bar').value = Math.max(0, Math.min(1, share ?? 0));
+};
+
+/**
+ * How far a search is, 0 to 1, from what the solver says while it works (`progress`): the
+ * length it is trying and how many of that length's jobs it has taken up. It tries one length
+ * after another, each about `growth` times longer than the one before, and nothing says which
+ * will be the last; a single solution is usually found early in the length that has one (the
+ * most promising jobs go first). So the bar is the time so far against the time so far plus
+ * what is likely left: the rest of the current length (lists run every length to its end;
+ * one solution, up to where solutions are usually found), and the lengths after it up to the
+ * usual length of a random cube (18 moves, 21 quarter turns), when the cube is not past it.
+ * Each length's time is measured as it goes (time so far over the share of jobs taken), and
+ * the next one is estimated from the last two. The bar never goes back, and it is full when
+ * the search ends.
+ */
+class SearchBar {
+  /** `stale`: what the solver said before this search (the last search's, until this one starts). */
+  constructor(list, metric, stale) {
+    this.list = list;
+    this.qtm = metric === 'qtm';
+    this.start = performance.now();
+    this.lengths = []; // { target, began, ended }
+    this.shown = 0;
+    this.stale = stale ? JSON.stringify(stale) : null;
+  }
+
+  /** The share to show, after the solver says `at` (or nothing yet). */
+  update(at) {
+    const now = performance.now();
+    if (!at?.target) return this.shown;
+    if (this.stale !== null) {
+      if (JSON.stringify(at) === this.stale) return this.shown;
+      this.stale = null;
+    }
+    const taken = at.jobs ? Math.min(1, at.claimed / at.jobs) : 0;
+    let cur = this.lengths.at(-1);
+    if (!cur || cur.target !== at.target) {
+      if (cur) cur.ended = now;
+      // (`first`: the share of jobs taken when this length was first seen: a short one may be
+      // well under way by then)
+      cur = { target: at.target, began: now, first: taken, lengths: at.lengths };
+      this.lengths.push(cur);
+    }
+    const time = (x) => (x.ended - x.began) / Math.max(0.1, 1 - x.first);
+    const done = this.lengths.filter((x) => x.ended);
+    const [before, last] = [done.at(-2), done.at(-1)];
+    // (Two lengths measure the growth if both were seen from early on and neither was a first
+    // pass, which stands for several lengths at once.)
+    const measured = (x) => x && x.lengths <= 1 && x.first < 0.5;
+    const step = this.qtm ? 2 : 1;
+    // (How much longer each length takes than the one before: measured, within bounds.)
+    const usual = this.qtm ? SEARCH.growthQtm : SEARCH.growth;
+    const growth = measured(before) && measured(last) && time(before) > 20
+      ? Math.min(4 * usual, Math.max(usual / 4, time(last) / time(before))) : usual;
+    // The current length's whole time: from the last length until a tenth of its jobs are
+    // taken (the lanes take jobs well ahead of finishing them), then more and more from its
+    // own pace; at least as long as the search so far (each length takes many times longer
+    // than all before it).
+    const elapsed = now - cur.began;
+    const spent = now - this.start;
+    const floor = Math.max(elapsed, (cur.began - this.start) * (growth - 1) / growth);
+    const expected = last ? growth * time(last) : null;
+    const paced = taken >= 0.1 && elapsed > 50 ? elapsed / taken : null;
+    let whole = expected ?? paced ?? Math.max(spent, 30);
+    if (paced !== null && expected !== null && taken < 0.3) whole = expected + (paced - expected) * ((taken - 0.1) / 0.2);
+    else if (paced !== null) whole = paced;
+    whole = Math.max(whole, floor);
+    // The length where the search likely ends (same parity in quarter turns).
+    const typical = this.qtm ? 21 : 18;
+    const end = cur.target >= typical ? cur.target : cur.target + step * Math.ceil((typical - cur.target) / step);
+    // Where in its last length the search ends: lists run it to its end; one solution is found
+    // after the median share of jobs measured for searches still going at `from`.
+    const lastFound = (from) => {
+      if (this.list) return 1;
+      const later = SEARCH.found.filter((f) => f > from);
+      return later.length ? later[Math.floor(later.length / 2)] : from + (1 - from) / 2;
+    };
+    let left;
+    if (end === cur.target) {
+      left = whole * Math.max(0, lastFound(taken) - taken);
+    } else {
+      left = whole * (1 - taken);
+      let next = whole;
+      for (let length = cur.target + step; length <= end; length += step) {
+        next *= growth;
+        left += next * (length === end ? lastFound(0) : 1);
+      }
+    }
+    this.shown = Math.max(this.shown, Math.min(0.97, spent / (spent + left)));
+    return this.shown;
+  }
+}
+/** Measured with the threads build on h4 tables (Bun, 8 threads, random states, 2026-11-25):
+ * each length took about 14 times as long as the one before in moves (11 pairs), and about
+ * 300 times in quarter turns (two lengths: four cubes); `found`: the share of jobs after which
+ * the length with the solution had it, for 18 cubes (12 in moves, 6 in quarter turns). */
+const SEARCH = {
+  growth: 14,
+  growthQtm: 300,
+  found: [0.01, 0.01, 0.02, 0.03, 0.03, 0.04, 0.05, 0.05, 0.06, 0.06, 0.07, 0.08, 0.1, 0.11, 0.13, 0.3, 0.66, 0.68],
 };
 
 // --- The solving data: a pruning table hk (with its base) for each metric ---
@@ -300,10 +394,18 @@ try {
 let worker = null;
 let nextId = 0;
 let onProgress = null;
+// What the solver last said of its progress (the single-thread build tells; the threads build
+// is read in its shared memory: `watched`).
+let told = null;
+const watched = () => (progressHandle ? progress(progressHandle) : told);
 const pending = new Map();
 const startWorker = () => {
   worker = new Worker(new URL('./demo-worker.mjs', import.meta.url), { type: 'module' });
   worker.onmessage = ({ data }) => {
+    if ('watch' in data) {
+      told = data.watch;
+      return;
+    }
     if ('progress' in data) {
       onProgress?.(data.progress);
       return;
@@ -370,9 +472,11 @@ const prepareTable = async (session) => {
     }
   }
   const t0 = performance.now();
+  told = null;
+  bar(0);
   const timer = setInterval(() => {
     status(fill(TEXT.preparing, { seconds: Math.round((performance.now() - t0) / 1000) }));
-    bar(progress(progressHandle)?.generated);
+    bar(watched()?.generated);
   }, 100);
   try {
     await call('generate', { ...KINDS[kind][metric], metric });
@@ -391,7 +495,7 @@ const start = async () => {
   ready = false;
   buttons();
   status(TEXT.loading);
-  bar(undefined);
+  bar(0);
   startWorker();
   try {
     ({ cancelHandle, progressHandle } = await call('init', { threads: cores }));
@@ -536,13 +640,14 @@ const solve = async () => {
   stopping = false;
   buttons();
   const t0 = performance.now();
-  // The search tries one length after another, each several times longer than the one before,
-  // and nothing says which will be the last: the bar is the length being tried. (Most cubes
-  // take seconds; the few of 19 and 20 moves can take minutes, and lists longer.)
-  bar(undefined);
+  // (Most cubes take seconds; the few of 19 and 20 moves can take minutes, and lists longer.)
+  const estimate = new SearchBar(listing, metric, watched());
+  told = null;
+  bar(0);
   const timer = setInterval(() => {
     const s = (performance.now() - t0) / 1000;
-    const at = progress(progressHandle);
+    const at = watched();
+    bar(estimate.update(at));
     const seconds = s < 15 ? s.toFixed(1) : Math.round(s);
     if (stopping) {
       status(TEXT.stopping);
@@ -552,11 +657,11 @@ const solve = async () => {
       const length = lengthText(at.target, metric);
       status(fill(listing ? TEXT.listingLength : at.lengths > 1 ? TEXT.tryingUpTo : TEXT.trying, { length, seconds })
         + (s >= 15 && !listing ? ` ${TEXT.hard}` : ''));
-      bar(at.jobs ? at.claimed / at.jobs : 0);
     } else {
       status(fill(listing ? TEXT.listing : TEXT.solving, { seconds }) + (s >= 15 && !listing ? ` ${TEXT.hard}` : ''));
     }
-  }, 100);
+    // (often: the first lengths take milliseconds, and the bar estimates from their times)
+  }, 25);
   try {
     if (listing) {
       // Every solution of up to `find` moves more than the shortest. Stop ends a list and
@@ -572,7 +677,9 @@ const solve = async () => {
     }
   } finally {
     clearInterval(timer);
-    bar(null);
+    // (full for a moment: the search is done)
+    bar(1);
+    setTimeout(() => { if (!solving) bar(null); }, 250);
     solving = listing = false;
     buttons();
   }

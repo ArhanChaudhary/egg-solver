@@ -32,6 +32,28 @@ pub fn installed() -> bool {
     REPORTER.get().is_some()
 }
 
+/// (WebAssembly) A function to call whenever a progress number grows: in a
+/// module without threads nothing else can read the numbers while it
+/// works, so the module calls out to its host (`set_hook`).
+#[cfg(target_family = "wasm")]
+static HOOK: OnceLock<fn()> = OnceLock::new();
+
+/// (WebAssembly) Call `hook` from now on whenever a progress number grows:
+/// `Overall`'s, or the search's (`lanes::share::SEARCH_PROGRESS`). Returns
+/// false if one is set already.
+#[cfg(target_family = "wasm")]
+pub fn set_hook(hook: fn()) -> bool {
+    HOOK.set(hook).is_ok()
+}
+
+/// (WebAssembly) A progress number grew: call the hook, if one is set.
+#[cfg(target_family = "wasm")]
+pub fn notify() {
+    if let Some(hook) = HOOK.get() {
+        hook();
+    }
+}
+
 /// Report a finished step: to the reporter, else to stderr.
 pub fn line(line: Arguments<'_>) {
     match REPORTER.get() {
@@ -57,17 +79,21 @@ pub fn advance(units: u64) {
 /// A reporter that keeps one number for a progress bar: how far a whole
 /// generation is, in permille, as an atomic that another thread can read
 /// (a page reads it in the WebAssembly module's shared memory while the
-/// module's thread generates).
+/// module's thread generates; without threads, `set_hook`'s hook is called
+/// whenever it grows).
 ///
-/// A step's share of the whole is told by its name, with shares measured
-/// on h4 tables (2026-11-25, 8 threads, seconds: HTM base 8: prefix 0.6,
-/// then two passes of 0.7 and 3.2; QTM base 10: 7.7, then 8.6 and 22.3):
-/// - `prefix depth D of P` (`gen::dfs`'s prefix): the first 160
-///   permille, each level ten times the one before;
+/// A step's share of the whole is told by its name, and the shares by
+/// `Shares` (`reset`):
+/// - `prefix depth D of P` and `prefix merge D of P` (`gen::dfs`'s prefix:
+///   each level expanded, then its parts merged), then `prefix index` (a
+///   set of its last two levels): together the first `Shares::prefix`
+///   permille, the index the last `Shares::index` of it, and of the rest
+///   each level ten times the one before, split between expansion and
+///   merge by `Shares::expand`;
 /// - `... depth D of L` (the BFS of h0 and h11): everything, each level
 ///   eight times the one before;
-/// - any other name: a pass of `gen::dfs`: the first up to 350, the
-///   second to the end.
+/// - any other name: a pass of `gen::dfs`: the first up to
+///   `Shares::first_pass`, the second to the end.
 #[derive(Default)]
 pub struct Overall {
     permille: AtomicU32,
@@ -78,12 +104,42 @@ pub struct Overall {
     done: AtomicU64,
     /// `gen::dfs` passes started.
     passes: AtomicU32,
+    /// `Shares`, packed: prefix, expand and first pass (permille each).
+    shares: AtomicU64,
 }
 
-/// The prefix's share of a `gen::dfs` generation, and where its first pass
-/// ends (permille).
-const PREFIX_END: f64 = 160.0;
-const FIRST_PASS_END: u32 = 350;
+/// How a `gen::dfs` generation's time divides, in permille (`Overall`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Shares {
+    /// Where the prefix ends.
+    pub prefix: u32,
+    /// Of the prefix: the share of its index.
+    pub index: u32,
+    /// Of each prefix level: the share of its expansion (the rest is the
+    /// merge of its parts).
+    pub expand: u32,
+    /// Where the first pass ends.
+    pub first_pass: u32,
+}
+
+impl Shares {
+    fn pack(self) -> u64 {
+        u64::from(self.prefix)
+            | u64::from(self.expand) << 16
+            | u64::from(self.first_pass) << 32
+            | u64::from(self.index) << 48
+    }
+
+    fn unpack(word: u64) -> Shares {
+        let field = |shift: u32| u32::try_from(word >> shift & 0xffff).unwrap_or(0);
+        Shares {
+            prefix: field(0),
+            expand: field(16),
+            first_pass: field(32),
+            index: field(48),
+        }
+    }
+}
 
 /// `(index, count)` of a step named `... <word> D of L`.
 fn level(name: &str, word: &str) -> Option<(u32, u32)> {
@@ -118,21 +174,23 @@ impl Overall {
             total: AtomicU64::new(0),
             done: AtomicU64::new(0),
             passes: AtomicU32::new(0),
+            shares: AtomicU64::new(0),
         }
     }
 
-    /// A generation starts: back to 0.
-    pub fn reset(&self) {
+    /// A generation starts, with these shares: back to 0.
+    pub fn reset(&self, shares: Shares) {
         for word in [&self.permille, &self.from, &self.to, &self.passes] {
             word.store(0, Relaxed);
         }
         self.total.store(0, Relaxed);
         self.done.store(0, Relaxed);
+        self.shares.store(shares.pack(), Relaxed);
     }
 
     /// The generation ended: 1000.
     pub fn finish(&self) {
-        self.permille.store(1000, Relaxed);
+        self.set(1000);
     }
 
     /// How far the generation is, 0 to 1000 (it never goes back).
@@ -140,32 +198,58 @@ impl Overall {
     pub fn permille(&self) -> &AtomicU32 {
         &self.permille
     }
+
+    /// At least `value` permille done.
+    fn set(&self, value: u32) {
+        let before = self.permille.fetch_max(value, Relaxed);
+        #[cfg(target_family = "wasm")]
+        if value > before {
+            notify();
+        }
+        #[cfg(not(target_family = "wasm"))]
+        let _ = before;
+    }
 }
 
 impl Reporter for &'static Overall {
     fn line(&self, _: &str) {}
 
     fn start(&self, name: &str, total: u64) {
-        let (from, to) = if let Some((index, count)) = level(name, "prefix depth ") {
-            (
-                level_end(index - 1, count, 10.0, PREFIX_END),
-                level_end(index, count, 10.0, PREFIX_END),
-            )
+        let shares = Shares::unpack(self.shares.load(Relaxed));
+        // (Where the levels end and the index starts.)
+        let levels_end = shares.prefix - shares.prefix * shares.index / 1000;
+        let prefix = f64::from(levels_end);
+        // (The prefix levels: where each starts and ends, and where its expansion ends.)
+        let prefix_level = |index: u32, count: u32| {
+            let (from, to) = (
+                level_end(index - 1, count, 10.0, prefix),
+                level_end(index, count, 10.0, prefix),
+            );
+            (from, from + (to - from) * shares.expand / 1000, to)
+        };
+        let (from, to) = if name == "prefix index" {
+            (levels_end, shares.prefix)
+        } else if let Some((index, count)) = level(name, "prefix depth ") {
+            let (from, expanded, _) = prefix_level(index, count);
+            (from, expanded)
+        } else if let Some((index, count)) = level(name, "prefix merge ") {
+            let (_, expanded, to) = prefix_level(index, count);
+            (expanded, to)
         } else if let Some((index, count)) = level(name, " depth ") {
             (
                 level_end(index - 1, count, 8.0, 1000.0),
                 level_end(index, count, 8.0, 1000.0),
             )
         } else if self.passes.fetch_add(1, Relaxed) == 0 {
-            (level_end(1, 1, 10.0, PREFIX_END), FIRST_PASS_END)
+            (shares.prefix, shares.first_pass)
         } else {
-            (FIRST_PASS_END, 1000)
+            (shares.first_pass, 1000)
         };
         self.from.store(from, Relaxed);
         self.to.store(to, Relaxed);
         self.total.store(total.max(1), Relaxed);
         self.done.store(0, Relaxed);
-        self.permille.fetch_max(from, Relaxed);
+        self.set(from);
     }
 
     #[expect(clippy::cast_possible_truncation, reason = "at most 1000")]
@@ -176,13 +260,13 @@ impl Reporter for &'static Overall {
         let span = u64::from(to.saturating_sub(from));
         // (`done * span` fits: both are far below 2^32.)
         let now = from + (done.saturating_mul(span) / total) as u32;
-        self.permille.fetch_max(now.min(1000), Relaxed);
+        self.set(now.min(1000));
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{Overall, Reporter};
+    use super::{Overall, Reporter, Shares};
     use std::sync::atomic::Ordering::Relaxed;
 
     /// A `gen::dfs` generation as its steps are reported: the prefix's
@@ -191,6 +275,14 @@ mod tests {
     fn overall_follows_a_dfs_generation() {
         static OVERALL: Overall = Overall::new();
         let reporter = &OVERALL;
+        let shares = Shares {
+            prefix: 200,
+            index: 200,
+            expand: 500,
+            first_pass: 350,
+        };
+        assert_eq!(Shares::unpack(shares.pack()), shares);
+        OVERALL.reset(shares);
         let read = || OVERALL.permille().load(Relaxed);
         let mut last = 0;
         let mut step = |name: &str, total: u64, at_end: u32| {
@@ -204,20 +296,29 @@ mod tests {
             assert_eq!(read(), at_end, "{name}");
             last = at_end;
         };
-        // (Each prefix level is ten times the one before: 160 / 1111 * 1, 11, 111, 1111.)
+        // (Each prefix level is ten times the one before: it ends at 160 / 1111 * 1, 11,
+        // 111, 1111; its expansion halfway.)
         step("prefix depth 1 of 4", 1, 0);
-        step("prefix depth 2 of 4", 4, 2);
-        step("prefix depth 3 of 4", 34, 16);
-        step("prefix depth 4 of 4", 333, 160);
+        step("prefix merge 1 of 4", 1, 0);
+        step("prefix depth 2 of 4", 4, 1);
+        step("prefix merge 2 of 4", 4, 2);
+        step("prefix depth 3 of 4", 34, 9);
+        step("prefix merge 3 of 4", 34, 16);
+        step("prefix depth 4 of 4", 333, 88);
+        step("prefix merge 4 of 4", 333, 160);
+        step("prefix index", 3000, 200);
         step("h4 depth 9", 3815, 350);
         step("h4 depth 10", 3815, 1000);
         reporter.line("ignored");
-        OVERALL.reset();
+        OVERALL.reset(shares);
         assert_eq!(read(), 0);
         // Units beyond a step's total (a last partial chunk) do not pass its end.
-        reporter.start("prefix depth 2 of 2", 10);
+        reporter.start("prefix merge 2 of 2", 10);
         reporter.advance(4096);
         assert_eq!(read(), 160);
+        reporter.start("prefix index", 10);
+        reporter.advance(4096);
+        assert_eq!(read(), 200);
         OVERALL.finish();
         assert_eq!(read(), 1000);
     }
@@ -228,6 +329,12 @@ mod tests {
     fn overall_follows_a_bfs_generation() {
         static OVERALL: Overall = Overall::new();
         let reporter = &OVERALL;
+        OVERALL.reset(Shares {
+            prefix: 160,
+            index: 0,
+            expand: 500,
+            first_pass: 350,
+        });
         let read = || OVERALL.permille().load(Relaxed);
         let mut ends = Vec::new();
         for depth in 1..=10 {

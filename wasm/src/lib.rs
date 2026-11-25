@@ -388,7 +388,8 @@ pub extern "C" fn egg_solver_generate(k: u32, base: u32, threads: u32, metric: u
         let corners = corners(&mut state.corners)?;
         // (The generators' steps go to `GENERATED` from now on, not to stderr.)
         egg_solver::gen::progress::install(Box::new(&GENERATED));
-        GENERATED.reset();
+        GENERATED.reset(generate_shares(metric));
+        watch_progress();
         let table = egg_solver::generate_table_metric(
             corners,
             k,
@@ -497,11 +498,64 @@ pub extern "C" fn egg_solver_search_progress_address() -> *const u32 {
         .cast::<u32>()
 }
 
+/// How a generation's time divides (`gen::progress::Shares`), measured in
+/// Bun with 8 threads on an EPYC 9V45 (2026-11-25) on h4. HTM base 8, 10 s
+/// in all: the prefix about 1 s, the first pass to 2.3 s. QTM base 10, 64
+/// s: the prefix's levels 6 s (most of it merging the last level), its
+/// index 5 s, the first pass to 25 s.
+fn generate_shares(metric: Metric) -> egg_solver::gen::progress::Shares {
+    match metric {
+        Metric::Htm => egg_solver::gen::progress::Shares {
+            prefix: PREFIX_HTM,
+            index: INDEX_HTM,
+            expand: EXPAND_HTM,
+            first_pass: FIRST_PASS_HTM,
+        },
+        Metric::Qtm => egg_solver::gen::progress::Shares {
+            prefix: PREFIX_QTM,
+            index: INDEX_QTM,
+            expand: EXPAND_QTM,
+            first_pass: FIRST_PASS_QTM,
+        },
+    }
+}
+const PREFIX_HTM: u32 = 100;
+const INDEX_HTM: u32 = 300;
+const EXPAND_HTM: u32 = 500;
+const FIRST_PASS_HTM: u32 = 225;
+const PREFIX_QTM: u32 = 170;
+const INDEX_QTM: u32 = 450;
+const EXPAND_QTM: u32 = 170;
+const FIRST_PASS_QTM: u32 = 395;
+
+#[cfg(not(wasm_threads))]
+#[link(wasm_import_module = "egg_solver")]
+unsafe extern "C" {
+    /// The host's progress function (the module without threads): called
+    /// while the module generates or searches, so that the host can read
+    /// the progress words (`egg_solver_generate_progress_address`,
+    /// `egg_solver_search_progress_address`) though nothing else runs
+    /// while the module does. The threads build has no such import:
+    /// another thread reads the words in the shared memory.
+    #[link_name = "progress"]
+    safe fn host_progress();
+}
+
+/// Call the host's progress function whenever a progress number grows
+/// (the module without threads; once).
+fn watch_progress() {
+    #[cfg(not(wasm_threads))]
+    {
+        let _ = egg_solver::gen::progress::set_hook(|| host_progress());
+    }
+}
+
 /// A search starts: nothing known yet.
 fn clear_search_progress() {
     for word in &egg_solver::lanes::share::SEARCH_PROGRESS {
         word.store(0, std::sync::atomic::Ordering::Relaxed);
     }
+    watch_progress();
 }
 
 /// List every distinct solution of one cube (a scramble or facelets, see

@@ -126,6 +126,51 @@ fn entry(corners: &Cocsep, c: Cube) -> u64 {
     corners.full_key(c)
 }
 
+/// The sorted union of the sorted, duplicate-free `parts`, without the
+/// entries that `older` says belong to an earlier level: a merge of the
+/// parts, reported as a progress step (`name`) of one unit per entry read.
+/// (It took the place of sorting the concatenated parts and then removing
+/// the old entries, which reported nothing for seconds on the last levels
+/// of the quarter-turn prefix in a browser.)
+fn merge_new(
+    parts: &[Vec<u64>],
+    older: impl Fn(&u64) -> bool,
+    name: std::fmt::Arguments<'_>,
+) -> Vec<u64> {
+    use std::cmp::Reverse;
+    let total: usize = parts.iter().map(Vec::len).sum();
+    super::progress::start(name, total as u64);
+    let mut heads: std::collections::BinaryHeap<Reverse<(u64, usize)>> = parts
+        .iter()
+        .enumerate()
+        .filter_map(|(i, part)| part.first().map(|&e| Reverse((e, i))))
+        .collect();
+    let mut at = vec![0usize; parts.len()];
+    let mut out = Vec::with_capacity(total);
+    let mut last = None;
+    let mut read = 0u64;
+    while let Some(Reverse((e, i))) = heads.pop() {
+        if let Some(&following) = parts.get(i).and_then(|part| {
+            at[i] += 1;
+            part.get(at[i])
+        }) {
+            heads.push(Reverse((following, i)));
+        }
+        if last != Some(e) {
+            last = Some(e);
+            if !older(&e) {
+                out.push(e);
+            }
+        }
+        read += 1;
+        if read.is_multiple_of(65_536) {
+            super::progress::advance(65_536);
+        }
+    }
+    super::progress::advance(read % 65_536);
+    out
+}
+
 impl Prefix {
     /// BFS on h11 entries up to `depth`: `depth + 1` levels.
     fn build(
@@ -170,9 +215,6 @@ impl Prefix {
                 out.dedup();
                 out
             })?;
-            let mut next: Vec<u64> = parts.concat();
-            next.sort_unstable();
-            next.dedup();
             // Neighbours of depth d - 1 are at depth d - 2, d - 1 or d.
             let older = |e: &u64| {
                 let lower = usize::from(d.saturating_sub(2));
@@ -181,7 +223,7 @@ impl Prefix {
                     .skip(lower)
                     .any(|l| l.binary_search(e).is_ok())
             };
-            next.retain(|e| !older(e));
+            let next = merge_new(&parts, older, format_args!("prefix merge {d} of {depth}"));
             if verbose {
                 super::progress::line(format_args!(
                     "[gen] prefix depth {d}: {} h11 entries",
@@ -191,8 +233,16 @@ impl Prefix {
             levels.push(next);
         }
         let last_two_levels = levels.iter().skip(levels.len().saturating_sub(2));
-        let mut last_two = HashSet::with_capacity(last_two_levels.clone().map(Vec::len).sum());
-        last_two.extend(last_two_levels.flatten().copied());
+        let size = last_two_levels.clone().map(Vec::len).sum();
+        let mut last_two = HashSet::with_capacity(size);
+        // (A step of its own for a progress bar: seconds in a browser.)
+        super::progress::start(format_args!("prefix index"), size as u64);
+        for level in last_two_levels {
+            for chunk in level.chunks(65_536) {
+                last_two.extend(chunk.iter().copied());
+                super::progress::advance(chunk.len() as u64);
+            }
+        }
         Ok(Prefix { levels, last_two })
     }
 }

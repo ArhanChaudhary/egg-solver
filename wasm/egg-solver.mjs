@@ -327,6 +327,9 @@ export class EggSolver {
     }
     let instanceMemory = memory;
     imports.wasi_snapshot_preview1 = wasiImports(() => instanceMemory, module);
+    // (The single-thread build calls this while it works: see `onProgress`.)
+    let solver = null;
+    imports.egg_solver = { progress: () => solver?.reportProgress() };
     const instance = await WebAssembly.instantiate(module, imports);
     instanceMemory = memory ?? instance.exports.memory;
     instance.exports._initialize?.();
@@ -339,7 +342,8 @@ export class EggSolver {
         workers.push(await startWorker(module, memory, control, slot));
       }
     }
-    return new EggSolver(instance, instanceMemory, threads, workers);
+    solver = new EggSolver(instance, instanceMemory, threads, workers);
+    return solver;
   }
 
   constructor(instance, memory, threads, workers) {
@@ -350,6 +354,27 @@ export class EggSolver {
     this.workers = workers;
     /** The loaded table's `{ k, base, bytes, metric }`, or null. */
     this.table = null;
+    /**
+     * Called with `progress`'s object (see there) whenever it moves, during
+     * `generateTable`, `solve` and `solveAll`, by the single-thread build,
+     * on this solver's own thread: nothing else can look at it while it
+     * works. The threads build never calls it: read `progress(solver.progressHandle)`
+     * from another thread instead.
+     */
+    this.onProgress = null;
+  }
+
+  /** (The module's `egg_solver.progress` import, the single-thread build: at most every 20 ms.) */
+  reportProgress() {
+    if (!this.onProgress) return;
+    const now = performance.now();
+    if (now - (this.reported ?? -Infinity) < 20) return;
+    this.reported = now;
+    this.onProgress(progress({
+      buffer: this.memory.buffer,
+      generate: this.exports.egg_solver_generate_progress_address() >>> 0,
+      search: this.exports.egg_solver_search_progress_address() >>> 0,
+    }));
   }
 
   /** The output of the last call (JSON or an error message). */

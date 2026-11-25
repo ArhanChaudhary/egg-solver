@@ -16,7 +16,9 @@ const commands = {
     const wasm = new URL(threads > 1 ? 'dist/egg-solver-threads.wasm' : 'dist/egg-solver.wasm', import.meta.url);
     solver = await EggSolver.create({ wasm, threads: threads > 1 ? threads : undefined });
     // (Shared memory of the threads build, null otherwise: with `cancelHandle` the page stops a
-    // list, in `progressHandle` it reads how far a table or a search is.)
+    // list, in `progressHandle` it reads how far a table or a search is. Without threads the
+    // solver says how far it is, and the page gets it as `watch` messages.)
+    if (!solver.progressHandle) solver.onProgress = (watch) => postMessage({ watch });
     return { threads: solver.threads, cancelHandle: solver.cancelHandle, progressHandle: solver.progressHandle };
   },
   async generate({ k, base, metric }) {

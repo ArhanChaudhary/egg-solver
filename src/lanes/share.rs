@@ -712,7 +712,7 @@ impl CubeCtx {
         }
         let (count, next) = claim_fields(self.claim.fetch_add(u64::from(chunk), AcqRel));
         #[cfg(target_family = "wasm")]
-        SEARCH_PROGRESS[2].fetch_max(next.saturating_add(chunk).min(count), Relaxed);
+        search_claimed(next.saturating_add(chunk).min(count), count);
         (next < count).then(|| (next, chunk.min(count - next)))
     }
 }
@@ -2432,6 +2432,23 @@ pub static SEARCH_PROGRESS: [AtomicU32; 4] = [
     AtomicU32::new(0),
 ];
 
+/// (WebAssembly) The permille of the current iteration's jobs claimed when
+/// the progress hook was last called (`gen::progress::notify`).
+#[cfg(target_family = "wasm")]
+static SEARCH_NOTIFIED: AtomicU32 = AtomicU32::new(0);
+
+/// (WebAssembly) `claimed` of the iteration's `jobs` are taken up: record
+/// it, and call the progress hook when another permille is done.
+#[cfg(target_family = "wasm")]
+fn search_claimed(claimed: u32, jobs: u32) {
+    SEARCH_PROGRESS[2].fetch_max(claimed, Relaxed);
+    let permille =
+        u32::try_from(u64::from(claimed) * 1000 / u64::from(jobs.max(1))).unwrap_or(1000);
+    if SEARCH_NOTIFIED.fetch_max(permille, Relaxed) < permille {
+        crate::gen::progress::notify();
+    }
+}
+
 /// Publish the (extended and sorted) jobs of the new iteration of `ctx`.
 fn finish_build(pool: &Pool, ctx: &Arc<CubeCtx>) {
     // SAFETY: as in `build`.
@@ -2470,6 +2487,8 @@ fn finish_build(pool: &Pool, ctx: &Arc<CubeCtx>) {
         SEARCH_PROGRESS[1].store(inner.phases, Relaxed);
         SEARCH_PROGRESS[2].store(0, Relaxed);
         SEARCH_PROGRESS[3].store(u32::try_from(claimed).unwrap_or(u32::MAX), Relaxed);
+        SEARCH_NOTIFIED.store(0, Relaxed);
+        crate::gen::progress::notify();
     }
     ctx.claim.store(claimed << 32, Release);
     pool.publish(ctx);
