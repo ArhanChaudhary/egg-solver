@@ -12,6 +12,7 @@ Use the native solver with a table you generate once and keep in RAM. The comman
 | Solve in the quarter-turn metric (a half turn is two moves) | [User guide: quarter-turn metric](reference/USER_GUIDE.md#quarter-turn-metric) |
 | List every optimal solution, or every solution up to a length | [User guide: all solutions](reference/USER_GUIDE.md#all-solutions) |
 | Compare measured solver performance | [Benchmarks](comparisons/README.md) |
+| See how fast egg-solver is (time and nodes per solve, ns per node) | [Speed](performance/SPEED.md) |
 | Understand lanes and parallel search | [How it works](guide/HOW_IT_WORKS.md) and [parallelism measurements](performance/PARALLELISM.md) |
 | Review correctness and safety checks | [Safety](safety/README.md) |
 

@@ -1,0 +1,11 @@
+start 10:35:37 load 3.91 6.73 7.44 avail 13631 MB
+built 10:35:50
+h6 t1 c1 10:37:09 {"type":"total","cubes":50,"wall":77.080721636,"wall_per_cube":1.54161443272,"nodes_per_cube":101966467.62,"threads":1,"lanes":24,"concurrency":1,"metric":"htm"
+h6 t4 c1 10:38:28 {"type":"total","cubes":200,"wall":78.76617556,"wall_per_cube":0.3938308778,"nodes_per_cube":101139471.485,"threads":4,"lanes":24,"concurrency":1,"metric":"htm"
+h6 t8 c1 10:39:31 {"type":"total","cubes":200,"wall":61.738646826,"wall_per_cube":0.30869323413,"nodes_per_cube":101396368.955,"threads":8,"lanes":24,"concurrency":1,"metric":"ht
+h6 t8 c0 10:40:37 {"type":"total","cubes":200,"wall":65.676851168,"wall_per_cube":0.32838425584,"nodes_per_cube":102934447.755,"threads":8,"lanes":24,"concurrency":0,"metric":"ht
+h7 t1 c1 10:41:19 {"type":"total","cubes":50,"wall":39.039908642,"wall_per_cube":0.78079817284,"nodes_per_cube":51041210.02,"threads":1,"lanes":24,"concurrency":1,"metric":"htm"}
+h7 t4 c1 10:42:01 {"type":"total","cubes":200,"wall":40.414363076,"wall_per_cube":0.20207181538,"nodes_per_cube":50938807.325,"threads":4,"lanes":24,"concurrency":1,"metric":"htm
+h7 t8 c1 10:42:34 {"type":"total","cubes":200,"wall":31.314792488,"wall_per_cube":0.15657396244,"nodes_per_cube":51144595.6,"threads":8,"lanes":24,"concurrency":1,"metric":"htm"}
+h7 t8 c0 10:43:08 {"type":"total","cubes":200,"wall":32.92194865,"wall_per_cube":0.16460974325,"nodes_per_cube":51706687.915,"threads":8,"lanes":24,"concurrency":0,"metric":"htm"
+end 10:43:08 load 7.14 6.17 6.76

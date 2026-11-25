@@ -73,6 +73,19 @@ list and prints what was found. See the
 `--load map` or shared memory, keep the backing storage unchanged while
 running. See `solve --help` and the [user guide](docs/reference/USER_GUIDE.md).
 
+## Speed
+
+Time to solve one random cube optimally, with all threads on it, and the time per search node (wall time ÷ nodes; for several threads, of the whole machine). Measured on a 48-core AMD EPYC 9V45 VM with `testdata/random_state.txt` (500 random states; the first 100 with one thread), tables copied into RAM on transparent huge pages, table loading excluded. The batch column solves all 500 at once. [Details, medians, an Apple M2 and how to measure your own machine](docs/performance/SPEED.md).
+
+| Table (GiB) | Nodes per solve (48 threads) | 1 thread | 14 threads | 48 threads | 48 threads, batch |
+|---|---:|---:|---:|---:|---:|
+| h6 (1.81) | 103.1 M | 1,223 ms · 11.58 ns/node | 84.9 ms · 0.85 ns/node | 30.9 ms · 0.30 ns/node | 34 solves/s |
+| h7 (3.62) | 52.7 M | 591 ms · 11.64 ns/node | 44.3 ms · 0.86 ns/node | 16.2 ms · 0.31 ns/node | 66 solves/s |
+| h8 (7.25) | 23.6 M | 273 ms · 11.97 ns/node | 20.4 ms · 0.88 ns/node | 7.53 ms · 0.32 ns/node | 141 solves/s |
+| h9 (14.50) | 12.1 M | 144 ms · 12.55 ns/node | 11.2 ms · 0.95 ns/node | 4.36 ms · 0.36 ns/node | 265 solves/s |
+| h10 (28.99) | 6.2 M | 81.7 ms · 13.29 ns/node | 6.29 ms · 1.05 ns/node | 2.56 ms · 0.41 ns/node | 486 solves/s |
+| h11 (58.00) | 3.5 M | 51.1 ms · 14.47 ns/node | 3.89 ms · 1.18 ns/node | 1.77 ms · 0.51 ns/node | 840 solves/s |
+
 ## Benchmarks
 
 How many times faster egg-solver is than each competitor (competitor time ÷ egg-solver time). Measured on a 48-core AMD EPYC 9V45 VM with tables resident in 1 GiB pages; table loading is excluded and each solver used its own table. Each competitor links to its study, with builds, commands and raw output.

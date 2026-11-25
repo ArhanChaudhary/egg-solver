@@ -19,6 +19,7 @@ The newest throughput study has **30 final batches × 500 states = 15,000 solves
 
 | Study | Scope | Evidence |
 |---|---|---|
+| egg-solver's own speed | Nov 25, commit `17386a2`; h6–h11, 1/8/14/48 threads and batch, two rounds; Apple M2 h6/h7 | [Speed](performance/SPEED.md), [raw runs](data/speed-20261125/README.md) |
 | Worker/lane scaling and cubeopt slots | Nov 8 CPU measurements; three-state single-cube sample | [Parallelism](performance/PARALLELISM.md), [analysis](data/nissy-throughput-20261108/analysis.json) |
 | h4 compression and cstimer table capacity | Nov 8 semantic bounds, native base-8/base-9 batches and browser generation | [Table study](comparisons/TABLE_ANALYSIS.md), [raw records](data/cubeopt-audit-20261108/README.md) |
 | Physical Xeon PMU | Separate host and older source; 242 collection runs, 621 counter rows, 6 profiles | [Counter analysis](performance/HARDWARE_COUNTERS.md), [data](data/phack/README.md) |

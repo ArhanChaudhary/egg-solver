@@ -6,6 +6,7 @@ Each study answers a specific performance question. Historical improvements use 
 
 | Study | What it measures | Result / scope |
 |---|---|---|
+| [How fast egg-solver is](SPEED.md) | Time per solve, nodes per solve and time per node, h6–h11 at 1–48 threads, and an Apple M2 | Current code (Nov 25); 500 random states; transparent huge pages |
 | [Lanes and parallelism](PARALLELISM.md) | Lane counts, cubeopt query slots, and scaling within one search | Latest production CLI screen; separate three-state scaling sample |
 | [Nissy versus egg](../comparisons/NISSY_THROUGHPUT.md) | Complete 500-state batch throughput, h6–h10 | Matched 1 GiB table pages; three final runs per solver/table |
 | [Xeon hardware counters](HARDWARE_COUNTERS.md) | Stalls, branches, memory and worker topology | Separate X5650 host and older source; not an EPYC timing comparison |
