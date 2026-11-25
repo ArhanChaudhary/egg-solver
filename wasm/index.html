@@ -45,7 +45,10 @@
   button:disabled { opacity: 0.5; cursor: default; }
   button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; padding: 0.5rem 1.3rem; min-width: 5.5rem; }
   button.link { border: 0; padding: 0; background: none; color: var(--accent); text-decoration: underline; font-size: 0.9rem; white-space: nowrap; }
-  .under { display: flex; justify-content: space-between; align-items: start; gap: 1rem; min-height: 1.5rem; margin: 0.35rem 0 1.25rem; font-size: 0.9rem; }
+  .options { display: flex; gap: 0.5rem; margin: 0.5rem 0 0; font-size: 0.9rem; }
+  select { flex: 0 1 auto; min-width: 0; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 0.2rem 0.3rem; }
+  select:disabled { opacity: 0.5; }
+  .under { display: flex; justify-content: space-between; align-items: start; gap: 1rem; min-height: 1.5rem; margin: 0.4rem 0 1rem; font-size: 0.9rem; }
   .under .links { display: flex; gap: 1rem; margin-left: auto; }
   #status.bad { color: var(--bad); }
   .hint { text-align: center; font-size: 0.9rem; margin: 0.75rem 0 0; }
@@ -60,6 +63,11 @@
   #play .pause, #play.playing .play { display: none; }
   #play.playing .pause { display: block; }
   .summary { text-align: center; margin: 0.75rem 0 0; }
+  .list { list-style: none; margin: 0.75rem 0 0; padding: 0; max-height: 14rem; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; font-family: ui-monospace, monospace; font-size: 0.9rem; }
+  .list button { display: flex; gap: 0.75rem; width: 100%; text-align: left; border: 0; border-radius: 0; padding: 0.25rem 0.6rem; }
+  .list button[aria-current=true] { background: color-mix(in srgb, var(--accent) 16%, var(--bg)); }
+  .list .n { flex: none; min-width: 2.2rem; text-align: right; color: var(--muted); }
+  .about { text-align: center; font-size: 0.9rem; margin: 0.5rem 0 0; }
 </style>
 </head>
 <body>
@@ -73,6 +81,18 @@
   <input id="scramble" type="text" aria-label="Scramble" placeholder="Scramble, e.g. R U R' U' F2 D L2 B'" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false">
   <button id="solve" class="primary" disabled>Solve</button>
 </form>
+<div class="options">
+  <select id="metric" aria-label="How moves are counted" title="How moves are counted: a half turn such as U2 is one move, or two quarter turns">
+    <option value="htm">Half-turn metric</option>
+    <option value="qtm">Quarter-turn metric</option>
+  </select>
+  <select id="find" aria-label="Which solutions to find" title="Which solutions to find: the shortest is not always the easiest to turn">
+    <option value="one">One shortest solution</option>
+    <option value="0">All shortest solutions</option>
+    <option value="1">All up to 1 move longer</option>
+    <option value="2">All up to 2 moves longer</option>
+  </select>
+</div>
 <div class="under">
   <span id="status" role="status" class="muted"></span>
   <span class="links">
@@ -97,12 +117,15 @@
     <input id="step" type="range" min="0" max="1" step="1" value="0" aria-label="Moves done">
   </div>
   <p id="summary" class="summary"></p>
+  <ol id="list" class="list" hidden aria-label="The solutions found: choose one to replay it"></ol>
+  <p id="about" class="about muted" hidden></p>
 </section>
 
 <script type="module">
 import { FACES, SOLVED, applyMove, applyMoves, formatMoves, isSolved, moveName, parseMoves } from './cube-model.mjs';
 import { COLOURS, COLOUR_NAMES, CubeInput } from './cube-input.mjs';
 import { Cube3D } from './cube-3d.mjs';
+import { cancel } from './egg-solver.mjs';
 
 const $ = (id) => document.getElementById(id);
 const field = $('scramble');
@@ -112,11 +135,51 @@ const status = (text, bad = false) => {
   $('status').classList.toggle('muted', !bad);
 };
 
-// --- The solving data: a pruning table hk (with its base, for h4) ---
+// --- The two choices: how moves are counted, and which solutions to find ---
+const saved = (name, values) => {
+  try {
+    const value = localStorage.getItem(name);
+    return values.includes(value) ? value : values[0];
+  } catch {
+    return values[0];
+  }
+};
+const remember = (name, value) => {
+  try {
+    localStorage.setItem(name, value);
+  } catch { /* (for this visit only) */ }
+};
+// 'htm': every turn is one move; 'qtm': a half turn is two (it has tables of its own).
+let metric = saved('egg-solver-metric', ['htm', 'qtm']);
+$('metric').value = metric;
+// 'one' shortest solution, or every solution of up to that many moves more than the shortest.
+// In quarter turns all solutions of a cube are odd or all are even, so the next longer ones
+// are 2 longer: 1 more would list nothing new, and is not offered there.
+const FIND = {
+  htm: [['one', 'One shortest solution'], ['0', 'All shortest solutions'], ['1', 'All up to 1 move longer'], ['2', 'All up to 2 moves longer']],
+  qtm: [['one', 'One shortest solution'], ['0', 'All shortest solutions'], ['2', 'All up to 2 quarter turns longer']],
+};
+/** Offer the metric's choices, with `wanted` chosen (or what stands for it in this metric). */
+const offerFinds = (wanted) => {
+  const values = FIND[metric].map(([value]) => value);
+  $('find').replaceChildren(...FIND[metric].map(([value, text]) => new Option(text, value)));
+  $('find').value = values.includes(wanted) ? wanted : wanted === '1' ? '2' : 'one';
+};
+offerFinds(saved('egg-solver-find', ['one', '0', '1', '2']));
+$('find').onchange = () => remember('egg-solver-find', $('find').value);
+const lengthText = (n, m) => `${n} ${m === 'qtm' ? 'quarter turn' : 'move'}${n === 1 ? '' : 's'}`;
+
+// --- The solving data: a pruning table hk (with its base) for each metric ---
 // Laptops and desktops get h4 of base 8 (464 MiB, about ten seconds to make); phones, tablets
 // and devices with little memory h3 (232 MiB). One that cannot be made falls back to a smaller
-// one. A made table is kept in IndexedDB, so later visits load it in about a second.
-const KINDS = { '4:8': { k: 4, base: 8 }, 3: { k: 3, base: 0 }, 2: { k: 2, base: 0 }, 0: { k: 0, base: 0 } };
+// one. The quarter-turn tables have base 10 and take about a minute and a half to make, whatever
+// their size. A made table is kept in IndexedDB, so later visits load it in about a second.
+const KINDS = {
+  '4:8': { htm: { k: 4, base: 8 }, qtm: { k: 4, base: 10 } },
+  3: { htm: { k: 3, base: 0 }, qtm: { k: 3, base: 10 } },
+  2: { htm: { k: 2, base: 0 }, qtm: { k: 2, base: 10 } },
+  0: { htm: { k: 0, base: 0 }, qtm: { k: 0, base: 0 } },
+};
 const SMALLER = { '4:8': '3', 3: '2', 2: '0' };
 // (iPadOS Safari says it is a Mac.)
 const handheld = navigator.userAgentData?.mobile
@@ -128,7 +191,7 @@ let kind = handheld ? '3' : '4:8';
 
 const DB = 'egg-solver';
 const STORE = 'tables';
-const key = (t) => `${t}-v1`;
+const key = (t, m) => (m === 'qtm' ? `${t}-qtm-v1` : `${t}-v1`);
 const db = () => new Promise((resolve, reject) => {
   const r = indexedDB.open(DB, 1);
   r.onupgradeneeded = () => r.result.createObjectStore(STORE);
@@ -143,20 +206,20 @@ const store = async (mode, f) => {
     r.onerror = () => reject(r.error);
   });
 };
-const cached = (t) => store('readonly', (s) => s.get(key(t))).catch(() => undefined);
-const keep = (t, blob) => store('readwrite', (s) => s.put(blob, key(t)));
-const forget = (t) => store('readwrite', (s) => s.delete(key(t))).catch(() => undefined);
+const cached = (name) => store('readonly', (s) => s.get(name)).catch(() => undefined);
+const keep = (name, blob) => store('readwrite', (s) => s.put(blob, name));
+const forget = (name) => store('readwrite', (s) => s.delete(name)).catch(() => undefined);
 /** Delete the tables that this page does not use (other kinds that earlier versions of it kept). */
 const tidy = () => store('readwrite', (s) => {
   const keys = s.getAllKeys();
   keys.addEventListener('success', () => {
-    for (const k of keys.result) if (k !== key(kind)) s.delete(k);
+    for (const k of keys.result) if (k !== key(kind, 'htm') && k !== key(kind, 'qtm')) s.delete(k);
   });
   return keys;
 }).catch(() => undefined);
 try {
   // (settings of earlier versions of this page)
-  for (const name of ['tables', 'metric', 'input', 'colours', 'cube']) localStorage.removeItem(`egg-solver-${name}`);
+  for (const name of ['tables', 'input', 'colours', 'cube']) localStorage.removeItem(`egg-solver-${name}`);
 } catch { /* (blocked storage: nothing to remove) */ }
 
 // --- The solver worker (demo-worker.mjs) ---
@@ -195,10 +258,15 @@ const call = (cmd, args = {}) => new Promise((resolve, reject) => {
 
 let ready = false;
 let solving = false;
+// A list is being made; the threads build's cancel word (shared memory) stops one and keeps
+// what it found (null without threads).
+let listing = false;
+let stopping = false;
+let cancelHandle = null;
 const buttons = () => {
   $('solve').textContent = solving ? 'Stop' : 'Solve';
   $('solve').disabled = !ready && !solving;
-  $('random').disabled = field.readOnly = solving;
+  $('random').disabled = $('metric').disabled = $('find').disabled = field.readOnly = solving;
 };
 
 // Each start is a session; one that a newer start replaced stops at its next step.
@@ -209,7 +277,8 @@ const current = (session) => {
 
 /** The table from IndexedDB, else made here (and then kept). */
 const prepareTable = async (session) => {
-  const blob = await cached(kind);
+  const name = key(kind, metric);
+  const blob = await cached(name);
   current(session);
   if (blob) {
     onProgress = (share) => status(`Loading… ${Math.round(100 * share)}%`);
@@ -219,7 +288,7 @@ const prepareTable = async (session) => {
     } catch (e) {
       // (a stopped worker, or no room for the table: keep it; a damaged copy: make it again)
       if (e.message === 'restarted' || e.message === 'stopped' || /room|memory/i.test(e.message)) throw e;
-      await forget(kind);
+      await forget(name);
     } finally {
       onProgress = null;
     }
@@ -227,13 +296,12 @@ const prepareTable = async (session) => {
   const t0 = performance.now();
   const timer = setInterval(() => status(`Getting ready (first visit only)… ${Math.round((performance.now() - t0) / 1000)} s`), 250);
   try {
-    await call('generate', { k: KINDS[kind].k, base: KINDS[kind].base, metric: 'htm' });
+    await call('generate', { ...KINDS[kind][metric], metric });
   } finally {
     clearInterval(timer);
   }
   // Keep it for the next visit (in the background; a failure only costs making it again).
-  const made = kind;
-  call('export').then((file) => keep(made, file)).catch(() => undefined);
+  call('export').then((file) => keep(name, file)).catch(() => undefined);
 };
 
 /** Start the solver with every core the page may use, and its table. */
@@ -246,21 +314,21 @@ const start = async () => {
   status('Loading…');
   startWorker();
   try {
-    await call('init', { threads: cores });
+    ({ cancelHandle } = await call('init', { threads: cores }));
   } catch (e) {
     // (the threads build could not start: one thread)
     if (cores <= 1 || e.message === 'restarted') throw e;
     current(session);
     stopWorker('restarted');
     startWorker();
-    await call('init', { threads: 1 });
+    ({ cancelHandle } = await call('init', { threads: 1 }));
   }
   try {
     await prepareTable(session);
   } catch (e) {
     const next = SMALLER[kind];
     if (!next || e.message === 'restarted' || e.message === 'stopped') throw e;
-    console.warn(`the h${KINDS[kind].k} table:`, e);
+    console.warn(`the h${KINDS[kind][metric].k} table:`, e);
     kind = next;
     return start();
   }
@@ -274,9 +342,17 @@ const run = (f) => f().catch((e) => {
   // (a solve stopped by ending the worker, or a start that a new one replaced)
   if (e.message === 'stopped' || e.message === 'restarted') return;
   status(`Something went wrong: ${e.message}`, true);
-  solving = false;
+  solving = listing = false;
   buttons();
 });
+// Another way to count: that metric's table.
+$('metric').onchange = () => {
+  metric = $('metric').value;
+  remember('egg-solver-metric', metric);
+  offerFinds($('find').value);
+  edit();
+  run(start);
+};
 
 // --- The cube to solve: what the scramble makes, or what was painted ---
 const net = new CubeInput($('net'), {
@@ -352,6 +428,8 @@ const showProblem = (problem) => {
 };
 
 // --- Solving ---
+// A list holds at most this many solutions (and says so when there are more).
+const MAX_LIST = 2000;
 const seconds = (s) => (s < 0.1 ? `${Math.max(1, Math.round(1000 * s))} ms` : s < 10 ? `${s.toFixed(1)} s` : `${Math.round(s)} s`);
 const solve = async () => {
   if (field.getAttribute('aria-invalid')) {
@@ -368,31 +446,52 @@ const solve = async () => {
     status('This cube is already solved.');
     return;
   }
+  const find = $('find').value;
   solving = true;
+  listing = find !== 'one';
+  stopping = false;
   buttons();
   const t0 = performance.now();
-  // (most cubes take seconds; the few of 19 and 20 moves can take minutes)
+  // (most cubes take seconds; the few of 19 and 20 moves can take minutes, and lists longer)
   const timer = setInterval(() => {
     const s = (performance.now() - t0) / 1000;
-    status(s < 15 ? `Solving… ${s.toFixed(1)} s` : `Solving… ${Math.round(s)} s (a hard cube: these can take minutes)`);
+    const doing = listing ? 'Listing' : 'Solving';
+    status(stopping ? 'Stopping…'
+      : s < 15 ? `${doing}… ${s.toFixed(1)} s`
+        : `${doing}… ${Math.round(s)} s${listing ? '' : ' (a hard cube: these can take minutes)'}`);
   }, 100);
   try {
-    const r = await call('solve', { cube, lanes: 0, metric: 'htm' });
-    status('');
-    showSolution(cube, parseMoves(r.moves) ?? [], r.wall);
+    if (listing) {
+      // Every solution of up to `find` moves more than the shortest. Stop ends a list and
+      // keeps what it found; without threads nothing can reach a running list, so it gets a
+      // minute.
+      const r = await call('solveAll', { cube, plus: Number(find), maxSolutions: MAX_LIST, timeLimit: cancelHandle ? undefined : 60, metric });
+      status('');
+      showSolutions(cube, r.solutions, r);
+    } else {
+      const r = await call('solve', { cube, lanes: 0, metric });
+      status('');
+      showSolutions(cube, [r], { ...r, optimal: r.length });
+    }
   } finally {
     clearInterval(timer);
-    solving = false;
+    solving = listing = false;
     buttons();
   }
 };
 $('form').addEventListener('submit', (e) => {
   e.preventDefault();
-  if (solving) {
-    // A solve cannot be interrupted inside the module: end the worker and start a new one (the
-    // table comes back from this browser's storage).
+  if (solving && listing && cancelHandle) {
+    // A list on the threads build: ask it to stop. (The module clears the word when a list
+    // starts, so ask again until the reply is there.)
+    stopping = true;
+    cancel(cancelHandle);
+    const again = setInterval(() => (listing ? cancel(cancelHandle) : clearInterval(again)), 100);
+  } else if (solving) {
+    // Otherwise a solve cannot be interrupted inside the module: end the worker and start a new
+    // one (the table comes back from this browser's storage).
     stopWorker('stopped');
-    solving = false;
+    solving = listing = false;
     run(start);
   } else if (ready) {
     run(solve);
@@ -453,7 +552,12 @@ const play = async () => {
 $('play').onclick = () => (replay.playing ? jump(replay.at) : play());
 $('step').addEventListener('input', () => jump(Number($('step').value)));
 
-const showSolution = (cube, moves, wall) => {
+let found = null; // { cube, items: [{ moves, length }], about: the solver's reply, list: it was asked for a list }
+
+/** Put solution `index` of those found on the 3D cube, at its start. */
+const choose = (index) => {
+  const { cube, items, about, list } = found;
+  const { moves, length } = items[index];
   const states = [cube];
   for (const move of moves) states.push(applyMove(states.at(-1), move));
   replay = { states, moves, at: 0, playing: false };
@@ -466,12 +570,54 @@ const showSolution = (cube, moves, wall) => {
     return b;
   }));
   $('step').max = moves.length;
-  $('summary').textContent = `${moves.length} move${moves.length === 1 ? '' : 's'} · shortest possible · ${seconds(wall)}`;
+  const rank = length === about.optimal ? 'shortest possible' : `${length - about.optimal} more than the shortest`;
+  $('summary').textContent = list && items.length > 1
+    ? `Solution ${index + 1} of ${items.length} · ${lengthText(length, about.metric)} · ${rank}`
+    : `${lengthText(length, about.metric)} · ${rank}${list ? '' : ` · ${seconds(about.wall)}`}`;
+  [...$('list').children].forEach((li, i) => li.firstChild.setAttribute('aria-current', String(i === index)));
+  jump(0);
+};
+
+/** Show what a solve found: one solution, or a list to choose from; the first one plays once. */
+const showSolutions = (cube, solutions, about) => {
+  const list = Array.isArray(about.solutions);
+  const items = solutions.map((x) => ({ moves: parseMoves(x.moves) ?? [], length: x.length }));
+  if (!items.length) {
+    // (only a stopped list is empty: a finished one has the shortest solutions)
+    status(`Stopped before a solution was found: there is none of ${lengthText(about.complete_length, about.metric)} or fewer.`);
+    return;
+  }
+  found = { cube, items, about, list };
+  $('list').replaceChildren(...(items.length > 1 ? items : []).map((x, i) => {
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.type = 'button';
+    const n = document.createElement('span');
+    n.className = 'n';
+    n.textContent = `${i + 1}.`;
+    b.append(n, formatMoves(x.moves));
+    b.onclick = () => choose(i);
+    li.append(b);
+    return li;
+  }));
+  $('list').hidden = items.length < 2;
+  $('list').scrollTop = 0;
+  if (list) {
+    // (how many of each length, if of several; what a stopped or cut list is missing)
+    const lengths = about.by_length.length > 1
+      ? `: ${about.by_length.map((x) => `${x.count} of ${lengthText(x.length, about.metric)}`).join(', ')}` : '';
+    const upTo = `it has every one of up to ${lengthText(about.complete_length, about.metric)}`;
+    $('about').textContent = `${items.length} solution${items.length === 1 ? '' : 's'}${lengths} · ${seconds(about.wall)}`
+      + (about.truncated ? ` · there are more than ${MAX_LIST}: ${upTo}` : '')
+      + (about.stopped ? ` · stopped early: ${upTo}` : '');
+  }
+  $('about').hidden = !list;
   $('edit').hidden = true;
   $('solution').hidden = $('change').hidden = false;
-  jump(0);
-  if (!isSolved(states.at(-1))) {
-    status('This solution failed its check: please report this cube.', true);
+  choose(0);
+  const wrong = items.filter((x) => !isSolved(applyMoves(cube, x.moves))).length;
+  if (wrong) {
+    status(`${wrong === 1 && items.length === 1 ? 'This solution' : `${wrong} of these solutions`} failed the check: please report this cube.`, true);
     return;
   }
   // (a moment to see the scrambled cube, then the solution plays once)
@@ -482,7 +628,7 @@ const showSolution = (cube, moves, wall) => {
 const edit = () => {
   if (!replay) return;
   replay.playing = false;
-  replay = null;
+  replay = found = null;
   cube3d.show(SOLVED);
   $('solution').hidden = $('change').hidden = true;
   $('edit').hidden = false;
