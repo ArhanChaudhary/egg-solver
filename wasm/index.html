@@ -151,9 +151,7 @@ const TEXT = {
   preparing: 'Getting ready (first visit only)… {seconds} s', // 29
   trying: 'Trying {length}… {seconds} s', // 30
   tryingUpTo: 'Trying up to {length}… {seconds} s', // 31
-  solving: 'Solving… {seconds} s', // 32
   listingLength: 'Listing solutions of {length}… {seconds} s', // 33
-  listing: 'Listing… {seconds} s', // 34
   hard: '(a hard cube: these can take minutes)', // 35
   stopping: 'Stopping…', // 36
   notScramble: "That is not a scramble: use the letters U R F D L B, each alone or followed by ' or 2.", // 37
@@ -261,14 +259,21 @@ class SearchBar {
     this.stale = stale ? JSON.stringify(stale) : null;
   }
 
+  /** Whether `at` is this search's (not the last search's, still there until this one starts). */
+  live(at) {
+    if (!at?.target) return false;
+    if (this.stale !== null) {
+      if (JSON.stringify(at) === this.stale) return false;
+      this.stale = null;
+    }
+    return true;
+  }
+
   /** The share to show, after the solver says `at` (or nothing yet). */
   update(at) {
     const now = performance.now();
     if (!at?.target) return this.shown;
-    if (this.stale !== null) {
-      if (JSON.stringify(at) === this.stale) return this.shown;
-      this.stale = null;
-    }
+    if (!this.live(at)) return this.shown;
     const taken = at.jobs ? Math.min(1, at.claimed / at.jobs) : 0;
     let cur = this.lengths.at(-1);
     if (!cur || cur.target !== at.target) {
@@ -653,12 +658,13 @@ const solve = async () => {
       status(TEXT.stopping);
       return;
     }
-    if (at?.target) {
+    // (Until the search has started on a length the line stays empty: the bar is there.)
+    if (estimate.live(at)) {
       const length = lengthText(at.target, metric);
       status(fill(listing ? TEXT.listingLength : at.lengths > 1 ? TEXT.tryingUpTo : TEXT.trying, { length, seconds })
         + (s >= 15 && !listing ? ` ${TEXT.hard}` : ''));
     } else {
-      status(fill(listing ? TEXT.listing : TEXT.solving, { seconds }) + (s >= 15 && !listing ? ` ${TEXT.hard}` : ''));
+      status('');
     }
     // (often: the first lengths take milliseconds, and the bar estimates from their times)
   }, 25);
